@@ -383,6 +383,17 @@ ul.regles { margin: 0; padding-left: 18px; display: grid; gap: 8px; color: var(-
 .ico-k.gris { stroke: var(--muted, #9fb2c8); }
 .btn.btn-ico { padding: 7px 9px; display: grid; place-items: center; }
 .reglages .version { color: var(--muted); font-size: 12px; text-align: center; }
+/* Réactions et fiche joueur */
+#btnReactions { display: none; }
+body.en-jeu #btnReactions { display: grid; }
+.reactions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.reactions button { font-size: 26px; padding: 10px 0; }
+.reactions button.phrase { grid-column: span 2; font-size: 15px; }
+.bulle.reaction { font-size: 26px; }
+.liste-k { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.liste-k li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; }
+.liste-k small { color: var(--muted); }
+.siege.cliquable { cursor: pointer; }
 /* Tutoriel */
 .tuto { display: grid; gap: 12px; }
 .tuto-etapes { display: flex; gap: 4px; }
@@ -413,6 +424,7 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
     <div class="vocal" id="vocal" hidden></div>
     <button class="btn" id="btnPleinEcranEntete" hidden title="Plein écran" aria-label="Plein écran">⛶</button>
     <button class="btn btn-ico" id="btnParametres" title="Paramètres" aria-label="Paramètres"><svg class="ico-k" viewBox="0 0 32 32" aria-hidden="true"><rect x="8" y="4" width="16" height="24" rx="2.5"/><path d="M12 10h8M12 16h8M12 22h8"/><circle cx="15" cy="10" r="1.8" class="fond"/><circle cx="18.5" cy="16" r="1.8" class="fond"/><circle cx="14" cy="22" r="1.8" class="acc"/></svg></button>
+    <button class="btn btn-ico" id="btnReactions" title="Réactions" aria-label="Envoyer une réaction"><svg class="ico-k" viewBox="0 0 32 32" aria-hidden="true"><rect x="9" y="4" width="14" height="20" rx="2.5"/><path d="M13 24l-3 5 7-5"/><path d="M13 11h6M13 16h4"/><circle cx="20.5" cy="16" r="1.6" class="acc"/></svg></button>
     <button class="btn" id="btnQuitter" hidden>Quitter</button>
   </header>
   <div class="bandeau" id="bandeau" hidden></div>
@@ -4418,6 +4430,8 @@ var qrcode = function() {
     ordre.forEach((id) => {
       const d = el('div', 'siege');
       d.dataset.id = id;
+      const jj = v.joueurs.find((j) => j.id === id) || {};
+      if (id !== v.moi && !jj.robot) { d.classList.add('cliquable'); d.onclick = () => ficheJoueur(id, jj.nom); }
       if (pause && pause.annonce && pause.annonce.meneur === id) d.classList.add('meneur');
       const k = autres.indexOf(id);
       if (k >= 0) {
@@ -4795,9 +4809,17 @@ var qrcode = function() {
     const ps = el('input', 'texte'); ps.maxLength = 16; ps.value = stock.lire('kopo-pseudo') || ''; ps.placeholder = 'Ex. Mundyo'; ps.setAttribute('aria-label', 'Pseudo');
     ps.onchange = () => { const p = ps.value.trim(); if (p.length >= 3) { stock.ecrire('kopo-pseudo', p); if ($('pseudo')) $('pseudo').value = p; toast('Pseudo enregistré. Il servira à ta prochaine partie.'); } else toast('Le pseudo fait au moins 3 caractères.'); };
     ligne('Pseudo', null, ps).style.flexWrap = 'wrap';
+    if (compteLocal()) {
+      const c = compteLocal();
+      ligne('Ton identifiant', 'À donner à tes amis', el('b', null, c.compte.pseudo + '#' + c.compte.numero));
+      const amis = el('button', 'btn', 'Mes amis'); amis.onclick = ouvrirAmis;
+      const bl = el('button', 'btn', 'Joueurs bloqués'); bl.onclick = ouvrirBloques;
+      z.append(amis, bl);
+    }
     ligne('Connexion Google ou téléphone', 'Bientôt : pour garder tes pièces sur tous tes téléphones', iconeCadenas()).classList.add('bientot');
     const supprimer = el('button', 'btn', 'Supprimer mon compte');
-    supprimer.onclick = () => demanderConfirmation('Ton pseudo, tes pièces d\'essai, tes statistiques et tes réglages seront effacés de ce téléphone. C\'est définitif.', () => {
+    supprimer.onclick = () => demanderConfirmation('Ton pseudo, tes pièces d\'essai, tes statistiques et tes réglages seront effacés de ce téléphone. C\'est définitif.', async () => {
+      if (compteLocal()) await apiJoueur('/moi', 'DELETE').catch(() => {});
       try { Object.keys(localStorage).filter((k) => k.startsWith('kopo')).forEach((k) => localStorage.removeItem(k)); sessionStorage.clear(); } catch (e) {}
       location.reload();
     }, { titre: 'Supprimer ?', oui: 'Oui, tout supprimer' });
@@ -4817,6 +4839,138 @@ var qrcode = function() {
     ouvrirFenetre([el('h2', null, 'Paramètres'), z, fermer]);
   }
   window.ouvrirParametres = ouvrirParametres;
+
+  // ------------------------------------------------------------------ entre joueurs
+  // Réactions rapides en partie, fiche d'un joueur (ami, bloquer, signaler), amis et bloqués.
+  // Les comptes n'existent qu'en mode serveur : sans serveur, seules les réactions marchent.
+  const REACTIONS = ['👏', '😂', '😮', '🔥', '😡', '👍', '😭', '🙏', 'Bien joué !', 'Vite !', 'Katapss !', 'Oups !'];
+  const compteLocal = () => { const c = stock.lire('kopo-compte-serveur'); return c && c.jeton ? c : null; };
+  async function apiJoueur(chemin, methode = 'GET', corps) {
+    const c = compteLocal();
+    if (!c) throw new Error('Il faut un compte en ligne.');
+    const r = await fetch(c.serveur + '/api' + chemin, { method: methode, headers: { 'content-type': 'application/json', authorization: 'Bearer ' + c.jeton }, body: corps ? JSON.stringify(corps) : undefined });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.erreur || 'Le serveur ne répond pas.');
+    return j;
+  }
+  let bloques = new Set(stock.lire('kopo-bloques') || []);
+  const memoriserBloques = () => stock.ecrire('kopo-bloques', [...bloques]);
+  async function majBloques() { if (!compteLocal()) return; try { bloques = new Set((await apiJoueur('/bloques')).map((b) => b.id)); memoriserBloques(); } catch (e) {} }
+
+  $('btnReactions').onclick = () => {
+    const z = el('div', 'reactions');
+    for (const r of REACTIONS) {
+      const b = el('button', 'btn' + (r.length > 2 ? ' phrase' : ''), r);
+      b.onclick = () => { fermerFenetre(); if (window.kopoReaction) window.kopoReaction(r); };
+      z.append(b);
+    }
+    const f = el('button', 'btn large', 'Fermer'); f.onclick = () => { fermerFenetre(); if (vueActuelle) afficher(vueActuelle); };
+    ouvrirFenetre([el('h2', null, 'Réagir'), z, f]);
+  };
+  window.addEventListener('kopo-reaction', (e) => {
+    const d = e.detail || {};
+    if (!d.joueur || bloques.has(d.joueur)) return;
+    const r = siegeEl(d.joueur) && rectSiege(d.joueur);
+    if (!r || !visible(r)) return;
+    const b = el('div', 'bulle reaction', String(d.emoji || '').slice(0, 16));
+    b.style.left = r.left + r.width / 2 + 'px'; b.style.top = r.top + r.height / 2 + 'px';
+    calque.append(b);
+    if (sansAnim) { b.style.transform = 'translate(-50%, -110%)'; setTimeout(() => b.remove(), 2200); return; }
+    b.animate([
+      { transform: 'translate(-50%, -50%) scale(.2)', opacity: 0 },
+      { transform: 'translate(-50%, -100%) scale(1.25)', opacity: 1, offset: 0.15 },
+      { transform: 'translate(-50%, -115%) scale(1)', opacity: 1, offset: 0.85 },
+      { transform: 'translate(-50%, -150%) scale(.9)', opacity: 0 },
+    ], { duration: 2400, easing: 'ease-out' }).onfinish = () => b.remove();
+  });
+
+  const MOTIFS = [['insultes', 'Insultes ou propos haineux'], ['pseudo', 'Pseudo inacceptable'], ['triche', 'Triche'], ['abandon', 'Quitte les parties'], ['autre', 'Autre']];
+  function ficheJoueur(id, nomJoueur) {
+    const contenu = [el('h2', null, nomJoueur || 'Joueur')];
+    const retour = () => { fermerFenetre(); if (vueActuelle) afficher(vueActuelle); };
+    if (!compteLocal() || !/^c_/.test(id)) {
+      contenu.push(el('p', null, 'Amis, blocage et signalement arrivent avec les comptes en ligne.'));
+    } else {
+      const ami = el('button', 'btn principal large', 'Ajouter en ami');
+      ami.onclick = async () => { try { await apiJoueur('/amis', 'POST', { cible: id }); toast((nomJoueur || 'Ce joueur') + ' est dans tes amis.'); retour(); } catch (e) { toast(e.message); } };
+      const estBloque = bloques.has(id);
+      const bloquer = el('button', 'btn large', estBloque ? 'Débloquer' : 'Bloquer');
+      bloquer.onclick = async () => {
+        try {
+          if (estBloque) { await apiJoueur('/bloques/' + encodeURIComponent(id), 'DELETE'); bloques.delete(id); toast('Joueur débloqué.'); }
+          else { await apiJoueur('/bloques', 'POST', { cible: id }); bloques.add(id); toast('Joueur bloqué : tu ne verras plus ses réactions.'); }
+          memoriserBloques(); retour();
+        } catch (e) { toast(e.message); }
+      };
+      const signaler = el('button', 'btn large', 'Signaler');
+      signaler.onclick = () => {
+        const choix = el('div', 'reglages');
+        let motif = null;
+        const boutons = MOTIFS.map(([v, t]) => { const b = el('button', 'btn large', t); b.onclick = () => { motif = v; boutons.forEach((x) => x.classList.toggle('principal', x === b)); }; return b; });
+        const details = el('input', 'texte'); details.maxLength = 300; details.placeholder = 'Détails (facultatif)';
+        const envoyerS = el('button', 'btn principal large', 'Envoyer le signalement');
+        envoyerS.onclick = async () => {
+          if (!motif) return toast('Choisis un motif.');
+          try { await apiJoueur('/signaler', 'POST', { cible: id, motif, details: details.value, partie: vueActuelle && vueActuelle.code }); toast('Merci, ton signalement a été envoyé.'); retour(); } catch (e) { toast(e.message); }
+        };
+        const annuler = el('button', 'btn large', 'Annuler'); annuler.onclick = retour;
+        choix.append(...boutons, details);
+        ouvrirFenetre([el('h2', null, 'Signaler'), el('p', null, 'Pourquoi signales-tu ' + (nomJoueur || 'ce joueur') + ' ?'), choix, envoyerS, annuler]);
+      };
+      contenu.push(ami, bloquer, signaler);
+    }
+    const f = el('button', 'btn large', 'Fermer'); f.onclick = retour;
+    contenu.push(f);
+    ouvrirFenetre(contenu);
+  }
+
+  async function ouvrirAmis() {
+    const liste = el('ul', 'liste-k');
+    const champ = el('input', 'texte'); champ.placeholder = 'Pseudo#1234'; champ.setAttribute('aria-label', 'Pseudo et numéro de ton ami');
+    const ajouter = el('button', 'btn principal', 'Ajouter');
+    const dessiner = async () => {
+      liste.replaceChildren(el('li', null, 'Chargement…'));
+      try {
+        const amis = await apiJoueur('/amis');
+        liste.replaceChildren();
+        if (!amis.length) liste.append(el('li', null, 'Pas encore d\'amis. Ajoute-les avec leur pseudo#numéro.'));
+        for (const a of amis) {
+          const li = el('li');
+          const t = el('span', null, a.pseudo + '#' + a.numero + ' ');
+          t.append(el('small', null, a.en_ligne ? '· en ligne' : ''));
+          const x = el('button', 'btn', 'Retirer');
+          x.onclick = async () => { try { await apiJoueur('/amis/' + encodeURIComponent(a.id), 'DELETE'); dessiner(); } catch (e) { toast(e.message); } };
+          li.append(t, x); liste.append(li);
+        }
+      } catch (e) { liste.replaceChildren(el('li', null, e.message)); }
+    };
+    ajouter.onclick = async () => { try { await apiJoueur('/amis', 'POST', { cible: champ.value.trim() }); champ.value = ''; dessiner(); } catch (e) { toast(e.message); } };
+    const ligne = el('div', 'lien'); ligne.append(champ, ajouter);
+    const c = compteLocal();
+    const moi = el('p', null, 'Ton identifiant à donner à tes amis : ');
+    moi.append(el('b', null, c.compte.pseudo + '#' + c.compte.numero));
+    const inviter = el('button', 'btn large', 'Inviter sur WhatsApp');
+    inviter.onclick = () => { const t = `Viens jouer au Kopo avec moi ! Ajoute-moi : ${c.compte.pseudo}#${c.compte.numero}\n${location.origin + location.pathname}`; window.open('https://wa.me/?text=' + encodeURIComponent(t), '_blank', 'noopener'); };
+    const f = el('button', 'btn large', 'Fermer'); f.onclick = () => ouvrirParametres();
+    ouvrirFenetre([el('h2', null, 'Mes amis'), moi, ligne, liste, inviter, f]);
+    dessiner();
+  }
+
+  async function ouvrirBloques() {
+    const liste = el('ul', 'liste-k');
+    const f = el('button', 'btn large', 'Fermer'); f.onclick = () => ouvrirParametres();
+    ouvrirFenetre([el('h2', null, 'Joueurs bloqués'), liste, f]);
+    try {
+      const l = await apiJoueur('/bloques');
+      if (!l.length) liste.append(el('li', null, 'Personne.'));
+      for (const b of l) {
+        const li = el('li'); const x = el('button', 'btn', 'Débloquer');
+        x.onclick = async () => { await apiJoueur('/bloques/' + encodeURIComponent(b.id), 'DELETE').catch(() => {}); bloques.delete(b.id); memoriserBloques(); ouvrirBloques(); };
+        li.append(el('span', null, b.pseudo + '#' + b.numero), x); liste.append(li);
+      }
+    } catch (e) { liste.append(el('li', null, e.message)); }
+  }
+  majBloques();
 
   // ------------------------------------------------------------------ tutoriel
   // Apprendre à jouer en 1 minute : 7 petites situations où l'on agit soi-même.
