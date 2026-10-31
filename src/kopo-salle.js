@@ -39,6 +39,8 @@
       expirations: {}, // id -> nombre de temps écoulés d'affilée
       chronoTotal: 0,
       suiteA: null, // instant (ms) où la manche suivante se lance seule
+      publique: false, // partie ouverte aux inconnus (recherche de joueurs)
+      taille: null, // partie publique : nombre de joueurs attendus (2 à 9), elle démarre quand la table est pleine
       horloge: Date.now,
       rng: rng || hasardFort(),
     };
@@ -144,7 +146,22 @@
   }
 
   // À appeler régulièrement par l'hôte. Renvoie true si un coup automatique a été joué.
+  function lancer(s) {
+    s.restants = s.joueurs.map((j) => j.id);
+    demarrerManche(s);
+  }
+  // Partie publique : une salle de N joueurs démarre seule dès qu'elle est pleine.
+  function rendrePublique(s, taille) {
+    if (!(taille >= MIN && taille <= MAX)) throw new Error('Taille de salle invalide');
+    s.publique = true;
+    s.taille = taille;
+  }
+
   function tic(s) {
+    if (s.etat === 'salon' && s.publique) {
+      if (s.joueurs.length >= s.taille) { lancer(s); return true; }
+      return false;
+    }
     if (s.etat === 'finManche' && s.suiteA && s.horloge() >= s.suiteA) { demarrerManche(s); return true; }
     if (s.etat !== 'manche') return false;
     const m = s.manche;
@@ -230,7 +247,7 @@
           return { ok: true };
         }
         if (s.etat !== 'salon') return { ok: false, erreur: 'La partie a déjà commencé.' };
-        if (s.joueurs.length >= MAX) return { ok: false, erreur: 'La table est pleine (9 joueurs).' };
+        if (s.joueurs.length >= (s.publique ? s.taille : MAX)) return { ok: false, erreur: 'La table est pleine.' };
         s.joueurs.push({ id, nom: nettoyerNom(msg.nom), connecte: true, peerId: typeof msg.peerId === 'string' ? msg.peerId.slice(0, 64) : null, voix: false, muet: true });
         if (!s.hote) s.hote = id;
         return { ok: true };
@@ -241,7 +258,7 @@
         return { ok: true };
       }
       case 'ajouterRobot': {
-        if (id !== s.hote || s.etat !== 'salon') return { ok: false, erreur: 'Impossible.' };
+        if (id !== s.hote || s.etat !== 'salon' || s.publique) return { ok: false, erreur: 'Impossible.' };
         if (s.joueurs.length >= MAX) return { ok: false, erreur: 'La table est pleine (9 joueurs).' };
         let n = 1;
         while (s.joueurs.some((j) => j.nom === 'Robot ' + n)) n++;
@@ -272,10 +289,10 @@
       }
       case 'lancer': {
         if (id !== s.hote) return { ok: false, erreur: "Seul l'hôte peut lancer." };
+        if (s.publique) return { ok: false, erreur: 'La salle démarre seule quand elle est pleine.' };
         if (s.etat !== 'salon') return { ok: false, erreur: 'Déjà lancée.' };
         if (s.joueurs.length < MIN) return { ok: false, erreur: 'Il faut au moins 2 joueurs.' };
-        s.restants = s.joueurs.map((j) => j.id);
-        demarrerManche(s);
+        lancer(s);
         return { ok: true };
       }
       case 'mancheSuivante': {
@@ -343,6 +360,8 @@
       hote: s.hote,
       joueurs: s.joueurs.map((j) => ({ id: j.id, nom: j.nom, connecte: j.connecte, peerId: j.peerId || null, voix: !!j.voix, muet: j.muet !== false, robot: !!j.robot, remplace: !!j.remplace, absent: estAbsent(s, j.id) })),
       delai: s.delai,
+      publique: !!s.publique,
+      taille: s.taille,
       chrono: s.echeance && s.etat === 'manche' ? { resteMs: Math.max(0, s.echeance - s.horloge()), totalMs: s.chronoTotal || s.delai * 1000 } : null,
       suite: s.etat === 'finManche' && s.suiteA ? { resteMs: Math.max(0, s.suiteA - s.horloge()), totalMs: s.durees.mancheAuto } : null,
       restants: s.restants.slice(),
@@ -385,7 +404,7 @@
     return s;
   }
 
-  const KopoSalle = { MIN, MAX, DELAIS, PAUSE_ROBOT, DUREES, creerSalle, choixRobot, reconnecter, DELAI_ABSENT, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
+  const KopoSalle = { MIN, MAX, DELAIS, PAUSE_ROBOT, DUREES, creerSalle, rendrePublique, choixRobot, reconnecter, DELAI_ABSENT, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
   if (typeof module !== 'undefined' && module.exports) module.exports = KopoSalle;
   else root.KopoSalle = KopoSalle;
 })(typeof window !== 'undefined' ? window : globalThis);

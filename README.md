@@ -11,6 +11,7 @@ Jeu de cartes multijoueur, de 2 à 9 joueurs, chacun sur son téléphone.
 - L'hôte peut ajouter des robots dans le salon, et remplacer par un robot un joueur déconnecté (le joueur reprend sa place en revenant).
 - L'hôte doit garder la page ouverte pendant la partie. S'il recharge la page, la partie reprend avec le même code.
 - Compte à rebours de 5 s avant chaque manche, avec le joueur qui commence. En fin de tour, les cartes restent 5 s sur la table avec celui qui reprend la main. La manche suivante se lance seule après 10 s (l'hôte peut la lancer plus tôt).
+- En ligne : salles publiques de 2 à 9 joueurs, qui démarrent seules quand elles sont pleines, et compteur des joueurs en ligne (canal commun sur les relais).
 - Un joueur déconnecté, ou dont le temps s'est écoulé 2 fois d'affilée, n'a plus que 5 s par tour (même sans chrono) jusqu'à son retour.
 - Chrono réglable (5 s par défaut) : un joueur trop lent ou hors ligne pioche. En ouverture, sa plus petite carte autorisée est posée.
 - Micro optionnel (WebRTC via PeerJS, avec relais TURN) : chacun l'active, le coupe, ou coupe le son des autres.
