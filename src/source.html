@@ -383,6 +383,22 @@ ul.regles { margin: 0; padding-left: 18px; display: grid; gap: 8px; color: var(-
 .ico-k.gris { stroke: var(--muted, #9fb2c8); }
 .btn.btn-ico { padding: 7px 9px; display: grid; place-items: center; }
 .reglages .version { color: var(--muted); font-size: 12px; text-align: center; }
+/* Tutoriel */
+.tuto { display: grid; gap: 12px; }
+.tuto-etapes { display: flex; gap: 4px; }
+.tuto-etapes span { flex: 1; height: 4px; border-radius: 2px; background: rgba(255,255,255,.12); }
+.tuto-etapes span.ok { background: var(--brass); }
+.tuto-scene { background: rgba(0,0,0,.18); border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: grid; gap: 10px; }
+.tuto-table { display: flex; gap: 10px; justify-content: center; min-height: 96px; align-items: flex-end; flex-wrap: wrap; }
+.tuto-table figure { margin: 0; display: grid; justify-items: center; gap: 3px; font-size: 12px; color: var(--muted); }
+.tuto-table .forte .carte { box-shadow: 0 0 0 3px var(--brass); }
+.tuto-main { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+.tuto-main .carte { width: 58px; height: 84px; cursor: pointer; }
+.tuto-main .carte.interdite { opacity: .45; }
+.tuto-texte { margin: 0; }
+.tuto-retour { min-height: 1.4em; margin: 0; font-weight: 600; }
+.tuto-retour.ok { color: var(--brass); } .tuto-retour.ko { color: #ff8a80; }
+.tuto-choix { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
 /* Cartes à 4 couleurs (plus lisibles, aide les daltoniens) */
 body.quatre-couleurs .carte[data-carte$="C"] { color: #c62828; }
 body.quatre-couleurs .carte[data-carte$="K"] { color: #1565c0; }
@@ -1634,7 +1650,19 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
     ps.onchange = () => { const p = ps.value.trim(); if (p.length >= 3) { stock.ecrire('kopo-pseudo', p); if ($('pseudo')) $('pseudo').value = p; toast('Pseudo enregistré. Il servira à ta prochaine partie.'); } else toast('Le pseudo fait au moins 3 caractères.'); };
     ligne('Pseudo', null, ps).style.flexWrap = 'wrap';
     ligne('Connexion Google ou téléphone', 'Bientôt : pour garder tes pièces sur tous tes téléphones', iconeCadenas()).classList.add('bientot');
+    const supprimer = el('button', 'btn', 'Supprimer mon compte');
+    supprimer.onclick = () => demanderConfirmation('Ton pseudo, tes pièces d\'essai, tes statistiques et tes réglages seront effacés de ce téléphone. C\'est définitif.', () => {
+      try { Object.keys(localStorage).filter((k) => k.startsWith('kopo')).forEach((k) => localStorage.removeItem(k)); sessionStorage.clear(); } catch (e) {}
+      location.reload();
+    }, { titre: 'Supprimer ?', oui: 'Oui, tout supprimer' });
+    z.append(supprimer);
     titre('Aide');
+    const tuto = el('button', 'btn', 'Apprendre à jouer');
+    tuto.onclick = ouvrirTutoriel;
+    const liens = el('p', 'version');
+    const lien = (t, h) => { const a = el('a', null, t); a.href = h; a.target = '_blank'; a.rel = 'noopener'; a.style.color = 'var(--brass)'; return a; };
+    liens.append(lien("Conditions d'utilisation", 'legal/conditions.html'), ' · ', lien('Confidentialité', 'legal/confidentialite.html'));
+    z.append(tuto, liens);
     const reinit = el('button', 'btn', 'Remettre les réglages par défaut');
     reinit.onclick = () => { Object.assign(prefs, PREFS_DEFAUT); enregistrerPrefs(); ouvrirParametres(); if (vueActuelle) afficher(vueActuelle); };
     z.append(reinit, el('p', 'version', 'Kopo · version ' + VERSION));
@@ -1643,6 +1671,99 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
     ouvrirFenetre([el('h2', null, 'Paramètres'), z, fermer]);
   }
   window.ouvrirParametres = ouvrirParametres;
+
+  // ------------------------------------------------------------------ tutoriel
+  // Apprendre à jouer en 1 minute : 7 petites situations où l'on agit soi-même.
+  const C = (c) => carteEl(c, 'button');
+  function ouvrirTutoriel() {
+    const ETAPES = [
+      { titre: 'Le but', texte: 'Chaque joueur reçoit 4 cartes. Débarrasse-toi des tiennes pour te qualifier. À chaque manche, le dernier qui a encore des cartes est éliminé. Le dernier survivant gagne la partie.',
+        main: ['3C', '9P', '5K', '9C'], libre: true },
+      { titre: 'Suivre la couleur', texte: 'Kevin a ouvert avec le 7♥ : la couleur du tour est cœur. À toi : joue un cœur.',
+        table: [['7C', 'Kevin']], main: ['3C', '9P', '5K', '9C'],
+        carte: (c) => K.couleur(c) === 'C' ? [true, 'Bien joué : tu as suivi la couleur.'] : [false, 'Il faut jouer un cœur ♥.'] },
+      { titre: 'Ramasser', texte: "Kevin a joué le 8♣. Tu n'as aucun trèfle : tu dois ramasser la plus forte carte de la table. Ramasser arrête la séquence.",
+        table: [['8T', 'Kevin']], main: ['2C', '6P', '4K'], bouton: 'Ramasser le 8♣', ok: 'La carte rejoint ta main. Astuce : tu peux aussi ramasser exprès pour bluffer, même si tu as la couleur.',
+        carte: () => [false, "Tu n'as pas de trèfle : ramasse."] },
+      { titre: 'Qui relance ?', texte: 'Tout le monde a suivi à pique. La plus forte carte gagne la séquence, et son joueur relance. Qui relance ?',
+        table: [['4P', 'Toi'], ['10P', 'Kevin'], ['7P', 'Nadia']], choix: [['Toi', false], ['Kevin', true], ['Nadia', false]], ok: "Oui : le 10♠ est la plus forte. Kevin relance, mais il doit changer de couleur : pas de pique." },
+      { titre: 'Relancer', texte: 'Tu as gagné la séquence précédente, jouée à carreau. Tu relances : joue une carte, mais pas de carreau.',
+        main: ['5K', '8K', '3T', '9C'], interdite: 'K',
+        carte: (c) => K.couleur(c) !== 'K' ? [true, 'Parfait : on change toujours de couleur en relançant.'] : [false, 'Pas de carreau : c\'était la couleur du tour précédent.'] },
+      { titre: 'Sortir', texte: 'Nadia a ouvert à trèfle et il ne te reste que des trèfles. Tu peux tout poser d\'un coup et te qualifier.',
+        table: [['6T', 'Nadia']], main: ['2T', '9T'], bouton: 'Tout poser (2 cartes) et sortir', ok: 'Qualifié ! Les cartes avec lesquelles tu sors ne comptent pas pour la plus forte.',
+        carte: () => [false, 'Utilise « Tout poser » pour sortir d\'un coup.'] },
+      { titre: 'Katapss !', texte: 'À la distribution, tu reçois 4 cartes de la même couleur. Annonce KATAPSS avant de jouer : tu es qualifié tout de suite.',
+        main: ['2P', '5P', '7P', '10P'], bouton: 'KATAPSS', katapss: true, ok: 'Qualifié d\'office ! Attention : dès que tu as joué ou ramassé, c\'est trop tard.',
+        carte: () => [false, 'Annonce plutôt KATAPSS !'] },
+    ];
+    let i = 0;
+    const dessiner = () => {
+      const e = ETAPES[i], z = el('div', 'tuto');
+      const barre = el('div', 'tuto-etapes');
+      ETAPES.forEach((_, k) => barre.append(el('span', k <= i ? 'ok' : null)));
+      const retour = el('p', 'tuto-retour');
+      const suivant = el('button', 'btn principal large', i === ETAPES.length - 1 ? 'Terminer' : 'Suivant');
+      suivant.disabled = !e.libre;
+      const reussi = (t) => { retour.className = 'tuto-retour ok'; retour.textContent = t; suivant.disabled = false; vibrer(40); };
+      const rate = (t, cible) => { retour.className = 'tuto-retour ko'; retour.textContent = t; if (cible && !sansAnim) cible.animate([{ transform: 'translateX(-6px)' }, { transform: 'translateX(6px)' }, { transform: 'none' }], { duration: 250 }); };
+      const scene = el('div', 'tuto-scene');
+      if (e.table) {
+        const t = el('div', 'tuto-table');
+        const forte = e.table.reduce((m, x) => (K.valeur(x[0]) > K.valeur(m[0]) ? x : m), e.table[0]);
+        for (const [c, qui] of e.table) { const f = el('figure', c === forte[0] && e.choix ? 'forte' : null); f.append(carteEl(c), el('figcaption', null, qui)); t.append(f); }
+        scene.append(t);
+      }
+      if (e.main) {
+        const m = el('div', 'tuto-main');
+        for (const c of e.main) {
+          const b = C(c);
+          if (e.interdite && K.couleur(c) === e.interdite) b.classList.add('interdite');
+          b.onclick = () => { if (!suivant.disabled && !e.libre) return; const [ok, t] = e.carte ? e.carte(c) : [true, '']; if (ok) { b.style.visibility = 'hidden'; reussi(t); } else rate(t, b); };
+          if (e.libre) b.onclick = null;
+          m.append(b);
+        }
+        scene.append(el('small', 'muted', 'Ta main'), m);
+      }
+      if (e.bouton) {
+        const b = el('button', 'btn large' + (e.katapss ? ' katapss' : ' principal'), e.bouton);
+        b.onclick = () => { b.disabled = true; if (e.katapss) tampon('KATAPSS !', 'Qualifié'); scene.querySelectorAll('.tuto-main .carte').forEach((x) => (x.style.visibility = 'hidden')); reussi(e.ok); };
+        scene.append(b);
+      }
+      if (e.choix) {
+        const ch = el('div', 'tuto-choix');
+        for (const [t, bon] of e.choix) { const b = el('button', 'btn', t); b.onclick = () => (bon ? reussi(e.ok) : rate('Non : regarde quelle carte est la plus forte.', b)); ch.append(b); }
+        scene.append(ch);
+      }
+      suivant.onclick = () => { if (i < ETAPES.length - 1) { i++; dessiner(); } else fin(); };
+      const passer = el('button', 'btn', 'Passer le tutoriel');
+      passer.onclick = () => { stock.ecrire('kopo-tuto', 'fini'); fermerFenetre(); };
+      z.append(barre, el('p', 'tuto-texte', e.texte), scene, retour, suivant, passer);
+      ouvrirFenetre([el('h2', null, e.titre), z]);
+    };
+    const fin = () => {
+      stock.ecrire('kopo-tuto', 'fini');
+      const robots = el('button', 'btn principal large', 'Jouer contre les robots');
+      robots.onclick = () => { fermerFenetre(); const b = $('btnModeRobots'); if (b) b.click(); };
+      const plus = el('button', 'btn large', 'Lire les règles complètes');
+      plus.onclick = () => { fermerFenetre(); const b = $('btnRegles'); if (b) b.click(); };
+      const ok = el('button', 'btn large', 'Fermer'); ok.onclick = fermerFenetre;
+      ouvrirFenetre([el('h2', null, 'Prêt !'), el('p', null, 'Tu connais l\'essentiel. Le mieux pour apprendre : une partie contre les robots (elle ne rapporte pas de pièces).'), robots, plus, ok]);
+    };
+    dessiner();
+  }
+  window.ouvrirTutoriel = ouvrirTutoriel;
+  // Première ouverture : on propose le tutoriel une fois.
+  function proposerTutoriel() {
+    if (stock.lire('kopo-tuto')) return false;
+    stock.ecrire('kopo-tuto', 'propose');
+    const oui = el('button', 'btn principal large', 'Apprendre à jouer (1 min)');
+    oui.onclick = ouvrirTutoriel;
+    const non = el('button', 'btn large', 'Je connais déjà');
+    non.onclick = fermerFenetre;
+    ouvrirFenetre([el('h2', null, 'Bienvenue !'), el('p', null, 'Nouveau au Kopo ? Apprends les règles en jouant quelques coups.'), oui, non]);
+    return true;
+  }
 
   // ------------------------------------------------------------------ boutons
   $('btnParametres').onclick = ouvrirParametres;
@@ -1683,7 +1804,7 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
     else corps.append(el('h2', null, 'Tes pièces'), piece, el('div', 'gain', formatPieces(pc.solde)), el('div', null, 'Bonus du jour déjà pris · série de ' + (pc.bonusSerie || 0) + ' jour' + ((pc.bonusSerie || 0) > 1 ? 's' : '')), barres);
     corps.append(el('div', 'note-essai', 'Pièces d\'essai, remises à zéro au lancement officiel.'));
     const ok = el('button', 'btn principal large', gain ? 'Récupérer' : 'OK');
-    ok.onclick = () => { fermerFenetre(); majSolde(); if (gain) pop($('btnBourse'), 1.2); };
+    ok.onclick = () => { fermerFenetre(); majSolde(); if (gain) pop($('btnBourse'), 1.2); proposerTutoriel(); };
     ouvrirFenetre([corps, ok]);
   }
   function bonusDuJour() {
@@ -1720,7 +1841,9 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
   function montrerRegles() {
     const ok = el('button', 'btn principal large', "C'est compris");
     ok.onclick = fermerFenetre;
-    ouvrirFenetre([el('h2', null, 'Règles'), $('modeleRegles').content.cloneNode(true), ok]);
+    const tuto = el('button', 'btn large', 'Apprendre en jouant (1 min)');
+    tuto.onclick = ouvrirTutoriel;
+    ouvrirFenetre([el('h2', null, 'Règles'), $('modeleRegles').content.cloneNode(true), ok, tuto]);
   }
   $('btnRegles').onclick = montrerRegles;
   $('btnPleinEcranAccueil').onclick = pleinEcran;
