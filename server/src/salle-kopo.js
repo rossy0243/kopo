@@ -28,8 +28,11 @@ class SalleKopo extends Room {
     if (options.rapide && process.env.KOPO_TESTS === '1') this.salle.durees = { depart: 0, finTour: 0, mancheAuto: 1 }; // tests seulement
     this.clientsParId = new Map();
     this.comptes = new Map(); // id -> compte (au moment de l'entrée)
-    this.partie = null; // { id, katapss: Map, abandons: Set, enregistree }
-    this.setMetadata({ code: this.code, publique: this.publique, taille: this.taille, etat: 'salon', joueurs: 0 });
+    this.partie = null; // { id, katapss: Map, abandons: Set, coupures: Set, classee, enregistree }
+    // Ligue : seulement en salle publique (inconnus placés au hasard). Dès qu'un joueur entre
+    // avec le code (un ami), la salle n'est plus classée : pas de complicité (strategie-pieces §6.3).
+    this.classee = this.publique;
+    this.setMetadata(this.meta('salon', 0));
     salles.add(this);
 
     this.onMessage('*', (client, type, msg) => this.recevoir(client, type, msg));
@@ -47,8 +50,11 @@ class SalleKopo extends Room {
     return c;
   }
 
+  meta(etat, joueurs) { return { code: this.code, publique: this.publique, taille: this.taille, etat, joueurs, classee: this.classee }; }
+
   onJoin(client, options, compte) {
     const id = compte.id;
+    if (this.publique && options && options.code && this.salle.etat === 'salon') this.classee = false;
     const ancien = this.clientsParId.get(id);
     if (ancien && ancien !== client) try { ancien.leave(4000); } catch (e) {} // même compte ouvert ailleurs
     const r = S.recevoir(this.salle, id, { type: 'rejoindre', nom: compte.pseudo });
@@ -64,10 +70,13 @@ class SalleKopo extends Room {
     if (!id) return;
     S.deconnecter(this.salle, id);
     if (volontaire && this.partie && this.salle.etat !== 'salon') this.partie.abandons.add(id);
+    const partie = this.partie;
+    if (!volontaire && partie && this.salle.etat !== 'salon') partie.coupures.add(id); // pas sa faute : pas de points perdus
     this.apresChangement();
     if (volontaire) return;
     try {
       await this.allowReconnection(client, 120); // 2 minutes pour revenir après une coupure réseau
+      if (partie) partie.coupures.delete(id);
       S.reconnecter(this.salle, id);
       this.apresChangement();
     } catch (e) { /* pas revenu : un robot peut le remplacer (règle de la salle) */ }
@@ -96,7 +105,11 @@ class SalleKopo extends Room {
   apresChangement() {
     const s = this.salle;
     if (s.etat === 'manche' && s.numeroManche === 1 && (!this.partie || this.partie.enregistree)) {
-      this.partie = { id: idAleatoire('p_'), katapss: new Map(), abandons: new Set(), enregistree: false, debut: new Date() };
+      const humains = s.joueurs.filter((j) => !j.robot).length;
+      const classee = this.classee && !s.joueurs.some((j) => j.robot) && humains >= SalleKopo.services.reglages.get('ligue').joueursMin;
+      this.partie = { id: idAleatoire('p_'), katapss: new Map(), abandons: new Set(), coupures: new Set(), classee, enregistree: false, debut: new Date() };
+      // La page peut afficher « Partie classée » dès le début.
+      for (const c of this.clientsParId.values()) c.send('classee', { classee });
     }
     if (s.etat === 'finPartie' && this.partie && !this.partie.enregistree) {
       this.partie.enregistree = true;
@@ -105,13 +118,13 @@ class SalleKopo extends Room {
     // Une partie commencée ne reçoit plus de nouveaux joueurs (seulement les reconnexions).
     if (s.etat !== 'salon' && !this.locked) this.lock();
     if (s.etat === 'salon' && this.locked && s.joueurs.length < (this.publique ? this.taille : S.MAX)) this.unlock();
-    this.setMetadata({ code: this.code, publique: this.publique, taille: this.taille, etat: s.etat, joueurs: s.joueurs.filter((j) => !j.robot).length });
+    this.setMetadata(this.meta(s.etat, s.joueurs.filter((j) => !j.robot).length));
     for (const [id, c] of this.clientsParId) c.send('vue', S.vue(s, id));
   }
 
   // Fin de partie : historique, places, gains (rien si la table avait des robots).
   async enregistrerPartie() {
-    const { base, comptes, reglages } = SalleKopo.services;
+    const { base, comptes, reglages, ligue } = SalleKopo.services;
     const s = this.salle, p = this.partie;
     const humains = s.joueurs.filter((j) => !j.robot || j.remplace).map((j) => j.id).filter((id) => this.comptes.has(id));
     const avecRobots = s.joueurs.some((j) => j.robot && !j.remplace);
@@ -120,8 +133,8 @@ class SalleKopo extends Room {
     const place = (id) => ordre.indexOf(id) + 1 || null;
     const g = reglages.get('gains');
     await base.transaction(async (q) => {
-      await q.query('INSERT INTO parties (id, code, publique, nb_joueurs, avec_robots, vainqueur, debut, fin) VALUES ($1,$2,$3,$4,$5,$6,$7, now())',
-        [p.id, this.code, this.publique, ordre.length, avecRobots, this.comptes.has(s.vainqueur) ? s.vainqueur : null, p.debut]);
+      await q.query('INSERT INTO parties (id, code, publique, nb_joueurs, avec_robots, vainqueur, debut, fin, classee) VALUES ($1,$2,$3,$4,$5,$6,$7, now(), $8)',
+        [p.id, this.code, this.publique, ordre.length, avecRobots, this.comptes.has(s.vainqueur) ? s.vainqueur : null, p.debut, p.classee && !avecRobots]);
       for (const id of humains) {
         const pl = place(id);
         await q.query('INSERT INTO participations (partie_id, compte_id, place, abandon) VALUES ($1,$2,$3,$4)', [p.id, id, pl, p.abandons.has(id)]);
@@ -136,9 +149,18 @@ class SalleKopo extends Room {
         for (const [montant, motif] of gains) if (montant > 0) await comptes.mouvement(q, id, montant, motif, p.id);
       }
     });
+    // Ligue : points selon la place, envoyés à chacun pour l'écran de fin.
+    let resultats = new Map();
+    if (p.classee && !avecRobots) {
+      resultats = await ligue.enregistrerPartie({
+        partieId: p.id, n: ordre.length,
+        joueurs: humains.map((id) => ({ id, place: place(id), abandon: p.abandons.has(id), coupure: p.coupures.has(id) && !p.abandons.has(id) })),
+      }).catch((e) => { console.error('Ligue :', e.message); return new Map(); });
+    }
     for (const [id, c] of this.clientsParId) {
       const compte = await comptes.lire(id);
       if (compte) c.send('solde', { solde: compte.solde });
+      if (resultats.has(id)) c.send('ligue', resultats.get(id));
     }
   }
 

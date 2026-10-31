@@ -4,9 +4,12 @@ const express = require('express');
 
 const MOTIFS = ['pseudo', 'insultes', 'triche', 'abandon', 'autre'];
 const enveloppe = (fn) => (req, res) => fn(req, res).catch((e) => res.status(e.statut || 500).json({ erreur: e.statut ? e.message : 'Erreur du serveur.' }) && (e.statut || console.error(e)));
-const publicCompte = (c) => c && { id: c.id, pseudo: c.pseudo, numero: c.numero, avatar: c.avatar, solde: c.solde, statut: c.statut, serieBonus: c.serie_bonus, dernierBonus: c.dernier_bonus };
+const publicCompte = (c) => c && { id: c.id, pseudo: c.pseudo, numero: c.numero, avatar: c.avatar, solde: c.solde, statut: c.statut, serieBonus: c.serie_bonus, dernierBonus: c.dernier_bonus, pays: c.pays || null };
 
-function routesJoueurs({ base, auth, comptes, reglages }) {
+// Pays déduit du réseau (en-tête posé par Cloudflare quand il existe), sinon choisi par le joueur.
+const paysReseau = (req) => { const p = String(req.get('cf-ipcountry') || '').toUpperCase(); return /^[A-Z]{2}$/.test(p) && p !== 'XX' ? p : null; };
+
+function routesJoueurs({ base, auth, comptes, reglages, ligue }) {
   const r = express.Router();
   r.use(express.json({ limit: '20kb' }));
 
@@ -41,7 +44,7 @@ function routesJoueurs({ base, auth, comptes, reglages }) {
   r.post('/invite', enveloppe(async (req, res) => {
     const n = (parIp.get(req.ip) || 0) + 1; parIp.set(req.ip, n);
     if (n > 20 && process.env.KOPO_TESTS !== '1') return res.status(429).json({ erreur: 'Trop de comptes créés depuis ce réseau. Réessaie plus tard.' });
-    const c = await comptes.creer({ pseudo: req.body.pseudo, pays: req.get('cf-ipcountry') || null });
+    const c = await comptes.creer({ pseudo: req.body.pseudo, pays: paysReseau(req) });
     await comptes.presence(c.id);
     res.json({ jeton: await auth.jetonJoueur(c.id), compte: publicCompte(c) });
   }));
@@ -74,6 +77,11 @@ function routesJoueurs({ base, auth, comptes, reglages }) {
     res.json({ compte: publicCompte(compte), quotaPseudo: await comptes.quotaPseudo(req.compte.id) });
   }));
   r.delete('/moi', joueur, enveloppe(async (req, res) => { await comptes.supprimer(req.compte.id); res.json({ ok: true }); }));
+
+  // --- Ligue classée et saisons
+  r.get('/ligue', joueur, enveloppe(async (req, res) => res.json(await ligue.etat(req.compte))));
+  r.post('/ligue/vu', joueur, enveloppe(async (req, res) => { await ligue.marquerVu(req.compte.id); res.json({ ok: true }); }));
+  r.get('/classement', joueur, enveloppe(async (req, res) => res.json(await ligue.classement(req.compte, String(req.query.type || 'mondial'), { pays: req.query.pays, limite: req.query.limite }))));
 
   r.post('/bonus-du-jour', joueur, enveloppe(async (req, res) => res.json(await comptes.bonusDuJour(req.compte.id))));
   r.post('/remise-a-flot', joueur, enveloppe(async (req, res) => res.json(await comptes.remiseAFlot(req.compte.id))));

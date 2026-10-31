@@ -108,7 +108,13 @@ function creerComptes(base, reglages) {
       return r.rows.length ? api.lire(id) : null;
     },
 
-    async changerProfil(id, { pseudo, avatar }) {
+    async changerProfil(id, { pseudo, avatar, pays }) {
+      // Pays du classement : code à 2 lettres (CD, CI, SN…), ou null pour ne pas l'afficher.
+      if (pays !== undefined) {
+        const p = pays === null || pays === '' ? null : String(pays).toUpperCase();
+        if (p !== null && !/^[A-Z]{2}$/.test(p)) throw Object.assign(new Error('Pays inconnu.'), { statut: 400 });
+        await base.query('UPDATE comptes SET pays = $2 WHERE id = $1', [id, p]);
+      }
       if (pseudo !== undefined) {
         const v = verifierPseudo(pseudo);
         if (!v.ok) throw Object.assign(new Error(v.erreur), { statut: 400 });

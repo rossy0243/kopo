@@ -3,7 +3,7 @@
 const express = require('express');
 const { enveloppe, publicCompte } = require('./api');
 
-function routesAdmin({ base, auth, comptes, reglages, salles, demarrage }) {
+function routesAdmin({ base, auth, comptes, reglages, ligue, salles, demarrage }) {
   const r = express.Router();
   r.use(express.json({ limit: '50kb' }));
 
@@ -18,6 +18,7 @@ function routesAdmin({ base, auth, comptes, reglages, salles, demarrage }) {
     next();
   });
   const journal = (action, cible, details) => base.query('INSERT INTO journal_admin (action, cible, details) VALUES ($1,$2,$3)', [action, cible || null, details ? JSON.stringify(details) : null]);
+  const n2 = (o) => JSON.parse(JSON.stringify(o, (k, v) => (typeof v === 'bigint' ? Number(v) : v)));
   const n = (rows) => rows.map((l) => Object.fromEntries(Object.entries(l).map(([k, v]) => [k, typeof v === 'bigint' ? Number(v) : v])));
 
   // --- En direct
@@ -109,6 +110,8 @@ function routesAdmin({ base, auth, comptes, reglages, salles, demarrage }) {
       signalementsRecus: await q(`SELECT s.id, s.motif, s.details, s.statut, s.cree_le, a.pseudo AS auteur FROM signalements s JOIN comptes a ON a.id = s.auteur_id WHERE s.cible_id = $1 ORDER BY s.id DESC LIMIT 50`),
       sanctions: await q(`SELECT type, motif, jusqu, cree_le FROM sanctions WHERE compte_id = $1 ORDER BY id DESC`),
       // Joueurs souvent à la même table : aide à repérer la complicité (strategie-pieces §6.3).
+      ligue: (await q(`SELECT l.saison, l.points, l.division, l.meilleure, l.parties, l.victoires FROM ligue l JOIN saisons s ON s.numero = l.saison WHERE l.compte_id = $1 AND s.statut = 'en_cours'`))[0] || null,
+      titres: await q(`SELECT saison, titre, rang, pieces FROM recompenses_saison WHERE compte_id = $1 ORDER BY saison DESC`),
       partenaires: await q(`SELECT c2.id, c2.pseudo, c2.numero, count(*)::int AS ensemble FROM participations a JOIN participations b ON b.partie_id = a.partie_id AND b.compte_id <> a.compte_id JOIN comptes c2 ON c2.id = b.compte_id WHERE a.compte_id = $1 GROUP BY c2.id, c2.pseudo, c2.numero ORDER BY ensemble DESC LIMIT 5`),
     });
   }));
@@ -166,6 +169,21 @@ function routesAdmin({ base, auth, comptes, reglages, salles, demarrage }) {
     await base.query('UPDATE signalements SET statut = $2, decision = $3, traite_le = now() WHERE id = $1', [req.params.id, statut, req.body.decision || null]);
     await journal('signalement:' + statut, String(req.params.id), { decision: req.body.decision });
     res.json({ ok: true });
+  }));
+
+  // --- Ligue et saisons
+  r.get('/ligue', enveloppe(async (req, res) => res.json(n2(await ligue.resume()))));
+  r.put('/ligue/saison', enveloppe(async (req, res) => {
+    const s = await ligue.modifierSaison(req.body || {});
+    await journal('saison:modifier', String(s.numero), req.body);
+    res.json({ ok: true, saison: s });
+  }));
+  // Clôturer la saison maintenant (récompenses versées, saison suivante ouverte). Irréversible.
+  r.post('/ligue/cloturer', enveloppe(async (req, res) => {
+    if (req.body.confirmation !== 'CLOTURER') return res.status(400).json({ erreur: 'Confirmation manquante.' });
+    const x = await ligue.assurerSaison({ forcer: true });
+    await journal('saison:cloturer', String(x.cloturee), x);
+    res.json({ ok: true, ...x });
   }));
 
   // --- Pilotage : gains, bonus, tables, pot, annonce, maintenance
