@@ -164,20 +164,105 @@ body.en-jeu .app { height: 100vh; height: calc(100dvh - env(safe-area-inset-top)
 body.en-jeu .logo { font-size: 28px; letter-spacing: 2px; }
 body.en-jeu .info { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 body.en-jeu #ecranPartie { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-body.en-jeu .sieges { flex: none; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 4px; }
-body.en-jeu .siege { padding: 4px 7px; gap: 2px; border-radius: 8px; }
-body.en-jeu .siege .nom { font-size: 13px; }
+body.en-jeu .sieges { flex: none; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 4px; }
+@media (max-width: 479px) { body.en-jeu .sieges { grid-template-columns: 1fr 1fr; } }
+body.en-jeu .siege { padding: 5px 8px; gap: 2px; border-radius: 8px; }
+body.en-jeu .siege .nom { font-size: 15px; }
 body.en-jeu .siege .pastille { font-size: 10px; padding: 0 6px; }
-body.en-jeu .table { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 14px; }
-body.en-jeu .poses { flex: 1 0 auto; align-content: center; min-height: 90px; }
+body.en-jeu .table { flex: 0 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 14px; }
+body.en-jeu .poses { flex: none; align-content: center; min-height: 84px; }
 body.en-jeu .consigne { font-size: 16px; }
-body.en-jeu .zone-main { flex: none; padding: 8px 10px 10px; gap: 8px; border-radius: 14px; }
+body.en-jeu .zone-main { flex: none; margin-top: auto; padding: 8px 10px 10px; gap: 8px; border-radius: 14px; }
 body.en-jeu .zone-main h3 { font-size: 13px; }
-/* Écran trop bas (téléphone couché) : la page défile normalement. */
-@media (max-height: 520px) {
-  body.en-jeu .app { height: auto; display: grid; }
-  body.en-jeu .table { overflow: visible; }
+@media (max-height: 640px) and (orientation: portrait) { body.en-jeu .sieges { grid-template-columns: repeat(3, minmax(0, 1fr)); } body.en-jeu .siege .nom { font-size: 13px; } }
+body.en-jeu .table { flex-shrink: 0; }
+.tapis, .siege .eventail, .tourner, #btnPleinEcranEntete { display: none; }
+.colonne { display: grid; gap: 14px; align-content: start; min-width: 0; }
+details.rappel summary { cursor: pointer; font-weight: 600; }
+
+/* Téléphone tenu droit pendant la partie : on propose de le tourner. */
+@media (orientation: portrait) {
+  body.en-jeu .tourner { display: flex; align-items: center; gap: 8px; flex: none; font-size: 13px; color: var(--brass); background: rgba(226,176,74,.1); border: 1px solid rgba(226,176,74,.35); border-radius: 10px; padding: 6px 10px; }
+  body.en-jeu .tourner .btn { margin-left: auto; padding: 4px 10px; font-size: 13px; }
 }
+
+/* Partie en paysage : les joueurs autour d'une table ovale, ta main en bas. */
+@media (orientation: landscape) {
+  body.en-jeu { overflow: hidden; }
+  body.en-jeu .app { max-width: none; height: 100vh; height: 100dvh; padding: 0; display: block; position: relative; }
+  body.en-jeu header { position: absolute; top: 0; left: 0; right: 0; z-index: 3; padding: 6px max(10px, env(safe-area-inset-right)) 0 max(10px, env(safe-area-inset-left)); pointer-events: none; }
+  body.en-jeu header > * { pointer-events: auto; }
+  body.en-jeu #btnPleinEcranEntete:not([hidden]) { display: inline-block; }
+  body.en-jeu .bandeau { position: absolute; top: 46px; left: 50%; transform: translateX(-50%); z-index: 4; width: max-content; max-width: 70%; }
+  body.en-jeu #ecranPartie { position: absolute; inset: 0; display: block; }
+  body.en-jeu .tapis { display: block; position: absolute; left: 6%; right: 6%; top: 10%; bottom: 12%; border-radius: 50%;
+    background: radial-gradient(ellipse at 50% 42%, #24497a, #142c4a 72%);
+    box-shadow: inset 0 0 0 7px #3b2a12, inset 0 0 0 10px rgba(226,176,74,.45), inset 0 0 60px rgba(0,0,0,.45), 0 14px 40px rgba(0,0,0,.5); }
+  body.en-jeu .sieges { position: absolute; inset: 0; display: block; pointer-events: none; }
+  body.en-jeu .siege { position: absolute; left: var(--x, 50%); top: var(--y, 20%); transform: translate(-50%, -50%); width: 136px; background: none; border: 0; box-shadow: none; padding: 0; display: grid; justify-items: center; gap: 3px; pointer-events: auto; }
+  body.en-jeu .siege .eventail { display: flex; height: 22px; align-items: flex-end; }
+  body.en-jeu .siege .eventail span { width: 15px; height: 22px; border-radius: 3px; border: 1px solid #f3e3bd; background: repeating-linear-gradient(45deg, var(--brass) 0 3px, #9c7524 3px 6px); box-shadow: 0 2px 4px rgba(0,0,0,.4); }
+  body.en-jeu .siege .eventail span + span { margin-left: -9px; }
+  body.en-jeu .siege .eventail .nb { margin-left: 5px; font-size: 14px; line-height: 1; font-variant-numeric: tabular-nums; text-shadow: 0 1px 3px rgba(0,0,0,.8); }
+  body.en-jeu .siege:not(.vous) .ligne .compte { display: none; }
+  body.en-jeu .siege .ligne { background: #0b1828; border: 2px solid rgba(255,255,255,.18); border-radius: 99px; padding: 2px 12px; max-width: 136px; box-shadow: 0 3px 8px rgba(0,0,0,.4); }
+  body.en-jeu .siege .nom { font-size: 14px; font-weight: 700; text-align: center; }
+  body.en-jeu .siege.courant .ligne { background: var(--brass); color: #1d1606; border-color: #f6d488; box-shadow: 0 0 0 4px rgba(226,176,74,.35), 0 3px 8px rgba(0,0,0,.4); }
+  body.en-jeu .siege.courant .compte::before { background: #1d1606; }
+  body.en-jeu .siege .chrono { width: 80px; }
+  body.en-jeu .siege.vous { left: max(10px, env(safe-area-inset-left)); top: auto; bottom: max(10px, env(safe-area-inset-bottom)); transform: none; justify-items: start; }
+  body.en-jeu .siege.vous .eventail { display: none; }
+  body.en-jeu .table { position: absolute; left: 50%; top: 47%; transform: translate(-50%, -50%); width: min(50%, 480px); background: none; border: 0; padding: 0; overflow: visible; display: grid; justify-items: center; gap: 6px; }
+  body.en-jeu .table-entete { justify-content: center; }
+  body.en-jeu .poses { justify-content: center; min-height: 0; flex: none; }
+  body.en-jeu .consigne { text-align: center; font-size: 15px; text-shadow: 0 1px 3px rgba(0,0,0,.7); }
+  body.en-jeu .table > .chrono { width: 60%; }
+  body.en-jeu .depart { padding: 0; }
+  body.en-jeu .decompte { font-size: 52px; }
+  body.en-jeu .depart-qui { font-size: 17px; }
+  body.en-jeu .zone-main { position: static; border: 0; background: none; padding: 0; margin: 0; }
+  body.en-jeu .zone-main h3 { display: none; }
+  body.en-jeu .main { position: absolute; left: 50%; transform: translateX(-50%); bottom: max(6px, env(safe-area-inset-bottom)); width: min(50%, 560px); justify-content: center; flex-wrap: nowrap; margin: 0; padding-top: 0; min-height: 0; z-index: 2; }
+  body.en-jeu .main .carte { transform: translateY(var(--dy, 0px)) rotate(var(--r, 0deg)); transform-origin: 50% 130%; box-shadow: 0 6px 14px rgba(0,0,0,.45); }
+  body.en-jeu .main .carte.choisie { transform: translateY(calc(var(--dy, 0px) - 22px)) rotate(var(--r, 0deg)); }
+  body.en-jeu .actions { position: absolute; right: max(10px, env(safe-area-inset-right)); bottom: max(10px, env(safe-area-inset-bottom)); width: 150px; grid-template-columns: 1fr; gap: 6px; z-index: 2; }
+  body.en-jeu .actions .btn.large { padding: 10px 8px; font-size: 15px; border-radius: 14px; box-shadow: 0 4px 12px rgba(0,0,0,.4); }
+  body.en-jeu #zoneKatapss { position: absolute; right: max(14px, env(safe-area-inset-right)); top: 50%; transform: translateY(-50%); z-index: 2; }
+  body.en-jeu .btn.katapss { width: 112px; height: 112px; border-radius: 50%; padding: 0; font-size: 24px; letter-spacing: 1px; line-height: 1; border: 4px solid #ff8f86; box-shadow: 0 8px 0 #7d1d18, 0 12px 24px rgba(0,0,0,.5); }
+}
+@media (orientation: landscape) and (max-height: 430px) {
+  body.en-jeu .main .carte { width: 58px; height: 84px; }
+  body.en-jeu .main .carte .coin { font-size: 16px; }
+  body.en-jeu .main .carte .centre { font-size: 30px; }
+  body.en-jeu .poses .carte { width: 46px; height: 66px; }
+  body.en-jeu .poses .carte .centre { font-size: 22px; }
+  body.en-jeu .pose .groupe .carte + .carte { margin-left: -30px; }
+  body.en-jeu .btn.katapss { width: 96px; height: 96px; font-size: 21px; }
+}
+
+/* Accueil et salon en deux colonnes quand le téléphone est couché. */
+@media (orientation: landscape) and (min-width: 560px) {
+  #ecranAccueil { grid-template-columns: 1fr 1fr; column-gap: 28px; }
+  #ecranAccueil .rappel { grid-column: 1 / -1; }
+  #ecranSalon { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); column-gap: 24px; }
+  #ecranSalon .qr svg { width: 140px; height: 140px; }
+  #ecranSalon .code-geant { font-size: 52px; }
+  .app { max-width: 900px; }
+}
+
+/* Écran de démarrage */
+.splash { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; align-content: center; gap: 14px; background: radial-gradient(ellipse at 50% 45%, var(--table-2), #08131f 75%); transition: opacity .45s ease; }
+.splash.fini { opacity: 0; pointer-events: none; }
+.splash-logo { font-family: var(--display); font-size: min(28vw, 30vh, 170px); letter-spacing: .12em; padding-left: .12em; color: var(--brass); line-height: 1; text-shadow: 0 6px 30px rgba(226,176,74,.35); animation: entree .7s cubic-bezier(.2,1.4,.4,1) both; }
+.splash-couleurs { display: flex; gap: 22px; font-size: 34px; color: var(--ink); }
+.splash-couleurs span { animation: saut 1s ease-in-out infinite; }
+.splash-couleurs span:nth-child(2) { animation-delay: .12s; color: var(--bad); }
+.splash-couleurs span:nth-child(3) { animation-delay: .24s; color: var(--bad); }
+.splash-couleurs span:nth-child(4) { animation-delay: .36s; }
+.splash-sous { color: var(--muted); letter-spacing: 4px; text-transform: uppercase; font-size: 13px; }
+@keyframes entree { from { transform: scale(.5); opacity: 0; } }
+@keyframes saut { 0%, 100% { transform: none; } 50% { transform: translateY(-10px); } }
+@media (prefers-reduced-motion: reduce) { .splash-logo, .splash-couleurs span { animation: none; } }
 </style>
 </head>
 <body>
@@ -186,6 +271,7 @@ body.en-jeu .zone-main h3 { font-size: 13px; }
     <div class="logo">KOPO</div>
     <div class="info" id="info"></div>
     <div class="vocal" id="vocal" hidden></div>
+    <button class="btn" id="btnPleinEcranEntete" hidden title="Plein écran" aria-label="Plein écran">⛶</button>
     <button class="btn" id="btnQuitter" hidden>Quitter</button>
   </header>
   <div class="bandeau" id="bandeau" hidden></div>
@@ -193,14 +279,18 @@ body.en-jeu .zone-main h3 { font-size: 13px; }
 
   <!-- Accueil -->
   <section class="panneau" id="ecranAccueil" hidden>
-    <h2>Jouer entre amis</h2>
-    <p>De 2 à 9 joueurs, chacun sur son téléphone. Une personne crée la partie, les autres la rejoignent avec le code.</p>
-    <label class="champ">Ton pseudo<input class="texte" id="pseudo" maxlength="16" autocomplete="nickname" placeholder="Ex. Mundyo"></label>
-    <button class="btn principal large" id="btnCreer">Créer une partie</button>
-    <div class="ou">ou</div>
-    <label class="champ">Code de la partie<input class="texte code" id="codeRejoindre" maxlength="4" autocomplete="off" autocapitalize="characters" placeholder="ABCD"></label>
-    <button class="btn large" id="btnRejoindre">Rejoindre</button>
-    <div class="rappel">Rappel des règles
+    <div class="colonne">
+      <h2>Jouer entre amis</h2>
+      <p>De 2 à 9 joueurs, chacun sur son téléphone. Une personne crée la partie, les autres la rejoignent avec le code.</p>
+      <label class="champ">Ton pseudo<input class="texte" id="pseudo" maxlength="16" autocomplete="nickname" placeholder="Ex. Mundyo"></label>
+    </div>
+    <div class="colonne">
+      <button class="btn principal large" id="btnCreer">Créer une partie</button>
+      <div class="ou">ou</div>
+      <label class="champ">Code de la partie<input class="texte code" id="codeRejoindre" maxlength="4" autocomplete="off" autocapitalize="characters" placeholder="ABCD"></label>
+      <button class="btn large" id="btnRejoindre">Rejoindre</button>
+    </div>
+    <details class="rappel"><summary>Rappel des règles</summary>
       <ul>
         <li>Suis la couleur, ou ramasse la plus forte carte de la table (permis même pour bluffer).</li>
         <li>Si tout le monde suit, la plus forte carte relance, dans une autre couleur.</li>
@@ -208,7 +298,7 @@ body.en-jeu .zone-main h3 { font-size: 13px; }
         <li>4 cartes d'une même couleur à la distribution : annonce <b>Katapss</b> avant d'agir.</li>
         <li>Le dernier joueur qui garde des cartes est éliminé, jusqu'à la finale à deux.</li>
       </ul>
-    </div>
+    </details>
   </section>
 
   <!-- Connexion -->
@@ -220,22 +310,28 @@ body.en-jeu .zone-main h3 { font-size: 13px; }
 
   <!-- Salon -->
   <section class="panneau" id="ecranSalon" hidden>
+    <div class="colonne">
     <h2>Salon</h2>
     <p>Code de la partie :</p>
     <div class="code-geant" id="codeSalon"></div>
     <div class="qr" id="qr"></div>
     <div class="lien"><input class="texte" id="lienSalon" readonly><button class="btn" id="btnCopier">Copier</button></div>
     <div class="bandeau info-hote" id="noteHote" hidden>Tu es l'hôte : c'est ton téléphone qui fait tourner la partie. Garde cette page ouverte jusqu'à la fin.</div>
+    </div>
+    <div class="colonne">
     <div class="reglage" id="reglage"></div>
     <h3 style="margin:0;font-size:15px" id="titreJoueurs"></h3>
     <ul class="liste-joueurs" id="listeJoueurs"></ul>
     <button class="btn large" id="btnRobot" hidden>🤖 Ajouter un robot</button>
     <button class="btn principal large" id="btnLancer" hidden>Lancer la partie</button>
     <p id="attenteHote" hidden>En attente du lancement par l'hôte…</p>
+    </div>
   </section>
 
   <!-- Partie -->
   <section id="ecranPartie" hidden>
+    <div class="tapis" aria-hidden="true"></div>
+    <div class="tourner" id="tourner"><span>↻ Tourne ton téléphone pour voir la table en grand.</span><button class="btn" id="btnPleinEcran" hidden>Plein écran</button></div>
     <div class="sieges" id="sieges" aria-label="Joueurs, dans l'ordre de jeu"></div>
     <section class="table" aria-label="Table">
       <div class="table-entete" id="entete"></div>
@@ -252,6 +348,11 @@ body.en-jeu .zone-main h3 { font-size: 13px; }
   </section>
 </div>
 
+<div class="splash" id="splash" aria-hidden="true">
+  <div class="splash-logo">KOPO</div>
+  <div class="splash-couleurs"><span>♠</span><span>♥</span><span>♦</span><span>♣</span></div>
+  <div class="splash-sous">Jeu de cartes entre amis</div>
+</div>
 <div class="voile" id="voile" hidden><div class="fenetre" id="fenetre"></div></div>
 <div class="toast" id="toast" hidden role="status"></div>
 
@@ -499,6 +600,7 @@ body.en-jeu .zone-main h3 { font-size: 13px; }
   function quitter() {
     if (hote) { hote.reseau.fermer(); stock.effacer(PREFIXE + 'salle-' + hote.salle.code); stock.effacer(PREFIXE + 'cles-' + hote.salle.code); }
     if (client) client.reseau.fermer();
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
     vocal.arreter();
     hote = client = vueActuelle = null;
     session = null;
@@ -519,7 +621,20 @@ body.en-jeu .zone-main h3 { font-size: 13px; }
 
   // ------------------------------------------------------------------ affichage
   const ecrans = ['ecranAccueil', 'ecranConnexion', 'ecranSalon', 'ecranPartie'];
-  function montrerEcran(nom) { for (const e of ecrans) $(e).hidden = e !== nom; $('btnQuitter').hidden = nom === 'ecranAccueil'; document.body.classList.toggle('en-jeu', nom === 'ecranPartie'); }
+  function montrerEcran(nom) { for (const e of ecrans) $(e).hidden = e !== nom; $('btnQuitter').hidden = nom === 'ecranAccueil'; document.body.classList.toggle('en-jeu', nom === 'ecranPartie'); majPleinEcran(); }
+  // Plein écran (Android) : cache les barres du navigateur et bloque le téléphone en paysage.
+  const peutPleinEcran = !!(document.fullscreenEnabled && document.documentElement.requestFullscreen);
+  function majPleinEcran() {
+    const enJeu = document.body.classList.contains('en-jeu');
+    $('btnPleinEcran').hidden = !peutPleinEcran;
+    $('btnPleinEcranEntete').hidden = !peutPleinEcran || !enJeu || !!document.fullscreenElement;
+  }
+  function pleinEcran() {
+    document.documentElement.requestFullscreen({ navigationUI: 'hide' })
+      .then(() => { try { return screen.orientation.lock('landscape'); } catch (e) {} })
+      .catch(() => {});
+  }
+  document.addEventListener('fullscreenchange', majPleinEcran);
   function el(tag, cls, texte) { const e = document.createElement(tag); if (cls) e.className = cls; if (texte != null) e.textContent = texte; return e; }
   function montrerBandeau(t) { $('bandeau').textContent = t; $('bandeau').hidden = false; }
   function cacherBandeau() { $('bandeau').hidden = true; }
@@ -623,13 +738,25 @@ body.en-jeu .zone-main h3 { font-size: 13px; }
     const i0 = Math.max(0, m.sieges.indexOf(v.moi));
     const ordre = m.sieges.slice(i0).concat(m.sieges.slice(0, i0));
     const box = $('sieges'); box.replaceChildren();
+    // En paysage, les adversaires sont placés sur le bord de la table, de ta gauche à ta droite.
+    const autres = ordre.filter((id) => id !== v.moi);
     ordre.forEach((id) => {
       const d = el('div', 'siege');
+      const k = autres.indexOf(id);
+      if (k >= 0) {
+        const angle = Math.PI * (1 - (k + 0.5) / autres.length);
+        d.style.setProperty('--x', (50 + 41 * Math.cos(angle)).toFixed(1) + '%');
+        d.style.setProperty('--y', (50 - 37 * Math.sin(angle)).toFixed(1) + '%');
+      }
       const q = m.qualifies.findIndex((x) => x.joueur === id);
       const joueur = v.joueurs.find((j) => j.id === id) || {};
       if (id === m.joueurCourant) d.classList.add('courant');
       if (id === v.moi) d.classList.add('vous');
       if (q >= 0 || m.elimine === id) d.classList.add('sorti');
+      const eventail = el('div', 'eventail');
+      for (let c = 0; c < Math.min(m.nbCartes[id] || 0, 10); c++) eventail.append(el('span'));
+      if (m.nbCartes[id]) eventail.append(el('b', 'nb', String(m.nbCartes[id])));
+      d.append(eventail);
       const ligne = el('div', 'ligne');
       ligne.append(el('span', 'nom', (joueur.robot ? '🤖 ' : joueur.voix ? (joueur.muet ? '🔇 ' : '🎤 ') : '') + (id === v.moi ? 'Toi' : joueur.nom || '?')));
       if (m.nbCartes[id]) { const n = el('span', 'compte', String(m.nbCartes[id])); n.setAttribute('aria-label', m.nbCartes[id] + ' carte' + (m.nbCartes[id] > 1 ? 's' : '')); ligne.append(n); }
@@ -714,9 +841,14 @@ body.en-jeu .zone-main h3 { font-size: 13px; }
     }
     $('titreMain').textContent = `Ta main (${m.main.length} carte${m.main.length > 1 ? 's' : ''})` + (jouables.size ? ' · touche une carte' : '');
     const main = $('main'); main.replaceChildren();
-    for (const c of trierMain(m.main)) {
+    const triee = trierMain(m.main);
+    triee.forEach((c, i) => {
       const b = carteEl(c, 'button');
       b.type = 'button';
+      // Éventail (en paysage) : légère rotation et arc.
+      const ecart = i - (triee.length - 1) / 2;
+      b.style.setProperty('--r', (ecart * Math.min(2.5, 16 / triee.length)).toFixed(1) + 'deg');
+      b.style.setProperty('--dy', (ecart * ecart * Math.min(1, 8 / triee.length)).toFixed(1) + 'px');
       if (jouables.has(c)) {
         b.classList.add('jouable');
         if (c === carteChoisie) b.classList.add('choisie');
@@ -726,12 +858,11 @@ body.en-jeu .zone-main h3 { font-size: 13px; }
         };
       } else if (monTour) b.disabled = true;
       main.append(b);
-    }
+    });
     ajusterMain();
     const act = $('actions'); act.replaceChildren();
-    if (jouables.size) {
-      const b = el('button', 'btn principal large', carteChoisie ? `Jouer le ${K.afficher(carteChoisie)}` : 'Choisis une carte');
-      b.disabled = !carteChoisie;
+    if (carteChoisie) {
+      const b = el('button', 'btn principal large', `Jouer le ${K.afficher(carteChoisie)}`);
       b.onclick = () => jouerCarte(carteChoisie);
       act.append(b);
     }
@@ -758,7 +889,8 @@ body.en-jeu .zone-main h3 { font-size: 13px; }
     const w = main.children[0].offsetWidth, W = main.clientWidth;
     if (n * w + (n - 1) * 6 <= W) return;
     let parLigne = n;
-    if ((W - w) / (n - 1) < 30) parLigne = Math.ceil(n / 2);
+    const paysage = matchMedia('(orientation: landscape)').matches;
+    if (!paysage && (W - w) / (n - 1) < 30) parLigne = Math.ceil(n / 2);
     const pas = Math.min(w + 6, Math.floor((W - w) / Math.max(1, parLigne - 1)));
     main.style.setProperty('--pas', pas + 'px');
     main.classList.add('serree');
@@ -971,6 +1103,8 @@ body.en-jeu .zone-main h3 { font-size: 13px; }
   };
   $('codeRejoindre').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('btnRejoindre').click(); });
   $('btnLancer').onclick = () => envoyer({ type: 'lancer' });
+  $('btnPleinEcran').onclick = pleinEcran;
+  $('btnPleinEcranEntete').onclick = pleinEcran;
   $('btnRobot').onclick = () => envoyer({ type: 'ajouterRobot' });
   $('btnAnnuler').onclick = quitter;
   $('btnQuitter').onclick = () => demanderConfirmation(
@@ -982,6 +1116,7 @@ body.en-jeu .zone-main h3 { font-size: 13px; }
   };
 
   // ------------------------------------------------------------------ démarrage
+  setTimeout(() => { $('splash').classList.add('fini'); setTimeout(() => $('splash').remove(), 500); }, 1300);
   if (typeof mqtt === 'undefined' && !LOCAL) montrerBandeau("La bibliothèque réseau n'a pas pu se charger.");
   const codeLien = location.hash.slice(1).toUpperCase();
   if (session && (!/^[A-Z]{4}$/.test(codeLien) || codeLien === session.code)) {
