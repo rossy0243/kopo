@@ -381,7 +381,7 @@ ul.regles { margin: 0; padding-left: 18px; display: grid; gap: 8px; color: var(-
     </div>
     <div class="modes" id="modes">
       <button class="mode mode-creer" data-coin="♠" id="btnCreer"><span class="mode-icone">♠<span class="r">♥</span></span><b>Créer une partie</b><small>Entre amis, de 2 à 9</small></button>
-      <button class="mode mode-enligne" id="btnModeEnLigne" data-coin="♦" aria-disabled="true" title="Bientôt"><span class="mode-icone">🌍</span><b>En ligne</b><small>Avec des inconnus, salles de 6 à 9</small><span class="ruban">Bientôt</span></button>
+      <button class="mode mode-enligne" id="btnInconnus" data-coin="♦" aria-disabled="true" title="Bientôt"><span class="mode-icone">🌍</span><b>En ligne</b><small>Avec des inconnus <span id="enLigne"></span></small><span class="ruban">Bientôt</span></button>
       <button class="mode mode-rejoindre" data-coin="♥" id="btnModeRejoindre"><span class="mode-icone">⌗</span><b>Rejoindre</b><small>Avec un code ou le QR</small></button>
       <button class="mode mode-robots" data-coin="♣" id="btnModeRobots"><span class="mode-icone">🤖</span><b>Contre les robots</b><small>Partie rapide, seul</small></button>
       <div class="mode mode-bientot" data-coin="♠" aria-disabled="true"><span class="mode-icone">🏆</span><b>Tournoi</b><small>🔒 Bientôt</small></div>
@@ -1461,7 +1461,7 @@ ul.regles { margin: 0; padding-left: 18px; display: grid; gap: 8px; color: var(-
   $('btnBourse').onclick = () => fenetrePieces(0, lirePieces().bonusSerie || 0);
   function majAvatar() { const p = $('pseudo').value.trim(); $('avatar').textContent = p ? p[0].toUpperCase() : '?'; }
   $('pseudo').addEventListener('input', majAvatar);
-  $('btnModeEnLigne').onclick = () => { if ($('btnModeEnLigne').hasAttribute('aria-disabled')) toast('Les salles en ligne arrivent bientôt.'); };
+  $('btnInconnus').onclick = () => { if ($('btnInconnus').hasAttribute('aria-disabled')) toast('Les salles en ligne arrivent bientôt.'); };
   $('btnModeRejoindre').onclick = () => { $('voileRejoindre').hidden = false; setTimeout(() => $('codeRejoindre').focus(), 50); };
   $('btnFermerRejoindre').onclick = () => ($('voileRejoindre').hidden = true);
   $('btnModeRobots').onclick = () => { if (lirePseudo()) $('voileRobots').hidden = false; };
