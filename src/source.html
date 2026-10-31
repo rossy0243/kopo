@@ -1963,7 +1963,7 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
   }
   function connexionGoogle(supabaseUrl) {
     const retour = location.origin + location.pathname + location.search;
-    location.href = supabaseUrl.replace(/\/$/, '') + '/auth/v1/authorize?provider=google&redirect_to=' + encodeURIComponent(retour);
+    location.href = new URL(supabaseUrl).origin + '/auth/v1/authorize?provider=google&redirect_to=' + encodeURIComponent(retour);
   }
   (async function finirConnexionGoogle() {
     let jeton = null, erreur = null;
