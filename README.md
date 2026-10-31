@@ -24,7 +24,10 @@ Le dossier `server/` contient le serveur de la V1 (comptes, parties sur le serve
 - `moteur/` : moteur de règles (règlement v1.2) et ses tests.
 - `src/kopo-salle.js` : salle de jeu (salon, manches, chrono, vues par joueur) et ses tests.
 - `src/source.html` : écrans et réseau.
-- `vendor/` : MQTT.js, PeerJS et qrcode-generator (licences MIT).
+- `vendor/` : MQTT.js, colyseus.js, PeerJS et qrcode-generator (licences MIT).
+
+## Serveur
+Quand une adresse de serveur est renseignée (`SERVEUR_PAR_DEFAUT` dans `src/source.html`, ou `?serveur=https://…` dans l'adresse de la page), les parties, la mise en relation et le compteur en ligne passent par le serveur (`server/`). Sans adresse, le jeu garde le mode relais MQTT.
 
 ## Tests
 ```

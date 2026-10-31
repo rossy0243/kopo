@@ -152,6 +152,61 @@ async function jouerPartie(joueurs, { robots = 0 } = {}) {
     await assert.rejects(c.create('kopo', { jeton: x.jeton }));
   });
 
+  console.log('Salles publiques (joueurs inconnus)');
+  await test('salle publique de 3 : les inconnus s\'y retrouvent, elle démarre pleine, le 4e en ouvre une autre', async () => {
+    const client = new Client(URL_.replace('http', 'ws'));
+    const js = [];
+    for (const p of ['Pub1', 'Pub2', 'Pub3', 'Pub4']) js.push(await invite(p + Math.floor(Math.random() * 1000)));
+    const vues = new Map();
+    const entrer = async (j) => {
+      const r = await client.joinOrCreate('kopo', { jeton: j.jeton, publique: true, taille: 3 });
+      r.onMessage('vue', (v) => vues.set(j.compte.id, v)); r.onMessage('erreur', () => {}); r.onMessage('solde', () => {});
+      return r;
+    };
+    const a = await entrer(js[0]);
+    const b = await entrer(js[1]);
+    assert.strictEqual(a.roomId, b.roomId);
+    await attendre(100);
+    let enLigne = (await api('/api/en-ligne')).json;
+    const ouverte = enLigne.sallesOuvertes.find((x) => x.id === a.roomId);
+    assert.ok(ouverte && ouverte.taille === 3 && ouverte.joueurs === 2 && /^[A-Z]{4}$/.test(ouverte.code), JSON.stringify(enLigne));
+    const c = await entrer(js[2]);
+    assert.strictEqual(c.roomId, a.roomId);
+    await attendre(400);
+    assert.strictEqual(vues.get(js[0].compte.id).etat, 'manche', 'la salle pleine démarre seule');
+    enLigne = (await api('/api/en-ligne')).json;
+    assert.ok(!enLigne.sallesOuvertes.some((x) => x.id === a.roomId), 'plus annoncée une fois commencée');
+    const d = await entrer(js[3]);
+    assert.notStrictEqual(d.roomId, a.roomId, 'le 4e ouvre une nouvelle salle');
+    for (const r of [a, b, c, d]) await r.leave();
+  });
+  await test('un ami rejoint une salle publique avec son code ; une salle privée n\'est jamais proposée aux inconnus', async () => {
+    const client = new Client(URL_.replace('http', 'ws'));
+    const [x, y, z] = [await invite('Ami' + Date.now() % 1000), await invite('Ami' + (Date.now() + 1) % 1000), await invite('Inc' + Date.now() % 1000)];
+    const pub = await client.joinOrCreate('kopo', { jeton: x.jeton, publique: true, taille: 5 });
+    let code = null; pub.onMessage('vue', (v) => (code = v.code)); pub.onMessage('erreur', () => {});
+    await attendre(150);
+    const ami = await client.join('kopo', { jeton: y.jeton, code });
+    assert.strictEqual(ami.roomId, pub.roomId);
+    const prive = await client.create('kopo', { jeton: x.jeton, code: 'PRIV' });
+    const inc = await client.joinOrCreate('kopo', { jeton: z.jeton, publique: true, taille: 4 });
+    assert.notStrictEqual(inc.roomId, prive.roomId);
+    for (const r of [pub, ami, prive, inc]) await r.leave();
+  });
+  await test('émoji rapide relayé à toute la table', async () => {
+    const client = new Client(URL_.replace('http', 'ws'));
+    const [x, y] = [await invite('Emo' + Date.now() % 1000), await invite('Emi' + Date.now() % 1000)];
+    const a = await client.create('kopo', { jeton: x.jeton, code: 'EMOJ' });
+    const b = await client.join('kopo', { jeton: y.jeton, code: 'EMOJ' });
+    let recu = null;
+    b.onMessage('reaction', (e) => (recu = e)); a.onMessage('reaction', () => {});
+    [a, b].forEach((r) => { r.onMessage('vue', () => {}); r.onMessage('erreur', () => {}); });
+    a.send('reaction', { emoji: '🔥' });
+    await attendre(200);
+    assert.deepStrictEqual(recu, { type: 'reaction', joueur: x.compte.id, emoji: '🔥' });
+    await a.leave(); await b.leave();
+  });
+
   console.log('Tableau de bord admin');
   await test('code à deux facteurs (TOTP) : bon code accepté, mauvais refusé', () => {
     assert.ok(verifierTotp(TOTP, codeTotp(TOTP)));

@@ -275,6 +275,17 @@
         armerChrono(s);
         return { ok: true };
       }
+      case 'reaction': {
+        // Émoji rapide : rien ne change dans la partie, l'hôte (ou le serveur) le relaie à toute la table.
+        if (!joueur) return { ok: false, erreur: 'Inconnu.' };
+        const emoji = typeof msg.emoji === 'string' ? msg.emoji.trim() : '';
+        if (!emoji || emoji.length > 16 || /[<>]/.test(emoji)) return { ok: false, erreur: 'Réaction invalide.' };
+        s.reactions = s.reactions || {};
+        const t = s.horloge();
+        if (id in s.reactions && t - s.reactions[id] < 1000) return { ok: false, erreur: 'Doucement !' }; // une par seconde
+        s.reactions[id] = t;
+        return { ok: true, evenement: { type: 'reaction', joueur: id, emoji } };
+      }
       case 'reglages': {
         if (id !== s.hote || s.etat !== 'salon' || !DELAIS.includes(msg.delai)) return { ok: false, erreur: 'Impossible.' };
         s.delai = msg.delai;

@@ -551,6 +551,7 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
 <div id="calque" aria-hidden="true"></div>
 
 <script>/*MQTT*/</script>
+<script>/*COLYSEUS*/</script>
 <script>/*PEERJS*/</script>
 <script>/*QRCODE*/</script>
 <script>/*MOTEUR*/</script>
@@ -723,6 +724,7 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
         }
         this.ecouteurs.forEach((f) => f());
       };
+      if (MODE_SERVEUR) { lireEnLigneServeur(); setInterval(lireEnLigneServeur, 8000); return; }
       if (LOCAL) {
         const bc = new BroadcastChannel(PREFIXE + 'lobby');
         bc.onmessage = (e) => recevoir(e.data.sujet, e.data.d);
@@ -744,6 +746,7 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
     publier(sujet, d) { this.canaux.forEach((c) => c.publier(sujet, d)); },
     signaler(demande) { this.vus.set(monId, Date.now()); this.publier(SUJET_PRESENCE, demande ? { id: monId, demande: true } : { id: monId }); },
     enLigne() {
+      if (MODE_SERVEUR) return Math.max(1, lobbyServeur.joueurs);
       const limite = Date.now() - 20000;
       let n = 0;
       for (const [id, t] of this.vus) { if (t >= limite) n++; else this.vus.delete(id); }
@@ -751,6 +754,7 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
     },
     // Salles publiques encore ouvertes d'une taille donnée, la plus remplie d'abord.
     ouvertes(taille, exclus) {
+      if (MODE_SERVEUR) return lobbyServeur.salles.filter((x) => x.taille === taille && x.joueurs < x.taille).map((x) => ({ code: x.code, taille: x.taille, nb: x.joueurs })).sort((a, b) => b.nb - a.nb);
       const limite = Date.now() - 10000;
       return [...this.salles.values()].filter((x) => x.t >= limite && x.taille === taille && x.nb < x.taille && !(exclus || []).includes(x.code)).sort((a, b) => b.nb - a.nb);
     },
@@ -780,6 +784,7 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
   // Rejoint la salle publique la plus remplie de cette taille ; s'il n'y en a pas, en crée une.
   let rechercheEnCours = null;
   function chercherSalle(nom, taille, exclus) {
+    if (MODE_SERVEUR) return entrerServeur(nom, { taille }); // le serveur choisit la salle la plus adaptée
     afficherConnexion(`Recherche d'une salle de ${taille}…`);
     clearTimeout(rechercheEnCours);
     const debut = Date.now();
@@ -799,6 +804,90 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
     if (s.etat === 'salon' && s.joueurs.length < s.taille) { lobby.publier(SUJET_SALLES, { code: s.code, taille: s.taille, nb: s.joueurs.length }); hote.annonceFermee = false; }
     else if (!hote.annonceFermee) { hote.annonceFermee = true; lobby.publier(SUJET_SALLES, { code: s.code, ferme: true }); }
   }, 3000);
+
+  // ------------------------------------------------------------------ serveur Kopo (V1)
+  // Quand le serveur est en ligne, les parties tournent sur lui (salles Colyseus) au lieu du
+  // téléphone de l'hôte. Sans adresse de serveur, on garde le mode relais (MQTT) ci-dessus.
+  const SERVEUR_PAR_DEFAUT = ''; // à remplir avec l'adresse du serveur une fois déployé, ex. 'https://kopo-serveur.onrender.com'
+  const SERVEUR = (new URLSearchParams(location.search).get('serveur') || SERVEUR_PAR_DEFAUT).replace(/\/$/, '');
+  const MODE_SERVEUR = !!SERVEUR && !LOCAL && typeof Colyseus !== 'undefined';
+
+  // Compte invité : créé une fois avec le pseudo, puis gardé sur l'appareil.
+  async function compteServeur(pseudo) {
+    const c = stock.lire('kopo-compte-serveur');
+    if (c && c.serveur === SERVEUR && c.jeton) return c;
+    const r = await fetch(SERVEUR + '/api/invite', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pseudo }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.erreur || 'Le serveur ne répond pas.');
+    const n = { serveur: SERVEUR, jeton: j.jeton, compte: j.compte };
+    stock.ecrire('kopo-compte-serveur', n);
+    return n;
+  }
+
+  // facon : { creer: true } | { code } | { taille } (salle publique) | { reconnexion: jeton de reconnexion }
+  async function entrerServeur(nom, facon) {
+    clearTimeout(rechercheEnCours);
+    afficherConnexion(facon.taille ? `Recherche d'une salle de ${facon.taille}…` : facon.code ? 'Connexion à la partie ' + facon.code + '…' : 'Ouverture de la partie…');
+    let room;
+    try {
+      const c = await compteServeur(nom);
+      const cli = new Colyseus.Client(SERVEUR.replace(/^http/, 'ws'));
+      if (facon.reconnexion) room = await cli.reconnect(facon.reconnexion);
+      else if (facon.creer) room = await cli.create('kopo', { jeton: c.jeton, code: nouveauCode() });
+      else if (facon.code) room = await cli.join('kopo', { jeton: c.jeton, code: facon.code });
+      else room = await cli.joinOrCreate('kopo', { jeton: c.jeton, publique: true, taille: facon.taille });
+      brancherSalleServeur(cli, room, nom, facon);
+    } catch (e) {
+      if (facon.reconnexion && facon.code) return entrerServeur(nom, { code: facon.code, taille: facon.taille });
+      const m = String((e && e.message) || e);
+      const texte = /no rooms found|not found/i.test(m) ? 'Partie introuvable, ou elle a déjà commencé.' : m.includes('locked') ? 'La partie a déjà commencé.' : m || 'Connexion impossible.';
+      if (/Compte inconnu|Connexion requise/.test(m)) stock.effacer('kopo-compte-serveur');
+      quitter(); toast(texte);
+    }
+  }
+
+  function brancherSalleServeur(cli, room, nom, facon) {
+    client = { serveur: true, room, dernierMessage: Date.now(), reseau: {
+      envoyer: (msg) => { try { room.send(msg.type, msg); } catch (e) {} },
+      fermer: () => { client && (client.depart = true); try { room.leave(true); } catch (e) {} },
+      changerRelais() {},
+    } };
+    const moi = client;
+    const memoriser = (code) => {
+      session = { code, role: 'serveur', nom, taille: facon.taille || null, jetonReco: room.reconnectionToken };
+      stock.ecrire(cleSession, session);
+      majHash(code);
+    };
+    room.onMessage('vue', (v) => { cacherBandeau(); memoriser(v.code); afficher(v); });
+    room.onMessage('erreur', (t) => toast(t));
+    room.onMessage('solde', () => {});
+    room.onMessage('reaction', (e) => window.dispatchEvent(new CustomEvent('kopo-reaction', { detail: e })));
+    room.onMessage('exclu', (raison) => { quitter(); toast(raison || 'Tu as été exclu de la partie.'); });
+    room.onLeave((code) => {
+      if (moi !== client || moi.depart) return;
+      if (code === 4000 || code === 4001) { quitter(); toast(code === 4000 ? 'Ta partie est ouverte sur un autre appareil.' : 'Tu as été exclu de la partie.'); return; }
+      // Coupure réseau : le serveur garde la place 2 minutes.
+      montrerBandeau('Connexion perdue. Reconnexion…');
+      const essayer = (n) => cli.reconnect(room.reconnectionToken)
+        .then((r) => { if (moi === client) brancherSalleServeur(cli, r, nom, facon); })
+        .catch(() => { if (moi === client && n < 40) setTimeout(() => essayer(n + 1), 3000); else if (moi === client) { quitter(); toast('Connexion au serveur perdue.'); } });
+      essayer(0);
+    });
+    room.send('sync');
+    if (vocal.actif) vocal.signaler();
+  }
+
+  // Joueurs en ligne et salles publiques ouvertes, lus sur le serveur toutes les 8 s.
+  const lobbyServeur = { joueurs: 0, salles: [], lu: false };
+  async function lireEnLigneServeur() {
+    try {
+      const j = await (await fetch(SERVEUR + '/api/en-ligne')).json();
+      lobbyServeur.joueurs = j.joueurs || 0;
+      lobbyServeur.salles = (j.sallesOuvertes || []).filter((x) => TAILLES.includes(x.taille));
+      lobbyServeur.lu = true;
+      afficherEnLigne();
+    } catch (e) {}
+  }
 
   // ------------------------------------------------------------------ hôte
   // L'hôte est aussi un joueur : ses propres messages sont traités directement.
@@ -835,6 +924,12 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
 
   function traiter(id, msg) {
     const r = S.recevoir(hote.salle, id, msg);
+    if (r.ok && r.evenement) {
+      // Émoji rapide : relayé à toute la table, sans changer la partie.
+      for (const j of hote.salle.joueurs) if (j.id !== monId) hote.reseau.envoyer(j.id, r.evenement);
+      window.dispatchEvent(new CustomEvent('kopo-reaction', { detail: r.evenement }));
+      return;
+    }
     if (!r.ok) {
       if (id === monId) toast(r.erreur);
       else hote.reseau.envoyer(id, { type: 'erreur', texte: r.erreur, refus: msg && msg.type === 'rejoindre' });
@@ -881,6 +976,7 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
         client.dernierMessage = Date.now();
         cacherBandeau();
         if (msg.type === 'vue') afficher(msg.vue);
+        else if (msg.type === 'reaction') window.dispatchEvent(new CustomEvent('kopo-reaction', { detail: msg }));
         else if (msg.type === 'erreur') {
           if (msg.refus && taille) {
             // La salle publique vient de se remplir : on en cherche une autre de la même taille.
@@ -895,7 +991,7 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
   }
   // Signe de vie toutes les 2 s ; sans nouvelles de l'hôte depuis 10 s, on se reconnecte.
   setInterval(() => {
-    if (!client) return;
+    if (!client || client.serveur) return; // le serveur surveille lui-même la connexion
     client.reseau.envoyer({ type: 'ping' });
     if (vueActuelle && Date.now() - client.dernierMessage > 10000) {
       montrerBandeau("L'hôte ne répond plus. Reconnexion…");
@@ -1774,12 +1870,12 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
     stock.ecrire('kopo-pseudo', p);
     return p;
   }
-  $('btnCreer').onclick = () => { const p = lirePseudo(); if (p) demarrerHote(nouveauCode(), p, false); };
+  $('btnCreer').onclick = () => { const p = lirePseudo(); if (!p) return; if (MODE_SERVEUR) entrerServeur(p, { creer: true }); else demarrerHote(nouveauCode(), p, false); };
   $('btnRejoindre').onclick = () => {
     const p = lirePseudo(); if (!p) return;
     const code = $('codeRejoindre').value.trim().toUpperCase();
     if (!/^[A-Z]{4}$/.test(code)) { toast('Le code fait 4 lettres.'); return; }
-    demarrerClient(code, p);
+    if (MODE_SERVEUR) entrerServeur(p, { code }); else demarrerClient(code, p);
   };
   $('codeRejoindre').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('btnRejoindre').click(); });
   // Accueil : profil, cartes de modes, barre du bas.
@@ -1870,18 +1966,22 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
 
   // ------------------------------------------------------------------ démarrage
   setTimeout(() => { $('splash').classList.add('fini'); setTimeout(() => $('splash').remove(), 500); }, 1300);
-  if (typeof mqtt === 'undefined' && !LOCAL) montrerBandeau("La bibliothèque réseau n'a pas pu se charger.");
+  if (typeof mqtt === 'undefined' && !LOCAL && !MODE_SERVEUR) montrerBandeau("La bibliothèque réseau n'a pas pu se charger.");
   lobby.demarrer();
   const codeLien = location.hash.slice(1).toUpperCase();
   if (session && (!/^[A-Z]{4}$/.test(codeLien) || codeLien === session.code)) {
-    if (session.role === 'hote') demarrerHote(session.code, session.nom, true);
+    if (session.role === 'serveur' && MODE_SERVEUR) entrerServeur(session.nom, { reconnexion: session.jetonReco, code: session.code, taille: session.taille });
+    else if (session.role === 'serveur') { stock.effacer(cleSession); session = null; afficherAccueil(); }
+    else if (session.role === 'hote') demarrerHote(session.code, session.nom, true);
     else demarrerClient(session.code, session.nom, session.taille);
   } else {
     if (session) { stock.effacer(cleSession); session = null; }
     afficherAccueil();
   }
-  window.__kopo = { get vue() { return vueActuelle; }, monId };
+  window.__kopo = { get vue() { return vueActuelle; }, monId, MODE_SERVEUR };
+  window.kopoReaction = (emoji) => envoyer({ type: 'reaction', emoji }); // pour les émojis rapides (écoute : événement « kopo-reaction »)
   if (LOCAL) window.__kopo.afficher = afficher; // tests des animations
+  if (new URLSearchParams(location.search).has('test')) window.__kopo.envoyer = envoyer; // tests automatiques
 })();
 </script>
 </body>
