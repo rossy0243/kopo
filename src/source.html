@@ -29,9 +29,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--brass); out
 .app { max-width: 720px; margin: 0 auto; padding: 10px 12px 24px; display: grid; gap: 12px; }
 header { display: flex; align-items: center; gap: 10px; }
 .logo { font-family: var(--display); font-size: 36px; letter-spacing: 3px; color: var(--brass); line-height: 1; }
-.info { color: var(--muted); font-size: 14px; }
+.info { color: var(--muted); font-size: 14px; flex: 1; min-width: 0; }
 .info strong { color: var(--ink); }
-header .btn { margin-left: auto; padding: 6px 10px; font-size: 13px; }
+header .btn { padding: 6px 10px; font-size: 13px; flex: none; }
 .btn { border: 1px solid var(--line); background: rgba(255,255,255,.07); color: var(--ink); border-radius: 10px; padding: 11px 16px; font-weight: 600; }
 .btn:active:not(:disabled) { background: rgba(255,255,255,.14); }
 .btn:disabled { opacity: .35; cursor: not-allowed; }
@@ -124,8 +124,8 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
 .chrono.urgent span { background: var(--bad); }
 .secondes { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--brass); }
 .secondes.urgent { color: var(--bad); }
-.vocal { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; font-size: 13px; color: var(--muted); }
-.vocal .btn { padding: 7px 12px; font-size: 14px; }
+.vocal { display: flex; gap: 6px; align-items: center; flex: none; }
+header .vocal .btn { padding: 5px 9px; font-size: 15px; line-height: 1.2; }
 .vocal .btn.ouvert { background: rgba(63,191,127,.18); border-color: var(--good); color: var(--good); }
 .vocal .btn.coupe { background: rgba(239,107,95,.15); border-color: var(--bad); color: var(--bad); }
 .reglage { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; color: var(--muted); font-size: 14px; }
@@ -139,6 +139,45 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
 .suite-auto strong { color: var(--brass); font-size: 20px; font-variant-numeric: tabular-nums; }
 .chrono.barre-pause span { background: var(--muted); }
 .toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: #2a1716; color: #ffd7d3; border: 1px solid var(--bad); border-radius: 10px; padding: 10px 14px; z-index: 20; max-width: 90vw; font-size: 14px; }
+
+/* Partie sur téléphone : tout tient sur un écran, sans défilement. */
+#ecranPartie { display: grid; gap: 8px; }
+.siege .ligne { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.siege .ligne .nom { flex: 1; min-width: 0; }
+.siege .compte { display: inline-flex; align-items: center; gap: 3px; font-weight: 700; font-size: 14px; font-variant-numeric: tabular-nums; }
+.siege .compte::before { content: ''; width: 9px; height: 13px; border-radius: 2px; background: repeating-linear-gradient(45deg, var(--brass) 0 3px, #9c7524 3px 6px); }
+.siege .pastille { justify-self: start; }
+.siege .chrono { height: 3px; }
+.siege.courant { background: rgba(226,176,74,.16); }
+.poses.serre { gap: 6px; min-height: 80px; }
+.poses.serre .carte { width: 42px; height: 60px; padding: 2px 4px; }
+.poses.serre .carte .coin { font-size: 13px; }
+.poses.serre .carte .centre { font-size: 20px; }
+.poses.serre .pose .groupe .carte + .carte { margin-left: -28px; }
+.poses.serre .pose, .poses.serre .pose .legende { max-width: 70px; }
+.main { padding-top: 12px; margin-top: -12px; }
+.main.serree { gap: 6px 0; padding-right: calc(66px - var(--pas, 66px)); }
+.main.serree .carte { margin-right: calc(var(--pas, 66px) - 66px); }
+.actions { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
+.actions .btn.large { font-size: 16px; padding: 13px 8px; }
+body.en-jeu .app { height: 100vh; height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 8px; padding: 6px 8px 8px; }
+body.en-jeu .logo { font-size: 28px; letter-spacing: 2px; }
+body.en-jeu .info { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body.en-jeu #ecranPartie { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+body.en-jeu .sieges { flex: none; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 4px; }
+body.en-jeu .siege { padding: 4px 7px; gap: 2px; border-radius: 8px; }
+body.en-jeu .siege .nom { font-size: 13px; }
+body.en-jeu .siege .pastille { font-size: 10px; padding: 0 6px; }
+body.en-jeu .table { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 14px; }
+body.en-jeu .poses { flex: 1 0 auto; align-content: center; min-height: 90px; }
+body.en-jeu .consigne { font-size: 16px; }
+body.en-jeu .zone-main { flex: none; padding: 8px 10px 10px; gap: 8px; border-radius: 14px; }
+body.en-jeu .zone-main h3 { font-size: 13px; }
+/* Écran trop bas (téléphone couché) : la page défile normalement. */
+@media (max-height: 520px) {
+  body.en-jeu .app { height: auto; display: grid; }
+  body.en-jeu .table { overflow: visible; }
+}
 </style>
 </head>
 <body>
@@ -146,10 +185,10 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
   <header>
     <div class="logo">KOPO</div>
     <div class="info" id="info"></div>
+    <div class="vocal" id="vocal" hidden></div>
     <button class="btn" id="btnQuitter" hidden>Quitter</button>
   </header>
   <div class="bandeau" id="bandeau" hidden></div>
-  <div class="vocal" id="vocal" hidden></div>
   <div id="audios" hidden></div>
 
   <!-- Accueil -->
@@ -196,7 +235,7 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
   </section>
 
   <!-- Partie -->
-  <section id="ecranPartie" hidden style="display:grid;gap:12px">
+  <section id="ecranPartie" hidden>
     <div class="sieges" id="sieges" aria-label="Joueurs, dans l'ordre de jeu"></div>
     <section class="table" aria-label="Table">
       <div class="table-entete" id="entete"></div>
@@ -480,7 +519,7 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
 
   // ------------------------------------------------------------------ affichage
   const ecrans = ['ecranAccueil', 'ecranConnexion', 'ecranSalon', 'ecranPartie'];
-  function montrerEcran(nom) { for (const e of ecrans) $(e).hidden = e !== nom; $('btnQuitter').hidden = nom === 'ecranAccueil'; }
+  function montrerEcran(nom) { for (const e of ecrans) $(e).hidden = e !== nom; $('btnQuitter').hidden = nom === 'ecranAccueil'; document.body.classList.toggle('en-jeu', nom === 'ecranPartie'); }
   function el(tag, cls, texte) { const e = document.createElement(tag); if (cls) e.className = cls; if (texte != null) e.textContent = texte; return e; }
   function montrerBandeau(t) { $('bandeau').textContent = t; $('bandeau').hidden = false; }
   function cacherBandeau() { $('bandeau').hidden = true; }
@@ -578,7 +617,7 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
     const m = v.manche;
     const finale = v.restants.length === 2;
     $('info').innerHTML = '';
-    $('info').append(el('strong', null, finale ? 'Finale' : 'Manche ' + v.numeroManche), document.createTextNode(` · ${m.sieges.length} joueurs · ${v.code}`));
+    $('info').append(el('strong', null, finale ? 'Finale' : 'Manche ' + v.numeroManche), document.createTextNode(` · ${v.code}`));
 
     // Sièges, en partant de moi, dans le sens des aiguilles d'une montre.
     const i0 = Math.max(0, m.sieges.indexOf(v.moi));
@@ -591,13 +630,14 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
       if (id === m.joueurCourant) d.classList.add('courant');
       if (id === v.moi) d.classList.add('vous');
       if (q >= 0 || m.elimine === id) d.classList.add('sorti');
-      d.append(el('div', 'nom', (joueur.robot ? '🤖 ' : joueur.voix ? (joueur.muet ? '🔇 ' : '🎤 ') : '') + (id === v.moi ? 'Toi' : joueur.nom || '?')));
-      const dos = el('div', 'dos');
-      for (let k = 0; k < m.nbCartes[id]; k++) dos.append(el('span'));
-      d.append(dos);
+      const ligne = el('div', 'ligne');
+      ligne.append(el('span', 'nom', (joueur.robot ? '🤖 ' : joueur.voix ? (joueur.muet ? '🔇 ' : '🎤 ') : '') + (id === v.moi ? 'Toi' : joueur.nom || '?')));
+      if (m.nbCartes[id]) { const n = el('span', 'compte', String(m.nbCartes[id])); n.setAttribute('aria-label', m.nbCartes[id] + ' carte' + (m.nbCartes[id] > 1 ? 's' : '')); ligne.append(n); }
+      d.append(ligne);
+      if (id === m.joueurCourant) d.setAttribute('aria-current', 'true');
       if (q >= 0) d.append(el('span', 'pastille ok', m.qualifies[q].raison === 'Katapss' ? 'Katapss ✓' : `qualifié ${q + 1}e`.replace('1e', '1er')));
       else if (m.elimine === id) d.append(el('span', 'pastille ko', 'éliminé'));
-      else if (id === m.joueurCourant) { d.append(el('span', 'pastille tour', 'à jouer')); if (v.chrono) { const c = el('div', 'chrono chrono-siege'); c.append(el('span')); d.append(c); } }
+      else if (id === m.joueurCourant && v.chrono && !m.pause) { const c = el('div', 'chrono chrono-siege'); c.append(el('span')); d.append(c); }
       if (!joueur.connecte && !joueur.robot) {
         d.append(el('span', 'pastille ko', 'déconnecté'));
         if (v.hote === v.moi && v.restants.includes(id)) {
@@ -618,6 +658,7 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
     let forte = null;
     m.table.forEach((p, i) => { if (p.compte) for (const c of p.cartes) if (!forte || K.valeur(c) > K.valeur(forte.carte)) forte = { carte: c, i }; });
     const poses = $('poses'); poses.replaceChildren();
+    poses.classList.toggle('serre', m.table.length > 4);
     const qui = (id) => (id === v.moi ? 'Toi' : nom(v, id));
     if (pause && pause.type === 'depart') {
       // Compte à rebours de départ, avec le joueur qui commence.
@@ -671,7 +712,7 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
       b.onclick = () => { b.disabled = true; envoyer({ type: 'action', action: { type: 'katapss' } }); };
       zk.append(b);
     }
-    $('titreMain').textContent = `Ta main (${m.main.length} carte${m.main.length > 1 ? 's' : ''})` + (jouables.size ? ' · touche une carte pour la choisir' : '');
+    $('titreMain').textContent = `Ta main (${m.main.length} carte${m.main.length > 1 ? 's' : ''})` + (jouables.size ? ' · touche une carte' : '');
     const main = $('main'); main.replaceChildren();
     for (const c of trierMain(m.main)) {
       const b = carteEl(c, 'button');
@@ -686,6 +727,7 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
       } else if (monTour) b.disabled = true;
       main.append(b);
     }
+    ajusterMain();
     const act = $('actions'); act.replaceChildren();
     if (jouables.size) {
       const b = el('button', 'btn principal large', carteChoisie ? `Jouer le ${K.afficher(carteChoisie)}` : 'Choisis une carte');
@@ -706,6 +748,22 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
     }
 
   }
+
+  // Ta main sur une seule ligne : si les cartes ne tiennent pas, elles se chevauchent
+  // (le coin de chaque carte reste visible). Au-delà, elles passent sur deux lignes.
+  function ajusterMain() {
+    const main = $('main'), n = main.children.length;
+    main.classList.remove('serree');
+    if (n < 2 || main.offsetParent === null) return;
+    const w = main.children[0].offsetWidth, W = main.clientWidth;
+    if (n * w + (n - 1) * 6 <= W) return;
+    let parLigne = n;
+    if ((W - w) / (n - 1) < 30) parLigne = Math.ceil(n / 2);
+    const pas = Math.min(w + 6, Math.floor((W - w) / Math.max(1, parLigne - 1)));
+    main.style.setProperty('--pas', pas + 'px');
+    main.classList.add('serree');
+  }
+  window.addEventListener('resize', ajusterMain);
 
   // ------------------------------------------------------------------ chrono (affichage)
   // L'hôte envoie le temps restant ; chaque téléphone le décompte avec sa propre horloge.
@@ -828,19 +886,21 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
       box.hidden = !this.vue;
       if (!this.vue) return;
       box.replaceChildren();
-      if (LOCAL) { box.append(el('span', null, 'Micro indisponible en mode test.')); return; }
+      if (LOCAL) { box.hidden = true; return; }
+      const etiquette = (b, texte) => { b.title = texte; b.setAttribute('aria-label', texte); return b; };
       if (!this.actif) {
-        const b = el('button', 'btn', '🎙️ Activer le micro');
+        const b = etiquette(el('button', 'btn', '🎙️ Micro'), 'Activer le micro pour discuter avec les autres');
         b.onclick = () => this.activer();
-        box.append(b, el('span', null, 'pour discuter avec les autres'));
+        box.append(b);
         return;
       }
-      const m = el('button', 'btn ' + (this.muet ? 'coupe' : 'ouvert'), this.muet ? '🔇 Micro coupé' : '🎤 Micro ouvert');
-      m.onclick = () => this.basculerMicro();
-      const so = el('button', 'btn' + (this.sonCoupe ? ' coupe' : ''), this.sonCoupe ? '🔈 Son coupé' : '🔊 Son');
-      so.onclick = () => this.basculerSon();
       const n = this.vue.joueurs.filter((j) => j.voix && j.id !== this.vue.moi).length;
-      box.append(m, so, el('span', null, n ? `${n} autre${n > 1 ? 's' : ''} en vocal` : 'personne d\'autre en vocal'));
+      const enVocal = n ? ` (${n} autre${n > 1 ? 's' : ''} en vocal)` : " (personne d'autre en vocal)";
+      const m = etiquette(el('button', 'btn ' + (this.muet ? 'coupe' : 'ouvert'), this.muet ? '🔇' : '🎤'), (this.muet ? 'Micro coupé, toucher pour parler' : 'Micro ouvert, toucher pour couper') + enVocal);
+      m.onclick = () => this.basculerMicro();
+      const so = etiquette(el('button', 'btn' + (this.sonCoupe ? ' coupe' : ''), this.sonCoupe ? '🔈' : '🔊'), this.sonCoupe ? 'Son des autres coupé, toucher pour le remettre' : 'Couper le son des autres');
+      so.onclick = () => this.basculerSon();
+      box.append(m, so);
     },
   };
 
