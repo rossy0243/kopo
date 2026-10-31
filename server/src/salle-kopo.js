@@ -20,11 +20,16 @@ class SalleKopo extends Room {
     this.code = options.code && /^[A-Z]{4}$/.test(options.code) ? options.code : nouveauCode();
     this.publique = !!options.publique;
     this.salle = S.creerSalle(this.code);
+    // Salle publique : N joueurs inconnus, elle démarre seule quand elle est pleine.
+    this.taille = this.publique ? Math.min(S.MAX, Math.max(S.MIN, Number(options.taille) || S.MAX)) : null;
+    if (this.publique) { S.rendrePublique(this.salle, this.taille); this.maxClients = this.taille; }
+    // Les amis peuvent aussi rejoindre une salle publique avec son code.
+    if (this.listing) this.listing.code = this.code;
     if (options.rapide && process.env.KOPO_TESTS === '1') this.salle.durees = { depart: 0, finTour: 0, mancheAuto: 1 }; // tests seulement
     this.clientsParId = new Map();
     this.comptes = new Map(); // id -> compte (au moment de l'entrée)
     this.partie = null; // { id, katapss: Map, abandons: Set, enregistree }
-    this.setMetadata({ code: this.code, publique: this.publique, etat: 'salon', joueurs: 0 });
+    this.setMetadata({ code: this.code, publique: this.publique, taille: this.taille, etat: 'salon', joueurs: 0 });
     salles.add(this);
 
     this.onMessage('*', (client, type, msg) => this.recevoir(client, type, msg));
@@ -75,9 +80,11 @@ class SalleKopo extends Room {
     if (!id) return;
     msg = Object.assign({}, msg && typeof msg === 'object' ? msg : {}, { type });
     if (type === 'rejoindre') return; // l'entrée passe par onJoin
+    if (type === 'sync') { client.send('vue', S.vue(this.salle, id)); return; } // la page demande sa vue dès qu'elle écoute
     if (type === 'micro' && this.comptes.get(id) && this.comptes.get(id).micro_coupe) msg.voix = false; // sanction
     const r = S.recevoir(this.salle, id, msg);
     if (!r.ok) { client.send('erreur', r.erreur); return; }
+    if (r.evenement) { this.broadcast(r.evenement.type, r.evenement); return; } // émoji rapide : relayé à toute la table
     if (type === 'action' && msg.action && msg.action.type === 'katapss' && this.partie) this.partie.katapss.set(id, (this.partie.katapss.get(id) || 0) + 1);
     this.apresChangement();
   }
@@ -91,7 +98,10 @@ class SalleKopo extends Room {
       this.partie.enregistree = true;
       this.enregistrerPartie().catch((e) => console.error('Enregistrement de partie :', e.message));
     }
-    this.setMetadata({ code: this.code, publique: this.publique, etat: s.etat, joueurs: s.joueurs.filter((j) => !j.robot).length });
+    // Une partie commencée ne reçoit plus de nouveaux joueurs (seulement les reconnexions).
+    if (s.etat !== 'salon' && !this.locked) this.lock();
+    if (s.etat === 'salon' && this.locked && s.joueurs.length < (this.publique ? this.taille : S.MAX)) this.unlock();
+    this.setMetadata({ code: this.code, publique: this.publique, taille: this.taille, etat: s.etat, joueurs: s.joueurs.filter((j) => !j.robot).length });
     for (const [id, c] of this.clientsParId) c.send('vue', S.vue(s, id));
   }
 

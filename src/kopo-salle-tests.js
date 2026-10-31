@@ -479,6 +479,18 @@ test('Une partie entre amis ne démarre jamais seule', () => {
   assert.strictEqual(s.etat, 'salon');
 });
 
+console.log('\nÉmojis rapides');
+test('Une réaction est relayée à toute la table, une par seconde au plus', () => {
+  const s = salleAvec(2);
+  let t = 0; s.horloge = () => t;
+  const r = S.recevoir(s, 'p2', { type: 'reaction', emoji: '😂' });
+  assert.deepStrictEqual(r, { ok: true, evenement: { type: 'reaction', joueur: 'p2', emoji: '😂' } });
+  assert.ok(!S.recevoir(s, 'p2', { type: 'reaction', emoji: '👍' }).ok, 'trop rapide');
+  t += 1000; assert.ok(S.recevoir(s, 'p2', { type: 'reaction', emoji: '👍' }).ok);
+  assert.ok(!S.recevoir(s, 'p1', { type: 'reaction', emoji: '<b>' }).ok);
+  assert.ok(!S.recevoir(s, 'intrus', { type: 'reaction', emoji: '👍' }).ok);
+});
+
 console.log('\nMélange');
 test('Distribution équitable : chaque valeur sort aussi souvent (20 000 donnes)', () => {
   const compte = {};

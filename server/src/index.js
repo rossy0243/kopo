@@ -42,12 +42,12 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
   app.get('/api/en-ligne', async (req, res) => {
     let joueurs = 0; for (const s of salles) joueurs += s.clientsParId.size;
     const ouvertes = (await matchMaker.query({ name: 'kopo' })).filter((r) => r.metadata && r.metadata.publique && r.metadata.etat === 'salon' && !r.locked);
-    res.json({ joueurs, sallesOuvertes: ouvertes.map((r) => ({ id: r.roomId, joueurs: r.clients })) });
+    res.json({ joueurs, sallesOuvertes: ouvertes.map((r) => ({ id: r.roomId, code: r.metadata.code, taille: r.metadata.taille, joueurs: r.clients })) });
   });
 
   const serveurHttp = http.createServer(app);
   const jeu = new Server({ transport: new WebSocketTransport({ server: serveurHttp, pingInterval: 5000, pingMaxRetries: 3 }) });
-  jeu.define('kopo', SalleKopo).filterBy(['code']);
+  jeu.define('kopo', SalleKopo).filterBy(['code', 'publique', 'taille']);
   await new Promise((ok) => serveurHttp.listen(port, ok));
   const adresse = serveurHttp.address();
   console.log(`Kopo : serveur prêt sur le port ${adresse.port} (base : ${base.genre}).`);
