@@ -10,7 +10,7 @@ Dans le jeu : sprite intégré en tête de `#ecranAccueil` dans `src/source.html
 2. **Trait unique** : épaisseur 2,2 sur 32, extrémités et angles arrondis, pas de remplissage (sauf pour masquer une carte placée derrière).
 3. **Couleur** : un seul ton, le laiton `#e2b04a` sur le fond bleu nuit (`#10233a` / `#183252`). Sur la carte dorée, l'encre est `#1d1606`. Grisé (`--muted #9fb2c8`) pour « Bientôt ».
 4. **Une seule touche de rouge** au plus (`#c7362f`). C'est le petit carreau ♦ ou un point, jamais une grande surface.
-5. **Pas d'emoji ni d'icônes génériques** dans les menus. Les seuls symboles admis sont les quatre couleurs ♠ ♥ ♦ ♣ (coins des cartes de menu).
+5. **Pas d'emoji ni d'icônes génériques** dans les menus. Les seuls symboles admis sont les quatre couleurs ♠ ♥ ♦ ♣ (coins des cartes de menu). Exception : les réactions rapides en partie restent des emojis (elles servent à s'exprimer).
 6. **Tailles** : lisibles de 24 à 48 px. En dessous de 24 px, on retire la touche de rouge.
 
 ## Icônes existantes
@@ -25,6 +25,15 @@ Dans le jeu : sprite intégré en tête de `#ecranAccueil` dans `src/source.html
 | `i-regles` | Règles | carte avec lignes de texte, ♦ rouge |
 | `i-plein` | Plein écran | quatre coins autour d'une petite carte |
 | `i-reglages` | Paramètres | carte avec trois curseurs, dont un rouge |
+| `i-couronne` | Gagne le tour | couronne, ♦ rouge |
+| `i-drapeau` | Joueur sorti | drapeau, ♦ rouge |
+| `i-ramasse` | Ramasse | flèche qui descend d'une carte |
+| `i-horsligne` | Déconnecté | carte et ondes barrées de rouge |
+| `i-chrono` | Temps écoulé | chronomètre |
+| `i-micro` / `i-micro-coupe` | Micro | micro, barré de rouge si coupé |
+| `i-son` / `i-son-coupe` | Son des autres | haut-parleur, croix rouge si coupé |
+| `i-oeil` | Spectateur | œil, pupille rouge |
+| `i-depart` | Qui commence | carte avec un triangle « lecture » |
 | `i-cadenas` | Bientôt / verrouillé | cadenas |
 | pièce « K » | Pièces | disque doré dégradé avec un K en Bebas Neue |
 

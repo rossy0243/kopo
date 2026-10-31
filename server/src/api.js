@@ -67,9 +67,12 @@ function routesJoueurs({ base, auth, comptes, reglages }) {
 
   r.get('/moi', joueur, enveloppe(async (req, res) => {
     await comptes.presence(req.compte.id);
-    res.json({ compte: publicCompte(req.compte), lie: !!req.compte.auth_id });
+    res.json({ compte: publicCompte(req.compte), lie: !!req.compte.auth_id, quotaPseudo: await comptes.quotaPseudo(req.compte.id) });
   }));
-  r.patch('/moi', joueur, enveloppe(async (req, res) => res.json({ compte: publicCompte(await comptes.changerProfil(req.compte.id, req.body)) })));
+  r.patch('/moi', joueur, enveloppe(async (req, res) => {
+    const compte = await comptes.changerProfil(req.compte.id, req.body);
+    res.json({ compte: publicCompte(compte), quotaPseudo: await comptes.quotaPseudo(req.compte.id) });
+  }));
   r.delete('/moi', joueur, enveloppe(async (req, res) => { await comptes.supprimer(req.compte.id); res.json({ ok: true }); }));
 
   r.post('/bonus-du-jour', joueur, enveloppe(async (req, res) => res.json(await comptes.bonusDuJour(req.compte.id))));

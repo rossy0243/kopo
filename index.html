@@ -268,6 +268,10 @@ details.rappel summary { cursor: pointer; font-weight: 600; }
 .carte { position: relative; }
 .volante { position: fixed; margin: 0 !important; z-index: 16; will-change: transform; box-shadow: 0 10px 22px rgba(0,0,0,.45); }
 .carte.verso::after, .carte.dos-carte::after { content: ''; position: absolute; inset: 0; border-radius: inherit; border: 2px solid #f3e3bd; background: repeating-linear-gradient(45deg, var(--brass) 0 4px, #9c7524 4px 8px); }
+.bulle .ico { width: .95em; height: .95em; padding: .22em; box-sizing: content-box; color: var(--brass); background: var(--table); border: 2px solid var(--brass); border-radius: 50%; vertical-align: middle; }
+.btn .ico, .nom .ico, .liste-joueurs .ico, .depart-qui .ico, .consigne .ico { width: 1.2em; height: 1.2em; color: var(--brass); vertical-align: -.25em; }
+.nom .ico, .btn.principal .ico, .btn.coupe .ico { color: inherit; }
+.trophee .ico { width: 1em; height: 1em; color: var(--brass); }
 .bulle { position: fixed; transform: translate(-50%, -50%); font-size: 30px; font-weight: 700; line-height: 1; white-space: nowrap; filter: drop-shadow(0 3px 6px rgba(0,0,0,.7)); }
 .bulle.texte { font-size: 16px; padding: 5px 10px; border-radius: 99px; background: var(--good); color: #062014; }
 .bulle.ko { font-size: 46px; color: var(--bad); }
@@ -300,6 +304,7 @@ body.accueil .app { max-width: none; min-height: 100vh; min-height: 100dvh; padd
 .profil-champ input { background: none; border: 0; color: var(--ink); font: inherit; font-weight: 700; font-size: 16px; width: 130px; padding: 0; }
 .profil-champ input:focus { outline: none; }
 .profil:focus-within { border-color: var(--brass); }
+.profil.fige { cursor: pointer; } .profil.fige input { cursor: pointer; pointer-events: none; }
 .bourse { margin-left: auto; display: flex; align-items: center; gap: 7px; background: rgba(0,0,0,.3); border: 1px solid rgba(226,176,74,.45); border-radius: 99px; padding: 4px 12px 4px 4px; color: var(--ink); font: inherit; cursor: pointer; }
 .bourse + .profil { margin-left: 0; }
 .bourse:active { transform: scale(.96); }
@@ -492,6 +497,17 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
   <symbol id="i-regles" viewBox="0 0 32 32"><rect x="8" y="4" width="16" height="24" rx="2.5"/><path d="M12 10h8M12 14.5h8M12 19h5"/><path style="fill:var(--acc,#c7362f);stroke:none" d="M20 20.5l1.8 2.4-1.8 2.4-1.8-2.4z"/></symbol>
   <symbol id="i-plein" viewBox="0 0 32 32"><path d="M5 11V5h6M21 5h6v6M27 21v6h-6M11 27H5v-6"/><rect x="12" y="10" width="8" height="12" rx="1.6"/></symbol>
   <symbol id="i-reglages" viewBox="0 0 32 32"><rect x="8" y="4" width="16" height="24" rx="2.5"/><path d="M12 10h8M12 16h8M12 22h8"/><circle cx="15" cy="10" r="1.8" style="fill:var(--fond)"/><circle cx="18.5" cy="16" r="1.8" style="fill:var(--fond)"/><circle cx="14" cy="22" r="1.8" style="fill:var(--acc,#c7362f);stroke:none"/></symbol>
+  <symbol id="i-couronne" viewBox="0 0 32 32"><path d="M6 24L4.5 10l6.5 5.5L16 7l5 8.5 6.5-5.5L26 24z"/><path d="M7 28h18"/><path style="fill:var(--acc,#c7362f);stroke:none" d="M16 16.5l1.8 2.4-1.8 2.4-1.8-2.4z"/></symbol>
+  <symbol id="i-drapeau" viewBox="0 0 32 32"><path d="M9 28V4M9 6h14l-3.5 5 3.5 5H9"/><path style="fill:var(--acc,#c7362f);stroke:none" d="M14.5 8.6l1.6 2.2-1.6 2.2-1.6-2.2z"/></symbol>
+  <symbol id="i-ramasse" viewBox="0 0 32 32"><rect x="10" y="3" width="12" height="16" rx="2.5"/><path d="M16 21v7M12.5 24.5L16 28l3.5-3.5"/></symbol>
+  <symbol id="i-horsligne" viewBox="0 0 32 32"><rect x="11" y="7" width="10" height="15" rx="2"/><path d="M7.5 10.5a7 7 0 0 0 0 8M24.5 10.5a7 7 0 0 1 0 8"/><path style="stroke:var(--acc,#c7362f)" d="M5 4l22 22"/></symbol>
+  <symbol id="i-chrono" viewBox="0 0 32 32"><circle cx="16" cy="18" r="10"/><path d="M16 18v-5.5M16 18l4 2.5M12.5 4h7M16 4v4"/></symbol>
+  <symbol id="i-micro" viewBox="0 0 32 32"><rect x="12" y="4" width="8" height="15" rx="4"/><path d="M8 15a8 8 0 0 0 16 0M16 23v5M12 28h8"/></symbol>
+  <symbol id="i-micro-coupe" viewBox="0 0 32 32"><rect x="12" y="4" width="8" height="15" rx="4"/><path d="M8 15a8 8 0 0 0 16 0M16 23v5M12 28h8"/><path style="stroke:var(--acc,#c7362f)" d="M5 4l22 22"/></symbol>
+  <symbol id="i-son" viewBox="0 0 32 32"><path d="M5 12h5l7-6v20l-7-6H5z"/><path d="M21 11.5a6 6 0 0 1 0 9M24.5 8a11 11 0 0 1 0 16"/></symbol>
+  <symbol id="i-son-coupe" viewBox="0 0 32 32"><path d="M5 12h5l7-6v20l-7-6H5z"/><path style="stroke:var(--acc,#c7362f)" d="M21 12.5l7 7M28 12.5l-7 7"/></symbol>
+  <symbol id="i-oeil" viewBox="0 0 32 32"><path d="M3 16s5-9 13-9 13 9 13 9-5 9-13 9S3 16 3 16z"/><circle cx="16" cy="16" r="4"/><circle cx="16" cy="16" r="1.4" style="fill:var(--acc,#c7362f);stroke:none"/></symbol>
+  <symbol id="i-depart" viewBox="0 0 32 32"><rect x="8" y="4" width="16" height="24" rx="2.5"/><path d="M14 11.5l6 4.5-6 4.5z"/></symbol>
   <symbol id="i-cadenas" viewBox="0 0 32 32"><rect x="8" y="14" width="16" height="13" rx="2.5"/><path d="M11.5 14v-3.5a4.5 4.5 0 0 1 9 0V14M16 19v3"/></symbol>
   </defs>
 </svg>
@@ -515,7 +531,7 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
     <div class="hub-haut">
       <div class="logo"><img class="marque" src="icons/kopo-logo.svg" alt="">KOPO</div>
       <button class="bourse" id="btnBourse" title="Tes pièces d'essai"><span class="piece" aria-hidden="true">K</span><span class="bourse-txt"><b id="solde">500</b><small>pièces d'essai</small></span></button>
-      <label class="profil" title="Ton pseudo">
+      <label class="profil" id="profil" title="Ton pseudo">
         <span class="avatar" id="avatar">?</span>
         <span class="profil-champ"><small>Ton pseudo</small><input id="pseudo" maxlength="16" autocomplete="nickname" placeholder="Ex. As_de_Pique"></span>
       </label>
@@ -592,7 +608,7 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
     <div class="reglage" id="reglage"></div>
     <h3 style="margin:0;font-size:15px" id="titreJoueurs"></h3>
     <ul class="liste-joueurs" id="listeJoueurs"></ul>
-    <button class="btn large" id="btnRobot" hidden>🤖 Ajouter un robot</button>
+    <button class="btn large" id="btnRobot" hidden><svg class="ico" aria-hidden="true"><use href="#i-robots"/></svg> Ajouter un robot</button>
     <button class="btn principal large" id="btnLancer" hidden>Lancer la partie</button>
     <p id="attenteHote" hidden>En attente du lancement par l'hôte…</p>
     </div>
@@ -4215,6 +4231,10 @@ var qrcode = function() {
       .catch(() => {});
   }
   document.addEventListener('fullscreenchange', majPleinEcran);
+  // Icône Kopo du sprite (#i-nom) : trait doré, voir docs/icones-kopo.md.
+  function ico(nom, cls) { const t = document.createElement('template'); t.innerHTML = '<svg class="ico' + (cls ? ' ' + cls : '') + '" aria-hidden="true"><use href="#i-' + nom + '"/></svg>'; return t.content.firstChild; }
+  // Texte précédé d'une icône (dans un bouton, un nom…).
+  function avecIco(e, nom, texte) { e.append(ico(nom)); if (texte) e.append(' ' + texte); return e; }
   function el(tag, cls, texte) { const e = document.createElement(tag); if (cls) e.className = cls; if (texte != null) e.textContent = texte; return e; }
   function montrerBandeau(t) { $('bandeau').textContent = t; $('bandeau').hidden = false; }
   function cacherBandeau() { $('bandeau').hidden = true; }
@@ -4225,6 +4245,8 @@ var qrcode = function() {
     montrerEcran('ecranAccueil');
     $('info').textContent = '';
     $('pseudo').value = nettoyerPseudo(stock.lire('kopo-pseudo') || '');
+    // Le pseudo se choisit une fois : ensuite il se change seulement dans les Paramètres (2 fois par an).
+    $('pseudo').readOnly = !!$('pseudo').value; $('profil').classList.toggle('fige', $('pseudo').readOnly);
     afficherEnLigne();
     const h = location.hash.slice(1).toUpperCase();
     majAvatar(); majSolde();
@@ -4342,7 +4364,8 @@ var qrcode = function() {
   function bulle(id, texte, o = {}) {
     const r = rectSiege(id);
     if (sansAnim || !visible(r)) return;
-    const b = el('div', 'bulle' + (o.cls ? ' ' + o.cls : ''), texte);
+    const b = el('div', 'bulle' + (o.cls ? ' ' + o.cls : ''), typeof texte === 'string' ? texte : null);
+    if (typeof texte !== 'string') b.append(texte);
     b.style.left = r.left + r.width / 2 + 'px'; b.style.top = r.top + r.height / 2 + 'px';
     calque.append(b);
     b.animate([
@@ -4406,9 +4429,9 @@ var qrcode = function() {
     for (const j of N.joueurs) {
       const o = A.joueurs.find((x) => x.id === j.id);
       if (!o || j.robot) continue;
-      if (!o.remplace && j.remplace) bulle(j.id, '🤖');
-      else if (o.connecte && !j.connecte) bulle(j.id, '📵');
-      else if (!o.connecte && j.connecte) bulle(j.id, '👋');
+      if (!o.remplace && j.remplace) bulle(j.id, ico('robots'));
+      else if (o.connecte && !j.connecte) bulle(j.id, ico('horsligne'));
+      else if (!o.connecte && j.connecte) bulle(j.id, ico('rejoindre'));
     }
     if (!memeManche) return;
 
@@ -4442,14 +4465,14 @@ var qrcode = function() {
           voler(an.carte, de, rectCarte(sel), { rot: 10, duree: 650, cible: sel });
           const e = document.querySelector(sel); if (e) e.classList.add('recue');
         } else voler(an.carte, de, rectCentre(rectSiege(an.joueur), 36, 52), { rot: 10, duree: 650, disparaitre: true });
-        bulle(an.joueur, '✋', { delai: 300 });
-      } else if (an.type === 'suivi') bulle(an.gagnant, '👑', { delai: 500, duree: 2200 });
-      else if (an.type === 'sortie') bulle(an.joueur, '🏁', { delai: 400 });
+        bulle(an.joueur, ico('ramasse'), { delai: 300 });
+      } else if (an.type === 'suivi') bulle(an.gagnant, ico('couronne'), { delai: 500, duree: 2200 });
+      else if (an.type === 'sortie') bulle(an.joueur, ico('drapeau'), { delai: 400 });
       if (an.meneur) bulle(an.meneur, '↻', { delai: 1400, duree: 1500 });
     }
 
     // Changement de tour ; chrono écoulé (coup joué automatiquement).
-    if (a.joueurCourant && a.joueurCourant !== m.joueurCourant && A.chrono && finAvant != null && performance.now() > finAvant - 350) bulle(a.joueurCourant, '⏱');
+    if (a.joueurCourant && a.joueurCourant !== m.joueurCourant && A.chrono && finAvant != null && performance.now() > finAvant - 350) bulle(a.joueurCourant, ico('chrono'));
     if (m.joueurCourant && !m.pause && (m.joueurCourant !== a.joueurCourant || a.pause)) {
       const s = siegeEl(m.joueurCourant); pop(s && (s.querySelector('.ligne') || s), 1.2, 450);
       if (m.joueurCourant === moi) pop($('main'), 1.06, 500);
@@ -4503,11 +4526,11 @@ var qrcode = function() {
     const ul = $('listeJoueurs'); ul.replaceChildren();
     for (const j of v.joueurs) {
       const li = el('li');
-      li.append(el('span', null, (j.robot ? '🤖 ' : '') + j.nom));
+      li.append(j.robot ? avecIco(el('span'), 'robots', j.nom) : el('span', null, j.nom));
       if (j.id === v.hote) li.append(el('span', 'pastille tour', 'hôte'));
       if (j.id === v.moi) li.append(el('span', 'pastille neutre', 'toi'));
       if (!j.connecte && !j.robot) li.append(el('span', 'pastille ko', 'déconnecté'));
-      if (j.voix) li.append(el('span', null, j.muet ? '🔇' : '🎤'));
+      if (j.voix) li.append(avecIco(el('span'), j.muet ? 'micro-coupe' : 'micro'));
       if (jeSuisHote && j.id !== v.moi && !v.publique) {
         const b = el('button', 'btn', 'Retirer');
         b.onclick = () => envoyer({ type: 'retirer', cible: j.id });
@@ -4558,7 +4581,8 @@ var qrcode = function() {
       if (m.nbCartes[id]) eventail.append(el('b', 'nb', String(m.nbCartes[id])));
       d.append(eventail);
       const ligne = el('div', 'ligne');
-      ligne.append(el('span', 'nom', (joueur.robot ? '🤖 ' : joueur.voix ? (joueur.muet ? '🔇 ' : '🎤 ') : '') + (id === v.moi ? 'Toi' : joueur.nom || '?')));
+      const nomJ = id === v.moi ? 'Toi' : joueur.nom || '?', icoJ = joueur.robot ? 'robots' : joueur.voix ? (joueur.muet ? 'micro-coupe' : 'micro') : null;
+      ligne.append(icoJ ? avecIco(el('span', 'nom'), icoJ, nomJ) : el('span', 'nom', nomJ));
       if (m.nbCartes[id]) { const n = el('span', 'compte', String(m.nbCartes[id])); n.setAttribute('aria-label', m.nbCartes[id] + ' carte' + (m.nbCartes[id] > 1 ? 's' : '')); ligne.append(n); }
       d.append(ligne);
       if (id === m.joueurCourant) d.setAttribute('aria-current', 'true');
@@ -4568,7 +4592,7 @@ var qrcode = function() {
       if (!joueur.connecte && !joueur.robot) {
         d.append(el('span', 'pastille ko', 'déconnecté'));
         if (v.hote === v.moi && v.restants.includes(id)) {
-          const b = el('button', 'btn mini', '🤖 Remplacer');
+          const b = avecIco(el('button', 'btn mini'), 'robots', 'Remplacer');
           b.onclick = () => envoyer({ type: 'remplacerParRobot', cible: id });
           d.append(b);
         }
@@ -4591,7 +4615,7 @@ var qrcode = function() {
       const d = el('div', 'depart');
       d.append(el('div', 'depart-titre', v.restants.length === 2 ? 'Finale' : 'Manche ' + v.numeroManche),
         el('div', 'decompte', ''),
-        el('div', 'depart-qui', m.joueurCourant === v.moi ? '🎯 Toi' : '🎯 ' + nom(v, m.joueurCourant)));
+        avecIco(el('div', 'depart-qui'), 'depart', m.joueurCourant === v.moi ? 'Toi' : nom(v, m.joueurCourant)));
       poses.append(d);
     }
     m.table.forEach((p, i) => {
@@ -4612,7 +4636,7 @@ var qrcode = function() {
     const jeJoue = m.enJeu.includes(v.moi);
     // Ce qui se passe est montré par les animations ; on n'écrit que ce que tu dois faire.
     if (pause || m.phase === 'terminee') {}
-    else if (!v.restants.includes(v.moi) || !jeJoue) cons.append('👀 Tu regardes la partie.');
+    else if (!v.restants.includes(v.moi) || !jeJoue) cons.append(ico('oeil'), ' Tu regardes la partie.');
     else if (monTour) { if (v.chrono) cons.append(el('span', 'secondes', ''), ' '); cons.append(el('em', null, 'À toi !')); }
     $('barreChrono').hidden = !(v.chrono && monTour) && !pause;
     $('barreChrono').classList.toggle('barre-pause', !!pause);
@@ -4817,16 +4841,16 @@ var qrcode = function() {
       if (LOCAL) { box.hidden = true; return; }
       const etiquette = (b, texte) => { b.title = texte; b.setAttribute('aria-label', texte); return b; };
       if (!this.actif) {
-        const b = etiquette(el('button', 'btn', '🎙️ Micro'), 'Activer le micro pour discuter avec les autres');
+        const b = etiquette(avecIco(el('button', 'btn'), 'micro', 'Micro'), 'Activer le micro pour discuter avec les autres');
         b.onclick = () => this.activer();
         box.append(b);
         return;
       }
       const n = this.vue.joueurs.filter((j) => j.voix && j.id !== this.vue.moi).length;
       const enVocal = n ? ` (${n} autre${n > 1 ? 's' : ''} en vocal)` : " (personne d'autre en vocal)";
-      const m = etiquette(el('button', 'btn ' + (this.muet ? 'coupe' : 'ouvert'), this.muet ? '🔇' : '🎤'), (this.muet ? 'Micro coupé, toucher pour parler' : 'Micro ouvert, toucher pour couper') + enVocal);
+      const m = etiquette(avecIco(el('button', 'btn ' + (this.muet ? 'coupe' : 'ouvert')), this.muet ? 'micro-coupe' : 'micro'), (this.muet ? 'Micro coupé, toucher pour parler' : 'Micro ouvert, toucher pour couper') + enVocal);
       m.onclick = () => this.basculerMicro();
-      const so = etiquette(el('button', 'btn' + (this.sonCoupe ? ' coupe' : ''), this.sonCoupe ? '🔈' : '🔊'), this.sonCoupe ? 'Son des autres coupé, toucher pour le remettre' : 'Couper le son des autres');
+      const so = etiquette(avecIco(el('button', 'btn' + (this.sonCoupe ? ' coupe' : '')), this.sonCoupe ? 'son-coupe' : 'son'), this.sonCoupe ? 'Son des autres coupé, toucher pour le remettre' : 'Couper le son des autres');
       so.onclick = () => this.basculerSon();
       box.append(m, so);
     },
@@ -4865,7 +4889,7 @@ var qrcode = function() {
     const ul = el('ul', 'bilan');
     const classement = [v.vainqueur].concat(v.elimines.slice().reverse());
     classement.forEach((id, i) => { const li = el('li'); li.append(el('span', null, `${i + 1}. ${nom(v, id)}`), el('span', 'pastille ' + (i ? 'neutre' : 'ok'), i ? `éliminé manche ${v.elimines.length - i + 1}` : 'vainqueur')); ul.append(li); });
-    const contenu = [el('div', 'trophee', '🏆'), el('h2', null, v.vainqueur === v.moi ? 'Tu as gagné !' : `${nom(v, v.vainqueur)} gagne !`), ul];
+    const contenu = [avecIco(el('div', 'trophee'), 'tournoi'), el('h2', null, v.vainqueur === v.moi ? 'Tu as gagné !' : `${nom(v, v.vainqueur)} gagne !`), ul];
     if (v.hote === v.moi) {
       const b = el('button', 'btn principal large', 'Rejouer avec les mêmes joueurs');
       b.onclick = () => envoyer({ type: 'rejouer' });
@@ -4879,9 +4903,17 @@ var qrcode = function() {
     const b1 = el('button', 'btn principal large', o.oui || 'Oui, quitter');
     const b2 = el('button', 'btn large', 'Annuler');
     b1.onclick = () => { fermerFenetre(); ok(); };
-    b2.onclick = () => { fermerFenetre(); if (vueActuelle) afficher(vueActuelle); };
+    b2.onclick = () => { fermerFenetre(); if (o.annuler) o.annuler(); else if (vueActuelle) afficher(vueActuelle); };
     ouvrirFenetre([el('h2', null, o.titre || 'Quitter ?'), el('p', null, texte), b1, b2]);
   }
+
+  // Changements de pseudo sur ce téléphone (sans compte en ligne) : 2 au plus sur 12 mois glissants.
+  function changementsPseudo() { const an = Date.now() - 365 * 864e5; return (stock.lire('kopo-pseudo-changements') || []).filter((d) => Date.parse(d) > an).sort(); }
+  function quotaPseudoLocal() {
+    const l = changementsPseudo(), restants = Math.max(0, 2 - l.length);
+    return { restants, prochain: restants ? null : new Date(Date.parse(l[l.length - 2]) + 365 * 864e5).toISOString() };
+  }
+  function noterChangementPseudo() { stock.ecrire('kopo-pseudo-changements', changementsPseudo().concat(new Date().toISOString())); }
 
   // Écran Paramètres. ouvrirParametres() peut aussi être appelé depuis l'accueil.
   function iconeCadenas() { const t = document.createElement('template'); t.innerHTML = '<svg class="ico-k gris" viewBox="0 0 32 32" aria-hidden="true"><rect x="8" y="14" width="16" height="13" rx="2.5"/><path d="M11.5 14v-3.5a4.5 4.5 0 0 1 9 0V14M16 19v3"/></svg>'; return t.content.firstChild; }
@@ -4915,20 +4947,37 @@ var qrcode = function() {
     choix('animations', 'Animations', animReduiteSysteme ? 'Réduites par ton téléphone' : 'Réduites : plus rapide, moins de batterie', [['normales', 'Normales'], ['reduites', 'Réduites']]);
     bascule('quatreCouleurs', 'Cartes à 4 couleurs', 'Pique noir, cœur rouge, carreau bleu, trèfle vert', null);
     titre('Compte');
+    // Pseudo : choisi une fois, puis 2 changements au plus sur 12 mois (le serveur fait foi s'il y a un compte).
     const ps = el('input', 'texte'); ps.maxLength = 16; ps.value = stock.lire('kopo-pseudo') || ''; ps.placeholder = 'Ex. As_de_Pique'; ps.setAttribute('aria-label', 'Pseudo');
-    ps.oninput = () => { const v = nettoyerPseudo(ps.value, true); if (v !== ps.value) ps.value = v; };
-    ps.onchange = async () => {
-      const p = nettoyerPseudo(ps.value); ps.value = p;
-      if (p.length < 3) { toast('Le pseudo fait au moins 3 caractères, en un seul mot.'); return; }
-      const c = compteLocal();
-      if (c) {
-        try { const j = await apiJoueur('/moi', 'PATCH', { pseudo: p }); c.compte = j.compte; stock.ecrire('kopo-compte-serveur', c); }
-        catch (e) { toast(e.message); ps.value = stock.lire('kopo-pseudo') || ''; return; }
-      }
-      stock.ecrire('kopo-pseudo', p); if ($('pseudo')) { $('pseudo').value = p; majAvatar(); }
-      toast('Pseudo enregistré.');
+    const aidePs = el('small', null, '');
+    let restantsPs = 2;
+    const montrerQuota = (q) => {
+      restantsPs = q.restants; ps.disabled = q.restants <= 0;
+      aidePs.textContent = q.restants > 0 ? 'Tu peux encore le changer ' + q.restants + ' fois cette année.'
+        : 'Déjà changé 2 fois cette année. Prochain changement le ' + new Date(q.prochain).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) + '.';
     };
-    ligne('Pseudo', null, ps).style.flexWrap = 'wrap';
+    montrerQuota(quotaPseudoLocal());
+    if (compteLocal()) apiJoueur('/moi').then((m) => m.quotaPseudo && montrerQuota(m.quotaPseudo)).catch(() => {});
+    ps.oninput = () => { const v = nettoyerPseudo(ps.value, true); if (v !== ps.value) ps.value = v; };
+    ps.onchange = () => {
+      const avant = stock.lire('kopo-pseudo') || '';
+      const p = nettoyerPseudo(ps.value); ps.value = p;
+      if (p === avant) return;
+      if (p.length < 3) { toast('Le pseudo fait au moins 3 caractères, en un seul mot.'); ps.value = avant; return; }
+      const fenetrePrecedente = [...$('fenetre').childNodes];
+      const retour = () => { ouvrirFenetre(fenetrePrecedente); };
+      demanderConfirmation('Ton pseudo deviendra « ' + p + ' ». ' + (restantsPs > 1 ? 'Il te restera 1 changement cette année.' : 'Ce sera ton dernier changement pour un an.'), async () => {
+        const c = compteLocal();
+        if (c) {
+          try { const j = await apiJoueur('/moi', 'PATCH', { pseudo: p }); c.compte = j.compte; stock.ecrire('kopo-compte-serveur', c); if (j.quotaPseudo) montrerQuota(j.quotaPseudo); }
+          catch (e) { toast(e.message); ps.value = avant; retour(); return; }
+        }
+        noterChangementPseudo(); if (!c) montrerQuota(quotaPseudoLocal());
+        stock.ecrire('kopo-pseudo', p); if ($('pseudo')) { $('pseudo').value = p; majAvatar(); }
+        toast('Pseudo enregistré.'); retour();
+      }, { titre: 'Changer de pseudo ?', oui: 'Changer', annuler: () => { ps.value = avant; retour(); } });
+    };
+    const lPs = ligne('Pseudo', null, ps); lPs.style.flexWrap = 'wrap'; lPs.firstChild.append(aidePs);
     if (compteLocal()) {
       const c = compteLocal();
       ligne('Ton identifiant', 'À donner à tes amis', el('b', null, c.compte.pseudo + '#' + c.compte.numero));
@@ -5342,6 +5391,7 @@ var qrcode = function() {
   $('btnBourse').onclick = () => fenetrePieces(0, lirePieces().bonusSerie || 0);
   function majAvatar() { const p = $('pseudo').value.trim(); $('avatar').textContent = p ? p[0].toUpperCase() : '?'; }
   $('pseudo').addEventListener('input', () => { const v = nettoyerPseudo($('pseudo').value, true); if (v !== $('pseudo').value) $('pseudo').value = v; majAvatar(); });
+  $('profil').addEventListener('click', (e) => { if ($('pseudo').readOnly) { e.preventDefault(); ouvrirParametres(); } });
   $('btnInconnus').onclick = () => { if (!lirePseudo()) return; dessinerSalles(); afficherEnLigne(); $('voileSalles').hidden = false; };
   $('btnFermerSalles').onclick = () => ($('voileSalles').hidden = true);
   $('btnModeRejoindre').onclick = () => { $('voileRejoindre').hidden = false; setTimeout(() => $('codeRejoindre').focus(), 50); };

@@ -83,6 +83,23 @@ async function jouerPartie(joueurs, { robots = 0 } = {}) {
     assert.strictEqual(ch.statut, 409);
     assert.strictEqual((await api('/api/moi', { methode: 'PATCH', jeton: a.jeton, corps: { pseudo: 'Unique' } })).statut, 200); // le sien
   });
+  await test('pseudo : 2 changements au plus sur 12 mois', async () => {
+    const a = await invite('Quota');
+    let m = await api('/api/moi', { jeton: a.jeton });
+    assert.deepStrictEqual([m.json.quotaPseudo.restants, m.json.quotaPseudo.max], [2, 2]);
+    assert.strictEqual((await api('/api/moi', { methode: 'PATCH', jeton: a.jeton, corps: { pseudo: 'Quota' } })).json.quotaPseudo.restants, 2); // même pseudo : rien à compter
+    assert.strictEqual((await api('/api/moi', { methode: 'PATCH', jeton: a.jeton, corps: { pseudo: 'Quota2' } })).json.quotaPseudo.restants, 1);
+    const r2 = await api('/api/moi', { methode: 'PATCH', jeton: a.jeton, corps: { pseudo: 'Quota3' } });
+    assert.strictEqual(r2.json.quotaPseudo.restants, 0);
+    assert.ok(r2.json.quotaPseudo.prochain);
+    const r3 = await api('/api/moi', { methode: 'PATCH', jeton: a.jeton, corps: { pseudo: 'Quota4' } });
+    assert.strictEqual(r3.statut, 403);
+    assert.match(r3.json.erreur, /2 fois cette année/);
+    assert.strictEqual((await api('/api/moi', { jeton: a.jeton })).json.compte.pseudo, 'Quota3');
+    // Un changement de plus d'un an ne compte plus.
+    await srv.base.query("UPDATE changements_pseudo SET cree_le = now() - interval '13 months' WHERE nouveau = 'Quota2'");
+    assert.strictEqual((await api('/api/moi', { methode: 'PATCH', jeton: a.jeton, corps: { pseudo: 'Quota4' } })).statut, 200);
+  });
   await test('migration : anciens pseudos avec espaces et doublons corrigés', async () => {
     const b = srv.base;
     await b.query('DROP INDEX IF EXISTS comptes_pseudo_unique');
