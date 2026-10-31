@@ -9,6 +9,7 @@
   const MIN = 2, MAX = 9;
   const DELAIS = [0, 3, 5, 10, 15]; // secondes par tour (0 = sans chrono)
   const PAUSE_ROBOT = 1200; // un robot réfléchit 1,2 s avant de jouer
+  const DUREES = { depart: 5000, finTour: 2000 }; // compte à rebours de départ, cartes laissées sur la table
 
   // Hasard de qualité cryptographique quand le navigateur le permet.
   function hasardFort() {
@@ -32,6 +33,8 @@
       delai: 5, // secondes pour jouer, réglables par l'hôte dans le salon
       echeance: null, // instant (ms) où le joueur courant aura épuisé son temps
       robotPret: null, // instant (ms) où un robot peut agir
+      pause: null, // { type: 'depart' | 'finTour', jusqua, total, table?, annonce? } : personne ne joue
+      durees: Object.assign({}, DUREES),
       horloge: Date.now,
       rng: rng || hasardFort(),
     };
@@ -65,7 +68,7 @@
   // Relance le chrono du joueur courant.
   function armerChrono(s) {
     const m = s.manche;
-    const enCours = s.etat === 'manche' && m && m.phase !== 'terminee';
+    const enCours = s.etat === 'manche' && m && m.phase !== 'terminee' && !s.pause;
     s.echeance = s.delai && enCours ? s.horloge() + s.delai * 1000 : null;
     s.robotPret = enCours ? s.horloge() + PAUSE_ROBOT : null;
   }
@@ -82,17 +85,64 @@
     return actions.find((a) => a.type === 'toutPoser') || null;
   }
 
+  function plusForte(table) {
+    let f = null;
+    for (const p of table) if (p.compte) for (const c of p.cartes) if (!f || K.valeur(c) > K.valeur(f.carte)) f = { carte: c, joueur: p.joueur };
+    return f;
+  }
+
+  // Applique une action. Si elle termine le tour, les cartes restent visibles
+  // quelques secondes avec l'annonce de qui reprend la main.
+  function appliquer(s, action) {
+    const m = s.manche;
+    const avant = m.table.map((p) => ({ joueur: p.joueur, cartes: p.cartes.slice(), compte: p.compte }));
+    const phaseAvant = m.phase;
+    const mainAvant = (m.mains[action.joueur] || []).slice();
+    K.jouer(m, action);
+    const j = action.joueur;
+    let fin = null;
+    if (action.type === 'katapss') {
+      // Un Katapss du joueur qui devait suivre peut clore le tour.
+      if (phaseAvant === 'suite' && m.phase !== 'suite' && avant.length) {
+        const f = plusForte(avant);
+        fin = { table: avant, annonce: { type: 'suivi', gagnant: f.joueur, carte: f.carte, meneur: m.meneur } };
+      }
+    } else if (phaseAvant === 'suite' && action.type === 'ramasser') {
+      const f = plusForte(avant);
+      fin = { table: avant, annonce: { type: 'ramasse', joueur: j, carte: f.carte, meneur: m.meneur } };
+    } else if (phaseAvant === 'suite' && m.phase !== 'suite') {
+      const table = avant.concat([action.type === 'jouer'
+        ? { joueur: j, cartes: [action.carte], compte: true }
+        : { joueur: j, cartes: mainAvant, compte: false }]);
+      const f = plusForte(table);
+      fin = { table, annonce: { type: 'suivi', gagnant: f.joueur, carte: f.carte, meneur: m.phase === 'terminee' ? null : m.meneur } };
+    } else if (phaseAvant === 'ouverture' && action.type === 'toutPoser') {
+      fin = { table: [{ joueur: j, cartes: mainAvant, compte: false }], annonce: { type: 'sortie', joueur: j, meneur: m.phase === 'terminee' ? null : m.meneur } };
+    }
+    if (fin && s.durees.finTour > 0) {
+      s.pause = { type: 'finTour', jusqua: s.horloge() + s.durees.finTour, total: s.durees.finTour, table: fin.table, annonce: fin.annonce };
+    } else finirMancheSiBesoin(s);
+    armerChrono(s);
+  }
+
   // À appeler régulièrement par l'hôte. Renvoie true si un coup automatique a été joué.
   function tic(s) {
     if (s.etat !== 'manche') return false;
     const m = s.manche;
+    if (s.pause) {
+      if (s.horloge() < s.pause.jusqua) return false;
+      s.pause = null;
+      finirMancheSiBesoin(s);
+      armerChrono(s);
+      return true;
+    }
     // Les robots d'abord : un Katapss éventuel, sinon le robot dont c'est le tour.
     if (s.robotPret && s.horloge() >= s.robotPret) {
       const candidats = m.katapss.filter((j) => estRobot(s, j));
       if (estRobot(s, m.joueurCourant)) candidats.push(m.joueurCourant);
       for (const j of candidats) {
         const a = choixRobot(s, j);
-        if (a) { K.jouer(m, a); finirMancheSiBesoin(s); armerChrono(s); return true; }
+        if (a) { appliquer(s, a); return true; }
       }
     }
     if (!s.echeance || s.horloge() < s.echeance) return false;
@@ -100,9 +150,7 @@
     const action = coupAutomatique(m, j);
     if (!action) { armerChrono(s); return false; }
     m.journal.push(`Temps écoulé pour ${j} : coup automatique.`);
-    K.jouer(m, action);
-    finirMancheSiBesoin(s);
-    armerChrono(s);
+    appliquer(s, action);
     return true;
   }
 
@@ -121,6 +169,8 @@
     s.numeroManche++;
     s.manche = K.nouvelleManche(sieges, mains, premier);
     s.etat = 'manche';
+    // Compte à rebours : chacun découvre ses cartes et qui commence.
+    s.pause = s.durees.depart > 0 ? { type: 'depart', jusqua: s.horloge() + s.durees.depart, total: s.durees.depart } : null;
     armerChrono(s);
   }
 
@@ -214,22 +264,22 @@
         s.manche = null;
         s.vainqueur = null;
         s.echeance = null;
+        s.pause = null;
         return { ok: true };
       }
       case 'action': {
         if (s.etat !== 'manche' || !joueur) return { ok: false, erreur: 'Pas de manche en cours.' };
+        if (s.pause) return { ok: false, erreur: s.pause.type === 'depart' ? 'Attends la fin du compte à rebours.' : 'Attends le tour suivant.' };
         const a = msg.action || {};
         // Le joueur ne peut agir que pour lui-même : on impose son id.
         const action = { type: a.type, joueur: id };
         if (a.carte) action.carte = a.carte;
         try {
-          K.jouer(s.manche, action);
+          appliquer(s, action);
         } catch (e) {
           // Clic devenu périmé (ex. Katapss déjà annoncé par un autre) : on ignore.
           return { ok: false, erreur: 'Action impossible maintenant.' };
         }
-        finirMancheSiBesoin(s);
-        armerChrono(s);
         return { ok: true };
       }
       default:
@@ -272,7 +322,8 @@
         sieges: m.sieges.slice(),
         enJeu: m.enJeu.slice(),
         nbCartes: Object.fromEntries(m.sieges.map((j) => [j, m.mains[j].length])),
-        table: m.table.map((p) => ({ joueur: p.joueur, cartes: p.cartes.slice(), compte: p.compte })),
+        table: (s.pause && s.pause.table ? s.pause.table : m.table).map((p) => ({ joueur: p.joueur, cartes: p.cartes.slice(), compte: p.compte })),
+        pause: s.pause ? { type: s.pause.type, resteMs: Math.max(0, s.pause.jusqua - s.horloge()), totalMs: s.pause.total, annonce: s.pause.annonce || null } : null,
         couleurTour: m.couleurTour,
         couleurInterdite: m.couleurInterdite,
         phase: m.phase,
@@ -281,7 +332,7 @@
         elimine: m.elimine,
         journal: journalLisible(s, m),
         main: m.mains[id] ? m.mains[id].slice() : [],
-        actions: K.actionsPossibles(m, id).map((a) => ({ type: a.type, carte: a.carte })),
+        actions: s.pause ? [] : K.actionsPossibles(m, id).map((a) => ({ type: a.type, carte: a.carte })),
       };
     }
     return v;
@@ -300,7 +351,7 @@
     return s;
   }
 
-  const KopoSalle = { MIN, MAX, DELAIS, PAUSE_ROBOT, creerSalle, choixRobot, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
+  const KopoSalle = { MIN, MAX, DELAIS, PAUSE_ROBOT, DUREES, creerSalle, choixRobot, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
   if (typeof module !== 'undefined' && module.exports) module.exports = KopoSalle;
   else root.KopoSalle = KopoSalle;
 })(typeof window !== 'undefined' ? window : globalThis);

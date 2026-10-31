@@ -12,6 +12,7 @@ function test(nom, fn) {
 
 function salleAvec(n, graine) {
   const s = S.creerSalle('ABCD', graine === undefined ? undefined : K.hasard(graine));
+  s.durees = { depart: 0, finTour: 0 }; // les pauses ont leurs propres tests
   for (let i = 1; i <= n; i++) assert.ok(S.recevoir(s, 'p' + i, { type: 'rejoindre', nom: 'Ami' + i }).ok);
   return s;
 }
@@ -285,6 +286,84 @@ test('Les mains des robots restent cachées', () => {
   S.recevoir(s, 'p1', { type: 'lancer' });
   const texte = JSON.stringify(S.vue(s, 'p1'));
   for (const c of s.manche.mains[s.joueurs[1].id]) assert.ok(!texte.includes('"' + c + '"'));
+});
+
+console.log('\nPauses (compte à rebours, cartes laissées sur la table)');
+function sallePauses() {
+  const s = salleAvec(3);
+  let t = 0; s.horloge = () => t;
+  s.durees = { depart: 5000, finTour: 2000 };
+  S.recevoir(s, 'p1', { type: 'lancer' });
+  return { s, avancer: (ms) => (t += ms) };
+}
+test('Compte à rebours de 5 s avant chaque manche : on voit ses cartes et qui commence, mais personne ne joue', () => {
+  const { s, avancer } = sallePauses();
+  const v = S.vue(s, 'p2');
+  assert.strictEqual(v.manche.pause.type, 'depart');
+  assert.strictEqual(v.manche.pause.resteMs, 5000);
+  assert.strictEqual(v.manche.main.length, 4);
+  assert.ok(v.manche.joueurCourant, 'le premier joueur est connu');
+  assert.deepStrictEqual(v.manche.actions, []);
+  assert.strictEqual(v.chrono, null, 'le chrono ne tourne pas encore');
+  const premier = s.manche.joueurCourant;
+  const carte = K.actionsPossibles(s.manche, premier).find((a) => a.type === 'jouer');
+  assert.ok(!S.recevoir(s, premier, { type: 'action', action: carte }).ok);
+  avancer(4999); assert.ok(!S.tic(s));
+  avancer(1); assert.ok(S.tic(s));
+  assert.strictEqual(S.vue(s, 'p2').manche.pause, null);
+  assert.strictEqual(S.vue(s, 'p2').chrono.resteMs, 5000, 'le chrono démarre après le compte à rebours');
+});
+function finDeTour() {
+  const { s, avancer } = sallePauses();
+  avancer(5000); S.tic(s);
+  s.manche = K.nouvelleManche(['p1', 'p2', 'p3'], {
+    p1: ['2P', '2C', '3C', '4C'], p2: ['9P', '2K', '3K', '4K'], p3: ['5P', '6P', '2T', '3T'],
+  }, 'p1');
+  return { s, avancer };
+}
+test('Fin de tour : les cartes restent 2 s sur la table avec celui qui reprend la main', () => {
+  const { s, avancer } = finDeTour();
+  for (const [j, c] of [['p1', '2P'], ['p2', '9P'], ['p3', '5P']]) assert.ok(S.recevoir(s, j, { type: 'action', action: { type: 'jouer', carte: c } }).ok);
+  const v = S.vue(s, 'p1');
+  assert.strictEqual(v.manche.pause.type, 'finTour');
+  assert.deepStrictEqual(v.manche.table.map((p) => p.cartes[0]), ['2P', '9P', '5P']);
+  assert.deepStrictEqual(v.manche.pause.annonce, { type: 'suivi', gagnant: 'p2', carte: '9P', meneur: 'p2' });
+  assert.ok(!S.recevoir(s, 'p2', { type: 'action', action: { type: 'jouer', carte: '2K' } }).ok, 'on attend');
+  avancer(2000); assert.ok(S.tic(s));
+  assert.strictEqual(S.vue(s, 'p1').manche.table.length, 0);
+  assert.ok(S.recevoir(s, 'p2', { type: 'action', action: { type: 'jouer', carte: '2K' } }).ok);
+});
+test('Fin de tour par ramassage : on montre la carte ramassée et qui relance', () => {
+  const { s } = finDeTour();
+  S.recevoir(s, 'p1', { type: 'action', action: { type: 'jouer', carte: '2C' } });
+  S.recevoir(s, 'p2', { type: 'action', action: { type: 'ramasser' } });
+  const v = S.vue(s, 'p3');
+  assert.deepStrictEqual(v.manche.pause.annonce, { type: 'ramasse', joueur: 'p2', carte: '2C', meneur: 'p1' });
+  assert.deepStrictEqual(v.manche.table.map((p) => p.cartes[0]), ['2C']);
+});
+test('La dernière séquence de la manche reste visible avant le bilan', () => {
+  const { s, avancer } = sallePauses();
+  avancer(5000); S.tic(s);
+  s.manche = K.nouvelleManche(['p1', 'p2'], { p1: ['2P'], p2: ['3C', '4C'] }, 'p1');
+  s.restants = ['p1', 'p2'];
+  S.recevoir(s, 'p1', { type: 'action', action: { type: 'toutPoser' } });
+  assert.strictEqual(s.etat, 'manche');
+  assert.strictEqual(S.vue(s, 'p2').manche.pause.annonce.type, 'sortie');
+  avancer(2000); S.tic(s);
+  assert.strictEqual(s.etat, 'finPartie');
+});
+test('Partie complète avec les pauses, robots et chrono', () => {
+  const s = salleAvec(1, 5);
+  let t = 0; s.horloge = () => t;
+  s.durees = { depart: 5000, finTour: 2000 };
+  for (let i = 0; i < 5; i++) S.recevoir(s, 'p1', { type: 'ajouterRobot' });
+  S.recevoir(s, 'p1', { type: 'lancer' });
+  let n = 0;
+  while (s.etat !== 'finPartie') {
+    if (++n > 50000) throw new Error('bloqué');
+    if (s.etat === 'finManche') { S.recevoir(s, 'p1', { type: 'mancheSuivante' }); continue; }
+    t += 250; S.tic(s);
+  }
 });
 
 console.log('\nMélange');

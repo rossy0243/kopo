@@ -131,6 +131,12 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
 .reglage { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; color: var(--muted); font-size: 14px; }
 .reglage .btn { padding: 6px 12px; font-size: 14px; }
 .reglage .btn.actif { background: var(--brass); color: #1d1606; border-color: var(--brass); }
+.depart { width: 100%; display: grid; justify-items: center; gap: 4px; padding: 6px 0; }
+.depart-titre { color: var(--muted); text-transform: uppercase; letter-spacing: 2px; font-size: 13px; }
+.decompte { font-family: var(--display); font-size: 72px; line-height: 1; color: var(--brass); }
+.depart-qui { font-size: 20px; font-weight: 600; }
+.meneur { color: var(--brass); }
+.chrono.barre-pause span { background: var(--muted); }
 .toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: #2a1716; color: #ffd7d3; border: 1px solid var(--bad); border-radius: 10px; padding: 10px 14px; z-index: 20; max-width: 90vw; font-size: 14px; }
 </style>
 </head>
@@ -2853,6 +2859,7 @@ var qrcode = function() {
   const MIN = 2, MAX = 9;
   const DELAIS = [0, 3, 5, 10, 15]; // secondes par tour (0 = sans chrono)
   const PAUSE_ROBOT = 1200; // un robot réfléchit 1,2 s avant de jouer
+  const DUREES = { depart: 5000, finTour: 2000 }; // compte à rebours de départ, cartes laissées sur la table
 
   // Hasard de qualité cryptographique quand le navigateur le permet.
   function hasardFort() {
@@ -2876,6 +2883,8 @@ var qrcode = function() {
       delai: 5, // secondes pour jouer, réglables par l'hôte dans le salon
       echeance: null, // instant (ms) où le joueur courant aura épuisé son temps
       robotPret: null, // instant (ms) où un robot peut agir
+      pause: null, // { type: 'depart' | 'finTour', jusqua, total, table?, annonce? } : personne ne joue
+      durees: Object.assign({}, DUREES),
       horloge: Date.now,
       rng: rng || hasardFort(),
     };
@@ -2909,7 +2918,7 @@ var qrcode = function() {
   // Relance le chrono du joueur courant.
   function armerChrono(s) {
     const m = s.manche;
-    const enCours = s.etat === 'manche' && m && m.phase !== 'terminee';
+    const enCours = s.etat === 'manche' && m && m.phase !== 'terminee' && !s.pause;
     s.echeance = s.delai && enCours ? s.horloge() + s.delai * 1000 : null;
     s.robotPret = enCours ? s.horloge() + PAUSE_ROBOT : null;
   }
@@ -2926,17 +2935,64 @@ var qrcode = function() {
     return actions.find((a) => a.type === 'toutPoser') || null;
   }
 
+  function plusForte(table) {
+    let f = null;
+    for (const p of table) if (p.compte) for (const c of p.cartes) if (!f || K.valeur(c) > K.valeur(f.carte)) f = { carte: c, joueur: p.joueur };
+    return f;
+  }
+
+  // Applique une action. Si elle termine le tour, les cartes restent visibles
+  // quelques secondes avec l'annonce de qui reprend la main.
+  function appliquer(s, action) {
+    const m = s.manche;
+    const avant = m.table.map((p) => ({ joueur: p.joueur, cartes: p.cartes.slice(), compte: p.compte }));
+    const phaseAvant = m.phase;
+    const mainAvant = (m.mains[action.joueur] || []).slice();
+    K.jouer(m, action);
+    const j = action.joueur;
+    let fin = null;
+    if (action.type === 'katapss') {
+      // Un Katapss du joueur qui devait suivre peut clore le tour.
+      if (phaseAvant === 'suite' && m.phase !== 'suite' && avant.length) {
+        const f = plusForte(avant);
+        fin = { table: avant, annonce: { type: 'suivi', gagnant: f.joueur, carte: f.carte, meneur: m.meneur } };
+      }
+    } else if (phaseAvant === 'suite' && action.type === 'ramasser') {
+      const f = plusForte(avant);
+      fin = { table: avant, annonce: { type: 'ramasse', joueur: j, carte: f.carte, meneur: m.meneur } };
+    } else if (phaseAvant === 'suite' && m.phase !== 'suite') {
+      const table = avant.concat([action.type === 'jouer'
+        ? { joueur: j, cartes: [action.carte], compte: true }
+        : { joueur: j, cartes: mainAvant, compte: false }]);
+      const f = plusForte(table);
+      fin = { table, annonce: { type: 'suivi', gagnant: f.joueur, carte: f.carte, meneur: m.phase === 'terminee' ? null : m.meneur } };
+    } else if (phaseAvant === 'ouverture' && action.type === 'toutPoser') {
+      fin = { table: [{ joueur: j, cartes: mainAvant, compte: false }], annonce: { type: 'sortie', joueur: j, meneur: m.phase === 'terminee' ? null : m.meneur } };
+    }
+    if (fin && s.durees.finTour > 0) {
+      s.pause = { type: 'finTour', jusqua: s.horloge() + s.durees.finTour, total: s.durees.finTour, table: fin.table, annonce: fin.annonce };
+    } else finirMancheSiBesoin(s);
+    armerChrono(s);
+  }
+
   // À appeler régulièrement par l'hôte. Renvoie true si un coup automatique a été joué.
   function tic(s) {
     if (s.etat !== 'manche') return false;
     const m = s.manche;
+    if (s.pause) {
+      if (s.horloge() < s.pause.jusqua) return false;
+      s.pause = null;
+      finirMancheSiBesoin(s);
+      armerChrono(s);
+      return true;
+    }
     // Les robots d'abord : un Katapss éventuel, sinon le robot dont c'est le tour.
     if (s.robotPret && s.horloge() >= s.robotPret) {
       const candidats = m.katapss.filter((j) => estRobot(s, j));
       if (estRobot(s, m.joueurCourant)) candidats.push(m.joueurCourant);
       for (const j of candidats) {
         const a = choixRobot(s, j);
-        if (a) { K.jouer(m, a); finirMancheSiBesoin(s); armerChrono(s); return true; }
+        if (a) { appliquer(s, a); return true; }
       }
     }
     if (!s.echeance || s.horloge() < s.echeance) return false;
@@ -2944,9 +3000,7 @@ var qrcode = function() {
     const action = coupAutomatique(m, j);
     if (!action) { armerChrono(s); return false; }
     m.journal.push(`Temps écoulé pour ${j} : coup automatique.`);
-    K.jouer(m, action);
-    finirMancheSiBesoin(s);
-    armerChrono(s);
+    appliquer(s, action);
     return true;
   }
 
@@ -2965,6 +3019,8 @@ var qrcode = function() {
     s.numeroManche++;
     s.manche = K.nouvelleManche(sieges, mains, premier);
     s.etat = 'manche';
+    // Compte à rebours : chacun découvre ses cartes et qui commence.
+    s.pause = s.durees.depart > 0 ? { type: 'depart', jusqua: s.horloge() + s.durees.depart, total: s.durees.depart } : null;
     armerChrono(s);
   }
 
@@ -3058,22 +3114,22 @@ var qrcode = function() {
         s.manche = null;
         s.vainqueur = null;
         s.echeance = null;
+        s.pause = null;
         return { ok: true };
       }
       case 'action': {
         if (s.etat !== 'manche' || !joueur) return { ok: false, erreur: 'Pas de manche en cours.' };
+        if (s.pause) return { ok: false, erreur: s.pause.type === 'depart' ? 'Attends la fin du compte à rebours.' : 'Attends le tour suivant.' };
         const a = msg.action || {};
         // Le joueur ne peut agir que pour lui-même : on impose son id.
         const action = { type: a.type, joueur: id };
         if (a.carte) action.carte = a.carte;
         try {
-          K.jouer(s.manche, action);
+          appliquer(s, action);
         } catch (e) {
           // Clic devenu périmé (ex. Katapss déjà annoncé par un autre) : on ignore.
           return { ok: false, erreur: 'Action impossible maintenant.' };
         }
-        finirMancheSiBesoin(s);
-        armerChrono(s);
         return { ok: true };
       }
       default:
@@ -3116,7 +3172,8 @@ var qrcode = function() {
         sieges: m.sieges.slice(),
         enJeu: m.enJeu.slice(),
         nbCartes: Object.fromEntries(m.sieges.map((j) => [j, m.mains[j].length])),
-        table: m.table.map((p) => ({ joueur: p.joueur, cartes: p.cartes.slice(), compte: p.compte })),
+        table: (s.pause && s.pause.table ? s.pause.table : m.table).map((p) => ({ joueur: p.joueur, cartes: p.cartes.slice(), compte: p.compte })),
+        pause: s.pause ? { type: s.pause.type, resteMs: Math.max(0, s.pause.jusqua - s.horloge()), totalMs: s.pause.total, annonce: s.pause.annonce || null } : null,
         couleurTour: m.couleurTour,
         couleurInterdite: m.couleurInterdite,
         phase: m.phase,
@@ -3125,7 +3182,7 @@ var qrcode = function() {
         elimine: m.elimine,
         journal: journalLisible(s, m),
         main: m.mains[id] ? m.mains[id].slice() : [],
-        actions: K.actionsPossibles(m, id).map((a) => ({ type: a.type, carte: a.carte })),
+        actions: s.pause ? [] : K.actionsPossibles(m, id).map((a) => ({ type: a.type, carte: a.carte })),
       };
     }
     return v;
@@ -3144,7 +3201,7 @@ var qrcode = function() {
     return s;
   }
 
-  const KopoSalle = { MIN, MAX, DELAIS, PAUSE_ROBOT, creerSalle, choixRobot, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
+  const KopoSalle = { MIN, MAX, DELAIS, PAUSE_ROBOT, DUREES, creerSalle, choixRobot, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
   if (typeof module !== 'undefined' && module.exports) module.exports = KopoSalle;
   else root.KopoSalle = KopoSalle;
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -3538,13 +3595,22 @@ var qrcode = function() {
     });
 
     // Table
+    const pause = m.pause;
     const ent = $('entete'); ent.replaceChildren();
-    if (m.couleurTour) { const c = el('span', 'chip'); c.append('Couleur du tour ', el('b', null, K.SYMBOLES[m.couleurTour])); ent.append(c); }
-    if (m.couleurInterdite && m.phase === 'ouverture') { const c = el('span', 'chip interdit'); c.append('Interdit pour ouvrir ', el('b', null, K.SYMBOLES[m.couleurInterdite])); ent.append(c); }
+    if (pause) {} else if (m.couleurTour) { const c = el('span', 'chip'); c.append('Couleur du tour ', el('b', null, K.SYMBOLES[m.couleurTour])); ent.append(c); }
+    if (!pause && m.couleurInterdite && m.phase === 'ouverture') { const c = el('span', 'chip interdit'); c.append('Interdit pour ouvrir ', el('b', null, K.SYMBOLES[m.couleurInterdite])); ent.append(c); }
     let forte = null;
     m.table.forEach((p, i) => { if (p.compte) for (const c of p.cartes) if (!forte || K.valeur(c) > K.valeur(forte.carte)) forte = { carte: c, i }; });
     const poses = $('poses'); poses.replaceChildren();
-    if (!m.table.length) poses.append(el('span', 'vide', m.phase === 'terminee' ? 'Manche terminée.' : 'La table est vide.'));
+    const qui = (id) => (id === v.moi ? 'Toi' : nom(v, id));
+    if (pause && pause.type === 'depart') {
+      // Compte à rebours de départ, avec le joueur qui commence.
+      const d = el('div', 'depart');
+      d.append(el('div', 'depart-titre', v.restants.length === 2 ? 'Finale' : 'Manche ' + v.numeroManche),
+        el('div', 'decompte', ''),
+        el('div', 'depart-qui', m.joueurCourant === v.moi ? '🎯 Tu commences !' : '🎯 ' + nom(v, m.joueurCourant) + ' commence'));
+      poses.append(d);
+    } else if (!m.table.length) poses.append(el('span', 'vide', m.phase === 'terminee' ? 'Manche terminée.' : 'La table est vide.'));
     m.table.forEach((p, i) => {
       const d = el('div', 'pose' + (p.compte ? '' : ' compte-pas') + (forte && forte.i === i ? ' forte' : ''));
       const g = el('div', 'groupe'); p.cartes.forEach((c) => g.append(carteEl(c)));
@@ -3556,16 +3622,27 @@ var qrcode = function() {
     const cons = $('consigne'); cons.replaceChildren();
     const monTour = m.joueurCourant === v.moi;
     const jeJoue = m.enJeu.includes(v.moi);
-    if (v.chrono && m.phase !== 'terminee' && m.joueurCourant) cons.append(el('span', 'secondes', ''), ' ');
-    if (m.phase === 'terminee') cons.append('Manche terminée.');
+    const a = pause && pause.annonce;
+    if (pause && pause.type === 'depart') cons.append('Prépare-toi, regarde tes cartes.');
+    else if (a) {
+      // Fin de tour : on annonce clairement qui reprend la main.
+      if (a.type === 'ramasse') cons.append(el('em', null, qui(a.joueur)), ` ${a.joueur === v.moi ? 'ramasses' : 'ramasse'} le ${K.afficher(a.carte)}.`);
+      else if (a.type === 'sortie') cons.append(el('em', null, qui(a.joueur)), ` ${a.joueur === v.moi ? 'sors' : 'sort'} en posant tout.`);
+      else cons.append(el('em', null, qui(a.gagnant)), ` ${a.gagnant === v.moi ? 'remportes' : 'remporte'} le tour avec le ${K.afficher(a.carte)}.`);
+      if (a.meneur) cons.append(' ', el('strong', 'meneur', a.meneur === v.moi ? 'À toi de relancer.' : `${nom(v, a.meneur)} ${a.type === 'sortie' ? 'ouvre' : 'relance'}.`));
+    }
+    else if (v.chrono && m.phase !== 'terminee' && m.joueurCourant) cons.append(el('span', 'secondes', ''), ' ');
+    if (pause) {}
+    else if (m.phase === 'terminee') cons.append('Manche terminée.');
     else if (!v.restants.includes(v.moi)) cons.append('Tu es éliminé. Tu regardes la partie. ', el('em', null, nom(v, m.joueurCourant)), ' doit jouer.');
     else if (!jeJoue) cons.append('Tu es qualifié pour la manche suivante. ', el('em', null, nom(v, m.joueurCourant)), ' doit jouer.');
     else if (monTour && m.phase === 'ouverture') cons.append(el('em', null, "À toi d'ouvrir."), m.couleurInterdite ? ` Pas de ${K.SYMBOLES[m.couleurInterdite]}.` : ' Joue la couleur de ton choix.');
     else if (monTour) cons.append(el('em', null, 'À toi.'), ` Suis à ${K.SYMBOLES[m.couleurTour]} ou ramasse le ${K.afficher(forte.carte)}.`);
     else cons.append('En attente de ', el('em', null, nom(v, m.joueurCourant)), '…');
-    $('barreChrono').hidden = !(v.chrono && monTour);
-    if (monTour && !etaitMonTour && navigator.vibrate) try { navigator.vibrate(120); } catch (e) {}
-    etaitMonTour = monTour;
+    $('barreChrono').hidden = !(v.chrono && monTour) && !pause;
+    $('barreChrono').classList.toggle('barre-pause', !!pause);
+    if (monTour && !pause && !etaitMonTour && navigator.vibrate) try { navigator.vibrate(120); } catch (e) {}
+    etaitMonTour = monTour && !pause;
 
     // Main et actions
     $('zoneMain').hidden = !jeJoue;
@@ -3618,16 +3695,20 @@ var qrcode = function() {
   // L'hôte envoie le temps restant ; chaque téléphone le décompte avec sa propre horloge.
   let finChrono = null, totalChrono = 0;
   function demarrerChrono(v) {
-    finChrono = v.chrono ? performance.now() + v.chrono.resteMs : null;
-    totalChrono = v.chrono ? v.chrono.totalMs : 0;
+    const p = v.manche && v.manche.pause;
+    const c = p ? { resteMs: p.resteMs, totalMs: p.totalMs } : v.chrono;
+    finChrono = c ? performance.now() + c.resteMs : null;
+    totalChrono = c ? c.totalMs : 0;
   }
   function majChrono() {
     if (finChrono == null) return;
+    const d = document.querySelector('.decompte');
+    if (d) d.textContent = Math.max(1, Math.ceil((finChrono - performance.now()) / 1000));
     const reste = Math.max(0, finChrono - performance.now());
     const urgent = reste < 2000;
     const sec = Math.ceil(reste / 1000);
     document.querySelectorAll('.secondes').forEach((e) => { e.textContent = sec + ' s'; e.classList.toggle('urgent', urgent); });
-    document.querySelectorAll('.chrono').forEach((c) => { c.firstChild.style.width = (100 * reste / (totalChrono || 1)) + '%'; c.classList.toggle('urgent', urgent); });
+    document.querySelectorAll('.chrono').forEach((c) => { if (c.classList.contains('barre-pause')) { c.firstChild.style.width = (100 * reste / (totalChrono || 1)) + '%'; return; } c.firstChild.style.width = (100 * reste / (totalChrono || 1)) + '%'; c.classList.toggle('urgent', urgent); });
   }
   (function boucle() { majChrono(); requestAnimationFrame(boucle); })();
 

@@ -10,6 +10,7 @@ Jeu de cartes multijoueur, de 2 à 9 joueurs, chacun sur son téléphone.
 - Les messages du jeu passent par des relais publics MQTT (EMQX, HiveMQ, Mosquitto), ce qui marche sur tous les réseaux, 4G comprise. L'hôte écoute sur tous les relais à la fois. Chaque joueur a une clé secrète : personne ne peut lire sa main ni jouer à sa place.
 - L'hôte peut ajouter des robots dans le salon, et remplacer par un robot un joueur déconnecté (le joueur reprend sa place en revenant).
 - L'hôte doit garder la page ouverte pendant la partie. S'il recharge la page, la partie reprend avec le même code.
+- Compte à rebours de 5 s avant chaque manche, avec le joueur qui commence. En fin de tour, les cartes restent 2 s sur la table avec celui qui reprend la main.
 - Chrono réglable (5 s par défaut) : un joueur trop lent ou hors ligne pioche. En ouverture, sa plus petite carte autorisée est posée.
 - Micro optionnel (WebRTC via PeerJS, avec relais TURN) : chacun l'active, le coupe, ou coupe le son des autres.
 
