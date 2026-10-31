@@ -300,6 +300,7 @@ body.accueil .app { max-width: none; min-height: 100vh; min-height: 100dvh; padd
 .profil-champ input { background: none; border: 0; color: var(--ink); font: inherit; font-weight: 700; font-size: 16px; width: 130px; padding: 0; }
 .profil-champ input:focus { outline: none; }
 .profil:focus-within { border-color: var(--brass); }
+.profil.fige { cursor: pointer; } .profil.fige input { cursor: pointer; pointer-events: none; }
 .bourse { margin-left: auto; display: flex; align-items: center; gap: 7px; background: rgba(0,0,0,.3); border: 1px solid rgba(226,176,74,.45); border-radius: 99px; padding: 4px 12px 4px 4px; color: var(--ink); font: inherit; cursor: pointer; }
 .bourse + .profil { margin-left: 0; }
 .bourse:active { transform: scale(.96); }
@@ -503,7 +504,7 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
     <div class="hub-haut">
       <div class="logo"><img class="marque" src="icons/kopo-logo.svg" alt="">KOPO</div>
       <button class="bourse" id="btnBourse" title="Tes pièces d'essai"><span class="piece" aria-hidden="true">K</span><span class="bourse-txt"><b id="solde">500</b><small>pièces d'essai</small></span></button>
-      <label class="profil" title="Ton pseudo">
+      <label class="profil" id="profil" title="Ton pseudo">
         <span class="avatar" id="avatar">?</span>
         <span class="profil-champ"><small>Ton pseudo</small><input id="pseudo" maxlength="16" autocomplete="nickname" placeholder="Ex. As_de_Pique"></span>
       </label>
@@ -1162,6 +1163,8 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
     montrerEcran('ecranAccueil');
     $('info').textContent = '';
     $('pseudo').value = nettoyerPseudo(stock.lire('kopo-pseudo') || '');
+    // Le pseudo se choisit une fois : ensuite il se change seulement dans les Paramètres (2 fois par an).
+    $('pseudo').readOnly = !!$('pseudo').value; $('profil').classList.toggle('fige', $('pseudo').readOnly);
     afficherEnLigne();
     const h = location.hash.slice(1).toUpperCase();
     majAvatar(); majSolde();
@@ -1815,9 +1818,17 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
     const b1 = el('button', 'btn principal large', o.oui || 'Oui, quitter');
     const b2 = el('button', 'btn large', 'Annuler');
     b1.onclick = () => { fermerFenetre(); ok(); };
-    b2.onclick = () => { fermerFenetre(); if (vueActuelle) afficher(vueActuelle); };
+    b2.onclick = () => { fermerFenetre(); if (o.annuler) o.annuler(); else if (vueActuelle) afficher(vueActuelle); };
     ouvrirFenetre([el('h2', null, o.titre || 'Quitter ?'), el('p', null, texte), b1, b2]);
   }
+
+  // Changements de pseudo sur ce téléphone (sans compte en ligne) : 2 au plus sur 12 mois glissants.
+  function changementsPseudo() { const an = Date.now() - 365 * 864e5; return (stock.lire('kopo-pseudo-changements') || []).filter((d) => Date.parse(d) > an).sort(); }
+  function quotaPseudoLocal() {
+    const l = changementsPseudo(), restants = Math.max(0, 2 - l.length);
+    return { restants, prochain: restants ? null : new Date(Date.parse(l[l.length - 2]) + 365 * 864e5).toISOString() };
+  }
+  function noterChangementPseudo() { stock.ecrire('kopo-pseudo-changements', changementsPseudo().concat(new Date().toISOString())); }
 
   // Écran Paramètres. ouvrirParametres() peut aussi être appelé depuis l'accueil.
   function iconeCadenas() { const t = document.createElement('template'); t.innerHTML = '<svg class="ico-k gris" viewBox="0 0 32 32" aria-hidden="true"><rect x="8" y="14" width="16" height="13" rx="2.5"/><path d="M11.5 14v-3.5a4.5 4.5 0 0 1 9 0V14M16 19v3"/></svg>'; return t.content.firstChild; }
@@ -1851,20 +1862,37 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
     choix('animations', 'Animations', animReduiteSysteme ? 'Réduites par ton téléphone' : 'Réduites : plus rapide, moins de batterie', [['normales', 'Normales'], ['reduites', 'Réduites']]);
     bascule('quatreCouleurs', 'Cartes à 4 couleurs', 'Pique noir, cœur rouge, carreau bleu, trèfle vert', null);
     titre('Compte');
+    // Pseudo : choisi une fois, puis 2 changements au plus sur 12 mois (le serveur fait foi s'il y a un compte).
     const ps = el('input', 'texte'); ps.maxLength = 16; ps.value = stock.lire('kopo-pseudo') || ''; ps.placeholder = 'Ex. As_de_Pique'; ps.setAttribute('aria-label', 'Pseudo');
-    ps.oninput = () => { const v = nettoyerPseudo(ps.value, true); if (v !== ps.value) ps.value = v; };
-    ps.onchange = async () => {
-      const p = nettoyerPseudo(ps.value); ps.value = p;
-      if (p.length < 3) { toast('Le pseudo fait au moins 3 caractères, en un seul mot.'); return; }
-      const c = compteLocal();
-      if (c) {
-        try { const j = await apiJoueur('/moi', 'PATCH', { pseudo: p }); c.compte = j.compte; stock.ecrire('kopo-compte-serveur', c); }
-        catch (e) { toast(e.message); ps.value = stock.lire('kopo-pseudo') || ''; return; }
-      }
-      stock.ecrire('kopo-pseudo', p); if ($('pseudo')) { $('pseudo').value = p; majAvatar(); }
-      toast('Pseudo enregistré.');
+    const aidePs = el('small', null, '');
+    let restantsPs = 2;
+    const montrerQuota = (q) => {
+      restantsPs = q.restants; ps.disabled = q.restants <= 0;
+      aidePs.textContent = q.restants > 0 ? 'Tu peux encore le changer ' + q.restants + ' fois cette année.'
+        : 'Déjà changé 2 fois cette année. Prochain changement le ' + new Date(q.prochain).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) + '.';
     };
-    ligne('Pseudo', null, ps).style.flexWrap = 'wrap';
+    montrerQuota(quotaPseudoLocal());
+    if (compteLocal()) apiJoueur('/moi').then((m) => m.quotaPseudo && montrerQuota(m.quotaPseudo)).catch(() => {});
+    ps.oninput = () => { const v = nettoyerPseudo(ps.value, true); if (v !== ps.value) ps.value = v; };
+    ps.onchange = () => {
+      const avant = stock.lire('kopo-pseudo') || '';
+      const p = nettoyerPseudo(ps.value); ps.value = p;
+      if (p === avant) return;
+      if (p.length < 3) { toast('Le pseudo fait au moins 3 caractères, en un seul mot.'); ps.value = avant; return; }
+      const fenetrePrecedente = [...$('fenetre').childNodes];
+      const retour = () => { ouvrirFenetre(fenetrePrecedente); };
+      demanderConfirmation('Ton pseudo deviendra « ' + p + ' ». ' + (restantsPs > 1 ? 'Il te restera 1 changement cette année.' : 'Ce sera ton dernier changement pour un an.'), async () => {
+        const c = compteLocal();
+        if (c) {
+          try { const j = await apiJoueur('/moi', 'PATCH', { pseudo: p }); c.compte = j.compte; stock.ecrire('kopo-compte-serveur', c); if (j.quotaPseudo) montrerQuota(j.quotaPseudo); }
+          catch (e) { toast(e.message); ps.value = avant; retour(); return; }
+        }
+        noterChangementPseudo(); if (!c) montrerQuota(quotaPseudoLocal());
+        stock.ecrire('kopo-pseudo', p); if ($('pseudo')) { $('pseudo').value = p; majAvatar(); }
+        toast('Pseudo enregistré.'); retour();
+      }, { titre: 'Changer de pseudo ?', oui: 'Changer', annuler: () => { ps.value = avant; retour(); } });
+    };
+    const lPs = ligne('Pseudo', null, ps); lPs.style.flexWrap = 'wrap'; lPs.firstChild.append(aidePs);
     if (compteLocal()) {
       const c = compteLocal();
       ligne('Ton identifiant', 'À donner à tes amis', el('b', null, c.compte.pseudo + '#' + c.compte.numero));
@@ -2242,6 +2270,7 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
   $('btnBourse').onclick = () => fenetrePieces(0, lirePieces().bonusSerie || 0);
   function majAvatar() { const p = $('pseudo').value.trim(); $('avatar').textContent = p ? p[0].toUpperCase() : '?'; }
   $('pseudo').addEventListener('input', () => { const v = nettoyerPseudo($('pseudo').value, true); if (v !== $('pseudo').value) $('pseudo').value = v; majAvatar(); });
+  $('profil').addEventListener('click', (e) => { if ($('pseudo').readOnly) { e.preventDefault(); ouvrirParametres(); } });
   $('btnInconnus').onclick = () => { if (!lirePseudo()) return; dessinerSalles(); afficherEnLigne(); $('voileSalles').hidden = false; };
   $('btnFermerSalles').onclick = () => ($('voileSalles').hidden = true);
   $('btnModeRejoindre').onclick = () => { $('voileRejoindre').hidden = false; setTimeout(() => $('codeRejoindre').focus(), 50); };

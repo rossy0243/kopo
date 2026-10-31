@@ -18,6 +18,16 @@ CREATE TABLE IF NOT EXISTS comptes (
 );
 CREATE INDEX IF NOT EXISTS comptes_pseudo ON comptes (lower(pseudo));
 
+-- Changements de pseudo : le pseudo choisi à la création, puis 2 changements au plus sur 12 mois glissants.
+CREATE TABLE IF NOT EXISTS changements_pseudo (
+  id         bigserial PRIMARY KEY,
+  compte_id  text NOT NULL REFERENCES comptes(id),
+  ancien     text NOT NULL,
+  nouveau    text NOT NULL,
+  cree_le    timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS changements_pseudo_compte ON changements_pseudo (compte_id, cree_le);
+
 -- Registre des pièces : chaque mouvement est une ligne, jamais modifiée ni effacée.
 -- comptes.solde est la somme de ce registre (mise à jour dans la même transaction).
 CREATE TABLE IF NOT EXISTS registre_pieces (

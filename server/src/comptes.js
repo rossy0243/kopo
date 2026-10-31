@@ -21,6 +21,8 @@ function verifierPseudo(p) {
   return { ok: true, pseudo };
 }
 const PSEUDO_PRIS = 'Ce pseudo est déjà pris, choisis-en un autre.';
+// Règle du créateur : le pseudo se choisit une fois, puis se change 2 fois au plus sur 12 mois glissants.
+const CHANGEMENTS_PSEUDO_PAR_AN = 2;
 const doublon = (e) => e && e.code === '23505' && /pseudo/.test(String(e.constraint || e.message || ''));
 
 // Pseudo pris (hors comptes supprimés), sans tenir compte des majuscules.
@@ -110,11 +112,31 @@ function creerComptes(base, reglages) {
       if (pseudo !== undefined) {
         const v = verifierPseudo(pseudo);
         if (!v.ok) throw Object.assign(new Error(v.erreur), { statut: 400 });
-        if (await pseudoPris(base, v.pseudo, id)) throw Object.assign(new Error(PSEUDO_PRIS), { statut: 409 });
-        await base.query('UPDATE comptes SET pseudo = $2 WHERE id = $1', [id, v.pseudo]).catch((e) => { throw doublon(e) ? Object.assign(new Error(PSEUDO_PRIS), { statut: 409 }) : e; });
+        const actuel = await api.lire(id);
+        if (actuel && actuel.pseudo !== v.pseudo) {
+          const quota = await api.quotaPseudo(id);
+          if (quota.restants <= 0) {
+            const date = new Date(quota.prochain).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+            throw Object.assign(new Error(`Tu as déjà changé ton pseudo ${CHANGEMENTS_PSEUDO_PAR_AN} fois cette année. Prochain changement possible le ${date}.`), { statut: 403 });
+          }
+          if (await pseudoPris(base, v.pseudo, id)) throw Object.assign(new Error(PSEUDO_PRIS), { statut: 409 });
+          await base.transaction(async (q) => {
+            await q.query('UPDATE comptes SET pseudo = $2 WHERE id = $1', [id, v.pseudo]);
+            await q.query('INSERT INTO changements_pseudo (compte_id, ancien, nouveau) VALUES ($1, $2, $3)', [id, actuel.pseudo, v.pseudo]);
+          }).catch((e) => { throw doublon(e) ? Object.assign(new Error(PSEUDO_PRIS), { statut: 409 }) : e; });
+        }
       }
       if (avatar !== undefined && /^a\d{1,2}$/.test(avatar)) await base.query('UPDATE comptes SET avatar = $2 WHERE id = $1', [id, avatar]);
       return api.lire(id);
+    },
+
+    // Changements de pseudo encore permis sur les 12 derniers mois, et date du prochain si aucun.
+    async quotaPseudo(id) {
+      const r = await base.query("SELECT cree_le FROM changements_pseudo WHERE compte_id = $1 AND cree_le > now() - interval '1 year' ORDER BY cree_le", [id]);
+      const restants = Math.max(0, CHANGEMENTS_PSEUDO_PAR_AN - r.rows.length);
+      let prochain = null;
+      if (!restants) { const d = new Date(r.rows[r.rows.length - CHANGEMENTS_PSEUDO_PAR_AN].cree_le); d.setUTCFullYear(d.getUTCFullYear() + 1); prochain = d.toISOString(); }
+      return { restants, max: CHANGEMENTS_PSEUDO_PAR_AN, prochain };
     },
 
     // Le joueur a ouvert le jeu : présence du jour (joueurs actifs, rétention).
