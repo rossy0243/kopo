@@ -9,12 +9,56 @@ const numeroAleatoire = () => String(crypto.randomInt(0, 10000)).padStart(4, '0'
 // Mots refusés dans les pseudos (liste de départ, complétée depuis le tableau de bord plus tard).
 const MOTS_INTERDITS = ['admin', 'kopo', 'moderateur', 'pute', 'salope', 'connard', 'encule', 'nazi', 'hitler', 'fuck', 'shit', 'bitch', 'nigger', 'pd'];
 function normaliser(t) { return String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, ''); }
+// Pseudo en un seul mot : les espaces deviennent « _ », seuls lettres, chiffres, _ - . restent.
+function nettoyerPseudo(p) {
+  return String(p || '').trim().replace(/\s+/g, '_').replace(/[^\p{L}\p{N}_.-]/gu, '');
+}
 function verifierPseudo(p) {
-  const pseudo = String(p || '').replace(/[<>#]/g, '').trim();
-  if (pseudo.length < 3 || pseudo.length > 16) return { ok: false, erreur: 'Le pseudo fait entre 3 et 16 caractères.' };
+  const pseudo = nettoyerPseudo(p);
+  if (pseudo.length < 3 || pseudo.length > 16) return { ok: false, erreur: 'Le pseudo fait entre 3 et 16 caractères, en un seul mot.' };
   const n = normaliser(pseudo);
   if (MOTS_INTERDITS.some((m) => n.includes(m))) return { ok: false, erreur: 'Ce pseudo n\'est pas autorisé.' };
   return { ok: true, pseudo };
+}
+const PSEUDO_PRIS = 'Ce pseudo est déjà pris, choisis-en un autre.';
+const doublon = (e) => e && e.code === '23505' && /pseudo/.test(String(e.constraint || e.message || ''));
+
+// Pseudo pris (hors comptes supprimés), sans tenir compte des majuscules.
+async function pseudoPris(q, pseudo, saufId = null) {
+  const r = await q.query("SELECT 1 FROM comptes WHERE lower(pseudo) = lower($1) AND statut <> 'supprime' AND id IS DISTINCT FROM $2 LIMIT 1", [pseudo, saufId]);
+  return r.rows.length > 0;
+}
+// Variante libre : Mundyo, puis Mundyo_4821, etc.
+async function pseudoLibre(q, pseudo, saufId = null) {
+  if (!(await pseudoPris(q, pseudo, saufId))) return pseudo;
+  for (let i = 0; i < 30; i++) {
+    const v = pseudo.slice(0, 11) + '_' + numeroAleatoire();
+    if (!(await pseudoPris(q, v, saufId))) return v;
+  }
+  throw Object.assign(new Error(PSEUDO_PRIS), { statut: 409 });
+}
+
+// Migration au démarrage : espaces remplacés par « _ », puis doublons renommés
+// (le plus ancien garde son pseudo), avant de poser l'index unique.
+async function migrerPseudos(base) {
+  await base.query("UPDATE comptes SET pseudo = regexp_replace(btrim(pseudo), '\\s+', '_', 'g') WHERE statut <> 'supprime' AND pseudo ~ '\\s'");
+  const r = await base.query("SELECT id, pseudo, row_number() OVER (PARTITION BY lower(pseudo) ORDER BY cree_le, id) AS rang FROM comptes WHERE statut <> 'supprime'");
+  for (const c of r.rows.filter((x) => Number(x.rang) > 1)) {
+    await base.query('UPDATE comptes SET pseudo = $2 WHERE id = $1', [c.id, await pseudoLibre(base, c.pseudo, c.id)]);
+  }
+  await base.query("CREATE UNIQUE INDEX IF NOT EXISTS comptes_pseudo_unique ON comptes (lower(pseudo)) WHERE statut <> 'supprime'");
+}
+
+// Efface aussi l'utilisateur Supabase Auth (e-mail, nom, photo Google).
+// Demande la clé secrète « service_role » dans SUPABASE_SERVICE_ROLE_KEY (Render).
+async function supprimerUtilisateurSupabase(authId) {
+  const url = process.env.SUPABASE_URL, cle = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !cle) { console.warn('Compte supprimé : utilisateur Supabase ' + authId + ' à effacer à la main (SUPABASE_SERVICE_ROLE_KEY absent).'); return false; }
+  try {
+    const r = await fetch(new URL('/auth/v1/admin/users/' + encodeURIComponent(authId), url), { method: 'DELETE', headers: { apikey: cle, authorization: 'Bearer ' + cle } });
+    if (!r.ok && r.status !== 404) console.warn('Suppression Supabase ' + authId + ' : ' + r.status);
+    return r.ok || r.status === 404;
+  } catch (e) { console.warn('Suppression Supabase ' + authId + ' : ' + e.message); return false; }
 }
 
 function creerComptes(base, reglages) {
@@ -31,15 +75,16 @@ function creerComptes(base, reglages) {
     mouvement,
     crediter: (compteId, montant, motif, ref, parAdmin) => base.transaction((q) => mouvement(q, compteId, montant, motif, ref, parAdmin)),
 
-    async creer({ pseudo, authId = null, pays = null } = {}) {
+    // Si le pseudo voulu est déjà pris, le compte reçoit une variante libre (Mundyo_4821).
+    async creer({ pseudo, authId = null, pays = null } = {}, essai = 0) {
       const v = verifierPseudo(pseudo || 'Joueur' + numeroAleatoire());
       if (!v.ok) throw Object.assign(new Error(v.erreur), { statut: 400 });
       const id = idAleatoire('c_');
       return base.transaction(async (q) => {
-        await q.query('INSERT INTO comptes (id, auth_id, pseudo, numero, pays) VALUES ($1, $2, $3, $4, $5)', [id, authId, v.pseudo, numeroAleatoire(), pays]);
+        await q.query('INSERT INTO comptes (id, auth_id, pseudo, numero, pays) VALUES ($1, $2, $3, $4, $5)', [id, authId, await pseudoLibre(q, v.pseudo), numeroAleatoire(), pays]);
         await mouvement(q, id, reglages.get('gains').bienvenue, 'bienvenue');
         return api.lire(id, q);
-      });
+      }).catch((e) => { if (doublon(e) && essai < 3) return api.creer({ pseudo, authId, pays }, essai + 1); throw e; });
     },
 
     async lire(id, q = base) {
@@ -54,16 +99,19 @@ function creerComptes(base, reglages) {
     // Rattache un compte invité à une connexion Google / téléphone.
     async lier(id, authId) {
       const deja = await api.parAuth(authId);
-      if (deja && deja.id !== id) return deja; // ce compte Google existe déjà : on le reprend
-      await base.query('UPDATE comptes SET auth_id = $2 WHERE id = $1', [id, authId]);
-      return api.lire(id);
+      // Un compte Google = un seul compte Kopo.
+      if (deja) return deja; // ce compte Google est déjà lié : on reprend ce compte-là
+      // Le compte de l'appareil est déjà lié à un autre compte Google : on n'y touche pas.
+      const r = await base.query('UPDATE comptes SET auth_id = $2 WHERE id = $1 AND auth_id IS NULL RETURNING id', [id, authId]);
+      return r.rows.length ? api.lire(id) : null;
     },
 
     async changerProfil(id, { pseudo, avatar }) {
       if (pseudo !== undefined) {
         const v = verifierPseudo(pseudo);
         if (!v.ok) throw Object.assign(new Error(v.erreur), { statut: 400 });
-        await base.query('UPDATE comptes SET pseudo = $2 WHERE id = $1', [id, v.pseudo]);
+        if (await pseudoPris(base, v.pseudo, id)) throw Object.assign(new Error(PSEUDO_PRIS), { statut: 409 });
+        await base.query('UPDATE comptes SET pseudo = $2 WHERE id = $1', [id, v.pseudo]).catch((e) => { throw doublon(e) ? Object.assign(new Error(PSEUDO_PRIS), { statut: 409 }) : e; });
       }
       if (avatar !== undefined && /^a\d{1,2}$/.test(avatar)) await base.query('UPDATE comptes SET avatar = $2 WHERE id = $1', [id, avatar]);
       return api.lire(id);
@@ -125,14 +173,16 @@ function creerComptes(base, reglages) {
     // Suppression demandée par le joueur (exigée par Google Play et l'App Store) :
     // on efface ce qui l'identifie, on garde les lignes anonymes pour les statistiques.
     async supprimer(id) {
+      const avant = await api.lire(id);
       await base.transaction(async (q) => {
         await q.query("UPDATE comptes SET statut = 'supprime', auth_id = NULL, pseudo = 'Joueur supprimé', pays = NULL WHERE id = $1", [id]);
         await q.query('DELETE FROM amis WHERE compte_id = $1 OR ami_id = $1', [id]);
         await q.query('DELETE FROM blocages WHERE compte_id = $1', [id]);
       });
+      if (avant && avant.auth_id) await supprimerUtilisateurSupabase(avant.auth_id);
     },
   };
   return api;
 }
 
-module.exports = { creerComptes, verifierPseudo, jourUTC, idAleatoire };
+module.exports = { creerComptes, verifierPseudo, nettoyerPseudo, migrerPseudos, jourUTC, idAleatoire };

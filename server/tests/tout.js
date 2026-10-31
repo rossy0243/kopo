@@ -5,7 +5,8 @@ const assert = require('assert');
 const { Client } = require('colyseus.js');
 const { demarrer } = require('../src/index');
 const { codeTotp, nouveauSecretTotp, verifierTotp } = require('../src/auth');
-const { verifierPseudo } = require('../src/comptes');
+const { verifierPseudo, migrerPseudos } = require('../src/comptes');
+const jose = require('jose');
 
 const TOTP = nouveauSecretTotp();
 let srv, URL_;
@@ -49,7 +50,7 @@ async function jouerPartie(joueurs, { robots = 0 } = {}) {
 }
 
 (async () => {
-  srv = await demarrer({ port: 0, env: { NODE_ENV: 'test', SECRET_SERVEUR: 'x'.repeat(40), ADMIN_MOT_DE_PASSE: 'motdepasse-admin', ADMIN_TOTP: TOTP } });
+  srv = await demarrer({ port: 0, env: { NODE_ENV: 'test', SECRET_SERVEUR: 'x'.repeat(40), ADMIN_MOT_DE_PASSE: 'motdepasse-admin', ADMIN_TOTP: TOTP, SUPABASE_JWT_SECRET: 's'.repeat(40) } });
   URL_ = 'http://localhost:' + srv.port;
   let adminJeton;
 
@@ -66,6 +67,45 @@ async function jouerPartie(joueurs, { robots = 0 } = {}) {
     assert.strictEqual(verifierPseudo('Connard du 93').ok, false);
     assert.strictEqual(verifierPseudo('Kévin').ok, true);
     assert.strictEqual((await api('/api/invite', { methode: 'POST', corps: { pseudo: 'x' } })).statut, 400);
+  });
+  await test('pseudo en un mot : espaces remplacés par _', async () => {
+    assert.strictEqual(verifierPseudo('  Jean  Paul ').pseudo, 'Jean_Paul');
+    assert.strictEqual(verifierPseudo('Ké<vin>').pseudo, 'Kévin');
+    const r = await invite('Marie Claire');
+    assert.strictEqual(r.compte.pseudo, 'Marie_Claire');
+  });
+  await test('pseudo unique : variante à la création, refus au changement', async () => {
+    const a = await invite('Unique');
+    const b = await invite('unique');
+    assert.strictEqual(a.compte.pseudo, 'Unique');
+    assert.match(b.compte.pseudo, /^unique_\d{4}$/);
+    const ch = await api('/api/moi', { methode: 'PATCH', jeton: b.jeton, corps: { pseudo: 'UNIQUE' } });
+    assert.strictEqual(ch.statut, 409);
+    assert.strictEqual((await api('/api/moi', { methode: 'PATCH', jeton: a.jeton, corps: { pseudo: 'Unique' } })).statut, 200); // le sien
+  });
+  await test('migration : anciens pseudos avec espaces et doublons corrigés', async () => {
+    const b = srv.base;
+    await b.query('DROP INDEX IF EXISTS comptes_pseudo_unique');
+    await b.query("INSERT INTO comptes (id, pseudo, numero, cree_le) VALUES ('c_m1', 'Papa Wemba', '0001', now() - interval '2 days'), ('c_m2', 'papa_wemba', '0002', now() - interval '1 day')");
+    await migrerPseudos(b);
+    assert.strictEqual((await srv.comptes.lire('c_m1')).pseudo, 'Papa_Wemba');
+    assert.match((await srv.comptes.lire('c_m2')).pseudo, /^papa_wemba_\d{4}$/);
+    await assert.rejects(b.query("INSERT INTO comptes (id, pseudo, numero) VALUES ('c_m3', 'PAPA_WEMBA', '0003')"));
+  });
+  const jetonGoogle = (sub, nom) => new jose.SignJWT({ user_metadata: { name: nom } }).setProtectedHeader({ alg: 'HS256' }).setSubject(sub).setAudience('authenticated').setExpirationTime('1h').sign(new TextEncoder().encode('s'.repeat(40)));
+  await test('un compte Google = un seul compte Kopo, nom Google jamais repris', async () => {
+    const g = await api('/api/connexion', { methode: 'POST', corps: { jetonSupabase: await jetonGoogle('google-1', 'Jean Dupont') } });
+    assert.strictEqual(g.statut, 200);
+    assert.match(g.json.compte.pseudo, /^Joueur\d{4}/);
+    // Un autre téléphone (invité) se connecte avec le même Google : il reprend le même compte.
+    const inv = await invite('Telephone2');
+    const g2 = await api('/api/connexion', { methode: 'POST', corps: { jetonSupabase: await jetonGoogle('google-1'), jeton: inv.jeton } });
+    assert.strictEqual(g2.json.compte.id, g.json.compte.id);
+    assert.strictEqual((await srv.comptes.lire(inv.compte.id)).auth_id, null);
+    // Un compte déjà lié ne passe pas à un autre Google.
+    const g3 = await api('/api/connexion', { methode: 'POST', corps: { jetonSupabase: await jetonGoogle('google-2'), jeton: g.json.jeton } });
+    assert.notStrictEqual(g3.json.compte.id, g.json.compte.id);
+    assert.strictEqual((await srv.comptes.lire(g.json.compte.id)).auth_id, 'google-1');
   });
   await test('sans jeton, pas d\'accès', async () => assert.strictEqual((await api('/api/moi')).statut, 401));
   await test('bonus du jour : 50 la première fois, une seule fois par jour', async () => {

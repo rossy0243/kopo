@@ -21,6 +21,8 @@ services:
         sync: false
       - key: SUPABASE_URL          # Supabase → Project Settings → API → Project URL
         sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY # Supabase → Project Settings → API Keys → service_role (secret) : efface l'utilisateur Google quand un joueur supprime son compte
+        sync: false
       - key: ADMIN_MOT_DE_PASSE    # mot de passe du tableau de bord (long, unique)
         sync: false
       - key: ADMIN_TOTP            # secret du code à 6 chiffres : node server/src/outils.js totp

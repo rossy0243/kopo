@@ -55,7 +55,11 @@ function routesJoueurs({ base, auth, comptes, reglages }) {
       const idInvite = await auth.verifierJoueur(req.body.jeton);
       if (idInvite) c = await comptes.lier(idInvite, s.sub);
     }
-    if (!c) c = await comptes.creer({ pseudo: req.body.pseudo || (s.user_metadata && s.user_metadata.name ? String(s.user_metadata.name).slice(0, 16) : undefined), authId: s.sub });
+    // Le nom Google n'est jamais repris comme pseudo (vie privée) : pseudo de l'appareil ou Joueur1234.
+    if (!c) c = await comptes.creer({ pseudo: req.body.pseudo, authId: s.sub }).catch((e) => {
+      if (e.statut === 400) return comptes.creer({ authId: s.sub }); // pseudo de l'appareil refusé : pseudo par défaut
+      throw e;
+    });
     if (c.statut === 'banni') return res.status(403).json({ erreur: 'Ce compte est banni.' });
     await comptes.presence(c.id);
     res.json({ jeton: await auth.jetonJoueur(c.id), compte: publicCompte(c) });
@@ -76,7 +80,8 @@ function routesJoueurs({ base, auth, comptes, reglages }) {
   async function cible(texte) {
     const m = /^(.{3,16})#(\d{4})$/.exec(String(texte || '').trim());
     if (m) return (await base.query("SELECT id, pseudo, numero, avatar FROM comptes WHERE lower(pseudo) = lower($1) AND numero = $2 AND statut <> 'supprime'", [m[1], m[2]])).rows[0];
-    return (await base.query("SELECT id, pseudo, numero, avatar FROM comptes WHERE id = $1 AND statut <> 'supprime'", [String(texte || '')])).rows[0];
+    const t = String(texte || '').trim();
+    return (await base.query("SELECT id, pseudo, numero, avatar FROM comptes WHERE (id = $1 OR lower(pseudo) = lower($1)) AND statut <> 'supprime' LIMIT 1", [t])).rows[0];
   }
 
   r.post('/signaler', joueur, enveloppe(async (req, res) => {
