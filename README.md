@@ -15,6 +15,8 @@ Jeu de cartes multijoueur, de 2 à 9 joueurs, chacun sur son téléphone.
 - Un joueur déconnecté, ou dont le temps s'est écoulé 2 fois d'affilée, n'a plus que 5 s par tour (même sans chrono) jusqu'à son retour.
 - Chrono réglable (5 s par défaut) : un joueur trop lent ou hors ligne pioche. En ouverture, sa plus petite carte autorisée est posée.
 - Micro optionnel (WebRTC via PeerJS, avec relais TURN) : chacun l'active, le coupe, ou coupe le son des autres.
+- Fin de partie : récap animé (XP et niveau, missions, face-à-face), **revanche** votée à la table (elle part dès que tout le monde a répondu, ou après 15 s avec au moins 2 joueurs ; les robots acceptent toujours). En salle publique, la partie suivante se cherche seule après 5 s (« Arrêter là » pour rester). Partage de la victoire en image (WhatsApp).
+- Rétention (sur le téléphone, avec les pièces d'essai) : 3 missions du jour gardées 2 jours avec un « Changer » par jour, défi de la semaine (cadre d'une ville), parcours de bienvenue sur 7 jours de jeu, joker de série (un jour raté par semaine ne casse pas la série du bonus du jour), première partie guidée contre 2 robots gentils avec des bulles d'aide, table rapide à 5 joueurs en ligne.
 
 ## Serveur
 Le dossier `server/` contient le serveur de la V1 (comptes, parties sur le serveur, registre des pièces, tableau de bord admin), prêt pour Render + Supabase. Voir [server/README.md](server/README.md).
@@ -22,7 +24,8 @@ Le dossier `server/` contient le serveur de la V1 (comptes, parties sur le serve
 ## Fichiers
 - `index.html` : la page complète, générée par `node build.js`.
 - `moteur/` : moteur de règles (règlement v1.2) et ses tests.
-- `src/kopo-salle.js` : salle de jeu (salon, manches, chrono, vues par joueur) et ses tests.
+- `src/kopo-salle.js` : salle de jeu (salon, manches, chrono, revanche, vues par joueur) et ses tests.
+- `src/kopo-retention.js` : XP, niveau, stats, face-à-face, missions, défi, bienvenue, joker, collection (calculés sur le téléphone, dans `kopo-profil`) et ses tests.
 - `src/source.html` : écrans et réseau.
 - `vendor/` : MQTT.js, colyseus.js, PeerJS et qrcode-generator (licences MIT).
 
@@ -33,5 +36,6 @@ Quand une adresse de serveur est renseignée (`SERVEUR_PAR_DEFAUT` dans `src/sou
 ```
 node moteur/kopo-tests.js
 node src/kopo-salle-tests.js
+node src/kopo-retention-tests.js
 ```
 Pour tester à plusieurs onglets sur un seul appareil, sans réseau : ouvrir `index.html?local=1` dans plusieurs onglets.
