@@ -431,6 +431,8 @@ body.en-jeu #btnReactions { display: grid; }
 .reactions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .reactions button { font-size: 26px; padding: 10px 0; }
 .reactions button.phrase { grid-column: span 2; font-size: 15px; }
+.phrases-chat { display: flex; flex-wrap: wrap; gap: 6px; }
+.phrases-chat button { font-size: 14px; padding: 8px 12px; border-radius: 99px; }
 .bulle.reaction { font-size: 26px; }
 /* Chat en partie : les derniers messages s'affichent à gauche, au-dessus de la main, puis s'effacent. */
 #filChat { position: fixed; left: max(8px, env(safe-area-inset-left)); bottom: 34%; z-index: 30; display: none; flex-direction: column; align-items: flex-start; gap: 4px; max-width: min(72vw, 320px); pointer-events: none; }
@@ -1964,7 +1966,7 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
   // ------------------------------------------------------------------ entre joueurs
   // Réactions rapides en partie, fiche d'un joueur (ami, bloquer, signaler), amis et bloqués.
   // Les comptes n'existent qu'en mode serveur : sans serveur, seules les réactions marchent.
-  const REACTIONS = ['👏', '😂', '😮', '🔥', '😡', '👍', '😭', '🙏', 'Bien joué !', 'Vite !', 'Katapss !', 'Oups !'];
+  const REACTIONS = ['👏', '😂', '😮', '🔥', '😡', '👍', '😭', '🙏', 'Bien joué !', 'Bravo !', 'Joli coup !', 'Belle carte !', 'Bien vu !', 'Trop fort !', 'Merci !', 'Désolé !', 'Oups !', 'Aïe !', 'Pas de chance !', 'Je ramasse…', 'Je t’ai eu !', 'Katapss !', 'Vite !', 'Prends ton temps', 'À toi !', 'Encore une !', 'Bonne chance !', 'Bonne partie !', 'GG !', 'Revanche ?', 'On en refait une ?', 'Je reviens', 'Salut tout le monde !', 'À la prochaine !'];
   const compteLocal = () => { const c = stock.lire('kopo-compte-serveur'); return c && c.jeton ? c : null; };
   async function apiJoueur(chemin, methode = 'GET', corps) {
     const c = compteLocal();
@@ -1997,14 +1999,16 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
       contenu.push(h);
       setTimeout(() => (h.scrollTop = h.scrollHeight));
     }
-    const z = el('div', 'reactions');
+    const z = el('div', 'reactions'), ph = el('div', 'phrases-chat'); // émojis en grille, phrases en pastilles
     for (const r of messagesChat()) {
-      const b = el('button', 'btn' + (estPhrase(r) ? ' phrase' : ''), r);
+      const b = el('button', 'btn', r);
       b.onclick = () => { fermerFenetre(); if (vueActuelle) afficher(vueActuelle); if (window.kopoReaction) window.kopoReaction(r); };
-      z.append(b);
+      (estPhrase(r) ? ph : z).append(b);
     }
     const f = el('button', 'btn large', 'Fermer'); f.onclick = () => { fermerFenetre(); if (vueActuelle) afficher(vueActuelle); };
-    contenu.push(z, f);
+    if (z.children.length) contenu.push(z);
+    if (ph.children.length) contenu.push(ph);
+    contenu.push(f);
     ouvrirFenetre(contenu, 'chat');
   };
   window.addEventListener('kopo-reaction', (e) => {

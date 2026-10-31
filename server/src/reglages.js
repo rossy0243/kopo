@@ -11,7 +11,7 @@ const DEFAUTS = {
   maintenance: { active: false, message: 'Le Kopo est en maintenance. On revient très vite !' },
   versionMin: '1.0',
   // Messages du chat en partie : les joueurs ne peuvent envoyer que ceux-là (pas de texte libre, donc pas d'insultes).
-  messagesRapides: ['👏', '😂', '😮', '🔥', '😡', '👍', '😭', '🙏', 'Bien joué !', 'Vite !', 'Katapss !', 'Oups !'],
+  messagesRapides: ['👏', '😂', '😮', '🔥', '😡', '👍', '😭', '🙏', 'Bien joué !', 'Bravo !', 'Joli coup !', 'Belle carte !', 'Bien vu !', 'Trop fort !', 'Merci !', 'Désolé !', 'Oups !', 'Aïe !', 'Pas de chance !', 'Je ramasse…', 'Je t’ai eu !', 'Katapss !', 'Vite !', 'Prends ton temps', 'À toi !', 'Encore une !', 'Bonne chance !', 'Bonne partie !', 'GG !', 'Revanche ?', 'On en refait une ?', 'Je reviens', 'Salut tout le monde !', 'À la prochaine !'],
 };
 const MESSAGE_MAX = 40, MESSAGES_MAX = 40;
 // Nettoie une liste de messages : texte seul, sans doublon, ni trop long ni trop nombreux.
