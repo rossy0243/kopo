@@ -820,7 +820,7 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
   // ------------------------------------------------------------------ serveur Kopo (V1)
   // Quand le serveur est en ligne, les parties tournent sur lui (salles Colyseus) au lieu du
   // téléphone de l'hôte. Sans adresse de serveur, on garde le mode relais (MQTT) ci-dessus.
-  const SERVEUR_PAR_DEFAUT = ''; // à remplir avec l'adresse du serveur une fois déployé, ex. 'https://kopo-serveur.onrender.com'
+  const SERVEUR_PAR_DEFAUT = 'https://kopo-serveur.onrender.com'; // ?serveur= dans l'adresse pour en essayer un autre
   const SERVEUR = (new URLSearchParams(location.search).get('serveur') || SERVEUR_PAR_DEFAUT).replace(/\/$/, '');
   const MODE_SERVEUR = !!SERVEUR && !LOCAL && typeof Colyseus !== 'undefined';
 
@@ -841,6 +841,8 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
     clearTimeout(rechercheEnCours);
     afficherConnexion(facon.taille ? `Recherche d'une salle de ${facon.taille}…` : facon.code ? 'Connexion à la partie ' + facon.code + '…' : 'Ouverture de la partie…');
     let room;
+    // L'hébergeur gratuit endort le serveur après un moment sans joueurs : le réveil prend jusqu'à une minute.
+    const reveil = setTimeout(() => afficherConnexion('Réveil du serveur, ça peut prendre jusqu\'à une minute…'), 6000);
     try {
       const c = await compteServeur(nom);
       const cli = new Colyseus.Client(SERVEUR.replace(/^http/, 'ws'));
@@ -848,12 +850,18 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
       else if (facon.creer) room = await cli.create('kopo', { jeton: c.jeton, code: nouveauCode() });
       else if (facon.code) room = await cli.join('kopo', { jeton: c.jeton, code: facon.code });
       else room = await cli.joinOrCreate('kopo', { jeton: c.jeton, publique: true, taille: facon.taille });
+      clearTimeout(reveil);
       brancherSalleServeur(cli, room, nom, facon);
     } catch (e) {
+      clearTimeout(reveil);
       if (facon.reconnexion && facon.code) return entrerServeur(nom, { code: facon.code, taille: facon.taille });
       const m = String((e && e.message) || e);
       const texte = /no rooms found|not found/i.test(m) ? 'Partie introuvable, ou elle a déjà commencé.' : m.includes('locked') ? 'La partie a déjà commencé.' : m || 'Connexion impossible.';
-      if (/Compte inconnu|Connexion requise/.test(m)) stock.effacer('kopo-compte-serveur');
+      if (/Compte inconnu|Connexion requise/.test(m)) {
+        stock.effacer('kopo-compte-serveur');
+        // Compte gardé sur l'appareil mais inconnu du serveur : on en recrée un, une seule fois.
+        if (!facon.retente) return entrerServeur(nom, Object.assign({}, facon, { retente: true }));
+      }
       quitter(); toast(texte);
     }
   }
