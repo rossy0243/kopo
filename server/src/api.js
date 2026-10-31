@@ -24,7 +24,9 @@ function routesJoueurs({ base, auth, comptes, reglages }) {
   // Ce que l'application lit au démarrage : annonce, maintenance, version minimale.
   r.get('/config', (req, res) => {
     const t = reglages.tout();
-    res.json({ annonce: t.annonce.active ? t.annonce.texte : null, maintenance: t.maintenance.active ? t.maintenance.message : null, versionMin: t.versionMin, tables: t.tables });
+    res.json({ annonce: t.annonce.active ? t.annonce.texte : null, maintenance: t.maintenance.active ? t.maintenance.message : null, versionMin: t.versionMin, tables: t.tables,
+      // Connexion Google : active quand CONNEXION_GOOGLE=1 et que Google est activé dans Supabase.
+      google: process.env.CONNEXION_GOOGLE === '1' && process.env.SUPABASE_URL ? process.env.SUPABASE_URL : null });
   });
 
   // Jouer sans compte (invité). Le compte pourra être rattaché à Google ou au téléphone ensuite.

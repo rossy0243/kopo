@@ -25,5 +25,7 @@ services:
         sync: false
       - key: ADMIN_TOTP            # secret du code à 6 chiffres : node server/src/outils.js totp
         sync: false
+      - key: CONNEXION_GOOGLE      # 1 = bouton « Se connecter avec Google » (une fois Google activé dans Supabase)
+        value: "0"
       - key: ORIGINES              # pages autorisées à appeler le serveur
         value: https://rossy0243.github.io,capacitor://localhost,https://localhost
