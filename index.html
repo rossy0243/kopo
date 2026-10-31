@@ -363,6 +363,28 @@ ul.regles { margin: 0; padding-left: 18px; display: grid; gap: 8px; color: var(-
   .mode-creer b { font-size: 24px; }
 }
 
+/* Première ouverture : Google ou invité */
+.bienvenue { position: fixed; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; gap: clamp(20px, 6vw, 72px); padding: max(16px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+  background: radial-gradient(ellipse at 50% 40%, var(--table-2), #08131f 78%); overflow-y: auto; }
+.bienvenue-haut { display: grid; justify-items: center; gap: 6px; text-align: center; }
+.bienvenue-marque { width: min(30vw, 22vh, 120px); border-radius: 22%; box-shadow: 0 10px 30px rgba(0,0,0,.5), 0 0 40px rgba(226,176,74,.15); }
+.bienvenue-titre { font-family: var(--display); font-size: min(18vw, 14vh, 92px); letter-spacing: .12em; padding-left: .12em; color: var(--brass); line-height: 1; }
+.bienvenue-sous { margin: 0; color: var(--muted); letter-spacing: 3px; text-transform: uppercase; font-size: 12px; }
+.bienvenue-choix { display: grid; gap: 10px; width: min(100%, 340px); }
+.btn-google { display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; min-height: 50px; border-radius: 12px; border: 1px solid #dadce0; background: #fff; color: #1f1f1f; font-family: inherit; font-weight: 600; font-size: 16px; cursor: pointer; }
+.btn-google svg { width: 20px; height: 20px; }
+.btn-google:active { transform: scale(.98); }
+.bienvenue-aide { color: var(--muted); font-size: 12px; text-align: center; line-height: 1.35; }
+.bienvenue-ou { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 2px; }
+.bienvenue-ou::before, .bienvenue-ou::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.bienvenue-pseudo { display: grid; gap: 4px; background: rgba(0,0,0,.3); border: 1px solid var(--line); border-radius: 12px; padding: 8px 14px; }
+.bienvenue-pseudo:focus-within { border-color: var(--brass); }
+.bienvenue-pseudo small { color: var(--muted); font-size: 11px; }
+.bienvenue-pseudo input { background: none; border: 0; color: var(--ink); font: inherit; font-weight: 700; font-size: 17px; padding: 0; }
+.bienvenue-pseudo input:focus { outline: none; }
+@media (orientation: portrait) { .bienvenue { flex-direction: column; } }
+@media (orientation: landscape) and (max-height: 500px) { .bienvenue-sous { display: none; } .bienvenue-choix { gap: 8px; } .btn-google { min-height: 44px; } }
+
 /* Écran de démarrage */
 .splash { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; align-content: center; gap: 14px; background: radial-gradient(ellipse at 50% 45%, var(--table-2), #08131f 75%); transition: opacity .45s ease; }
 .splash-marque { width: min(26vw, 24vh, 140px); height: auto; border-radius: 22%; box-shadow: 0 10px 34px rgba(0,0,0,.5), 0 0 40px rgba(226,176,74,.18); animation: entree .7s cubic-bezier(.2,1.4,.4,1) both; }
@@ -461,6 +483,22 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
   <symbol id="i-cadenas" viewBox="0 0 32 32"><rect x="8" y="14" width="16" height="13" rx="2.5"/><path d="M11.5 14v-3.5a4.5 4.5 0 0 1 9 0V14M16 19v3"/></symbol>
   </defs>
 </svg>
+  <!-- Première ouverture : se connecter avec Google ou jouer en invité -->
+  <section class="bienvenue" id="bienvenue" hidden>
+    <div class="bienvenue-haut">
+      <img class="bienvenue-marque" src="icons/kopo-logo.svg" alt="">
+      <div class="bienvenue-titre">KOPO</div>
+      <p class="bienvenue-sous">Jeu de cartes entre amis</p>
+    </div>
+    <div class="bienvenue-choix">
+      <button class="btn-google" id="btnEntreeGoogle" hidden><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.9 6.1C12.5 13.6 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.7 6c4.5-4.2 6.9-10.3 6.9-17.7z"/><path fill="#FBBC05" d="M10.6 28.6A14.6 14.6 0 0 1 9.5 24c0-1.6.3-3.2.8-4.6l-7.9-6.1A24 24 0 0 0 0 24c0 3.9.9 7.5 2.6 10.7l8-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.7-6c-2.2 1.5-5 2.3-8.2 2.3-6.2 0-11.5-4.2-13.4-9.9l-8 6.1C6.6 42.6 14.6 48 24 48z"/></svg>Continuer avec Google</button>
+      <small class="bienvenue-aide" id="aideGoogle" hidden>Tes pièces et ton compte te suivent sur tous tes téléphones.</small>
+      <div class="bienvenue-ou" id="ouGoogle" hidden><span>ou</span></div>
+      <label class="bienvenue-pseudo"><small>Ton pseudo</small><input id="pseudoEntree" maxlength="16" autocomplete="nickname" placeholder="Ex. Mundyo"></label>
+      <button class="btn principal large" id="btnEntreeInvite">Jouer en invité</button>
+      <small class="bienvenue-aide">Tu pourras te connecter avec Google plus tard, dans les Paramètres.</small>
+    </div>
+  </section>
   <section class="hub" id="ecranAccueil" hidden>
     <div class="hub-haut">
       <div class="logo"><img class="marque" src="icons/kopo-logo.svg" alt="">KOPO</div>
@@ -3657,7 +3695,8 @@ var qrcode = function() {
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
   // On le met de côté et on nettoie l'adresse avant que le jeu ne lise un code de partie.
-  if (/access_token=/.test(location.hash)) {
+  const retourGoogle = /access_token=/.test(location.hash);
+  if (retourGoogle) {
     const h = new URLSearchParams(location.hash.slice(1));
     try { sessionStorage.setItem('kopo-google-retour', h.get('access_token')); } catch (e) {}
     history.replaceState(null, '', location.pathname + location.search);
@@ -4176,6 +4215,7 @@ var qrcode = function() {
     afficherEnLigne();
     const h = location.hash.slice(1).toUpperCase();
     majAvatar(); majSolde();
+    if (montrerBienvenue()) return;
     if (/^[A-Z]{4}$/.test(h)) { $('codeRejoindre').value = h; $('voileRejoindre').hidden = false; }
     else setTimeout(bonusDuJour, 1600);
   }
@@ -5075,6 +5115,7 @@ var qrcode = function() {
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.erreur || 'Connexion refusée.');
       stock.ecrire('kopo-compte-serveur', { serveur: SERVEUR, jeton: j.jeton, compte: j.compte });
+      stock.ecrire('kopo-entree', 'google'); $('bienvenue').hidden = true;
       if (j.compte && j.compte.pseudo) { stock.ecrire('kopo-pseudo', j.compte.pseudo); if ($('pseudo')) $('pseudo').value = j.compte.pseudo; }
       toast('Connecté avec Google : ' + j.compte.pseudo + '#' + j.compte.numero);
       majBloques();
@@ -5173,6 +5214,29 @@ var qrcode = function() {
     ouvrirFenetre([el('h2', null, 'Bienvenue !'), el('p', null, 'Nouveau au Kopo ? Apprends les règles en jouant quelques coups.'), oui, non]);
     return true;
   }
+
+  // Première ouverture : « Continuer avec Google » ou « Jouer en invité », une seule fois.
+  // Les joueurs qui avaient déjà un pseudo ne la voient pas (Google reste dans les Paramètres).
+  function montrerBienvenue() {
+    if (stock.lire('kopo-entree') || retourGoogle) return false;
+    if (stock.lire('kopo-pseudo')) { stock.ecrire('kopo-entree', 'invite'); return false; }
+    $('bienvenue').hidden = false;
+    lireConfig().then((cfg) => {
+      const ok = !!(cfg && cfg.google);
+      $('btnEntreeGoogle').hidden = $('aideGoogle').hidden = $('ouGoogle').hidden = !ok;
+      if (ok) $('btnEntreeGoogle').onclick = () => connexionGoogle(cfg.google);
+    });
+    return true;
+  }
+  $('pseudoEntree').addEventListener('input', () => { const v = nettoyerPseudo($('pseudoEntree').value, true); if (v !== $('pseudoEntree').value) $('pseudoEntree').value = v; });
+  $('pseudoEntree').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('btnEntreeInvite').click(); });
+  $('btnEntreeInvite').onclick = () => {
+    const p = nettoyerPseudo($('pseudoEntree').value);
+    if (!p) { toast('Choisis ton pseudo pour jouer.'); $('pseudoEntree').focus(); return; }
+    stock.ecrire('kopo-pseudo', p); stock.ecrire('kopo-entree', 'invite');
+    $('bienvenue').hidden = true;
+    afficherAccueil();
+  };
 
   // ------------------------------------------------------------------ boutons
   $('btnParametres').onclick = ouvrirParametres;
