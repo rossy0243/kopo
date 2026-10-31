@@ -332,6 +332,7 @@ body.accueil .app { max-width: none; min-height: 100vh; min-height: 100dvh; padd
 .choix-salles .btn small { font-weight: 500; color: var(--muted); font-size: 12px; }
 .choix-salles .btn.attente small { color: var(--good); }
 .en-ligne-fenetre { color: var(--good) !important; font-weight: 600; }
+.point-en-ligne { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--good); margin: 0 4px 1px 2px; box-shadow: 0 0 6px var(--good); }
 .choix-robots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .choix-robots .btn { font-size: 20px; padding: 12px 0; }
 ul.regles { margin: 0; padding-left: 18px; display: grid; gap: 8px; color: var(--ink); }
@@ -703,9 +704,9 @@ ul.regles { margin: 0; padding-left: 18px; display: grid; gap: 8px; color: var(-
 
   function afficherEnLigne() {
     const n = lobby.enLigne();
-    const texte = `🟢 ${n} joueur${n > 1 ? 's' : ''} en ligne`;
-    $('enLigne').textContent = '· ' + texte;
-    $('enLigneSalles').textContent = texte;
+    const texte = `${n} joueur${n > 1 ? 's' : ''} en ligne`;
+    $('enLigne').replaceChildren(el('span', 'point-en-ligne'), texte);
+    $('enLigneSalles').replaceChildren(el('span', 'point-en-ligne'), texte);
     if (!$('voileSalles').hidden) dessinerSalles();
     if (vueActuelle && vueActuelle.etat === 'salon' && vueActuelle.publique) afficherSalon(vueActuelle);
   }
