@@ -286,19 +286,42 @@ body.accueil .app { max-width: none; min-height: 100vh; min-height: 100dvh; padd
 .profil-champ input { background: none; border: 0; color: var(--ink); font: inherit; font-weight: 700; font-size: 16px; width: 130px; padding: 0; }
 .profil-champ input:focus { outline: none; }
 .profil:focus-within { border-color: var(--brass); }
-.modes { flex: 1; min-width: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-content: center; }
-.mode { position: relative; border: 0; border-radius: 18px; padding: 14px 12px; min-height: 150px; display: grid; justify-items: center; align-content: center; gap: 6px; text-align: center; color: #fff; font: inherit;
-  background: var(--fond, #24497a); box-shadow: inset 0 0 0 5px rgba(255,255,255,.9), inset 0 0 0 7px rgba(0,0,0,.25), 0 10px 22px rgba(0,0,0,.45); transition: transform .12s ease; }
+.bourse { margin-left: auto; display: flex; align-items: center; gap: 7px; background: rgba(0,0,0,.3); border: 1px solid rgba(226,176,74,.45); border-radius: 99px; padding: 4px 12px 4px 4px; color: var(--ink); font: inherit; cursor: pointer; }
+.bourse + .profil { margin-left: 0; }
+.bourse:active { transform: scale(.96); }
+.piece { width: 30px; height: 30px; border-radius: 50%; flex: none; display: grid; place-items: center; font-family: var(--display); font-size: 17px; color: #6b4f12;
+  background: radial-gradient(circle at 35% 30%, #f8e3a6, var(--brass) 55%, #a87b26); box-shadow: inset 0 0 0 2px rgba(107,79,18,.35), 0 2px 5px rgba(0,0,0,.4); }
+.bourse-txt { display: grid; line-height: 1.05; text-align: left; }
+.bourse-txt b { font-family: var(--display); font-weight: 400; font-size: 21px; letter-spacing: 1px; color: var(--brass); }
+.bourse-txt small { font-size: 10px; color: var(--muted); }
+.bonus-jour { display: grid; justify-items: center; gap: 10px; text-align: center; }
+.bonus-jour .piece { width: 72px; height: 72px; font-size: 40px; animation: entree .6s cubic-bezier(.2,1.4,.4,1) both; }
+.bonus-jour .gain { font-family: var(--display); font-size: 44px; color: var(--brass); line-height: 1; }
+.serie { display: flex; gap: 4px; }
+.serie span { width: 22px; height: 6px; border-radius: 3px; background: var(--line); }
+.serie span.ok { background: var(--brass); }
+.note-essai { color: var(--muted); font-size: 12px; }
+@media (max-width: 420px) { .bourse-txt small, .profil-champ small { display: none; } .profil-champ input { width: 96px; } .hub-haut .logo { font-size: 30px; } }
+.modes { flex: 1; min-width: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-content: center; }
+.mode { position: relative; border: 0; border-radius: 14px; padding: 10px 8px; min-height: 0; aspect-ratio: 5 / 7; display: grid; justify-items: center; align-content: center; gap: 6px; text-align: center; color: #fff; font: inherit;
+  background: radial-gradient(ellipse at 50% 30%, var(--table-2), var(--table) 80%); border: 1.5px solid rgba(226,176,74,.6); box-shadow: inset 0 0 0 4px var(--table), inset 0 0 0 5px rgba(226,176,74,.22), 0 8px 18px rgba(0,0,0,.45); transition: transform .12s ease, box-shadow .12s ease; }
+.mode::before, .mode::after { content: attr(data-coin); position: absolute; font-size: 13px; line-height: 1; color: rgba(226,176,74,.7); }
+.mode::before { top: 9px; left: 10px; }
+.mode::after { bottom: 9px; right: 10px; transform: rotate(180deg); }
+.mode-creer::before, .mode-creer::after { color: rgba(29,22,6,.55); }
 .mode:active:not([aria-disabled]) { transform: scale(.96); }
-.mode b { font-family: var(--display); font-weight: 400; font-size: 25px; letter-spacing: 1.5px; line-height: 1; text-shadow: 0 2px 0 rgba(0,0,0,.3); }
-.mode small { font-size: 12px; opacity: .9; }
-.mode-icone { font-size: 38px; line-height: 1; filter: drop-shadow(0 3px 4px rgba(0,0,0,.35)); }
-.mode-creer { --fond: linear-gradient(160deg, #f0c25e, #b9821f); color: #2a1d05; }
-.mode-creer b { text-shadow: none; }
-.mode-rejoindre { --fond: linear-gradient(160deg, #3d7bd1, #1b4380); }
-.mode-robots { --fond: linear-gradient(160deg, #2f9e6f, #15603f); }
-.mode-regles { --fond: linear-gradient(160deg, #d24a40, #8a1f19); }
-.mode-bientot { --fond: linear-gradient(160deg, #4a5566, #2a3240); opacity: .7; cursor: default; }
+.mode b { font-family: var(--display); font-weight: 400; font-size: 19px; letter-spacing: 1.2px; line-height: 1; color: var(--brass); }
+.mode small { font-size: 11px; color: var(--muted); line-height: 1.2; text-wrap: balance; }
+.mode-icone { font-size: 28px; line-height: 1; color: var(--ink); }
+.mode-icone .r { color: var(--red); }
+.mode-creer { background: radial-gradient(ellipse at 50% 25%, #f1cd7c, var(--brass) 70%); border-color: #f3d48a; box-shadow: inset 0 0 0 4px var(--brass), inset 0 0 0 5px rgba(29,22,6,.25), 0 8px 18px rgba(0,0,0,.45); }
+.mode-creer b, .mode-creer .mode-icone { color: #1d1606; }
+.mode-creer small { color: #4a3a12; }
+.ruban { position: absolute; top: 10px; right: -4px; background: var(--brass); color: #1d1606; font-size: 10px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; padding: 2px 8px; border-radius: 4px 0 0 4px; box-shadow: 0 2px 4px rgba(0,0,0,.4); }
+.mode-enligne[aria-disabled] { cursor: default; }
+.mode-enligne[aria-disabled] .mode-icone { filter: saturate(.4); }
+.mode-bientot { opacity: .5; cursor: default; border-color: var(--line); }
+.mode-bientot b { color: var(--muted); }
 .barre-bas { display: flex; justify-content: center; gap: 6px; }
 .onglet { background: none; border: 0; color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; display: grid; justify-items: center; gap: 2px; padding: 4px 14px; border-radius: 12px; }
 .onglet span { font-size: 22px; line-height: 1; }
@@ -309,11 +332,14 @@ ul.regles { margin: 0; padding-left: 18px; display: grid; gap: 8px; color: var(-
 @media (max-height: 500px) { ul.regles { gap: 4px; font-size: 14px; } }
 @media (orientation: landscape) {
   .modes { display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 10px 4px; margin: 0 -4px; justify-content: safe center; align-items: center; }
-  .mode { flex: none; width: 150px; min-height: 0; height: min(220px, 52vh); scroll-snap-align: center; }
-  .mode-creer { width: 172px; height: min(244px, 58vh); }
+  .mode { flex: none; height: min(168px, 44vh); width: auto; scroll-snap-align: center; }
+  .mode-creer { height: min(188px, 50vh); }
 }
 @media (orientation: portrait) {
-  .mode-creer { grid-column: 1 / -1; min-height: 130px; }
+  .modes { align-content: center; max-width: 360px; margin: 0 auto; width: 100%; }
+  .mode:not(.mode-creer) { aspect-ratio: 4 / 3.6; }
+  .mode-creer { grid-column: 1 / -1; aspect-ratio: auto; min-height: 112px; }
+  .mode-creer b { font-size: 24px; }
 }
 
 /* Écran de démarrage */
@@ -347,17 +373,18 @@ ul.regles { margin: 0; padding-left: 18px; display: grid; gap: 8px; color: var(-
   <section class="hub" id="ecranAccueil" hidden>
     <div class="hub-haut">
       <div class="logo">KOPO</div>
+      <button class="bourse" id="btnBourse" title="Tes pièces d'essai"><span class="piece" aria-hidden="true">K</span><span class="bourse-txt"><b id="solde">500</b><small>pièces d'essai</small></span></button>
       <label class="profil" title="Ton pseudo">
         <span class="avatar" id="avatar">?</span>
         <span class="profil-champ"><small>Ton pseudo</small><input id="pseudo" maxlength="16" autocomplete="nickname" placeholder="Ex. Mundyo"></span>
       </label>
     </div>
     <div class="modes" id="modes">
-      <button class="mode mode-creer" id="btnCreer"><span class="mode-icone">♠♥</span><b>Créer une partie</b><small>Entre amis · 2 à 9 joueurs</small></button>
-      <button class="mode mode-rejoindre" id="btnModeRejoindre"><span class="mode-icone">⌗</span><b>Rejoindre</b><small>Avec le code ou le QR</small></button>
-      <button class="mode mode-robots" id="btnModeRobots"><span class="mode-icone">🤖</span><b>Contre les robots</b><small>Partie rapide, tout seul</small></button>
-      <button class="mode mode-regles" id="btnModeRegles"><span class="mode-icone">♦♣</span><b>Règles</b><small>Comment on joue</small></button>
-      <div class="mode mode-bientot" aria-disabled="true"><span class="mode-icone">🏆</span><b>Tournoi</b><small>🔒 Bientôt</small></div>
+      <button class="mode mode-creer" data-coin="♠" id="btnCreer"><span class="mode-icone">♠<span class="r">♥</span></span><b>Créer une partie</b><small>Entre amis, de 2 à 9</small></button>
+      <button class="mode mode-enligne" id="btnModeEnLigne" data-coin="♦" aria-disabled="true" title="Bientôt"><span class="mode-icone">🌍</span><b>En ligne</b><small>Avec des inconnus, salles de 6 à 9</small><span class="ruban">Bientôt</span></button>
+      <button class="mode mode-rejoindre" data-coin="♥" id="btnModeRejoindre"><span class="mode-icone">⌗</span><b>Rejoindre</b><small>Avec un code ou le QR</small></button>
+      <button class="mode mode-robots" data-coin="♣" id="btnModeRobots"><span class="mode-icone">🤖</span><b>Contre les robots</b><small>Partie rapide, seul</small></button>
+      <div class="mode mode-bientot" data-coin="♠" aria-disabled="true"><span class="mode-icone">🏆</span><b>Tournoi</b><small>🔒 Bientôt</small></div>
     </div>
     <nav class="barre-bas">
       <button class="onglet" id="btnPartager"><span>📤</span>Partager</button>
@@ -739,8 +766,9 @@ ul.regles { margin: 0; padding-left: 18px; display: grid; gap: 8px; color: var(-
     $('info').textContent = '';
     $('pseudo').value = stock.lire('kopo-pseudo') || '';
     const h = location.hash.slice(1).toUpperCase();
-    majAvatar();
+    majAvatar(); majSolde();
     if (/^[A-Z]{4}$/.test(h)) { $('codeRejoindre').value = h; $('voileRejoindre').hidden = false; }
+    else setTimeout(bonusDuJour, 1600);
   }
   function afficherConnexion(t) { montrerEcran('ecranConnexion'); $('texteConnexion').textContent = t; }
 
@@ -1397,8 +1425,43 @@ ul.regles { margin: 0; padding-left: 18px; display: grid; gap: 8px; color: var(-
   };
   $('codeRejoindre').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('btnRejoindre').click(); });
   // Accueil : profil, cartes de modes, barre du bas.
+  // Pièces d'essai (stratégie des pièces v1.0, phase 0) : cadeau de bienvenue + bonus du jour, dans kopo-profil.
+  const jourLocal = (d) => { d = d || new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+  function lireProfil() { const p = stock.lire('kopo-profil'); return p && typeof p === 'object' ? p : { version: 1 }; }
+  function lirePieces() {
+    const p = lireProfil();
+    if (!p.pieces) { p.pieces = { solde: 500, essai: true, bonusSerie: 0, bonusDernier: null }; stock.ecrire('kopo-profil', p); }
+    return p.pieces;
+  }
+  function ecrirePieces(pc) { const p = lireProfil(); p.pieces = pc; stock.ecrire('kopo-profil', p); }
+  const formatPieces = (n) => n.toLocaleString('fr-FR');
+  function majSolde() { $('solde').textContent = formatPieces(lirePieces().solde); }
+  function fenetrePieces(gain, serie) {
+    const pc = lirePieces();
+    const barres = el('div', 'serie');
+    for (let i = 1; i <= 7; i++) barres.append(el('span', i <= Math.min(serie, 7) ? 'ok' : null));
+    const piece = el('span', 'piece', 'K');
+    const corps = el('div', 'bonus-jour');
+    if (gain) corps.append(el('h2', null, 'Bonus du jour'), piece, el('div', 'gain', '+' + gain), el('div', null, 'Jour ' + serie + ' d\'affilée · reviens demain pour +' + Math.min(50 + serie * 10, 150)), barres);
+    else corps.append(el('h2', null, 'Tes pièces'), piece, el('div', 'gain', formatPieces(pc.solde)), el('div', null, 'Bonus du jour déjà pris · série de ' + (pc.bonusSerie || 0) + ' jour' + ((pc.bonusSerie || 0) > 1 ? 's' : '')), barres);
+    corps.append(el('div', 'note-essai', 'Pièces d\'essai, remises à zéro au lancement officiel.'));
+    const ok = el('button', 'btn principal large', gain ? 'Récupérer' : 'OK');
+    ok.onclick = () => { fermerFenetre(); majSolde(); if (gain) pop($('btnBourse'), 1.2); };
+    ouvrirFenetre([corps, ok]);
+  }
+  function bonusDuJour() {
+    const pc = lirePieces(); const auj = jourLocal();
+    if (pc.bonusDernier === auj) return;
+    const hier = jourLocal(new Date(Date.now() - 864e5));
+    const serie = pc.bonusDernier === hier ? (pc.bonusSerie || 0) + 1 : 1;
+    const gain = Math.min(50 + (serie - 1) * 10, 150);
+    pc.solde += gain; pc.bonusSerie = serie; pc.bonusDernier = auj; ecrirePieces(pc);
+    fenetrePieces(gain, serie);
+  }
+  $('btnBourse').onclick = () => fenetrePieces(0, lirePieces().bonusSerie || 0);
   function majAvatar() { const p = $('pseudo').value.trim(); $('avatar').textContent = p ? p[0].toUpperCase() : '?'; }
   $('pseudo').addEventListener('input', majAvatar);
+  $('btnModeEnLigne').onclick = () => { if ($('btnModeEnLigne').hasAttribute('aria-disabled')) toast('Les salles en ligne arrivent bientôt.'); };
   $('btnModeRejoindre').onclick = () => { $('voileRejoindre').hidden = false; setTimeout(() => $('codeRejoindre').focus(), 50); };
   $('btnFermerRejoindre').onclick = () => ($('voileRejoindre').hidden = true);
   $('btnModeRobots').onclick = () => { if (lirePseudo()) $('voileRobots').hidden = false; };
@@ -1421,7 +1484,6 @@ ul.regles { margin: 0; padding-left: 18px; display: grid; gap: 8px; color: var(-
     ok.onclick = fermerFenetre;
     ouvrirFenetre([el('h2', null, 'Règles'), $('modeleRegles').content.cloneNode(true), ok]);
   }
-  $('btnModeRegles').onclick = montrerRegles;
   $('btnRegles').onclick = montrerRegles;
   $('btnPleinEcranAccueil').onclick = pleinEcran;
   $('btnPartager').onclick = async () => {
