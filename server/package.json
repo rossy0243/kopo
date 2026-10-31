@@ -1,0 +1,26 @@
+{
+  "name": "kopo-serveur",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Serveur du Kopo : comptes, salles de jeu, registre des pièces, tableau de bord admin.",
+  "main": "src/index.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node tests/tout.js",
+    "charge": "node tests/charge.js"
+  },
+  "dependencies": {
+    "@colyseus/ws-transport": "^0.16.5",
+    "colyseus": "^0.16.5",
+    "express": "^4.22.3",
+    "jose": "^6.2.14",
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.14",
+    "colyseus.js": "^0.16.22"
+  }
+}
