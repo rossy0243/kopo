@@ -1,0 +1,29 @@
+# Mise en ligne du serveur Kopo sur Render (offre Starter : toujours allumé, ≈ 7 $/mois).
+# Render lit ce fichier : Dashboard → New → Blueprint → choisir le dépôt kopo.
+services:
+  - type: web
+    name: kopo-serveur
+    runtime: node
+    plan: starter
+    region: frankfurt          # le plus proche de l'Afrique centrale chez Render
+    buildCommand: cd server && npm ci --omit=dev
+    startCommand: node server/src/index.js
+    healthCheckPath: /sante
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      - key: SECRET_SERVEUR        # signe les jetons des joueurs : généré par Render
+        generateValue: true
+      - key: DATABASE_URL          # Supabase → Project Settings → Database → Connection string (mode « Session »)
+        sync: false
+      - key: SUPABASE_URL          # Supabase → Project Settings → API → Project URL
+        sync: false
+      - key: ADMIN_MOT_DE_PASSE    # mot de passe du tableau de bord (long, unique)
+        sync: false
+      - key: ADMIN_TOTP            # secret du code à 6 chiffres : node server/src/outils.js totp
+        sync: false
+      - key: ORIGINES              # pages autorisées à appeler le serveur
+        value: https://rossy0243.github.io,capacitor://localhost,https://localhost

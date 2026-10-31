@@ -16,6 +16,9 @@ Jeu de cartes multijoueur, de 2 à 9 joueurs, chacun sur son téléphone.
 - Chrono réglable (5 s par défaut) : un joueur trop lent ou hors ligne pioche. En ouverture, sa plus petite carte autorisée est posée.
 - Micro optionnel (WebRTC via PeerJS, avec relais TURN) : chacun l'active, le coupe, ou coupe le son des autres.
 
+## Serveur
+Le dossier `server/` contient le serveur de la V1 (comptes, parties sur le serveur, registre des pièces, tableau de bord admin), prêt pour Render + Supabase. Voir [server/README.md](server/README.md).
+
 ## Fichiers
 - `index.html` : la page complète, générée par `node build.js`.
 - `moteur/` : moteur de règles (règlement v1.2) et ses tests.

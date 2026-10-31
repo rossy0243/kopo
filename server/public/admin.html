@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Kopo — Tableau de bord</title>
+<style>
+:root { --fond: #10233a; --fond-2: #183252; --ligne: rgba(226,176,74,.25); --laiton: #e2b04a; --encre: #f4ecd8; --muted: #9fb2c8; --rouge: #c7362f; --vert: #5fae6e; }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--fond); color: var(--encre); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+header { display: flex; align-items: center; gap: 16px; padding: 12px 20px; border-bottom: 1px solid var(--ligne); position: sticky; top: 0; background: var(--fond); z-index: 2; flex-wrap: wrap; }
+.logo { font: 400 28px/1 "Bebas Neue", Impact, sans-serif; letter-spacing: 3px; color: var(--laiton); }
+nav { display: flex; gap: 4px; flex-wrap: wrap; }
+nav button { background: none; border: 1px solid transparent; color: var(--muted); padding: 7px 12px; border-radius: 8px; font: inherit; cursor: pointer; display: flex; gap: 6px; align-items: center; }
+nav button[aria-current="page"] { color: var(--laiton); border-color: var(--ligne); background: var(--fond-2); }
+nav .badge { background: var(--rouge); color: #fff; border-radius: 9px; padding: 0 6px; font-size: 12px; }
+main { padding: 20px; max-width: 1200px; margin: 0 auto; }
+h2 { font: 400 30px/1 "Bebas Neue", Impact, sans-serif; letter-spacing: 2px; color: var(--laiton); margin: 8px 0 16px; }
+h3 { font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--laiton); margin: 22px 0 10px; }
+.tuiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
+.tuile { background: var(--fond-2); border: 1px solid var(--ligne); border-radius: 12px; padding: 14px; }
+.tuile b { display: block; font-size: 30px; font-variant-numeric: tabular-nums; }
+.tuile small { color: var(--muted); }
+.carte { background: var(--fond-2); border: 1px solid var(--ligne); border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid rgba(255,255,255,.06); vertical-align: top; }
+th { color: var(--muted); font-weight: 500; font-size: 13px; }
+td.n, th.n { text-align: right; }
+.btn { background: rgba(255,255,255,.07); border: 1px solid var(--ligne); color: var(--encre); border-radius: 8px; padding: 7px 12px; font: inherit; cursor: pointer; }
+.btn.principal { background: var(--laiton); color: #1d1606; border-color: var(--laiton); font-weight: 600; }
+.btn.danger { border-color: var(--rouge); color: #ffb4ae; }
+input, select, textarea { background: #0b1a2c; border: 1px solid var(--ligne); color: var(--encre); border-radius: 8px; padding: 8px 10px; font: inherit; }
+.ligne { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 8px 0; }
+.muted { color: var(--muted); }
+.ok { color: var(--vert); } .ko { color: #ff8a80; }
+.lien { color: var(--laiton); cursor: pointer; text-decoration: underline; background: none; border: 0; font: inherit; padding: 0; }
+#connexion { max-width: 360px; margin: 12vh auto; display: grid; gap: 12px; }
+#connexion .logo { font-size: 56px; text-align: center; }
+.graphe { width: 100%; height: 180px; }
+.graphe text { fill: var(--muted); font-size: 11px; }
+.legende { display: flex; gap: 14px; font-size: 13px; color: var(--muted); }
+.legende i { display: inline-block; width: 12px; height: 3px; vertical-align: middle; margin-right: 5px; }
+.message { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--fond-2); border: 1px solid var(--laiton); padding: 10px 16px; border-radius: 10px; z-index: 5; }
+.ico-k { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.ico-k .acc { fill: var(--rouge); stroke: none; }
+.statut-banni, .statut-suspendu { color: #ff8a80; }
+</style>
+</head>
+<body>
+<svg style="display:none" aria-hidden="true">
+  <!-- Icônes au style Kopo (docs/icones-kopo.md) : une carte à jouer, trait laiton, une touche de rouge au plus. -->
+  <symbol id="d-direct" viewBox="0 0 32 32"><rect x="10" y="6" width="12" height="20" rx="2.5"/><path d="M6 11a8 8 0 0 0 0 10M26 11a8 8 0 0 1 0 10"/><circle cx="16" cy="16" r="2" class="acc"/></symbol>
+  <symbol id="d-audience" viewBox="0 0 32 32"><rect x="8" y="4" width="16" height="24" rx="2.5"/><path d="M12 22v-4M16 22v-9M20 22v-6"/></symbol>
+  <symbol id="d-pieces" viewBox="0 0 32 32"><rect x="8" y="4" width="16" height="24" rx="2.5"/><circle cx="16" cy="16" r="5"/><path d="M15 13.5v5M15 16l2.5-2.5M15 16l2.5 2.5"/></symbol>
+  <symbol id="d-joueurs" viewBox="0 0 32 32"><rect x="8" y="4" width="16" height="24" rx="2.5"/><circle cx="16" cy="13" r="3.5"/><path d="M11 23a5 5 0 0 1 10 0"/></symbol>
+  <symbol id="d-signal" viewBox="0 0 32 32"><rect x="8" y="4" width="16" height="24" rx="2.5"/><path d="M16 10v8"/><circle cx="16" cy="22.5" r="1.6" class="acc"/></symbol>
+  <symbol id="d-pilotage" viewBox="0 0 32 32"><rect x="8" y="4" width="16" height="24" rx="2.5"/><path d="M12 10h8M12 16h8M12 22h8"/><circle cx="14" cy="22" r="1.8" class="acc"/></symbol>
+  <symbol id="d-journal" viewBox="0 0 32 32"><rect x="8" y="4" width="16" height="24" rx="2.5"/><path d="M12 10h8M12 14h8M12 18h5"/></symbol>
+</svg>
+
+<section id="connexion" hidden>
+  <div class="logo">KOPO</div>
+  <p class="muted" style="text-align:center;margin:0">Tableau de bord du super admin</p>
+  <input id="mdp" type="password" placeholder="Mot de passe" autocomplete="current-password">
+  <input id="code" inputmode="numeric" maxlength="6" placeholder="Code à 6 chiffres (application d'authentification)" autocomplete="one-time-code">
+  <button class="btn principal" id="btnConnexion">Se connecter</button>
+  <p id="erreurConnexion" class="ko"></p>
+</section>
+
+<div id="app" hidden>
+  <header>
+    <div class="logo">KOPO</div>
+    <nav id="nav"></nav>
+    <span style="flex:1"></span>
+    <button class="btn" id="btnDeconnexion">Se déconnecter</button>
+  </header>
+  <main id="contenu"></main>
+</div>
+
+<script>
+'use strict';
+const $ = (s) => document.querySelector(s);
+const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const nb = (x) => (x ?? 0).toLocaleString('fr-FR');
+const date = (d) => d ? new Date(d).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+const MOTIFS = { bienvenue: 'Bienvenue', bonus_jour: 'Bonus du jour', manche: 'Manches survécues', katapss: 'Katapss', victoire: 'Victoires', deuxieme: '2e places', remise_a_flot: 'Remise à flot', admin: 'Corrections admin', cadeau: 'Cadeaux', mise: 'Mises', pot: 'Pots' };
+let jeton = sessionStorage.getItem('kopo-admin');
+let page = 'direct', minuteur = null;
+
+function message(t) { const m = document.createElement('div'); m.className = 'message'; m.textContent = t; document.body.append(m); setTimeout(() => m.remove(), 3000); }
+async function api(chemin, opt = {}) {
+  const r = await fetch('/admin/api' + chemin, { method: opt.methode || 'GET', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + jeton }, body: opt.corps ? JSON.stringify(opt.corps) : undefined });
+  if (r.status === 401 && chemin !== '/connexion') { deconnexion(); throw new Error('Session expirée.'); }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.erreur || 'Erreur ' + r.status);
+  return j;
+}
+
+// --- Connexion
+function afficherConnexion() { $('#connexion').hidden = false; $('#app').hidden = true; $('#mdp').focus(); }
+function deconnexion() { jeton = null; sessionStorage.removeItem('kopo-admin'); clearInterval(minuteur); afficherConnexion(); }
+$('#btnConnexion').onclick = async () => {
+  $('#erreurConnexion').textContent = '';
+  try {
+    const r = await fetch('/admin/api/connexion', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ motDePasse: $('#mdp').value, code: $('#code').value }) });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.erreur);
+    jeton = j.jeton; sessionStorage.setItem('kopo-admin', jeton);
+    $('#mdp').value = $('#code').value = '';
+    demarrer();
+  } catch (e) { $('#erreurConnexion').textContent = e.message; }
+};
+$('#code').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#btnConnexion').click(); });
+$('#btnDeconnexion').onclick = deconnexion;
+
+// --- Navigation
+const PAGES = [
+  ['direct', 'En direct', 'd-direct'], ['audience', 'Audience', 'd-audience'], ['economie', 'Pièces', 'd-pieces'],
+  ['joueurs', 'Joueurs', 'd-joueurs'], ['signalements', 'Signalements', 'd-signal'], ['pilotage', 'Pilotage', 'd-pilotage'], ['journal', 'Journal', 'd-journal'],
+];
+function nav() {
+  $('#nav').innerHTML = PAGES.map(([id, t, ico]) => `<button data-page="${id}" ${id === page ? 'aria-current="page"' : ''}><svg class="ico-k"><use href="#${ico}"/></svg>${t}${id === 'signalements' ? ' <span class="badge" id="nbSignal" hidden></span>' : ''}</button>`).join('');
+  $('#nav').querySelectorAll('button').forEach((b) => (b.onclick = () => aller(b.dataset.page)));
+}
+function aller(p, arg) { page = p; nav(); clearInterval(minuteur); afficher[p](arg).catch((e) => ($('#contenu').innerHTML = `<p class="ko">${esc(e.message)}</p>`)); majBadge(); }
+async function majBadge() { try { const l = await api('/signalements'); const b = $('#nbSignal'); if (b) { b.textContent = l.length; b.hidden = !l.length; } } catch (e) {} }
+function demarrer() { $('#connexion').hidden = true; $('#app').hidden = false; aller('direct'); }
+
+// --- Graphe en lignes (séries sur 30 jours)
+function graphe(donnees, series) {
+  const L = 900, H = 180, g = 30, b = 22;
+  const max = Math.max(1, ...donnees.flatMap((d) => series.map((s) => d[s.cle] || 0)));
+  const x = (i) => g + (i * (L - g - 8)) / Math.max(1, donnees.length - 1);
+  const y = (v) => H - b - (v / max) * (H - b - 10);
+  const lignes = series.map((s) => `<polyline fill="none" stroke="${s.couleur}" stroke-width="2.2" stroke-linejoin="round" points="${donnees.map((d, i) => x(i) + ',' + y(d[s.cle] || 0)).join(' ')}"><title>${esc(s.nom)}</title></polyline>`).join('');
+  const reperes = [0, Math.round(max / 2), max].map((v) => `<line x1="${g}" x2="${L}" y1="${y(v)}" y2="${y(v)}" stroke="rgba(255,255,255,.07)"/><text x="${g - 4}" y="${y(v) + 4}" text-anchor="end">${nb(v)}</text>`).join('');
+  const jours = donnees.map((d, i) => (i % 7 === 0 || (i === donnees.length - 1 && i % 7 >= 3)) ? `<text x="${x(i)}" y="${H - 4}" text-anchor="middle">${new Date(d.jour).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</text>` : '').join('');
+  return `<div class="legende">${series.map((s) => `<span><i style="background:${s.couleur}"></i>${esc(s.nom)}</span>`).join('')}</div>
+    <svg class="graphe" viewBox="0 0 ${L} ${H}" preserveAspectRatio="none" role="img" aria-label="${esc(series.map((s) => s.nom).join(', '))} sur 30 jours">${reperes}${lignes}${jours}</svg>`;
+}
+const tuile = (v, t, s) => `<div class="tuile"><b>${v}</b>${esc(t)}${s ? `<br><small>${esc(s)}</small>` : ''}</div>`;
+
+const afficher = {
+  async direct() {
+    const maj = async () => {
+      const d = await api('/direct');
+      $('#contenu').innerHTML = `<h2>En direct</h2>
+        <div class="tuiles">${tuile(nb(d.joueursConnectes), 'joueurs connectés')}${tuile(nb(d.salles), 'tables ouvertes')}${tuile(nb(d.sallesParEtat.manche || 0), 'parties en cours')}${tuile(nb(d.enAttenteAdversaires), "en attente d'adversaires")}</div>
+        <h3>Serveur</h3><p class="muted">En marche depuis ${Math.floor(d.serveur.demarreIl / 3600)} h ${Math.floor((d.serveur.demarreIl % 3600) / 60)} min · mémoire ${d.serveur.memoireMo} Mo · base : ${d.serveur.base === 'postgres' ? 'Supabase' : '<span class="ko">en mémoire (essai, rien n\'est gardé)</span>'}</p>
+        <h3>Tables</h3>
+        <div class="carte"><table><tr><th>Code</th><th>Type</th><th>État</th><th class="n">Manche</th><th>Joueurs</th></tr>
+        ${d.tables.map((t) => `<tr><td>${esc(t.code)}</td><td>${t.publique ? 'Inconnus' : 'Entre amis'}</td><td>${esc(t.etat)}</td><td class="n">${t.manche}</td><td>${t.joueurs.map((j) => j.robot ? `<span class="muted">${esc(j.nom)}</span>` : `<button class="lien" data-joueur="${esc(j.id)}">${esc(j.nom)}</button>${j.connecte ? '' : ' <span class="ko">(coupé)</span>'}`).join(', ')}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">Aucune table ouverte.</td></tr>'}
+        </table></div><p class="muted">Mis à jour toutes les 5 secondes.</p>`;
+      lierJoueurs();
+    };
+    await maj();
+    minuteur = setInterval(() => maj().catch(() => {}), 5000);
+  },
+
+  async audience() {
+    const a = await api('/audience');
+    const r = (x) => x.taux == null ? '—' : x.taux + ' %';
+    $('#contenu').innerHTML = `<h2>Audience</h2>
+      <div class="tuiles">${tuile(nb(a.actifs.jour), "joueurs aujourd'hui")}${tuile(nb(a.actifs.semaine), 'sur 7 jours')}${tuile(nb(a.actifs.mois), 'sur 30 jours')}${tuile(nb(a.inscrits.aujourdhui), "nouveaux aujourd'hui", nb(a.inscrits.semaine) + ' sur 7 jours')}${tuile(nb(a.inscrits.total), 'comptes au total', nb(a.inscrits.avec_connexion) + ' avec Google ou téléphone')}</div>
+      <h3>Rétention : part des nouveaux joueurs qui reviennent</h3>
+      <div class="tuiles">${tuile(r(a.retention.j1), 'le lendemain (J1)', 'sur ' + a.retention.j1.cohorte + ' joueurs')}${tuile(r(a.retention.j7), 'une semaine après (J7)', 'sur ' + a.retention.j7.cohorte + ' joueurs')}${tuile(r(a.retention.j30), 'un mois après (J30)', 'sur ' + a.retention.j30.cohorte + ' joueurs')}</div>
+      <p class="muted">Repères pour un jeu mobile : J1 autour de 30 à 40 %, J7 autour de 10 à 15 %, J30 autour de 5 %.</p>
+      <h3>30 derniers jours</h3>
+      <div class="carte">${graphe(a.parJour, [{ cle: 'actifs', nom: 'Joueurs actifs', couleur: '#e2b04a' }, { cle: 'nouveaux', nom: 'Nouveaux', couleur: '#9fb2c8' }])}</div>
+      <div class="carte">${graphe(a.parJour, [{ cle: 'parties', nom: 'Parties jouées', couleur: '#e2b04a' }, { cle: 'parties_robots', nom: 'dont avec robots', couleur: '#9fb2c8' }])}</div>
+      <div class="tuiles">${tuile(a.parties.duree_min + ' min', 'durée moyenne d\'une partie')}${tuile(a.parties.joueurs_moyens, 'joueurs par partie')}${tuile(nb(a.parties.abandons), 'abandons en cours de partie')}</div>`;
+  },
+
+  async economie() {
+    const e = await api('/economie');
+    const t = e.parJour.reduce((s, d) => ({ c: s.c + d.creees, d: s.d + d.detruites }), { c: 0, d: 0 });
+    $('#contenu').innerHTML = `<h2>Économie des pièces</h2>
+      <div class="tuiles">${tuile(nb(e.soldes.en_circulation), 'pièces en circulation')}${tuile(nb(e.soldes.moyen), 'solde moyen', 'joueurs actifs sur 7 jours')}${tuile(e.soldes.part_a_court + ' %', 'joueurs à court', 'moins de 20 pièces')}${tuile(nb(t.c), 'créées sur 30 jours')}${tuile(nb(t.d), 'détruites sur 30 jours')}</div>
+      <p class="muted">Créées et détruites doivent rester proches. Si on crée beaucoup plus qu'on ne détruit, augmente la part de la maison ou baisse les gains gratuits (onglet Pilotage).</p>
+      <div class="carte">${graphe(e.parJour, [{ cle: 'creees', nom: 'Pièces créées', couleur: '#e2b04a' }, { cle: 'detruites', nom: 'Pièces détruites', couleur: '#c7362f' }])}</div>
+      <h3>D'où viennent et où vont les pièces (7 jours)</h3>
+      <div class="carte"><table><tr><th>Motif</th><th class="n">Total</th><th class="n">Opérations</th></tr>${e.parMotif.map((m) => `<tr><td>${esc(MOTIFS[m.motif] || m.motif)}</td><td class="n ${m.total < 0 ? 'ko' : ''}">${nb(m.total)}</td><td class="n">${nb(m.operations)}</td></tr>`).join('') || '<tr><td colspan="3" class="muted">Rien pour l\'instant.</td></tr>'}</table></div>`;
+  },
+
+  async joueurs(q = '') {
+    $('#contenu').innerHTML = `<h2>Joueurs</h2><div class="ligne"><input id="recherche" placeholder="Pseudo, Pseudo#1234 ou identifiant" value="${esc(q)}" style="min-width:300px"><button class="btn principal" id="btnRecherche">Chercher</button></div><div id="resultats"></div>`;
+    const go = async () => {
+      const l = await api('/joueurs?q=' + encodeURIComponent($('#recherche').value));
+      $('#resultats').innerHTML = `<div class="carte"><table><tr><th>Joueur</th><th class="n">Pièces</th><th>Statut</th><th>Inscrit</th><th>Vu</th></tr>${l.map((c) => `<tr><td><button class="lien" data-joueur="${esc(c.id)}">${esc(c.pseudo)}#${c.numero}</button>${c.lie ? '' : ' <span class="muted">(invité)</span>'}</td><td class="n">${nb(c.solde)}</td><td class="statut-${c.statut}">${esc(c.statut)}</td><td>${date(c.creeLe)}</td><td>${date(c.vuLe)}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">Aucun joueur.</td></tr>'}</table></div>`;
+      lierJoueurs();
+    };
+    $('#btnRecherche').onclick = go;
+    $('#recherche').addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+    await go();
+  },
+
+  async fiche(id) {
+    const f = await api('/joueurs/' + encodeURIComponent(id));
+    const c = f.compte;
+    $('#contenu').innerHTML = `<p><button class="lien" id="retour">← Joueurs</button></p>
+      <h2>${esc(c.pseudo)}#${c.numero}</h2>
+      <div class="tuiles">${tuile(nb(c.solde), 'pièces')}${tuile(nb(f.stats.parties), 'parties')}${tuile(nb(f.stats.victoires), 'victoires')}${tuile(nb(f.stats.abandons), 'abandons')}${tuile(`<span class="statut-${c.statut}">${esc(c.statut)}</span>`, c.suspendu_jusqu ? "jusqu'au " + date(c.suspendu_jusqu) : (c.micro_coupe ? 'micro coupé' : 'statut'))}</div>
+      <p class="muted">Identifiant ${esc(c.id)} · inscrit le ${date(c.cree_le)} · vu le ${date(c.vu_le)} · ${c.auth_id ? 'compte Google/téléphone' : 'invité'}${c.pays ? ' · ' + esc(c.pays) : ''}</p>
+      <div class="carte"><h3 style="margin-top:0">Sanction</h3>
+        <div class="ligne"><select id="sType"><option value="avertissement">Avertir</option><option value="micro">Couper le micro</option><option value="suspension">Suspendre</option><option value="bannissement">Bannir</option><option value="levee">Lever les sanctions</option></select>
+        <input id="sJours" type="number" min="1" value="3" style="width:80px" title="Jours de suspension"> <span class="muted">jours</span>
+        <input id="sMotif" placeholder="Motif (obligatoire)" style="flex:1;min-width:200px"><button class="btn danger" id="btnSanction">Appliquer</button></div>
+        <h3>Corriger le solde</h3>
+        <div class="ligne"><input id="pMontant" type="number" placeholder="+100 ou -50" style="width:130px"><input id="pMotif" placeholder="Motif (obligatoire)" style="flex:1;min-width:200px"><button class="btn" id="btnPieces">Corriger</button></div>
+      </div>
+      ${f.partenaires.length ? `<h3>Joue souvent avec</h3><p class="muted">Utile pour repérer la complicité aux tables à mise.</p><div class="carte"><table>${f.partenaires.map((p) => `<tr><td><button class="lien" data-joueur="${esc(p.id)}">${esc(p.pseudo)}#${p.numero}</button></td><td class="n">${p.ensemble} parties ensemble</td></tr>`).join('')}</table></div>` : ''}
+      <h3>Signalements reçus (${f.signalementsRecus.length})</h3>
+      <div class="carte"><table>${f.signalementsRecus.map((s) => `<tr><td>${date(s.cree_le)}</td><td>${esc(s.motif)}</td><td>${esc(s.details || '')}</td><td class="muted">par ${esc(s.auteur)}</td><td>${esc(s.statut)}</td></tr>`).join('') || '<tr><td class="muted">Aucun.</td></tr>'}</table></div>
+      <h3>Sanctions</h3>
+      <div class="carte"><table>${f.sanctions.map((s) => `<tr><td>${date(s.cree_le)}</td><td>${esc(s.type)}</td><td>${esc(s.motif)}</td><td>${s.jusqu ? "jusqu'au " + date(s.jusqu) : ''}</td></tr>`).join('') || '<tr><td class="muted">Aucune.</td></tr>'}</table></div>
+      <h3>Dernières parties</h3>
+      <div class="carte"><table><tr><th>Date</th><th>Code</th><th class="n">Joueurs</th><th class="n">Place</th><th></th></tr>${f.parties.map((p) => `<tr><td>${date(p.debut)}</td><td>${esc(p.code)}</td><td class="n">${p.nb_joueurs}</td><td class="n">${p.place ?? '—'}</td><td>${p.avec_robots ? '<span class="muted">robots</span>' : ''}${p.abandon ? ' <span class="ko">abandon</span>' : ''}</td></tr>`).join('') || '<tr><td class="muted">Aucune.</td></tr>'}</table></div>
+      <h3>Registre des pièces</h3>
+      <div class="carte"><table><tr><th>Date</th><th>Motif</th><th class="n">Montant</th><th></th></tr>${f.pieces.map((p) => `<tr><td>${date(p.cree_le)}</td><td>${esc(MOTIFS[p.motif] || p.motif)}</td><td class="n ${p.montant < 0 ? 'ko' : 'ok'}">${p.montant > 0 ? '+' : ''}${nb(p.montant)}</td><td class="muted">${p.par_admin ? 'admin · ' + esc(p.ref || '') : ''}</td></tr>`).join('')}</table></div>`;
+    $('#retour').onclick = () => aller('joueurs');
+    $('#btnSanction').onclick = async () => {
+      const type = $('#sType').value;
+      if (!$('#sMotif').value.trim()) return message('Indique un motif.');
+      if ((type === 'bannissement' || type === 'suspension') && !confirm(`Confirmer : ${type} de ${c.pseudo}#${c.numero} ?`)) return;
+      try { await api(`/joueurs/${encodeURIComponent(id)}/sanction`, { methode: 'POST', corps: { type, motif: $('#sMotif').value, jours: Number($('#sJours').value) } }); message('Sanction appliquée.'); aller('fiche', id); } catch (e) { message(e.message); }
+    };
+    $('#btnPieces').onclick = async () => {
+      try { await api(`/joueurs/${encodeURIComponent(id)}/pieces`, { methode: 'POST', corps: { montant: Number($('#pMontant').value), motif: $('#pMotif').value } }); message('Solde corrigé.'); aller('fiche', id); } catch (e) { message(e.message); }
+    };
+    lierJoueurs();
+  },
+
+  async signalements(statut = 'ouvert') {
+    const l = await api('/signalements?statut=' + statut);
+    $('#contenu').innerHTML = `<h2>Signalements</h2>
+      <div class="ligne">${['ouvert', 'traite', 'rejete'].map((s) => `<button class="btn ${s === statut ? 'principal' : ''}" data-statut="${s}">${{ ouvert: 'À traiter', traite: 'Traités', rejete: 'Rejetés' }[s]}</button>`).join('')}</div>
+      <div class="carte"><table><tr><th>Date</th><th>Joueur signalé</th><th>Motif</th><th>Détails</th><th>Par</th><th></th></tr>
+      ${l.map((s) => `<tr><td>${date(s.cree_le)}</td><td><button class="lien" data-joueur="${esc(s.cible_id)}">${esc(s.cible_pseudo)}#${s.cible_numero}</button><br><small class="muted">${s.total_cible} signalement(s) · <span class="statut-${s.cible_statut}">${esc(s.cible_statut)}</span></small></td><td>${esc(s.motif)}</td><td>${esc(s.details || '')}</td><td class="muted">${esc(s.auteur_pseudo)}#${s.auteur_numero}</td>
+        <td>${statut === 'ouvert' ? `<button class="btn" data-traiter="${s.id}">Traité</button> <button class="btn" data-rejeter="${s.id}">Rejeter</button>` : esc(s.decision || '')}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">Rien à traiter.</td></tr>'}
+      </table></div><p class="muted">Pour sanctionner, ouvre la fiche du joueur signalé.</p>`;
+    $('#contenu').querySelectorAll('[data-statut]').forEach((b) => (b.onclick = () => afficher.signalements(b.dataset.statut)));
+    const traiter = async (id, st) => { const decision = prompt('Décision (facultatif) :') ?? ''; await api('/signalements/' + id, { methode: 'POST', corps: { statut: st, decision } }); afficher.signalements(statut); majBadge(); };
+    $('#contenu').querySelectorAll('[data-traiter]').forEach((b) => (b.onclick = () => traiter(b.dataset.traiter, 'traite')));
+    $('#contenu').querySelectorAll('[data-rejeter]').forEach((b) => (b.onclick = () => traiter(b.dataset.rejeter, 'rejete')));
+    lierJoueurs();
+  },
+
+  async pilotage() {
+    const r = await api('/reglages');
+    const champs = (cle, libelles) => Object.entries(libelles).map(([k, t]) => `<label class="ligne"><span style="min-width:230px">${t}</span><input type="number" data-cle="${cle}" data-champ="${k}" value="${r[cle][k]}" style="width:110px"></label>`).join('');
+    $('#contenu').innerHTML = `<h2>Pilotage</h2>
+      <p class="muted">Ces réglages s'appliquent tout de suite, sans mise à jour du jeu. Chaque changement est noté dans le Journal.</p>
+      <div class="carte"><h3 style="margin-top:0">Annonce à tous les joueurs</h3>
+        <div class="ligne"><input id="annonce" value="${esc(r.annonce.texte)}" placeholder="Ex. Tournoi samedi à 20 h !" style="flex:1;min-width:260px"><label><input type="checkbox" id="annonceActive" ${r.annonce.active ? 'checked' : ''}> affichée</label><button class="btn principal" id="btnAnnonce">Enregistrer</button></div>
+        <h3>Maintenance</h3>
+        <div class="ligne"><input id="maint" value="${esc(r.maintenance.message)}" style="flex:1;min-width:260px"><label><input type="checkbox" id="maintActive" ${r.maintenance.active ? 'checked' : ''}> <span class="ko">jeu fermé</span></label><button class="btn" id="btnMaint">Enregistrer</button></div>
+        <h3>Version minimale de l'application</h3>
+        <div class="ligne"><input id="version" value="${esc(r.versionMin)}" style="width:110px"><button class="btn" id="btnVersion">Enregistrer</button><span class="muted">Les versions plus anciennes devront se mettre à jour.</span></div>
+      </div>
+      <div class="carte"><h3 style="margin-top:0">Gains (tables gratuites)</h3>${champs('gains', { bienvenue: 'Cadeau de bienvenue', manche: 'Par manche survécue', katapss: 'Katapss', victoire: 'Victoire', deuxieme: '2e place' })}<button class="btn principal" data-enregistrer="gains">Enregistrer les gains</button>
+        <h3>Bonus du jour</h3>${champs('bonusJour', { depart: 'Premier jour', pas: 'En plus chaque jour', plafond: 'Plafond' })}<button class="btn principal" data-enregistrer="bonusJour">Enregistrer le bonus</button>
+        <h3>Remise à flot</h3>${champs('remiseAFlot', { seuil: 'Si le solde passe sous', niveau: 'Remonter à' })}<button class="btn principal" data-enregistrer="remiseAFlot">Enregistrer</button></div>
+      <div class="carte"><h3 style="margin-top:0">Tables à mise</h3>${champs('tables', { bronze: 'Bronze', argent: 'Argent', or: 'Or', diamant: 'Diamant' })}<button class="btn principal" data-enregistrer="tables">Enregistrer les mises</button>
+        <h3>Partage du pot (en %, total 100)</h3>${champs('pot', { vainqueur: 'Vainqueur', deuxieme: '2e', troisieme: '3e', maison: 'Maison (pièces détruites)' })}<button class="btn principal" data-enregistrer="pot">Enregistrer le partage</button></div>
+      <div class="carte"><h3 style="margin-top:0">Cadeau à tous les joueurs</h3>
+        <div class="ligne"><input id="cadeauMontant" type="number" min="1" placeholder="Pièces" style="width:110px"><input id="cadeauMotif" placeholder="Motif (ex. excuses pour la panne)" style="flex:1;min-width:240px"><button class="btn" id="btnCadeau">Envoyer</button></div></div>`;
+    const ecrire = async (cle, valeur) => { try { await api('/reglages/' + cle, { methode: 'PUT', corps: { valeur } }); message('Enregistré.'); } catch (e) { message(e.message); } };
+    $('#contenu').querySelectorAll('[data-enregistrer]').forEach((b) => (b.onclick = () => {
+      const cle = b.dataset.enregistrer, v = {};
+      $('#contenu').querySelectorAll(`[data-cle="${cle}"]`).forEach((i) => (v[i.dataset.champ] = Number(i.value)));
+      ecrire(cle, v);
+    }));
+    $('#btnAnnonce').onclick = () => ecrire('annonce', { texte: $('#annonce').value, active: $('#annonceActive').checked });
+    $('#btnMaint').onclick = () => { if (!$('#maintActive').checked || confirm('Fermer le jeu pour maintenance ?')) ecrire('maintenance', { message: $('#maint').value, active: $('#maintActive').checked }); };
+    $('#btnVersion').onclick = () => ecrire('versionMin', $('#version').value.trim());
+    $('#btnCadeau').onclick = async () => {
+      const montant = Number($('#cadeauMontant').value);
+      if (!confirm(`Donner ${montant} pièces à tous les joueurs actifs ?`)) return;
+      try { const r2 = await api('/cadeau', { methode: 'POST', corps: { montant, motif: $('#cadeauMotif').value } }); message(`Cadeau envoyé à ${nb(r2.joueurs)} joueurs.`); } catch (e) { message(e.message); }
+    };
+  },
+
+  async journal() {
+    const l = await api('/journal');
+    $('#contenu').innerHTML = `<h2>Journal</h2><p class="muted">Toutes les actions faites depuis ce tableau de bord.</p>
+      <div class="carte"><table><tr><th>Date</th><th>Action</th><th>Cible</th><th>Détails</th></tr>${l.map((j) => `<tr><td>${date(j.cree_le)}</td><td>${esc(j.action)}</td><td>${j.cible && j.cible.startsWith("c_") ? `<button class="lien" data-joueur="${esc(j.cible)}">${esc(j.cible)}</button>` : esc(j.cible || '')}</td><td class="muted">${esc(JSON.stringify(j.details || ''))}</td></tr>`).join('') || '<tr><td class="muted">Rien pour l\'instant.</td></tr>'}</table></div>`;
+    lierJoueurs();
+  },
+};
+function lierJoueurs() { $('#contenu').querySelectorAll('[data-joueur]').forEach((b) => (b.onclick = () => aller('fiche', b.dataset.joueur))); }
+
+if (jeton) demarrer(); else afficherConnexion();
+</script>
+</body>
+</html>
