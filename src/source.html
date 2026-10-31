@@ -114,7 +114,7 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
 
 /* Fenêtres */
 .voile { position: fixed; inset: 0; background: rgba(6,14,24,.75); display: grid; place-items: center; padding: 16px; z-index: 10; }
-.fenetre { background: var(--table-2); border: 1px solid var(--line); border-radius: 16px; padding: 20px; width: min(440px, 100%); display: grid; gap: 12px; box-shadow: 0 20px 50px rgba(0,0,0,.5); max-height: 90vh; overflow-y: auto; }
+.fenetre { background: var(--table-2); border: 1px solid var(--line); border-radius: 16px; padding: 20px; width: min(440px, 100%); display: grid; gap: 12px; box-shadow: 0 20px 50px rgba(0,0,0,.5); max-height: 90vh; max-height: 90dvh; overflow-y: auto; grid-auto-rows: max-content; }
 .fenetre h2 { margin: 0; font-family: var(--display); font-size: 36px; letter-spacing: 2px; color: var(--brass); font-weight: 400; line-height: 1; }
 .fenetre p { margin: 0; color: var(--muted); }
 .bilan { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
@@ -243,8 +243,6 @@ details.rappel summary { cursor: pointer; font-weight: 600; }
 
 /* Accueil et salon en deux colonnes quand le téléphone est couché. */
 @media (orientation: landscape) and (min-width: 560px) {
-  #ecranAccueil { grid-template-columns: 1fr 1fr; column-gap: 28px; }
-  #ecranAccueil .rappel { grid-column: 1 / -1; }
   #ecranSalon { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); column-gap: 24px; }
   #ecranSalon .qr svg { width: 140px; height: 140px; }
   #ecranSalon .code-geant { font-size: 52px; }
@@ -274,6 +272,76 @@ details.rappel summary { cursor: pointer; font-weight: 600; }
 .consigne:empty { display: none; }
 @media (prefers-reduced-motion: reduce) { .siege.courant .ligne, .siege.courant, .siege.meneur .ligne::after, .pose .carte.gagnante, .trophee { animation: none; } }
 
+/* Accueil : profil, grandes cartes de modes, barre du bas. */
+body.accueil header { display: none; }
+body.accueil { overflow-x: hidden; }
+body.accueil .app { max-width: none; min-height: 100vh; min-height: 100dvh; padding: 0; display: block; }
+.hub { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; gap: 10px; padding: max(10px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  background: radial-gradient(ellipse at 50% 55%, rgba(226,176,74,.12), transparent 60%); }
+.hub-haut { display: flex; align-items: center; gap: 12px; }
+.profil { margin-left: auto; display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,.3); border: 1px solid var(--line); border-radius: 99px; padding: 4px 14px 4px 4px; cursor: text; }
+.avatar { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--brass); color: #1d1606; font-family: var(--display); font-size: 24px; flex: none; }
+.profil-champ { display: grid; line-height: 1.1; }
+.profil-champ small { color: var(--muted); font-size: 11px; }
+.profil-champ input { background: none; border: 0; color: var(--ink); font: inherit; font-weight: 700; font-size: 16px; width: 130px; padding: 0; }
+.profil-champ input:focus { outline: none; }
+.profil:focus-within { border-color: var(--brass); }
+.bourse { margin-left: auto; display: flex; align-items: center; gap: 7px; background: rgba(0,0,0,.3); border: 1px solid rgba(226,176,74,.45); border-radius: 99px; padding: 4px 12px 4px 4px; color: var(--ink); font: inherit; cursor: pointer; }
+.bourse + .profil { margin-left: 0; }
+.bourse:active { transform: scale(.96); }
+.piece { width: 30px; height: 30px; border-radius: 50%; flex: none; display: grid; place-items: center; font-family: var(--display); font-size: 17px; color: #6b4f12;
+  background: radial-gradient(circle at 35% 30%, #f8e3a6, var(--brass) 55%, #a87b26); box-shadow: inset 0 0 0 2px rgba(107,79,18,.35), 0 2px 5px rgba(0,0,0,.4); }
+.bourse-txt { display: grid; line-height: 1.05; text-align: left; }
+.bourse-txt b { font-family: var(--display); font-weight: 400; font-size: 21px; letter-spacing: 1px; color: var(--brass); }
+.bourse-txt small { font-size: 10px; color: var(--muted); }
+.bonus-jour { display: grid; justify-items: center; gap: 10px; text-align: center; }
+.bonus-jour .piece { width: 72px; height: 72px; font-size: 40px; animation: entree .6s cubic-bezier(.2,1.4,.4,1) both; }
+.bonus-jour .gain { font-family: var(--display); font-size: 44px; color: var(--brass); line-height: 1; }
+.serie { display: flex; gap: 4px; }
+.serie span { width: 22px; height: 6px; border-radius: 3px; background: var(--line); }
+.serie span.ok { background: var(--brass); }
+.note-essai { color: var(--muted); font-size: 12px; }
+@media (max-width: 420px) { .bourse-txt small, .profil-champ small { display: none; } .profil-champ input { width: 96px; } .hub-haut .logo { font-size: 30px; } }
+.modes { flex: 1; min-width: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-content: center; }
+.mode { position: relative; border: 0; border-radius: 14px; padding: 10px 8px; min-height: 0; aspect-ratio: 5 / 7; display: grid; justify-items: center; align-content: center; gap: 6px; text-align: center; color: #fff; font: inherit;
+  background: radial-gradient(ellipse at 50% 30%, var(--table-2), var(--table) 80%); border: 1.5px solid rgba(226,176,74,.6); box-shadow: inset 0 0 0 4px var(--table), inset 0 0 0 5px rgba(226,176,74,.22), 0 8px 18px rgba(0,0,0,.45); transition: transform .12s ease, box-shadow .12s ease; }
+.mode::before, .mode::after { content: attr(data-coin); position: absolute; font-size: 13px; line-height: 1; color: rgba(226,176,74,.7); }
+.mode::before { top: 9px; left: 10px; }
+.mode::after { bottom: 9px; right: 10px; transform: rotate(180deg); }
+.mode-creer::before, .mode-creer::after { color: rgba(29,22,6,.55); }
+.mode:active:not([aria-disabled]) { transform: scale(.96); }
+.mode b { font-family: var(--display); font-weight: 400; font-size: 19px; letter-spacing: 1.2px; line-height: 1; color: var(--brass); }
+.mode small { font-size: 11px; color: var(--muted); line-height: 1.2; text-wrap: balance; }
+.ico { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; --fond: var(--table); vertical-align: middle; }
+.mode-icone { font-size: 40px; line-height: 1; color: var(--brass); display: block; }
+.mode-creer { background: radial-gradient(ellipse at 50% 25%, #f1cd7c, var(--brass) 70%); border-color: #f3d48a; box-shadow: inset 0 0 0 4px var(--brass), inset 0 0 0 5px rgba(29,22,6,.25), 0 8px 18px rgba(0,0,0,.45); }
+.mode-creer b, .mode-creer .mode-icone { color: #1d1606; }
+.mode-creer .ico { --fond: var(--brass); }
+.mode-creer small { color: #4a3a12; }
+.ruban { position: absolute; top: 10px; right: -4px; background: var(--brass); color: #1d1606; font-size: 10px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; padding: 2px 8px; border-radius: 4px 0 0 4px; box-shadow: 0 2px 4px rgba(0,0,0,.4); }
+.mode-enligne[aria-disabled] { cursor: default; }
+.mode-bientot { opacity: .5; cursor: default; border-color: var(--line); }
+.mode-bientot b, .mode-bientot .mode-icone { color: var(--muted); }
+.barre-bas { display: flex; justify-content: center; gap: 6px; }
+.onglet { background: none; border: 0; color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; display: grid; justify-items: center; gap: 2px; padding: 4px 14px; border-radius: 12px; }
+.onglet span { font-size: 24px; line-height: 1; color: var(--brass); }
+.onglet:active { background: rgba(255,255,255,.08); }
+.choix-robots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.choix-robots .btn { font-size: 20px; padding: 12px 0; }
+ul.regles { margin: 0; padding-left: 18px; display: grid; gap: 8px; color: var(--ink); }
+@media (max-height: 500px) { ul.regles { gap: 4px; font-size: 14px; } }
+@media (orientation: landscape) {
+  .modes { display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 10px 4px; margin: 0 -4px; justify-content: safe center; align-items: center; }
+  .mode { flex: none; height: min(168px, 44vh); width: auto; scroll-snap-align: center; }
+  .mode-creer { height: min(188px, 50vh); }
+}
+@media (orientation: portrait) {
+  .modes { align-content: center; max-width: 360px; margin: 0 auto; width: 100%; }
+  .mode:not(.mode-creer) { aspect-ratio: 4 / 3.6; }
+  .mode-creer { grid-column: 1 / -1; aspect-ratio: auto; min-height: 112px; }
+  .mode-creer b { font-size: 24px; }
+}
+
 /* Écran de démarrage */
 .splash { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; align-content: center; gap: 14px; background: radial-gradient(ellipse at 50% 45%, var(--table-2), #08131f 75%); transition: opacity .45s ease; }
 .splash.fini { opacity: 0; pointer-events: none; }
@@ -301,28 +369,70 @@ details.rappel summary { cursor: pointer; font-weight: 600; }
   <div class="bandeau" id="bandeau" hidden></div>
   <div id="audios" hidden></div>
 
-  <!-- Accueil -->
-  <section class="panneau" id="ecranAccueil" hidden>
-    <div class="colonne">
-      <h2>Jouer entre amis</h2>
-      <p>De 2 à 9 joueurs, chacun sur son téléphone. Une personne crée la partie, les autres la rejoignent avec le code.</p>
-      <label class="champ">Ton pseudo<input class="texte" id="pseudo" maxlength="16" autocomplete="nickname" placeholder="Ex. Mundyo"></label>
+  <!-- Accueil : les différentes parties du jeu -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+  <!-- Icônes Kopo : partent de la carte à jouer, trait doré 2,2, extrémités arrondies, au plus une touche de rouge. -->
+  <defs>
+  <symbol id="i-creer" viewBox="0 0 32 32"><rect x="7" y="6" width="13" height="18" rx="2.5" transform="rotate(-14 13.5 15)"/><rect x="12.5" y="8" width="13" height="18" rx="2.5" transform="rotate(9 19 17)" style="fill:var(--fond)"/><path d="M19 13.5v7M15.5 17h7"/></symbol>
+  <symbol id="i-enligne" viewBox="0 0 32 32"><rect x="11" y="7" width="10" height="15" rx="2"/><path style="fill:var(--acc,#c7362f);stroke:none" d="M16 11.2l2.4 3.3-2.4 3.3-2.4-3.3z"/><path d="M7.5 10.5a7 7 0 0 0 0 8M4 8a11 11 0 0 0 0 13M24.5 10.5a7 7 0 0 1 0 8M28 8a11 11 0 0 1 0 13M12 26.5h8"/></symbol>
+  <symbol id="i-rejoindre" viewBox="0 0 32 32"><rect x="14" y="6" width="12" height="19" rx="2.5"/><path d="M4 15.5h13M12.5 11l4.5 4.5-4.5 4.5"/></symbol>
+  <symbol id="i-robots" viewBox="0 0 32 32"><rect x="8.5" y="9" width="15" height="18" rx="3"/><path d="M16 9V5.5"/><circle cx="16" cy="4.2" r="1.3" style="fill:var(--acc,#c7362f);stroke:none"/><circle cx="12.8" cy="16" r="1.7" style="fill:currentColor;stroke:none"/><circle cx="19.2" cy="16" r="1.7" style="fill:currentColor;stroke:none"/><path d="M12.5 21.5h7M5.5 15v5M26.5 15v5"/></symbol>
+  <symbol id="i-tournoi" viewBox="0 0 32 32"><rect x="10" y="13" width="12" height="15" rx="2.5"/><path d="M8.5 10.5L10 4l3.5 3.5L16 3l2.5 4.5L22 4l1.5 6.5z"/><path style="fill:var(--acc,#c7362f);stroke:none" d="M16 17.3l2 2.7-2 2.7-2-2.7z"/></symbol>
+  <symbol id="i-partager" viewBox="0 0 32 32"><rect x="5" y="10" width="13" height="18" rx="2.5"/><path d="M13 19L26 6M19 6h7v7"/></symbol>
+  <symbol id="i-regles" viewBox="0 0 32 32"><rect x="8" y="4" width="16" height="24" rx="2.5"/><path d="M12 10h8M12 14.5h8M12 19h5"/><path style="fill:var(--acc,#c7362f);stroke:none" d="M20 20.5l1.8 2.4-1.8 2.4-1.8-2.4z"/></symbol>
+  <symbol id="i-plein" viewBox="0 0 32 32"><path d="M5 11V5h6M21 5h6v6M27 21v6h-6M11 27H5v-6"/><rect x="12" y="10" width="8" height="12" rx="1.6"/></symbol>
+  <symbol id="i-reglages" viewBox="0 0 32 32"><rect x="8" y="4" width="16" height="24" rx="2.5"/><path d="M12 10h8M12 16h8M12 22h8"/><circle cx="15" cy="10" r="1.8" style="fill:var(--fond)"/><circle cx="18.5" cy="16" r="1.8" style="fill:var(--fond)"/><circle cx="14" cy="22" r="1.8" style="fill:var(--acc,#c7362f);stroke:none"/></symbol>
+  <symbol id="i-cadenas" viewBox="0 0 32 32"><rect x="8" y="14" width="16" height="13" rx="2.5"/><path d="M11.5 14v-3.5a4.5 4.5 0 0 1 9 0V14M16 19v3"/></symbol>
+  </defs>
+</svg>
+  <section class="hub" id="ecranAccueil" hidden>
+    <div class="hub-haut">
+      <div class="logo">KOPO</div>
+      <button class="bourse" id="btnBourse" title="Tes pièces d'essai"><span class="piece" aria-hidden="true">K</span><span class="bourse-txt"><b id="solde">500</b><small>pièces d'essai</small></span></button>
+      <label class="profil" title="Ton pseudo">
+        <span class="avatar" id="avatar">?</span>
+        <span class="profil-champ"><small>Ton pseudo</small><input id="pseudo" maxlength="16" autocomplete="nickname" placeholder="Ex. Mundyo"></span>
+      </label>
     </div>
-    <div class="colonne">
-      <button class="btn principal large" id="btnCreer">Créer une partie</button>
-      <div class="ou">ou</div>
-      <label class="champ">Code de la partie<input class="texte code" id="codeRejoindre" maxlength="4" autocomplete="off" autocapitalize="characters" placeholder="ABCD"></label>
-      <button class="btn large" id="btnRejoindre">Rejoindre</button>
+    <div class="modes" id="modes">
+      <button class="mode mode-creer" data-coin="♠" id="btnCreer"><span class="mode-icone"><svg class="ico"><use href="#i-creer"/></svg></span><b>Créer une partie</b><small>Entre amis, de 2 à 9</small></button>
+      <button class="mode mode-enligne" id="btnInconnus" data-coin="♦" aria-disabled="true" title="Bientôt"><span class="mode-icone"><svg class="ico"><use href="#i-enligne"/></svg></span><b>En ligne</b><small>Avec des inconnus <span id="enLigne"></span></small><span class="ruban">Bientôt</span></button>
+      <button class="mode mode-rejoindre" data-coin="♥" id="btnModeRejoindre"><span class="mode-icone"><svg class="ico"><use href="#i-rejoindre"/></svg></span><b>Rejoindre</b><small>Avec un code ou le QR</small></button>
+      <button class="mode mode-robots" data-coin="♣" id="btnModeRobots"><span class="mode-icone"><svg class="ico"><use href="#i-robots"/></svg></span><b>Contre les robots</b><small>Partie rapide, seul</small></button>
+      <div class="mode mode-bientot" data-coin="♠" aria-disabled="true"><span class="mode-icone"><svg class="ico"><use href="#i-tournoi"/></svg></span><b>Tournoi</b><small>Bientôt</small></div>
     </div>
-    <details class="rappel"><summary>Rappel des règles</summary>
-      <ul>
+    <nav class="barre-bas">
+      <button class="onglet" id="btnPartager"><span><svg class="ico"><use href="#i-partager"/></svg></span>Partager</button>
+      <button class="onglet" id="btnRegles"><span><svg class="ico"><use href="#i-regles"/></svg></span>Règles</button>
+      <button class="onglet" id="btnParametresAccueil" hidden><span><svg class="ico"><use href="#i-reglages"/></svg></span>Paramètres</button>
+      <button class="onglet" id="btnPleinEcranAccueil" hidden><span><svg class="ico"><use href="#i-plein"/></svg></span>Plein écran</button>
+    </nav>
+    <div class="voile" id="voileRejoindre" hidden>
+      <div class="fenetre">
+        <h2>Rejoindre</h2>
+        <p>Tape le code à 4 lettres affiché chez l'hôte, ou scanne son QR code avec l'appareil photo.</p>
+        <input class="texte code" id="codeRejoindre" maxlength="4" autocomplete="off" autocapitalize="characters" placeholder="ABCD">
+        <button class="btn principal large" id="btnRejoindre">Rejoindre</button>
+        <button class="btn large" id="btnFermerRejoindre">Annuler</button>
+      </div>
+    </div>
+    <div class="voile" id="voileRobots" hidden>
+      <div class="fenetre">
+        <h2>Contre les robots</h2>
+        <p>Combien de robots autour de la table ?</p>
+        <div class="choix-robots" id="choixRobots"></div>
+        <button class="btn large" id="btnFermerRobots">Annuler</button>
+      </div>
+    </div>
+    <template id="modeleRegles">
+      <ul class="regles">
         <li>Suis la couleur, ou ramasse la plus forte carte de la table (permis même pour bluffer).</li>
         <li>Si tout le monde suit, la plus forte carte relance, dans une autre couleur.</li>
         <li>Plus qu'une couleur en main ? Tu peux tout poser d'un coup pour sortir.</li>
         <li>4 cartes d'une même couleur à la distribution : annonce <b>Katapss</b> avant d'agir.</li>
         <li>Le dernier joueur qui garde des cartes est éliminé, jusqu'à la finale à deux.</li>
       </ul>
-    </details>
+    </template>
   </section>
 
   <!-- Connexion -->
@@ -646,13 +756,14 @@ details.rappel summary { cursor: pointer; font-weight: 600; }
 
   // ------------------------------------------------------------------ affichage
   const ecrans = ['ecranAccueil', 'ecranConnexion', 'ecranSalon', 'ecranPartie'];
-  function montrerEcran(nom) { for (const e of ecrans) $(e).hidden = e !== nom; $('btnQuitter').hidden = nom === 'ecranAccueil'; document.body.classList.toggle('en-jeu', nom === 'ecranPartie'); majPleinEcran(); }
+  function montrerEcran(nom) { for (const e of ecrans) $(e).hidden = e !== nom; $('btnQuitter').hidden = nom === 'ecranAccueil'; document.body.classList.toggle('en-jeu', nom === 'ecranPartie'); document.body.classList.toggle('accueil', nom === 'ecranAccueil'); if (nom !== 'ecranAccueil') $('voileRejoindre').hidden = $('voileRobots').hidden = true; majPleinEcran(); }
   // Plein écran (Android) : cache les barres du navigateur et bloque le téléphone en paysage.
   const peutPleinEcran = !!(document.fullscreenEnabled && document.documentElement.requestFullscreen);
   function majPleinEcran() {
     const enJeu = document.body.classList.contains('en-jeu');
     $('btnPleinEcran').hidden = !peutPleinEcran;
     $('btnPleinEcranEntete').hidden = !peutPleinEcran || !enJeu || !!document.fullscreenElement;
+    $('btnPleinEcranAccueil').hidden = !peutPleinEcran || !!document.fullscreenElement;
   }
   function pleinEcran() {
     document.documentElement.requestFullscreen({ navigationUI: 'hide' })
@@ -671,7 +782,9 @@ details.rappel summary { cursor: pointer; font-weight: 600; }
     $('info').textContent = '';
     $('pseudo').value = stock.lire('kopo-pseudo') || '';
     const h = location.hash.slice(1).toUpperCase();
-    if (/^[A-Z]{4}$/.test(h)) $('codeRejoindre').value = h;
+    majAvatar(); majSolde();
+    if (/^[A-Z]{4}$/.test(h)) { $('codeRejoindre').value = h; $('voileRejoindre').hidden = false; }
+    else setTimeout(bonusDuJour, 1600);
   }
   function afficherConnexion(t) { montrerEcran('ecranConnexion'); $('texteConnexion').textContent = t; }
 
@@ -771,7 +884,7 @@ details.rappel summary { cursor: pointer; font-weight: 600; }
       if (o.cible) {
         const n = (enVol.get(o.cible) || 1) - 1;
         if (n > 0) enVol.set(o.cible, n);
-        else { enVol.delete(o.cible); document.querySelectorAll(o.cible).forEach((x) => { x.style.visibility = ''; x.animate([{ transform: 'scale(1.12)' }, { transform: 'scale(1)' }], { duration: 220 }); }); }
+        else { enVol.delete(o.cible); document.querySelectorAll(o.cible).forEach((x) => { x.style.visibility = ''; x.animate([{ scale: '1.12' }, { scale: '1' }], { duration: 220 }); }); }
       }
     };
     a.onfinish = fin; a.oncancel = fin;
@@ -809,7 +922,7 @@ details.rappel summary { cursor: pointer; font-weight: 600; }
       { transform: 'translate(-50%, -50%) rotate(-8deg) scale(1.1)', opacity: 0 },
     ], { duration: 1900, easing: 'ease-out' }).onfinish = () => t.remove();
   }
-  function pop(e, ampleur = 1.25, duree = 400) { if (e && !sansAnim) e.animate([{ transform: `scale(${ampleur})` }, { transform: 'scale(1)' }], { duration: duree, easing: 'cubic-bezier(.3,1.6,.5,1)' }); }
+  function pop(e, ampleur = 1.25, duree = 400) { if (e && !sansAnim) e.animate([{ scale: String(ampleur) }, { scale: '1' }], { duration: duree, easing: 'cubic-bezier(.3,1.6,.5,1)' }); }
 
   // Distribution : les cartes partent du centre vers chaque joueur, à tour de rôle.
   function distribuer(v) {
@@ -1315,7 +1428,7 @@ details.rappel summary { cursor: pointer; font-weight: 600; }
   // ------------------------------------------------------------------ boutons
   function lirePseudo() {
     const p = $('pseudo').value.trim();
-    if (!p) { toast("Choisis d'abord un pseudo."); $('pseudo').focus(); return null; }
+    if (!p) { $('voileRejoindre').hidden = $('voileRobots').hidden = true; toast("Choisis d'abord ton pseudo, en haut."); $('pseudo').focus(); return null; }
     stock.ecrire('kopo-pseudo', p);
     return p;
   }
@@ -1327,6 +1440,76 @@ details.rappel summary { cursor: pointer; font-weight: 600; }
     demarrerClient(code, p);
   };
   $('codeRejoindre').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('btnRejoindre').click(); });
+  // Accueil : profil, cartes de modes, barre du bas.
+  // Pièces d'essai (stratégie des pièces v1.0, phase 0) : cadeau de bienvenue + bonus du jour, dans kopo-profil.
+  const jourLocal = (d) => { d = d || new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+  function lireProfil() { const p = stock.lire('kopo-profil'); return p && typeof p === 'object' ? p : { version: 1 }; }
+  function lirePieces() {
+    const p = lireProfil();
+    if (!p.pieces) { p.pieces = { solde: 500, essai: true, bonusSerie: 0, bonusDernier: null }; stock.ecrire('kopo-profil', p); }
+    return p.pieces;
+  }
+  function ecrirePieces(pc) { const p = lireProfil(); p.pieces = pc; stock.ecrire('kopo-profil', p); }
+  const formatPieces = (n) => n.toLocaleString('fr-FR');
+  function majSolde() { $('solde').textContent = formatPieces(lirePieces().solde); }
+  function fenetrePieces(gain, serie) {
+    const pc = lirePieces();
+    const barres = el('div', 'serie');
+    for (let i = 1; i <= 7; i++) barres.append(el('span', i <= Math.min(serie, 7) ? 'ok' : null));
+    const piece = el('span', 'piece', 'K');
+    const corps = el('div', 'bonus-jour');
+    if (gain) corps.append(el('h2', null, 'Bonus du jour'), piece, el('div', 'gain', '+' + gain), el('div', null, 'Jour ' + serie + ' d\'affilée · reviens demain pour +' + Math.min(50 + serie * 10, 150)), barres);
+    else corps.append(el('h2', null, 'Tes pièces'), piece, el('div', 'gain', formatPieces(pc.solde)), el('div', null, 'Bonus du jour déjà pris · série de ' + (pc.bonusSerie || 0) + ' jour' + ((pc.bonusSerie || 0) > 1 ? 's' : '')), barres);
+    corps.append(el('div', 'note-essai', 'Pièces d\'essai, remises à zéro au lancement officiel.'));
+    const ok = el('button', 'btn principal large', gain ? 'Récupérer' : 'OK');
+    ok.onclick = () => { fermerFenetre(); majSolde(); if (gain) pop($('btnBourse'), 1.2); };
+    ouvrirFenetre([corps, ok]);
+  }
+  function bonusDuJour() {
+    const pc = lirePieces(); const auj = jourLocal();
+    if (pc.bonusDernier === auj) return;
+    const hier = jourLocal(new Date(Date.now() - 864e5));
+    const serie = pc.bonusDernier === hier ? (pc.bonusSerie || 0) + 1 : 1;
+    const gain = Math.min(50 + (serie - 1) * 10, 150);
+    pc.solde += gain; pc.bonusSerie = serie; pc.bonusDernier = auj; ecrirePieces(pc);
+    fenetrePieces(gain, serie);
+  }
+  $('btnBourse').onclick = () => fenetrePieces(0, lirePieces().bonusSerie || 0);
+  function majAvatar() { const p = $('pseudo').value.trim(); $('avatar').textContent = p ? p[0].toUpperCase() : '?'; }
+  $('pseudo').addEventListener('input', majAvatar);
+  $('btnInconnus').onclick = () => { if ($('btnInconnus').hasAttribute('aria-disabled')) toast('Les salles en ligne arrivent bientôt.'); };
+  $('btnModeRejoindre').onclick = () => { $('voileRejoindre').hidden = false; setTimeout(() => $('codeRejoindre').focus(), 50); };
+  $('btnFermerRejoindre').onclick = () => ($('voileRejoindre').hidden = true);
+  $('btnModeRobots').onclick = () => { if (lirePseudo()) $('voileRobots').hidden = false; };
+  $('btnFermerRobots').onclick = () => ($('voileRobots').hidden = true);
+  for (let n = 1; n <= 8; n++) {
+    const b = el('button', 'btn', String(n));
+    b.setAttribute('aria-label', n + ' robot' + (n > 1 ? 's' : ''));
+    b.onclick = () => {
+      const p = lirePseudo(); if (!p) return;
+      $('voileRobots').hidden = true;
+      // Partie avec des robots : on crée la salle, on ajoute les robots et on lance tout de suite.
+      demarrerHote(nouveauCode(), p, false);
+      for (let i = 0; i < n; i++) envoyer({ type: 'ajouterRobot' });
+      envoyer({ type: 'lancer' });
+    };
+    $('choixRobots').append(b);
+  }
+  function montrerRegles() {
+    const ok = el('button', 'btn principal large', "C'est compris");
+    ok.onclick = fermerFenetre;
+    ouvrirFenetre([el('h2', null, 'Règles'), $('modeleRegles').content.cloneNode(true), ok]);
+  }
+  $('btnRegles').onclick = montrerRegles;
+  $('btnPleinEcranAccueil').onclick = pleinEcran;
+  // Paramètres (fil version 1) : visible dès que window.ouvrirParametres existe.
+  $('btnParametresAccueil').onclick = () => window.ouvrirParametres && window.ouvrirParametres();
+  setTimeout(() => ($('btnParametresAccueil').hidden = typeof window.ouvrirParametres !== 'function'), 0);
+  $('btnPartager').onclick = async () => {
+    const url = location.origin + location.pathname;
+    try { if (navigator.share) { await navigator.share({ title: 'Kopo', text: 'Viens jouer au Kopo avec moi !', url }); return; } } catch (e) { return; }
+    try { await navigator.clipboard.writeText(url); toast('Lien du jeu copié.'); } catch (e) { toast(url); }
+  };
   $('btnLancer').onclick = () => envoyer({ type: 'lancer' });
   $('btnPleinEcran').onclick = pleinEcran;
   $('btnPleinEcranEntete').onclick = pleinEcran;
