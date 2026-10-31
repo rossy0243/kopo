@@ -589,6 +589,16 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
   const VERSION = '1.0-essai';
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
+  // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
+  // On le met de côté et on nettoie l'adresse avant que le jeu ne lise un code de partie.
+  if (/access_token=/.test(location.hash)) {
+    const h = new URLSearchParams(location.hash.slice(1));
+    try { sessionStorage.setItem('kopo-google-retour', h.get('access_token')); } catch (e) {}
+    history.replaceState(null, '', location.pathname + location.search);
+  } else if (/error_description=/.test(location.hash)) {
+    try { sessionStorage.setItem('kopo-google-erreur', new URLSearchParams(location.hash.slice(1)).get('error_description')); } catch (e) {}
+    history.replaceState(null, '', location.pathname + location.search);
+  }
   function enregistrerPrefs() { stock.ecrire('kopo-prefs', prefs); appliquerPrefs(); }
   function appliquerPrefs() {
     document.body.classList.toggle('quatre-couleurs', !!prefs.quatreCouleurs);
@@ -1774,7 +1784,9 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
       const bl = el('button', 'btn', 'Joueurs bloqués'); bl.onclick = ouvrirBloques;
       z.append(amis, bl);
     }
-    ligne('Connexion Google ou téléphone', 'Bientôt : pour garder tes pièces sur tous tes téléphones', iconeCadenas()).classList.add('bientot');
+    const zoneGoogle = el('div');
+    z.append(zoneGoogle);
+    dessinerConnexionGoogle(zoneGoogle);
     const supprimer = el('button', 'btn', 'Supprimer mon compte');
     supprimer.onclick = () => demanderConfirmation('Ton pseudo, tes pièces d\'essai, tes statistiques et tes réglages seront effacés de ce téléphone. C\'est définitif.', async () => {
       if (compteLocal()) await apiJoueur('/moi', 'DELETE').catch(() => {});
@@ -1929,6 +1941,47 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
     } catch (e) { liste.append(el('li', null, e.message)); }
   }
   majBloques();
+
+  // Connexion Google : garde son compte et ses pièces sur tous ses téléphones.
+  // Le serveur dit si elle est active (/api/config) ; la page passe par Supabase puis par /api/connexion.
+  let configServeur = null;
+  async function lireConfig() {
+    if (configServeur || typeof SERVEUR === 'undefined' || !SERVEUR) return configServeur;
+    try { configServeur = await (await fetch(SERVEUR + '/api/config')).json(); } catch (e) {}
+    return configServeur;
+  }
+  async function dessinerConnexionGoogle(zone) {
+    const ligneG = (texte, aide, controle) => { const l = el('div', 'reglage-ligne'), s2 = el('span', null, texte); if (aide) s2.append(el('small', null, aide)); l.append(s2, controle); zone.replaceChildren(l); return l; };
+    ligneG('Connexion Google', 'Bientôt : pour garder tes pièces sur tous tes téléphones', iconeCadenas()).classList.add('bientot');
+    const cfg = await lireConfig();
+    if (!cfg || !cfg.google) return;
+    const c = compteLocal();
+    if (c) { try { const m = await apiJoueur('/moi'); if (m.lie) return ligneG('Connecté avec Google', 'Ton compte te suit sur tous tes téléphones', el('b', null, '✓')); } catch (e) {} }
+    const b = el('button', 'btn principal', 'Se connecter');
+    b.onclick = () => connexionGoogle(cfg.google);
+    ligneG('Connexion Google', 'Garde ton compte et tes pièces si tu changes de téléphone', b);
+  }
+  function connexionGoogle(supabaseUrl) {
+    const retour = location.origin + location.pathname + location.search;
+    location.href = supabaseUrl.replace(/\/$/, '') + '/auth/v1/authorize?provider=google&redirect_to=' + encodeURIComponent(retour);
+  }
+  (async function finirConnexionGoogle() {
+    let jeton = null, erreur = null;
+    try { jeton = sessionStorage.getItem('kopo-google-retour'); erreur = sessionStorage.getItem('kopo-google-erreur'); sessionStorage.removeItem('kopo-google-retour'); sessionStorage.removeItem('kopo-google-erreur'); } catch (e) {}
+    if (erreur) return toast('Connexion Google annulée.');
+    if (!jeton || typeof SERVEUR === 'undefined' || !SERVEUR) return;
+    try {
+      const invite = compteLocal();
+      const pseudo = stock.lire('kopo-pseudo') || undefined;
+      const r = await fetch(SERVEUR + '/api/connexion', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jetonSupabase: jeton, jeton: invite && invite.jeton, pseudo }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.erreur || 'Connexion refusée.');
+      stock.ecrire('kopo-compte-serveur', { serveur: SERVEUR, jeton: j.jeton, compte: j.compte });
+      if (j.compte && j.compte.pseudo) { stock.ecrire('kopo-pseudo', j.compte.pseudo); if ($('pseudo')) $('pseudo').value = j.compte.pseudo; }
+      toast('Connecté avec Google : ' + j.compte.pseudo + '#' + j.compte.numero);
+      majBloques();
+    } catch (e) { toast(e.message); }
+  })();
 
   // ------------------------------------------------------------------ tutoriel
   // Apprendre à jouer en 1 minute : 7 petites situations où l'on agit soi-même.
