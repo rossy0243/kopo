@@ -2,7 +2,8 @@
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--fond); color: var(--encre); font: 16px/1.6 "Outfit", "Segoe UI", system-ui, sans-serif; }
 main { max-width: 760px; margin: 0 auto; padding: 28px 20px 60px; }
-.logo { font: 400 40px/1 "Bebas Neue", Impact, sans-serif; letter-spacing: 3px; color: var(--laiton); text-decoration: none; }
+.logo { font: 400 40px/1 "Bebas Neue", Impact, sans-serif; letter-spacing: 3px; color: var(--laiton); text-decoration: none; display: inline-flex; align-items: center; gap: 10px; }
+.logo img { width: 1.05em; height: 1.05em; border-radius: 22%; }
 h1 { font: 400 34px/1.1 "Bebas Neue", Impact, sans-serif; letter-spacing: 2px; color: var(--laiton); margin: 24px 0 4px; }
 h2 { font-size: 18px; color: var(--laiton); margin: 28px 0 8px; }
 p, li { color: var(--encre); }
