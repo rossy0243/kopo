@@ -362,6 +362,25 @@ ul.regles { margin: 0; padding-left: 18px; display: grid; gap: 8px; color: var(-
 @keyframes entree { from { transform: scale(.5); opacity: 0; } }
 @keyframes saut { 0%, 100% { transform: none; } 50% { transform: translateY(-10px); } }
 @media (prefers-reduced-motion: reduce) { .splash-logo, .splash-couleurs span { animation: none; } }
+/* Paramètres */
+.reglages { display: grid; gap: 14px; }
+.reglages h3 { margin: 6px 0 0; font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--brass); }
+.reglage-ligne { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.reglage-ligne > span { display: grid; gap: 2px; }
+.reglage-ligne small { color: var(--muted); font-size: 12px; }
+.bascule { flex: none; width: 52px; height: 30px; border-radius: 15px; border: 1px solid var(--line); background: rgba(255,255,255,.1); position: relative; padding: 0; }
+.bascule::after { content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: var(--ink); transition: transform .15s; }
+.bascule[aria-checked="true"] { background: var(--brass); border-color: var(--brass); }
+.bascule[aria-checked="true"]::after { transform: translateX(22px); background: #1d1606; }
+.choix { display: flex; flex: none; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.choix button { border: 0; background: transparent; color: var(--ink); padding: 8px 10px; font-weight: 600; font-size: 13px; }
+.choix button[aria-pressed="true"] { background: var(--brass); color: #1d1606; }
+.reglages .bientot { opacity: .5; }
+.reglages .version { color: var(--muted); font-size: 12px; text-align: center; }
+/* Cartes à 4 couleurs (plus lisibles, aide les daltoniens) */
+body.quatre-couleurs .carte[data-carte$="C"] { color: #c62828; }
+body.quatre-couleurs .carte[data-carte$="K"] { color: #1565c0; }
+body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
 </style>
 </head>
 <body>
@@ -371,6 +390,7 @@ ul.regles { margin: 0; padding-left: 18px; display: grid; gap: 8px; color: var(-
     <div class="info" id="info"></div>
     <div class="vocal" id="vocal" hidden></div>
     <button class="btn" id="btnPleinEcranEntete" hidden title="Plein écran" aria-label="Plein écran">⛶</button>
+    <button class="btn" id="btnParametres" title="Paramètres" aria-label="Paramètres">⚙</button>
     <button class="btn" id="btnQuitter" hidden>Quitter</button>
   </header>
   <div class="bandeau" id="bandeau" hidden></div>
@@ -3567,6 +3587,18 @@ var qrcode = function() {
     ecrire(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
     effacer(k) { try { localStorage.removeItem(k); } catch (e) {} },
   };
+
+  // ------------------------------------------------------------------ paramètres
+  // Réglages du joueur, gardés sur le téléphone (plus tard : rattachés au compte).
+  const VERSION = '1.0-essai';
+  const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false };
+  const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
+  function enregistrerPrefs() { stock.ecrire('kopo-prefs', prefs); appliquerPrefs(); }
+  function appliquerPrefs() {
+    document.body.classList.toggle('quatre-couleurs', !!prefs.quatreCouleurs);
+    sansAnim = animReduiteSysteme || prefs.animations === 'reduites';
+  }
+  function vibrer(ms) { if (prefs.vibrations && navigator.vibrate) try { navigator.vibrate(ms); } catch (e) {} }
   // Identifiant du joueur : par onglet en mode local, par appareil sinon.
   function idAleatoire() { return 'j' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4); }
   let monId = LOCAL ? sessionStorage.getItem('kopo-id') : stock.lire('kopo-id');
@@ -3963,7 +3995,8 @@ var qrcode = function() {
     e.dataset.carte = c;
     return e;
   }
-  const trierMain = (main) => main.slice().sort((a, b) => K.COULEURS.indexOf(K.couleur(a)) - K.COULEURS.indexOf(K.couleur(b)) || K.valeur(a) - K.valeur(b));
+  const parCouleur = (a, b) => K.COULEURS.indexOf(K.couleur(a)) - K.COULEURS.indexOf(K.couleur(b));
+  const trierMain = (main) => main.slice().sort(prefs.tri === 'valeur' ? (a, b) => K.valeur(a) - K.valeur(b) || parCouleur(a, b) : (a, b) => parCouleur(a, b) || K.valeur(a) - K.valeur(b));
 
   let carteChoisie = null;
   let etaitMonTour = false;
@@ -3999,7 +4032,8 @@ var qrcode = function() {
 
   // ------------------------------------------------------------------ animations
   // Chaque nouvelle vue est comparée à la précédente : ce qui a changé est animé.
-  const sansAnim = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const animReduiteSysteme = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let sansAnim = animReduiteSysteme || prefs.animations === 'reduites';
   const enVol = new Map(); // sélecteur d'une carte en vol -> nombre de vols : cachée jusqu'à l'arrivée
   const cartesRecues = new Set(); // cartes ramassées, mises en évidence dans ta main
   let retardFenetre = 0, minuteurFenetre = null;
@@ -4330,7 +4364,7 @@ var qrcode = function() {
     else if (monTour) { if (v.chrono) cons.append(el('span', 'secondes', ''), ' '); cons.append(el('em', null, 'À toi !')); }
     $('barreChrono').hidden = !(v.chrono && monTour) && !pause;
     $('barreChrono').classList.toggle('barre-pause', !!pause);
-    if (monTour && !pause && !etaitMonTour && navigator.vibrate) try { navigator.vibrate(120); } catch (e) {}
+    if (monTour && !pause && !etaitMonTour) vibrer(120);
     etaitMonTour = monTour && !pause;
 
     // Main et actions
@@ -4375,7 +4409,10 @@ var qrcode = function() {
     }
     if (actions.some((a) => a.type === 'toutPoser')) {
       const b = el('button', 'btn large' + (jouables.size ? '' : ' principal'), `Tout poser (${m.main.length} carte${m.main.length > 1 ? 's' : ''}) et sortir`);
-      b.onclick = () => { b.disabled = true; envoyer({ type: 'action', action: { type: 'toutPoser' } }); };
+      const poser = () => { b.disabled = true; envoyer({ type: 'action', action: { type: 'toutPoser' } }); };
+      b.onclick = () => prefs.confirmerToutPoser
+        ? demanderConfirmation(`Tu poses tes ${m.main.length} carte${m.main.length > 1 ? 's' : ''} et tu sors de la manche.`, poser, { titre: 'Tout poser ?', oui: 'Oui, tout poser' })
+        : poser();
       act.append(b);
     }
     if (actions.some((a) => a.type === 'ramasser')) {
@@ -4431,7 +4468,7 @@ var qrcode = function() {
   // Chaque téléphone appelle directement les autres (audio seulement). Le micro est coupé
   // tant que le joueur ne l'a pas activé, et chacun peut le couper à tout moment.
   const vocal = {
-    actif: false, muet: true, sonCoupe: false, flux: null, appels: new Map(), vue: null,
+    actif: false, muet: true, sonCoupe: !!prefs.sonAutresCoupe, flux: null, appels: new Map(), vue: null,
     pair: null,
     peer() { return this.pair; },
     // Connexion audio directe entre téléphones (WebRTC). Les serveurs TURN relaient le son
@@ -4586,15 +4623,62 @@ var qrcode = function() {
     ouvrirFenetre(contenu);
   }
 
-  function demanderConfirmation(texte, ok) {
-    const b1 = el('button', 'btn principal large', 'Oui, quitter');
+  function demanderConfirmation(texte, ok, o = {}) {
+    const b1 = el('button', 'btn principal large', o.oui || 'Oui, quitter');
     const b2 = el('button', 'btn large', 'Annuler');
     b1.onclick = () => { fermerFenetre(); ok(); };
     b2.onclick = () => { fermerFenetre(); if (vueActuelle) afficher(vueActuelle); };
-    ouvrirFenetre([el('h2', null, 'Quitter ?'), el('p', null, texte), b1, b2]);
+    ouvrirFenetre([el('h2', null, o.titre || 'Quitter ?'), el('p', null, texte), b1, b2]);
   }
 
+  // Écran Paramètres. ouvrirParametres() peut aussi être appelé depuis l'accueil.
+  function ouvrirParametres() {
+    const z = el('div', 'reglages');
+    const titre = (t) => z.append(el('h3', null, t));
+    const ligne = (texte, aide, controle) => {
+      const l = el('div', 'reglage-ligne'), s = el('span', null, texte);
+      if (aide) s.append(el('small', null, aide));
+      l.append(s, controle); z.append(l); return l;
+    };
+    const bascule = (cle, texte, aide, apres) => {
+      const b = el('button', 'bascule'); b.setAttribute('role', 'switch'); b.setAttribute('aria-label', texte);
+      const maj = () => b.setAttribute('aria-checked', String(!!prefs[cle]));
+      b.onclick = () => { prefs[cle] = !prefs[cle]; enregistrerPrefs(); maj(); if (apres) apres(); };
+      maj(); ligne(texte, aide, b);
+    };
+    const choix = (cle, texte, aide, options) => {
+      const c = el('div', 'choix');
+      const maj = () => c.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === prefs[cle])));
+      for (const [v, t] of options) { const b = el('button', null, t); b.dataset.v = v; b.onclick = () => { prefs[cle] = v; enregistrerPrefs(); maj(); if (vueActuelle) afficher(vueActuelle); }; c.append(b); }
+      maj(); ligne(texte, aide, c);
+    };
+    titre('Son et vibrations');
+    bascule('vibrations', 'Vibrations', 'Quand c\'est à toi de jouer', () => vibrer(60));
+    bascule('sonAutresCoupe', 'Couper le micro des autres', 'Au début de chaque partie', null);
+    titre('Jeu');
+    choix('tri', 'Ranger ma main', null, [['couleur', 'Par couleur'], ['valeur', 'Par valeur']]);
+    bascule('confirmerToutPoser', 'Confirmer avant « Tout poser »', 'Évite de sortir par erreur', null);
+    titre('Affichage');
+    choix('animations', 'Animations', animReduiteSysteme ? 'Réduites par ton téléphone' : 'Réduites : plus rapide, moins de batterie', [['normales', 'Normales'], ['reduites', 'Réduites']]);
+    bascule('quatreCouleurs', 'Cartes à 4 couleurs', 'Pique noir, cœur rouge, carreau bleu, trèfle vert', null);
+    titre('Compte');
+    const ps = el('input', 'texte'); ps.maxLength = 16; ps.value = stock.lire('kopo-pseudo') || ''; ps.placeholder = 'Ex. Mundyo'; ps.setAttribute('aria-label', 'Pseudo');
+    ps.onchange = () => { const p = ps.value.trim(); if (p.length >= 3) { stock.ecrire('kopo-pseudo', p); if ($('pseudo')) $('pseudo').value = p; toast('Pseudo enregistré. Il servira à ta prochaine partie.'); } else toast('Le pseudo fait au moins 3 caractères.'); };
+    ligne('Pseudo', null, ps).style.flexWrap = 'wrap';
+    ligne('Connexion Google ou téléphone', 'Bientôt : pour garder tes pièces sur tous tes téléphones', el('span', 'bientot', '🔒')).classList.add('bientot');
+    titre('Aide');
+    const reinit = el('button', 'btn', 'Remettre les réglages par défaut');
+    reinit.onclick = () => { Object.assign(prefs, PREFS_DEFAUT); enregistrerPrefs(); ouvrirParametres(); if (vueActuelle) afficher(vueActuelle); };
+    z.append(reinit, el('p', 'version', 'Kopo · version ' + VERSION));
+    const fermer = el('button', 'btn principal large', 'Fermer');
+    fermer.onclick = () => { fermerFenetre(); if (vueActuelle) afficher(vueActuelle); };
+    ouvrirFenetre([el('h2', null, 'Paramètres'), z, fermer]);
+  }
+  window.ouvrirParametres = ouvrirParametres;
+
   // ------------------------------------------------------------------ boutons
+  $('btnParametres').onclick = ouvrirParametres;
+  appliquerPrefs();
   function lirePseudo() {
     const p = $('pseudo').value.trim();
     if (!p) { $('voileRejoindre').hidden = $('voileRobots').hidden = true; toast("Choisis d'abord ton pseudo, en haut."); $('pseudo').focus(); return null; }
