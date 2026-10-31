@@ -4,6 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#10233a">
+<meta name="description" content="Le Kopo, jeu de cartes de 2 à 9 joueurs, entre amis ou en ligne.">
+<link rel="icon" href="icons/kopo-logo.svg" type="image/svg+xml">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Kopo">
+<meta property="og:title" content="Kopo · jeu de cartes entre amis">
+<meta property="og:description" content="De 2 à 9 joueurs, entre amis ou en ligne. Gratuit.">
+<meta property="og:url" content="https://rossy0243.github.io/kopo/">
+<meta property="og:image" content="https://rossy0243.github.io/kopo/icons/og-kopo.png">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
 <title>Kopo · multijoueur</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -28,7 +41,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--brass); out
 [hidden] { display: none !important; }
 .app { max-width: 720px; margin: 0 auto; padding: 10px 12px 24px; display: grid; gap: 12px; }
 header { display: flex; align-items: center; gap: 10px; }
-.logo { font-family: var(--display); font-size: 36px; letter-spacing: 3px; color: var(--brass); line-height: 1; }
+.logo { font-family: var(--display); font-size: 36px; letter-spacing: 3px; color: var(--brass); line-height: 1; display: flex; align-items: center; gap: .22em; }
+.logo .marque { height: 1.05em; width: 1.05em; border-radius: 22%; box-shadow: 0 2px 8px rgba(0,0,0,.4); flex: none; }
 .info { color: var(--muted); font-size: 14px; flex: 1; min-width: 0; }
 .info strong { color: var(--ink); }
 header .btn { padding: 6px 10px; font-size: 13px; flex: none; }
@@ -351,6 +365,7 @@ ul.regles { margin: 0; padding-left: 18px; display: grid; gap: 8px; color: var(-
 
 /* Écran de démarrage */
 .splash { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; align-content: center; gap: 14px; background: radial-gradient(ellipse at 50% 45%, var(--table-2), #08131f 75%); transition: opacity .45s ease; }
+.splash-marque { width: min(26vw, 24vh, 140px); height: auto; border-radius: 22%; box-shadow: 0 10px 34px rgba(0,0,0,.5), 0 0 40px rgba(226,176,74,.18); animation: entree .7s cubic-bezier(.2,1.4,.4,1) both; }
 .splash.fini { opacity: 0; pointer-events: none; }
 .splash-logo { font-family: var(--display); font-size: min(28vw, 30vh, 170px); letter-spacing: .12em; padding-left: .12em; color: var(--brass); line-height: 1; text-shadow: 0 6px 30px rgba(226,176,74,.35); animation: entree .7s cubic-bezier(.2,1.4,.4,1) both; }
 .splash-couleurs { display: flex; gap: 22px; font-size: 34px; color: var(--ink); }
@@ -361,7 +376,7 @@ ul.regles { margin: 0; padding-left: 18px; display: grid; gap: 8px; color: var(-
 .splash-sous { color: var(--muted); letter-spacing: 4px; text-transform: uppercase; font-size: 13px; }
 @keyframes entree { from { transform: scale(.5); opacity: 0; } }
 @keyframes saut { 0%, 100% { transform: none; } 50% { transform: translateY(-10px); } }
-@media (prefers-reduced-motion: reduce) { .splash-logo, .splash-couleurs span { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .splash-logo, .splash-marque, .splash-couleurs span { animation: none; } }
 /* Paramètres */
 .reglages { display: grid; gap: 14px; }
 .reglages h3 { margin: 6px 0 0; font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--brass); }
@@ -419,7 +434,7 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
 <body>
 <div class="app">
   <header>
-    <div class="logo">KOPO</div>
+    <div class="logo"><img class="marque" src="icons/kopo-logo.svg" alt="">KOPO</div>
     <div class="info" id="info"></div>
     <div class="vocal" id="vocal" hidden></div>
     <button class="btn" id="btnPleinEcranEntete" hidden title="Plein écran" aria-label="Plein écran">⛶</button>
@@ -448,7 +463,7 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
 </svg>
   <section class="hub" id="ecranAccueil" hidden>
     <div class="hub-haut">
-      <div class="logo">KOPO</div>
+      <div class="logo"><img class="marque" src="icons/kopo-logo.svg" alt="">KOPO</div>
       <button class="bourse" id="btnBourse" title="Tes pièces d'essai"><span class="piece" aria-hidden="true">K</span><span class="bourse-txt"><b id="solde">500</b><small>pièces d'essai</small></span></button>
       <label class="profil" title="Ton pseudo">
         <span class="avatar" id="avatar">?</span>
@@ -554,6 +569,7 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
 </div>
 
 <div class="splash" id="splash" aria-hidden="true">
+  <img class="splash-marque" src="icons/kopo-logo.svg" alt="">
   <div class="splash-logo">KOPO</div>
   <div class="splash-couleurs"><span>♠</span><span>♥</span><span>♦</span><span>♣</span></div>
   <div class="splash-sous">Jeu de cartes entre amis</div>
