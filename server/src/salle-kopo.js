@@ -81,6 +81,10 @@ class SalleKopo extends Room {
     msg = Object.assign({}, msg && typeof msg === 'object' ? msg : {}, { type });
     if (type === 'rejoindre') return; // l'entrée passe par onJoin
     if (type === 'sync') { client.send('vue', S.vue(this.salle, id)); return; } // la page demande sa vue dès qu'elle écoute
+    if (type === 'reaction') { // chat : seulement les messages choisis dans le tableau de bord
+      const liste = SalleKopo.services.reglages.get('messagesRapides') || [];
+      if (!liste.includes(typeof msg.emoji === 'string' ? msg.emoji.trim() : '')) { client.send('erreur', 'Ce message n\'est plus proposé.'); return; }
+    }
     if (type === 'micro' && this.comptes.get(id) && this.comptes.get(id).micro_coupe) msg.voix = false; // sanction
     const r = S.recevoir(this.salle, id, msg);
     if (!r.ok) { client.send('erreur', r.erreur); return; }

@@ -318,6 +318,29 @@ async function jouerPartie(joueurs, { robots = 0 } = {}) {
     await api('/admin/api/reglages/annonce', { methode: 'PUT', jeton: adminJeton, corps: { valeur: { texte: 'Tournoi samedi !', active: true } } });
     assert.strictEqual((await api('/api/config')).json.annonce, 'Tournoi samedi !');
   });
+  await test('chat : messages gérés dans l\'admin, les autres sont refusés en partie', async () => {
+    const mauvais = await api('/admin/api/reglages/messagesRapides', { methode: 'PUT', jeton: adminJeton, corps: { valeur: ['x'.repeat(41)] } });
+    assert.strictEqual(mauvais.statut, 400);
+    assert.strictEqual((await api('/admin/api/reglages/messagesRapides', { methode: 'PUT', jeton: adminJeton, corps: { valeur: [] } })).statut, 400);
+    const ok = await api('/admin/api/reglages/messagesRapides', { methode: 'PUT', jeton: adminJeton, corps: { valeur: ['👍', '  On se calme  ', '👍', '', 'Belle main, bravo à toi !'] } });
+    assert.strictEqual(ok.statut, 200);
+    assert.deepStrictEqual((await api('/api/config')).json.messages, ['👍', 'On se calme', 'Belle main, bravo à toi !']);
+    const client = new Client(URL_.replace('http', 'ws'));
+    const [x, y] = [await invite('Cha' + Date.now() % 1000), await invite('Cho' + Date.now() % 1000)];
+    const a = await client.create('kopo', { jeton: x.jeton, code: 'CHAT' });
+    const b = await client.join('kopo', { jeton: y.jeton, code: 'CHAT' });
+    const recus = [], erreurs = [];
+    b.onMessage('reaction', (e) => recus.push(e.emoji)); a.onMessage('reaction', () => {});
+    a.onMessage('erreur', (e) => erreurs.push(e)); b.onMessage('erreur', () => {});
+    [a, b].forEach((r) => r.onMessage('vue', () => {}));
+    a.send('reaction', { emoji: 'texte libre interdit' });
+    await attendre(150);
+    a.send('reaction', { emoji: 'Belle main, bravo à toi !' });
+    await attendre(200);
+    assert.deepStrictEqual(recus, ['Belle main, bravo à toi !']);
+    assert.strictEqual(erreurs.length, 1);
+    await a.leave(); await b.leave();
+  });
   await test('trop d\'essais de connexion admin : bloqué', async () => {
     for (let i = 0; i < 5; i++) await api('/admin/api/connexion', { methode: 'POST', corps: { motDePasse: 'x', code: '1' } });
     const r = await api('/admin/api/connexion', { methode: 'POST', corps: { motDePasse: 'motdepasse-admin', code: codeTotp(TOTP) } });
