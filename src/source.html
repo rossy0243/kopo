@@ -427,6 +427,18 @@ body.en-jeu #btnReactions { display: grid; }
 .reactions button { font-size: 26px; padding: 10px 0; }
 .reactions button.phrase { grid-column: span 2; font-size: 15px; }
 .bulle.reaction { font-size: 26px; }
+/* Chat en partie : les derniers messages s'affichent à gauche, au-dessus de la main, puis s'effacent. */
+#filChat { position: fixed; left: max(8px, env(safe-area-inset-left)); bottom: 34%; z-index: 30; display: none; flex-direction: column; align-items: flex-start; gap: 4px; max-width: min(72vw, 320px); pointer-events: none; }
+body.en-jeu #filChat { display: flex; }
+.msg-chat { background: rgba(6,14,26,.82); color: var(--ink); border: 1px solid var(--line); border-radius: 14px 14px 14px 4px; padding: 4px 10px; font-size: 14px; line-height: 1.3; overflow-wrap: anywhere; transition: opacity .6s; animation: entreeChat .25s ease-out; }
+.msg-chat b { color: var(--brass); font-weight: 600; margin-right: 4px; }
+.msg-chat.moi b { color: var(--good); }
+.msg-chat .emo { font-size: 20px; vertical-align: -2px; }
+.msg-chat.part { opacity: 0; }
+@keyframes entreeChat { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .msg-chat { animation: none; transition: none; } }
+.histo-chat { max-height: 28vh; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+.histo-chat .msg-chat { animation: none; align-self: flex-start; }
 .liste-k { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .liste-k li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; }
 .liste-k small { color: var(--muted); }
@@ -615,6 +627,7 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
 <div class="voile" id="voile" hidden><div class="fenetre" id="fenetre"></div></div>
 <div class="toast" id="toast" hidden role="status"></div>
 <div id="calque" aria-hidden="true"></div>
+<div id="filChat" role="log" aria-live="polite" aria-label="Chat de la partie"></div>
 
 <script>/*MQTT*/</script>
 <script>/*COLYSEUS*/</script>
@@ -1213,7 +1226,8 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
         minuteurFenetre = setTimeout(() => { const w = vueActuelle; if (w && w.etat === 'finManche') afficherFinManche(w); else if (w && w.etat === 'finPartie') afficherFinPartie(w); }, attente);
       } else if (v.etat === 'finManche') afficherFinManche(v);
       else afficherFinPartie(v);
-    } else fermerFenetre();
+    } else if (!($('fenetre').dataset.type === 'chat' && !$('voile').hidden && !(v.manche && v.manche.joueurCourant === v.moi))) fermerFenetre();
+    // (le chat reste ouvert pendant que les autres jouent, et se ferme quand c'est à toi)
   }
 
   // ------------------------------------------------------------------ animations
@@ -1774,7 +1788,7 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
     envoyer({ type: 'action', action: { type: 'jouer', carte: c } });
   }
 
-  function ouvrirFenetre(contenu) { $('fenetre').replaceChildren(...contenu); $('voile').hidden = false; }
+  function ouvrirFenetre(contenu, type) { $('fenetre').replaceChildren(...contenu); $('fenetre').dataset.type = type || ''; $('voile').hidden = false; }
   function fermerFenetre() { $('voile').hidden = true; }
 
   function afficherFinManche(v) {
@@ -1915,22 +1929,57 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
   const memoriserBloques = () => stock.ecrire('kopo-bloques', [...bloques]);
   async function majBloques() { if (!compteLocal()) return; try { bloques = new Set((await apiJoueur('/bloques')).map((b) => b.id)); memoriserBloques(); } catch (e) {} }
 
+  // Chat en partie : messages choisis dans le tableau de bord (/api/config), sinon la liste de départ.
+  const messagesChat = () => (configServeur && Array.isArray(configServeur.messages) && configServeur.messages.length ? configServeur.messages : REACTIONS);
+  const estPhrase = (t) => /\p{L}/u.test(t);
+  const historiqueChat = []; // { code, nom, texte, moi } : les 30 derniers messages de la partie en cours
+  function ligneChat(m) {
+    const d = el('div', 'msg-chat' + (m.moi ? ' moi' : ''));
+    d.append(el('b', null, m.moi ? 'Moi' : m.nom), estPhrase(m.texte) ? document.createTextNode(m.texte) : el('span', 'emo', m.texte));
+    return d;
+  }
   $('btnReactions').onclick = () => {
+    const code = vueActuelle && vueActuelle.code;
+    const anciens = historiqueChat.filter((m) => m.code === code);
+    const contenu = [el('h2', null, 'Chat')];
+    if (anciens.length) {
+      const h = el('div', 'histo-chat');
+      for (const m of anciens) h.append(ligneChat(m));
+      contenu.push(h);
+      setTimeout(() => (h.scrollTop = h.scrollHeight));
+    }
     const z = el('div', 'reactions');
-    for (const r of REACTIONS) {
-      const b = el('button', 'btn' + (r.length > 2 ? ' phrase' : ''), r);
-      b.onclick = () => { fermerFenetre(); if (window.kopoReaction) window.kopoReaction(r); };
+    for (const r of messagesChat()) {
+      const b = el('button', 'btn' + (estPhrase(r) ? ' phrase' : ''), r);
+      b.onclick = () => { fermerFenetre(); if (vueActuelle) afficher(vueActuelle); if (window.kopoReaction) window.kopoReaction(r); };
       z.append(b);
     }
     const f = el('button', 'btn large', 'Fermer'); f.onclick = () => { fermerFenetre(); if (vueActuelle) afficher(vueActuelle); };
-    ouvrirFenetre([el('h2', null, 'Réagir'), z, f]);
+    contenu.push(z, f);
+    ouvrirFenetre(contenu, 'chat');
   };
   window.addEventListener('kopo-reaction', (e) => {
     const d = e.detail || {};
     if (!d.joueur || bloques.has(d.joueur)) return;
+    const texte = String(d.emoji || '').slice(0, 40);
+    if (!texte) return;
+    // 1. Le fil de chat
+    const m = { code: vueActuelle && vueActuelle.code, nom: vueActuelle ? nom(vueActuelle, d.joueur) : '?', texte, moi: !!vueActuelle && d.joueur === vueActuelle.moi };
+    historiqueChat.push(m); if (historiqueChat.length > 30) historiqueChat.shift();
+    const fil = $('filChat'), ligne = ligneChat(m);
+    fil.append(ligne);
+    while (fil.children.length > 4) fil.firstChild.remove();
+    if ($('fenetre').dataset.type === 'chat' && !$('voile').hidden) { // fenêtre du chat ouverte : le message s'y ajoute aussi
+      let h = $('fenetre').querySelector('.histo-chat');
+      if (!h) { h = el('div', 'histo-chat'); $('fenetre').firstChild.after(h); }
+      h.append(ligneChat(m)); h.scrollTop = h.scrollHeight;
+    }
+    setTimeout(() => { ligne.classList.add('part'); setTimeout(() => ligne.remove(), 650); }, 6000);
+    // 2. Un émoji s'envole aussi au-dessus du siège du joueur
+    if (estPhrase(texte)) return;
     const r = siegeEl(d.joueur) && rectSiege(d.joueur);
     if (!r || !visible(r)) return;
-    const b = el('div', 'bulle reaction', String(d.emoji || '').slice(0, 16));
+    const b = el('div', 'bulle reaction', texte);
     b.style.left = r.left + r.width / 2 + 'px'; b.style.top = r.top + r.height / 2 + 'px';
     calque.append(b);
     if (sansAnim) { b.style.transform = 'translate(-50%, -110%)'; setTimeout(() => b.remove(), 2200); return; }
@@ -2038,6 +2087,7 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
     try { configServeur = await (await fetch(SERVEUR + '/api/config')).json(); } catch (e) {}
     return configServeur;
   }
+  if (MODE_SERVEUR) lireConfig(); // messages du chat, connexion Google…
   async function dessinerConnexionGoogle(zone) {
     const ligneG = (texte, aide, controle) => { const l = el('div', 'reglage-ligne'), s2 = el('span', null, texte); if (aide) s2.append(el('small', null, aide)); l.append(s2, controle); zone.replaceChildren(l); return l; };
     ligneG('Connexion Google', 'Bientôt : pour garder tes pièces sur tous tes téléphones', iconeCadenas()).classList.add('bientot');

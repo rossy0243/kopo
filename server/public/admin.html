@@ -266,6 +266,10 @@ const afficher = {
         <h3>Remise à flot</h3>${champs('remiseAFlot', { seuil: 'Si le solde passe sous', niveau: 'Remonter à' })}<button class="btn principal" data-enregistrer="remiseAFlot">Enregistrer</button></div>
       <div class="carte"><h3 style="margin-top:0">Tables à mise</h3>${champs('tables', { bronze: 'Bronze', argent: 'Argent', or: 'Or', diamant: 'Diamant' })}<button class="btn principal" data-enregistrer="tables">Enregistrer les mises</button>
         <h3>Partage du pot (en %, total 100)</h3>${champs('pot', { vainqueur: 'Vainqueur', deuxieme: '2e', troisieme: '3e', maison: 'Maison (pièces détruites)' })}<button class="btn principal" data-enregistrer="pot">Enregistrer le partage</button></div>
+      <div class="carte"><h3 style="margin-top:0">Messages du chat en partie</h3>
+        <p class="muted">Un message par ligne (émoji ou courte phrase, 40 caractères au plus, 40 messages au plus). Les joueurs ne peuvent envoyer que ces messages, dans cet ordre.</p>
+        <textarea id="messagesRapides" rows="8" style="width:100%;max-width:520px;font-size:16px">${esc((r.messagesRapides || []).join('\n'))}</textarea>
+        <div class="ligne"><button class="btn principal" id="btnMessages">Enregistrer les messages</button></div></div>
       <div class="carte"><h3 style="margin-top:0">Cadeau à tous les joueurs</h3>
         <div class="ligne"><input id="cadeauMontant" type="number" min="1" placeholder="Pièces" style="width:110px"><input id="cadeauMotif" placeholder="Motif (ex. excuses pour la panne)" style="flex:1;min-width:240px"><button class="btn" id="btnCadeau">Envoyer</button></div></div>`;
     const ecrire = async (cle, valeur) => { try { await api('/reglages/' + cle, { methode: 'PUT', corps: { valeur } }); message('Enregistré.'); } catch (e) { message(e.message); } };
@@ -276,6 +280,7 @@ const afficher = {
     }));
     $('#btnAnnonce').onclick = () => ecrire('annonce', { texte: $('#annonce').value, active: $('#annonceActive').checked });
     $('#btnMaint').onclick = () => { if (!$('#maintActive').checked || confirm('Fermer le jeu pour maintenance ?')) ecrire('maintenance', { message: $('#maint').value, active: $('#maintActive').checked }); };
+    $('#btnMessages').onclick = () => ecrire('messagesRapides', $('#messagesRapides').value.split('\n'));
     $('#btnVersion').onclick = () => ecrire('versionMin', $('#version').value.trim());
     $('#btnCadeau').onclick = async () => {
       const montant = Number($('#cadeauMontant').value);
