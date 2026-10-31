@@ -381,6 +381,7 @@ ul.regles { margin: 0; padding-left: 18px; display: grid; gap: 8px; color: var(-
   <symbol id="i-partager" viewBox="0 0 32 32"><rect x="5" y="10" width="13" height="18" rx="2.5"/><path d="M13 19L26 6M19 6h7v7"/></symbol>
   <symbol id="i-regles" viewBox="0 0 32 32"><rect x="8" y="4" width="16" height="24" rx="2.5"/><path d="M12 10h8M12 14.5h8M12 19h5"/><path style="fill:var(--acc,#c7362f);stroke:none" d="M20 20.5l1.8 2.4-1.8 2.4-1.8-2.4z"/></symbol>
   <symbol id="i-plein" viewBox="0 0 32 32"><path d="M5 11V5h6M21 5h6v6M27 21v6h-6M11 27H5v-6"/><rect x="12" y="10" width="8" height="12" rx="1.6"/></symbol>
+  <symbol id="i-reglages" viewBox="0 0 32 32"><rect x="8" y="4" width="16" height="24" rx="2.5"/><path d="M12 10h8M12 16h8M12 22h8"/><circle cx="15" cy="10" r="1.8" style="fill:var(--fond)"/><circle cx="18.5" cy="16" r="1.8" style="fill:var(--fond)"/><circle cx="14" cy="22" r="1.8" style="fill:var(--acc,#c7362f);stroke:none"/></symbol>
   <symbol id="i-cadenas" viewBox="0 0 32 32"><rect x="8" y="14" width="16" height="13" rx="2.5"/><path d="M11.5 14v-3.5a4.5 4.5 0 0 1 9 0V14M16 19v3"/></symbol>
   </defs>
 </svg>
@@ -403,6 +404,7 @@ ul.regles { margin: 0; padding-left: 18px; display: grid; gap: 8px; color: var(-
     <nav class="barre-bas">
       <button class="onglet" id="btnPartager"><span><svg class="ico"><use href="#i-partager"/></svg></span>Partager</button>
       <button class="onglet" id="btnRegles"><span><svg class="ico"><use href="#i-regles"/></svg></span>Règles</button>
+      <button class="onglet" id="btnParametresAccueil" hidden><span><svg class="ico"><use href="#i-reglages"/></svg></span>Paramètres</button>
       <button class="onglet" id="btnPleinEcranAccueil" hidden><span><svg class="ico"><use href="#i-plein"/></svg></span>Plein écran</button>
     </nav>
     <div class="voile" id="voileRejoindre" hidden>
@@ -1500,6 +1502,9 @@ ul.regles { margin: 0; padding-left: 18px; display: grid; gap: 8px; color: var(-
   }
   $('btnRegles').onclick = montrerRegles;
   $('btnPleinEcranAccueil').onclick = pleinEcran;
+  // Paramètres (fil version 1) : visible dès que window.ouvrirParametres existe.
+  $('btnParametresAccueil').onclick = () => window.ouvrirParametres && window.ouvrirParametres();
+  setTimeout(() => ($('btnParametresAccueil').hidden = typeof window.ouvrirParametres !== 'function'), 0);
   $('btnPartager').onclick = async () => {
     const url = location.origin + location.pathname;
     try { if (navigator.share) { await navigator.share({ title: 'Kopo', text: 'Viens jouer au Kopo avec moi !', url }); return; } } catch (e) { return; }
