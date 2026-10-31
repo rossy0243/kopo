@@ -29,6 +29,7 @@ Les tables sont créées toutes seules au premier démarrage (`src/schema.sql`).
 | `SECRET_SERVEUR` | Signe les jetons des joueurs (généré par Render) |
 | `SUPABASE_URL` | Vérifie les connexions Google / téléphone |
 | `SUPABASE_JWT_SECRET` | Facultatif, si le projet Supabase utilise encore l'ancien secret partagé |
+| `SUPABASE_SERVICE_ROLE_KEY` | Clé secrète *service_role* : efface aussi l'utilisateur Google dans Supabase quand un joueur supprime son compte. Sans elle, le serveur le signale dans les journaux et il faut l'effacer à la main (Authentication → Users) |
 | `ADMIN_MOT_DE_PASSE`, `ADMIN_TOTP` | Accès au tableau de bord (mot de passe + code à 6 chiffres) |
 | `CONNEXION_GOOGLE` | `1` pour afficher « Se connecter avec Google » dans le jeu (après avoir activé Google dans Supabase, avec la Site URL du jeu) |
 | `ORIGINES` | Pages autorisées à appeler l'API (séparées par des virgules) |

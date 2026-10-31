@@ -851,15 +851,36 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
   const MODE_SERVEUR = !!SERVEUR && !LOCAL && typeof Colyseus !== 'undefined';
 
   // Compte invité : créé une fois avec le pseudo, puis gardé sur l'appareil.
+  // Le pseudo changé sur l'appareil est envoyé au serveur avant de jouer (il doit être libre).
   async function compteServeur(pseudo) {
-    const c = stock.lire('kopo-compte-serveur');
-    if (c && c.serveur === SERVEUR && c.jeton) return c;
-    const r = await fetch(SERVEUR + '/api/invite', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pseudo }) });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(j.erreur || 'Le serveur ne répond pas.');
-    const n = { serveur: SERVEUR, jeton: j.jeton, compte: j.compte };
-    stock.ecrire('kopo-compte-serveur', n);
-    return n;
+    let c = stock.lire('kopo-compte-serveur');
+    if (!(c && c.serveur === SERVEUR && c.jeton)) {
+      const r = await fetch(SERVEUR + '/api/invite', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pseudo }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.erreur || 'Le serveur ne répond pas.');
+      c = { serveur: SERVEUR, jeton: j.jeton, compte: j.compte };
+      stock.ecrire('kopo-compte-serveur', c);
+    } else if (pseudo && c.compte && c.compte.pseudo !== pseudo) {
+      const r = await fetch(SERVEUR + '/api/moi', { method: 'PATCH', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + c.jeton }, body: JSON.stringify({ pseudo }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.erreur || 'Le serveur ne répond pas.');
+      c.compte = j.compte; stock.ecrire('kopo-compte-serveur', c);
+    }
+    adopterPseudo(c.compte && c.compte.pseudo);
+    return c;
+  }
+  // Pseudo en un seul mot : les espaces deviennent « _ » (même règle que le serveur).
+  function nettoyerPseudo(p, enCours) {
+    const t = String(p || '').replace(/^\s+/, '');
+    return (enCours ? t : t.trim()).replace(/\s+/g, '_').replace(/[^\p{L}\p{N}_.-]/gu, '');
+  }
+  // Le serveur a pu donner une variante (pseudo déjà pris) : on l'affiche partout.
+  function adopterPseudo(p) {
+    if (!p || p === stock.lire('kopo-pseudo')) return;
+    const avant = stock.lire('kopo-pseudo');
+    stock.ecrire('kopo-pseudo', p);
+    if ($('pseudo')) { $('pseudo').value = p; majAvatar(); }
+    if (avant && avant.toLowerCase() !== p.toLowerCase()) toast('« ' + avant + ' » était déjà pris : ton pseudo est ' + p + '.');
   }
 
   // facon : { creer: true } | { code } | { taille } (salle publique) | { reconnexion: jeton de reconnexion }
@@ -1101,7 +1122,7 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
   function afficherAccueil() {
     montrerEcran('ecranAccueil');
     $('info').textContent = '';
-    $('pseudo').value = stock.lire('kopo-pseudo') || '';
+    $('pseudo').value = nettoyerPseudo(stock.lire('kopo-pseudo') || '');
     afficherEnLigne();
     const h = location.hash.slice(1).toUpperCase();
     majAvatar(); majSolde();
@@ -1791,7 +1812,18 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
     bascule('quatreCouleurs', 'Cartes à 4 couleurs', 'Pique noir, cœur rouge, carreau bleu, trèfle vert', null);
     titre('Compte');
     const ps = el('input', 'texte'); ps.maxLength = 16; ps.value = stock.lire('kopo-pseudo') || ''; ps.placeholder = 'Ex. Mundyo'; ps.setAttribute('aria-label', 'Pseudo');
-    ps.onchange = () => { const p = ps.value.trim(); if (p.length >= 3) { stock.ecrire('kopo-pseudo', p); if ($('pseudo')) $('pseudo').value = p; toast('Pseudo enregistré. Il servira à ta prochaine partie.'); } else toast('Le pseudo fait au moins 3 caractères.'); };
+    ps.oninput = () => { const v = nettoyerPseudo(ps.value, true); if (v !== ps.value) ps.value = v; };
+    ps.onchange = async () => {
+      const p = nettoyerPseudo(ps.value); ps.value = p;
+      if (p.length < 3) { toast('Le pseudo fait au moins 3 caractères, en un seul mot.'); return; }
+      const c = compteLocal();
+      if (c) {
+        try { const j = await apiJoueur('/moi', 'PATCH', { pseudo: p }); c.compte = j.compte; stock.ecrire('kopo-compte-serveur', c); }
+        catch (e) { toast(e.message); ps.value = stock.lire('kopo-pseudo') || ''; return; }
+      }
+      stock.ecrire('kopo-pseudo', p); if ($('pseudo')) { $('pseudo').value = p; majAvatar(); }
+      toast('Pseudo enregistré.');
+    };
     ligne('Pseudo', null, ps).style.flexWrap = 'wrap';
     if (compteLocal()) {
       const c = compteLocal();
@@ -2096,7 +2128,7 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
   $('btnParametres').onclick = ouvrirParametres;
   appliquerPrefs();
   function lirePseudo() {
-    const p = $('pseudo').value.trim();
+    const p = nettoyerPseudo($('pseudo').value); $('pseudo').value = p;
     if (!p) { $('voileRejoindre').hidden = $('voileRobots').hidden = true; toast("Choisis d'abord ton pseudo, en haut."); $('pseudo').focus(); return null; }
     stock.ecrire('kopo-pseudo', p);
     return p;
@@ -2145,7 +2177,7 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
   }
   $('btnBourse').onclick = () => fenetrePieces(0, lirePieces().bonusSerie || 0);
   function majAvatar() { const p = $('pseudo').value.trim(); $('avatar').textContent = p ? p[0].toUpperCase() : '?'; }
-  $('pseudo').addEventListener('input', majAvatar);
+  $('pseudo').addEventListener('input', () => { const v = nettoyerPseudo($('pseudo').value, true); if (v !== $('pseudo').value) $('pseudo').value = v; majAvatar(); });
   $('btnInconnus').onclick = () => { if (!lirePseudo()) return; dessinerSalles(); afficherEnLigne(); $('voileSalles').hidden = false; };
   $('btnFermerSalles').onclick = () => ($('voileSalles').hidden = true);
   $('btnModeRejoindre').onclick = () => { $('voileRejoindre').hidden = false; setTimeout(() => $('codeRejoindre').focus(), 50); };

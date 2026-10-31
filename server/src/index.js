@@ -8,13 +8,14 @@ const { WebSocketTransport } = require('@colyseus/ws-transport');
 const { ouvrirBase } = require('./base');
 const { creerAuth } = require('./auth');
 const { creerReglages } = require('./reglages');
-const { creerComptes } = require('./comptes');
+const { creerComptes, migrerPseudos } = require('./comptes');
 const { routesJoueurs } = require('./api');
 const { routesAdmin } = require('./admin');
 const { SalleKopo, salles } = require('./salle-kopo');
 
 async function demarrer({ port = Number(process.env.PORT || 2567), env = process.env } = {}) {
   const base = await ouvrirBase(env.DATABASE_URL);
+  await migrerPseudos(base);
   const auth = creerAuth(env);
   const reglages = creerReglages(base);
   await reglages.charger();
