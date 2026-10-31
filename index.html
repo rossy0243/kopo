@@ -312,19 +312,19 @@ body.accueil .app { max-width: none; min-height: 100vh; min-height: 100dvh; padd
 .mode:active:not([aria-disabled]) { transform: scale(.96); }
 .mode b { font-family: var(--display); font-weight: 400; font-size: 19px; letter-spacing: 1.2px; line-height: 1; color: var(--brass); }
 .mode small { font-size: 11px; color: var(--muted); line-height: 1.2; text-wrap: balance; }
-.mode-icone { font-size: 28px; line-height: 1; color: var(--ink); }
-.mode-icone .r { color: var(--red); }
+.ico { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; --fond: var(--table); vertical-align: middle; }
+.mode-icone { font-size: 40px; line-height: 1; color: var(--brass); display: block; }
 .mode-creer { background: radial-gradient(ellipse at 50% 25%, #f1cd7c, var(--brass) 70%); border-color: #f3d48a; box-shadow: inset 0 0 0 4px var(--brass), inset 0 0 0 5px rgba(29,22,6,.25), 0 8px 18px rgba(0,0,0,.45); }
 .mode-creer b, .mode-creer .mode-icone { color: #1d1606; }
+.mode-creer .ico { --fond: var(--brass); }
 .mode-creer small { color: #4a3a12; }
 .ruban { position: absolute; top: 10px; right: -4px; background: var(--brass); color: #1d1606; font-size: 10px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; padding: 2px 8px; border-radius: 4px 0 0 4px; box-shadow: 0 2px 4px rgba(0,0,0,.4); }
 .mode-enligne[aria-disabled] { cursor: default; }
-.mode-enligne[aria-disabled] .mode-icone { filter: saturate(.4); }
 .mode-bientot { opacity: .5; cursor: default; border-color: var(--line); }
-.mode-bientot b { color: var(--muted); }
+.mode-bientot b, .mode-bientot .mode-icone { color: var(--muted); }
 .barre-bas { display: flex; justify-content: center; gap: 6px; }
 .onglet { background: none; border: 0; color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; display: grid; justify-items: center; gap: 2px; padding: 4px 14px; border-radius: 12px; }
-.onglet span { font-size: 22px; line-height: 1; }
+.onglet span { font-size: 24px; line-height: 1; color: var(--brass); }
 .onglet:active { background: rgba(255,255,255,.08); }
 .choix-robots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .choix-robots .btn { font-size: 20px; padding: 12px 0; }
@@ -370,6 +370,20 @@ ul.regles { margin: 0; padding-left: 18px; display: grid; gap: 8px; color: var(-
   <div id="audios" hidden></div>
 
   <!-- Accueil : les différentes parties du jeu -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+  <!-- Icônes Kopo : partent de la carte à jouer, trait doré 2,2, extrémités arrondies, au plus une touche de rouge. -->
+  <defs>
+  <symbol id="i-creer" viewBox="0 0 32 32"><rect x="7" y="6" width="13" height="18" rx="2.5" transform="rotate(-14 13.5 15)"/><rect x="12.5" y="8" width="13" height="18" rx="2.5" transform="rotate(9 19 17)" style="fill:var(--fond)"/><path d="M19 13.5v7M15.5 17h7"/></symbol>
+  <symbol id="i-enligne" viewBox="0 0 32 32"><rect x="11" y="7" width="10" height="15" rx="2"/><path style="fill:var(--acc,#c7362f);stroke:none" d="M16 11.2l2.4 3.3-2.4 3.3-2.4-3.3z"/><path d="M7.5 10.5a7 7 0 0 0 0 8M4 8a11 11 0 0 0 0 13M24.5 10.5a7 7 0 0 1 0 8M28 8a11 11 0 0 1 0 13M12 26.5h8"/></symbol>
+  <symbol id="i-rejoindre" viewBox="0 0 32 32"><rect x="14" y="6" width="12" height="19" rx="2.5"/><path d="M4 15.5h13M12.5 11l4.5 4.5-4.5 4.5"/></symbol>
+  <symbol id="i-robots" viewBox="0 0 32 32"><rect x="8.5" y="9" width="15" height="18" rx="3"/><path d="M16 9V5.5"/><circle cx="16" cy="4.2" r="1.3" style="fill:var(--acc,#c7362f);stroke:none"/><circle cx="12.8" cy="16" r="1.7" style="fill:currentColor;stroke:none"/><circle cx="19.2" cy="16" r="1.7" style="fill:currentColor;stroke:none"/><path d="M12.5 21.5h7M5.5 15v5M26.5 15v5"/></symbol>
+  <symbol id="i-tournoi" viewBox="0 0 32 32"><rect x="10" y="13" width="12" height="15" rx="2.5"/><path d="M8.5 10.5L10 4l3.5 3.5L16 3l2.5 4.5L22 4l1.5 6.5z"/><path style="fill:var(--acc,#c7362f);stroke:none" d="M16 17.3l2 2.7-2 2.7-2-2.7z"/></symbol>
+  <symbol id="i-partager" viewBox="0 0 32 32"><rect x="5" y="10" width="13" height="18" rx="2.5"/><path d="M13 19L26 6M19 6h7v7"/></symbol>
+  <symbol id="i-regles" viewBox="0 0 32 32"><rect x="8" y="4" width="16" height="24" rx="2.5"/><path d="M12 10h8M12 14.5h8M12 19h5"/><path style="fill:var(--acc,#c7362f);stroke:none" d="M20 20.5l1.8 2.4-1.8 2.4-1.8-2.4z"/></symbol>
+  <symbol id="i-plein" viewBox="0 0 32 32"><path d="M5 11V5h6M21 5h6v6M27 21v6h-6M11 27H5v-6"/><rect x="12" y="10" width="8" height="12" rx="1.6"/></symbol>
+  <symbol id="i-cadenas" viewBox="0 0 32 32"><rect x="8" y="14" width="16" height="13" rx="2.5"/><path d="M11.5 14v-3.5a4.5 4.5 0 0 1 9 0V14M16 19v3"/></symbol>
+  </defs>
+</svg>
   <section class="hub" id="ecranAccueil" hidden>
     <div class="hub-haut">
       <div class="logo">KOPO</div>
@@ -380,16 +394,16 @@ ul.regles { margin: 0; padding-left: 18px; display: grid; gap: 8px; color: var(-
       </label>
     </div>
     <div class="modes" id="modes">
-      <button class="mode mode-creer" data-coin="♠" id="btnCreer"><span class="mode-icone">♠<span class="r">♥</span></span><b>Créer une partie</b><small>Entre amis, de 2 à 9</small></button>
-      <button class="mode mode-enligne" id="btnInconnus" data-coin="♦" aria-disabled="true" title="Bientôt"><span class="mode-icone">🌍</span><b>En ligne</b><small>Avec des inconnus <span id="enLigne"></span></small><span class="ruban">Bientôt</span></button>
-      <button class="mode mode-rejoindre" data-coin="♥" id="btnModeRejoindre"><span class="mode-icone">⌗</span><b>Rejoindre</b><small>Avec un code ou le QR</small></button>
-      <button class="mode mode-robots" data-coin="♣" id="btnModeRobots"><span class="mode-icone">🤖</span><b>Contre les robots</b><small>Partie rapide, seul</small></button>
-      <div class="mode mode-bientot" data-coin="♠" aria-disabled="true"><span class="mode-icone">🏆</span><b>Tournoi</b><small>🔒 Bientôt</small></div>
+      <button class="mode mode-creer" data-coin="♠" id="btnCreer"><span class="mode-icone"><svg class="ico"><use href="#i-creer"/></svg></span><b>Créer une partie</b><small>Entre amis, de 2 à 9</small></button>
+      <button class="mode mode-enligne" id="btnInconnus" data-coin="♦" aria-disabled="true" title="Bientôt"><span class="mode-icone"><svg class="ico"><use href="#i-enligne"/></svg></span><b>En ligne</b><small>Avec des inconnus <span id="enLigne"></span></small><span class="ruban">Bientôt</span></button>
+      <button class="mode mode-rejoindre" data-coin="♥" id="btnModeRejoindre"><span class="mode-icone"><svg class="ico"><use href="#i-rejoindre"/></svg></span><b>Rejoindre</b><small>Avec un code ou le QR</small></button>
+      <button class="mode mode-robots" data-coin="♣" id="btnModeRobots"><span class="mode-icone"><svg class="ico"><use href="#i-robots"/></svg></span><b>Contre les robots</b><small>Partie rapide, seul</small></button>
+      <div class="mode mode-bientot" data-coin="♠" aria-disabled="true"><span class="mode-icone"><svg class="ico"><use href="#i-tournoi"/></svg></span><b>Tournoi</b><small>Bientôt</small></div>
     </div>
     <nav class="barre-bas">
-      <button class="onglet" id="btnPartager"><span>📤</span>Partager</button>
-      <button class="onglet" id="btnRegles"><span>📖</span>Règles</button>
-      <button class="onglet" id="btnPleinEcranAccueil" hidden><span>⛶</span>Plein écran</button>
+      <button class="onglet" id="btnPartager"><span><svg class="ico"><use href="#i-partager"/></svg></span>Partager</button>
+      <button class="onglet" id="btnRegles"><span><svg class="ico"><use href="#i-regles"/></svg></span>Règles</button>
+      <button class="onglet" id="btnPleinEcranAccueil" hidden><span><svg class="ico"><use href="#i-plein"/></svg></span>Plein écran</button>
     </nav>
     <div class="voile" id="voileRejoindre" hidden>
       <div class="fenetre">
