@@ -74,6 +74,7 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
 .siege .nom { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .siege .dos { display: flex; gap: 2px; flex-wrap: wrap; min-height: 14px; }
 .siege .dos span { width: 9px; height: 13px; border-radius: 2px; background: repeating-linear-gradient(45deg, var(--brass) 0 3px, #9c7524 3px 6px); }
+.siege .btn.mini { padding: 3px 6px; font-size: 12px; }
 .siege.courant { border-color: var(--brass); box-shadow: 0 0 0 2px var(--brass) inset; }
 .siege.sorti { opacity: .55; }
 .siege.vous { background: rgba(226,176,74,.09); }
@@ -182,6 +183,7 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
     <div class="reglage" id="reglage"></div>
     <h3 style="margin:0;font-size:15px" id="titreJoueurs"></h3>
     <ul class="liste-joueurs" id="listeJoueurs"></ul>
+    <button class="btn large" id="btnRobot" hidden>🤖 Ajouter un robot</button>
     <button class="btn principal large" id="btnLancer" hidden>Lancer la partie</button>
     <p id="attenteHote" hidden>En attente du lancement par l'hôte…</p>
   </section>
@@ -207,6 +209,7 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
 <div class="voile" id="voile" hidden><div class="fenetre" id="fenetre"></div></div>
 <div class="toast" id="toast" hidden role="status"></div>
 
+<script>/*MQTT*/</script>
 <script>/*PEERJS*/</script>
 <script>/*QRCODE*/</script>
 <script>/*MOTEUR*/</script>
@@ -232,91 +235,114 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
   if (!monId) { monId = idAleatoire(); LOCAL ? sessionStorage.setItem('kopo-id', monId) : stock.ecrire('kopo-id', monId); }
   const cleSession = LOCAL ? 'kopo-session-local-' + monId : 'kopo-session';
 
-  // ------------------------------------------------------------------ réseau
-  // Deux transports : PeerJS (téléphones différents) et BroadcastChannel (onglets, pour tester).
-  // Interface commune : hôte { envoyer(id, msg), fermer() } ; client { envoyer(msg), fermer() }.
-  function reseauHote(code, cb) {
-    if (LOCAL) {
-      const bc = new BroadcastChannel(PREFIXE + code);
-      bc.onmessage = (e) => { const d = e.data; if (d.a === 'hote') cb.message(d.de, d.msg); };
-      setTimeout(cb.pret, 0);
-      return { envoyer: (id, msg) => bc.postMessage({ a: id, msg }), fermer: () => bc.close() };
-    }
-    const conns = new Map(); // id joueur -> connexion
-    let peer = null, ferme = false, essais = 0;
-    function ouvrir() {
-      peer = new Peer(PREFIXE + code.toLowerCase());
-      peer.on('open', () => { essais = 0; cb.pret(); });
-      peer.on('call', (appel) => vocal.recevoirAppel(appel));
-      peer.on('connection', (conn) => {
-        const id = conn.metadata && conn.metadata.id;
-        if (!id) return conn.close();
-        conn.on('open', () => {
-          const ancien = conns.get(id);
-          if (ancien && ancien !== conn) try { ancien.close(); } catch (e) {}
-          conns.set(id, conn);
-        });
-        conn.on('data', (msg) => { if (conns.get(id) === conn) cb.message(id, msg); });
-        conn.on('close', () => { if (conns.get(id) === conn) { conns.delete(id); cb.deconnexion(id); } });
-      });
-      peer.on('disconnected', () => { if (!ferme) setTimeout(() => { try { peer.reconnect(); } catch (e) {} }, 1500); });
-      peer.on('error', (err) => {
-        if (err.type === 'unavailable-id') {
-          // Code déjà pris : à la création on en change, à la reprise on attend que l'ancien se libère.
-          if (cb.codePris && cb.codePris()) return;
-          if (++essais < 20) { try { peer.destroy(); } catch (e) {} setTimeout(ouvrir, 3000); }
-          else cb.erreur("Impossible de reprendre la partie. Réessaie dans une minute.");
-        } else if (err.type === 'network' || err.type === 'server-error' || err.type === 'socket-error') {
-          cb.erreur('Connexion au serveur de mise en relation perdue, nouvel essai…');
-        } else if (err.type === 'browser-incompatible') {
-          cb.erreur("Ce navigateur ne permet pas de jouer en ligne. Essaie Chrome ou Safari à jour.");
-        }
-      });
-    }
-    ouvrir();
-    return {
-      envoyer(id, msg) { const c = conns.get(id); if (c && c.open) try { c.send(msg); } catch (e) {} },
-      peer: () => peer,
-      fermer() { ferme = true; try { peer.destroy(); } catch (e) {} },
-    };
+  // Clé secrète du joueur : elle prouve à l'hôte que les messages viennent bien de lui,
+  // et nomme le canal où l'hôte lui envoie sa main. Elle n'est jamais montrée aux autres.
+  let maCle = LOCAL ? sessionStorage.getItem('kopo-cle') : stock.lire('kopo-cle');
+  if (!maCle) {
+    const t = new Uint8Array(12); crypto.getRandomValues(t);
+    maCle = Array.from(t, (x) => x.toString(16).padStart(2, '0')).join('');
+    LOCAL ? sessionStorage.setItem('kopo-cle', maCle) : stock.ecrire('kopo-cle', maCle);
   }
 
-  function reseauClient(code, cb) {
+  // ------------------------------------------------------------------ réseau
+  // Les messages du jeu passent par des relais publics MQTT (connexion web classique),
+  // ce qui marche sur tous les réseaux, 4G comprise. L'hôte écoute sur tous les relais
+  // à la fois ; chaque joueur utilise le premier qui répond.
+  // En mode test (?local=1), un BroadcastChannel relie les onglets d'un même navigateur.
+  const RELAIS = new URLSearchParams(location.search).get('relais')?.split(',') || [ // ?relais= : pour les tests
+    'wss://broker.emqx.io:8084/mqtt',
+    'wss://broker.hivemq.com:8884/mqtt',
+    'wss://test.mosquitto.org:8081/mqtt',
+  ];
+  const sujetHote = (code) => `${PREFIXE}${code}/h`;
+  const sujetJoueur = (code, cle) => `${PREFIXE}${code}/j/${cle}`;
+  const idClientMqtt = () => 'kopo_' + Math.random().toString(36).slice(2, 12);
+  function lireJSON(buf) { try { return JSON.parse(typeof buf === 'string' ? buf : new TextDecoder().decode(buf)); } catch (e) { return null; } }
+
+  // Hôte : cb.message(id, msg) pour chaque message authentifié.
+  function reseauHote(code, cb) {
+    const cles = new Map(Object.entries(stock.lire(PREFIXE + 'cles-' + code) || {})); // id joueur -> clé
+    const routes = new Map(); // id joueur -> { envoyer(sujet, texte) }
+    function recevoir(d, route) {
+      if (!d || typeof d.de !== 'string' || typeof d.cle !== 'string' || !d.msg) return;
+      const connue = cles.get(d.de);
+      if (connue && connue !== d.cle) return; // quelqu'un se fait passer pour un autre joueur
+      if (!connue) { cles.set(d.de, d.cle); stock.ecrire(PREFIXE + 'cles-' + code, Object.fromEntries(cles)); }
+      routes.set(d.de, route);
+      cb.message(d.de, d.msg);
+    }
     if (LOCAL) {
       const bc = new BroadcastChannel(PREFIXE + code);
-      bc.onmessage = (e) => { const d = e.data; if (d.a === monId) cb.message(d.msg); };
-      setTimeout(cb.ouvert, 0);
-      return { envoyer: (msg) => bc.postMessage({ a: 'hote', de: monId, msg }), fermer: () => bc.close() };
+      const route = { envoyer: (sujet, texte) => bc.postMessage({ sujet, texte }) };
+      bc.onmessage = (e) => { if (e.data.sujet === sujetHote(code)) recevoir(lireJSON(e.data.texte), route); };
+      setTimeout(cb.pret, 0);
+      return { envoyer: envoyerA, fermer: () => bc.close() };
     }
-    let peer = null, conn = null, ferme = false;
+    let pret = false, nbOk = 0;
+    const clients = RELAIS.map((url) => {
+      const c = mqtt.connect(url, { clientId: idClientMqtt(), keepalive: 20, reconnectPeriod: 2000, connectTimeout: 6000, clean: true });
+      const route = { envoyer: (sujet, texte) => c.connected && c.publish(sujet, texte, { qos: 1 }) };
+      c.on('connect', () => {
+        c.subscribe(sujetHote(code), { qos: 1 });
+        nbOk++;
+        if (!pret) { pret = true; cb.pret(); }
+      });
+      c.on('message', (sujet, buf) => recevoir(lireJSON(buf), route));
+      c.on('error', () => {});
+      return c;
+    });
+    setTimeout(() => { if (!pret) cb.erreur("Impossible de joindre les relais. Vérifie ta connexion internet."); }, 9000);
+    function envoyerA(id, msg) {
+      const route = routes.get(id), cle = cles.get(id);
+      if (route && cle) route.envoyer(sujetJoueur(code, cle), JSON.stringify(msg));
+    }
+    return { envoyer: envoyerA, fermer() { clients.forEach((c) => { try { c.end(true); } catch (e) {} }); } };
+  }
+
+  // Joueur : essaie les relais l'un après l'autre jusqu'à obtenir une réponse de l'hôte.
+  function reseauClient(code, cb) {
+    const emballer = (msg) => JSON.stringify({ de: monId, cle: maCle, msg });
+    if (LOCAL) {
+      const bc = new BroadcastChannel(PREFIXE + code);
+      bc.onmessage = (e) => { if (e.data.sujet === sujetJoueur(code, maCle)) { const m = lireJSON(e.data.texte); if (m) cb.message(m); } };
+      setTimeout(cb.ouvert, 0);
+      return { envoyer: (msg) => bc.postMessage({ sujet: sujetHote(code), texte: emballer(msg) }), fermer: () => bc.close(), changerRelais() {} };
+    }
+    let i = 0, c = null, ferme = false, repondu = false, essais = 0, minuteur = null;
     function connecter() {
       if (ferme) return;
-      if (!peer || peer.destroyed) {
-        peer = new Peer();
-        peer.on('open', connecter);
-        peer.on('call', (appel) => vocal.recevoirAppel(appel));
-        peer.on('error', (err) => {
-          if (err.type === 'peer-unavailable') cb.erreur("Partie introuvable. Vérifie le code, ou l'hôte n'est plus connecté.");
-          else if (err.type === 'browser-incompatible') cb.erreur("Ce navigateur ne permet pas de jouer en ligne. Essaie Chrome ou Safari à jour.");
-          setTimeout(reessayer, 3000);
-        });
-        peer.on('disconnected', () => { if (!ferme) setTimeout(() => { try { peer.reconnect(); } catch (e) {} }, 1500); });
-        return;
-      }
-      if (!peer.open) return;
-      conn = peer.connect(PREFIXE + code.toLowerCase(), { metadata: { id: monId }, reliable: true });
-      const c = conn;
-      c.on('open', () => { if (c === conn) cb.ouvert(); });
-      c.on('data', (msg) => { if (c === conn) cb.message(msg); });
-      c.on('close', () => { if (c === conn) { cb.ferme(); setTimeout(reessayer, 2000); } });
+      if (c) try { c.end(true); } catch (e) {}
+      repondu = false;
+      const url = RELAIS[i % RELAIS.length];
+      const moi = mqtt.connect(url, { clientId: idClientMqtt(), keepalive: 20, reconnectPeriod: 2000, connectTimeout: 6000, clean: true });
+      c = moi;
+      moi.on('connect', () => {
+        if (moi !== c) return;
+        moi.subscribe(sujetJoueur(code, maCle), { qos: 1 }, () => cb.ouvert());
+      });
+      moi.on('message', (sujet, buf) => {
+        if (moi !== c) return;
+        const m = lireJSON(buf);
+        if (!m) return;
+        repondu = true; essais = 0;
+        cb.message(m);
+      });
+      moi.on('close', () => { if (moi === c && repondu) cb.ferme(); });
+      moi.on('error', () => {});
+      // Pas de réponse de l'hôte sur ce relais en 5 s : on passe au suivant.
+      clearTimeout(minuteur);
+      minuteur = setTimeout(() => {
+        if (ferme || repondu) return;
+        i++;
+        if (++essais >= RELAIS.length) cb.erreur("Partie introuvable pour l'instant. Vérifie le code ; nouvel essai en cours…");
+        connecter();
+      }, 5000);
     }
-    function reessayer() { if (ferme) return; if (conn && conn.open) return; connecter(); }
     connecter();
     return {
-      envoyer(msg) { if (conn && conn.open) try { conn.send(msg); } catch (e) {} },
-      peer: () => peer,
-      reconnecter() { try { conn && conn.close(); } catch (e) {} conn = null; connecter(); },
-      fermer() { ferme = true; try { peer && peer.destroy(); } catch (e) {} },
+      envoyer(msg) { if (c && c.connected) c.publish(sujetHote(code), emballer(msg), { qos: 1 }); },
+      changerRelais() { i++; connecter(); },
+      fermer() { ferme = true; clearTimeout(minuteur); if (c) try { c.end(true); } catch (e) {} },
     };
   }
 
@@ -333,8 +359,8 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
     hote = { salle, vus: new Map(), reseau: null };
     session = { code, role: 'hote', nom };
     stock.ecrire(cleSession, session);
-    S.recevoir(salle, monId, { type: 'rejoindre', nom, peerId: LOCAL ? null : PREFIXE + code.toLowerCase() });
-    salle.joueurs.forEach((j) => { j.voix = j.id === monId ? vocal.actif : false; });
+    S.recevoir(salle, monId, { type: 'rejoindre', nom });
+    salle.joueurs.forEach((j) => { if (!j.robot) j.voix = j.id === monId ? vocal.actif : false; });
     afficherConnexion("Ouverture de la partie…");
     hote.reseau = reseauHote(code, {
       pret() { majHash(code); diffuser(); },
@@ -342,18 +368,11 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
         hote.vus.set(id, Date.now());
         if (msg && msg.type === 'ping') {
           const j = salle.joueurs.find((x) => x.id === id);
-          if (j && !j.connecte) { j.connecte = true; diffuser(); }
+          if (j && !j.connecte && !j.robot) { j.connecte = true; diffuser(); }
+          else hote.reseau.envoyer(id, { type: 'pong' });
           return;
         }
         traiter(id, msg);
-      },
-      deconnexion(id) { S.deconnecter(salle, id); diffuser(); },
-      codePris() {
-        if (reprise) return false;
-        // Collision à la création : on prend un autre code.
-        hote.reseau.fermer(); stock.effacer(PREFIXE + 'salle-' + code);
-        demarrerHote(nouveauCode(), nom, false);
-        return true;
       },
       erreur: montrerBandeau,
     });
@@ -384,7 +403,7 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
     let change = false;
     const maintenant = Date.now();
     for (const j of hote.salle.joueurs) {
-      if (j.id === monId || !j.connecte) continue;
+      if (j.id === monId || !j.connecte || j.robot) continue;
       if (maintenant - (hote.vus.get(j.id) || 0) > 8000) { j.connecte = false; change = true; }
     }
     if (change) diffuser();
@@ -399,9 +418,8 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
     client.reseau = reseauClient(code, {
       ouvert() {
         cacherBandeau(); client.dernierMessage = Date.now();
-        const pr = client.reseau.peer && client.reseau.peer();
-        client.reseau.envoyer({ type: 'rejoindre', nom, peerId: pr ? pr.id : null });
-        if (vocal.actif) client.reseau.envoyer({ type: 'micro', voix: true, muet: vocal.muet });
+        client.reseau.envoyer({ type: 'rejoindre', nom });
+        if (vocal.actif) vocal.signaler();
         majHash(code);
       },
       message(msg) {
@@ -423,7 +441,7 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
     if (vueActuelle && Date.now() - client.dernierMessage > 10000) {
       montrerBandeau("L'hôte ne répond plus. Reconnexion…");
       client.dernierMessage = Date.now();
-      if (client.reseau.reconnecter) client.reseau.reconnecter();
+      client.reseau.changerRelais();
     }
   }, 2000);
 
@@ -433,7 +451,7 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
   }
 
   function quitter() {
-    if (hote) { hote.reseau.fermer(); stock.effacer(PREFIXE + 'salle-' + hote.salle.code); }
+    if (hote) { hote.reseau.fermer(); stock.effacer(PREFIXE + 'salle-' + hote.salle.code); stock.effacer(PREFIXE + 'cles-' + hote.salle.code); }
     if (client) client.reseau.fermer();
     vocal.arreter();
     hote = client = vueActuelle = null;
@@ -529,10 +547,10 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
     const ul = $('listeJoueurs'); ul.replaceChildren();
     for (const j of v.joueurs) {
       const li = el('li');
-      li.append(el('span', null, j.nom));
+      li.append(el('span', null, (j.robot ? '🤖 ' : '') + j.nom));
       if (j.id === v.hote) li.append(el('span', 'pastille tour', 'hôte'));
       if (j.id === v.moi) li.append(el('span', 'pastille neutre', 'toi'));
-      if (!j.connecte) li.append(el('span', 'pastille ko', 'déconnecté'));
+      if (!j.connecte && !j.robot) li.append(el('span', 'pastille ko', 'déconnecté'));
       if (j.voix) li.append(el('span', null, j.muet ? '🔇' : '🎤'));
       if (jeSuisHote && j.id !== v.moi) {
         const b = el('button', 'btn', 'Retirer');
@@ -541,6 +559,7 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
       }
       ul.append(li);
     }
+    $('btnRobot').hidden = !jeSuisHote || v.joueurs.length >= 9;
     $('btnLancer').hidden = !jeSuisHote;
     $('btnLancer').disabled = v.joueurs.length < 2;
     $('btnLancer').textContent = v.joueurs.length < 2 ? 'En attente d\'au moins 2 joueurs' : `Lancer la partie (${v.joueurs.length} joueurs)`;
@@ -565,14 +584,21 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
       if (id === m.joueurCourant) d.classList.add('courant');
       if (id === v.moi) d.classList.add('vous');
       if (q >= 0 || m.elimine === id) d.classList.add('sorti');
-      d.append(el('div', 'nom', (joueur.voix ? (joueur.muet ? '🔇 ' : '🎤 ') : '') + (id === v.moi ? 'Toi' : joueur.nom || '?')));
+      d.append(el('div', 'nom', (joueur.robot ? '🤖 ' : joueur.voix ? (joueur.muet ? '🔇 ' : '🎤 ') : '') + (id === v.moi ? 'Toi' : joueur.nom || '?')));
       const dos = el('div', 'dos');
       for (let k = 0; k < m.nbCartes[id]; k++) dos.append(el('span'));
       d.append(dos);
       if (q >= 0) d.append(el('span', 'pastille ok', m.qualifies[q].raison === 'Katapss' ? 'Katapss ✓' : `qualifié ${q + 1}e`.replace('1e', '1er')));
       else if (m.elimine === id) d.append(el('span', 'pastille ko', 'éliminé'));
       else if (id === m.joueurCourant) { d.append(el('span', 'pastille tour', 'à jouer')); if (v.chrono) { const c = el('div', 'chrono chrono-siege'); c.append(el('span')); d.append(c); } }
-      if (!joueur.connecte) d.append(el('span', 'pastille ko', 'déconnecté'));
+      if (!joueur.connecte && !joueur.robot) {
+        d.append(el('span', 'pastille ko', 'déconnecté'));
+        if (v.hote === v.moi && v.restants.includes(id)) {
+          const b = el('button', 'btn mini', '🤖 Remplacer');
+          b.onclick = () => envoyer({ type: 'remplacerParRobot', cible: id });
+          d.append(b);
+        }
+      } else if (joueur.remplace) d.append(el('span', 'pastille neutre', 'remplacé'));
       box.append(d);
     });
 
@@ -675,7 +701,22 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
   // tant que le joueur ne l'a pas activé, et chacun peut le couper à tout moment.
   const vocal = {
     actif: false, muet: true, sonCoupe: false, flux: null, appels: new Map(), vue: null,
-    peer() { const r = hote ? hote.reseau : client && client.reseau; return r && r.peer ? r.peer() : null; },
+    pair: null,
+    peer() { return this.pair; },
+    // Connexion audio directe entre téléphones (WebRTC). Les serveurs TURN relaient le son
+    // quand deux téléphones ne peuvent pas se joindre directement (par exemple 4G contre 4G).
+    ouvrirPair() {
+      if (this.pair && !this.pair.destroyed) return;
+      this.pair = new Peer({ config: { iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: ['turn:eu-0.turn.peerjs.com:3478', 'turn:us-0.turn.peerjs.com:3478'], username: 'peerjs', credential: 'peerjsp' },
+        { urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443', 'turn:openrelay.metered.ca:443?transport=tcp'], username: 'openrelayproject', credential: 'openrelayproject' },
+      ] } });
+      this.pair.on('open', () => { this.signaler(); if (this.vue) this.maj(this.vue); });
+      this.pair.on('call', (appel) => this.recevoirAppel(appel));
+      this.pair.on('disconnected', () => { setTimeout(() => { try { this.pair && !this.pair.destroyed && this.pair.reconnect(); } catch (e) {} }, 2000); });
+      this.pair.on('error', () => {});
+    },
     async activer() {
       try {
         this.flux = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false });
@@ -687,6 +728,7 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
         toast("Micro non autorisé : tu entends les autres mais ils ne t'entendent pas.");
       }
       this.actif = true;
+      this.ouvrirPair();
       this.appliquerMuet();
       this.signaler();
       this.dessiner();
@@ -702,7 +744,7 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
       $('audios').querySelectorAll('audio').forEach((a) => (a.muted = this.sonCoupe));
       this.dessiner();
     },
-    signaler() { envoyer({ type: 'micro', voix: this.actif, muet: this.muet }); },
+    signaler() { envoyer({ type: 'micro', voix: this.actif, muet: this.muet, peerId: this.pair && this.pair.open ? this.pair.id : null }); },
     brancher(appel) {
       const pid = appel.peer;
       const ancien = this.appels.get(pid);
@@ -741,6 +783,8 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
       for (const appel of this.appels.values()) try { appel.close(); } catch (e) {}
       this.appels.clear();
       if (this.flux) this.flux.getTracks().forEach((t) => t.stop());
+      if (this.pair) try { this.pair.destroy(); } catch (e) {}
+      this.pair = null;
       this.flux = null; this.actif = false; this.muet = true; this.vue = null;
       $('audios').replaceChildren();
       this.dessiner();
@@ -828,6 +872,7 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
   };
   $('codeRejoindre').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('btnRejoindre').click(); });
   $('btnLancer').onclick = () => envoyer({ type: 'lancer' });
+  $('btnRobot').onclick = () => envoyer({ type: 'ajouterRobot' });
   $('btnAnnuler').onclick = quitter;
   $('btnQuitter').onclick = () => demanderConfirmation(
     hote ? "Tu es l'hôte : si tu quittes, la partie s'arrête pour tout le monde." : (vueActuelle && vueActuelle.etat === 'manche' ? 'Tu ne pourras pas revenir dans cette partie avec un autre code.' : 'Tu quittes la partie.'),
@@ -838,7 +883,7 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
   };
 
   // ------------------------------------------------------------------ démarrage
-  if (typeof Peer === 'undefined' && !LOCAL) montrerBandeau("La bibliothèque réseau n'a pas pu se charger.");
+  if (typeof mqtt === 'undefined' && !LOCAL) montrerBandeau("La bibliothèque réseau n'a pas pu se charger.");
   const codeLien = location.hash.slice(1).toUpperCase();
   if (session && (!/^[A-Z]{4}$/.test(codeLien) || codeLien === session.code)) {
     if (session.role === 'hote') demarrerHote(session.code, session.nom, true);

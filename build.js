@@ -5,6 +5,7 @@ const ici = (p) => path.join(__dirname, p);
 const lire = (p) => fs.readFileSync(ici(p), 'utf8').replace(/<\/script/gi, '<\\/script');
 let html = fs.readFileSync(ici('src/source.html'), 'utf8');
 const rempl = {
+  MQTT: lire('vendor/mqtt.min.js').replace(/\/\/# sourceMappingURL=.*$/m, ''),
   PEERJS: lire('vendor/peerjs.min.js').replace(/\/\/# sourceMappingURL=.*$/m, ''),
   QRCODE: lire('vendor/qrcode.js'),
   MOTEUR: lire('moteur/kopo-moteur.js'),

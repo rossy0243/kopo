@@ -8,6 +8,15 @@
 
   const MIN = 2, MAX = 9;
   const DELAIS = [0, 3, 5, 10, 15]; // secondes par tour (0 = sans chrono)
+  const PAUSE_ROBOT = 1200; // un robot réfléchit 1,2 s avant de jouer
+
+  // Hasard de qualité cryptographique quand le navigateur le permet.
+  function hasardFort() {
+    const c = typeof crypto !== 'undefined' && crypto.getRandomValues ? crypto : null;
+    if (!c) return Math.random;
+    const t = new Uint32Array(1);
+    return () => (c.getRandomValues(t), t[0] / 4294967296);
+  }
 
   function creerSalle(code, rng) {
     return {
@@ -22,15 +31,43 @@
       vainqueur: null,
       delai: 5, // secondes pour jouer, réglables par l'hôte dans le salon
       echeance: null, // instant (ms) où le joueur courant aura épuisé son temps
+      robotPret: null, // instant (ms) où un robot peut agir
       horloge: Date.now,
-      rng: rng || Math.random,
+      rng: rng || hasardFort(),
     };
+  }
+
+  const estRobot = (s, id) => !!(s.joueurs.find((j) => j.id === id) || {}).robot;
+
+  // Robot : annonce Katapss, pose tout dès qu'il peut, ouvre dans sa couleur la plus longue
+  // avec sa plus petite carte, suit avec sa plus petite carte, bluffe rarement.
+  function choixRobot(s, j) {
+    const m = s.manche;
+    const actions = K.actionsPossibles(m, j);
+    const k = actions.find((a) => a.type === 'katapss');
+    if (k) return k;
+    if (j !== m.joueurCourant) return null;
+    const tout = actions.find((a) => a.type === 'toutPoser');
+    if (tout) return tout;
+    const cartes = actions.filter((a) => a.type === 'jouer');
+    if (!cartes.length) return actions.find((a) => a.type === 'ramasser') || null;
+    if (m.phase === 'ouverture') {
+      const main = m.mains[j];
+      const nb = (c) => main.filter((x) => K.couleur(x) === c).length;
+      cartes.sort((a, b) => nb(K.couleur(b.carte)) - nb(K.couleur(a.carte)) || K.valeur(a.carte) - K.valeur(b.carte));
+      return cartes[0];
+    }
+    if (s.rng() < 0.05) return actions.find((a) => a.type === 'ramasser');
+    cartes.sort((a, b) => K.valeur(a.carte) - K.valeur(b.carte));
+    return cartes[0];
   }
 
   // Relance le chrono du joueur courant.
   function armerChrono(s) {
     const m = s.manche;
-    s.echeance = s.delai && s.etat === 'manche' && m && m.phase !== 'terminee' ? s.horloge() + s.delai * 1000 : null;
+    const enCours = s.etat === 'manche' && m && m.phase !== 'terminee';
+    s.echeance = s.delai && enCours ? s.horloge() + s.delai * 1000 : null;
+    s.robotPret = enCours ? s.horloge() + PAUSE_ROBOT : null;
   }
 
   // Coup joué automatiquement quand le temps est écoulé (ou le joueur hors ligne) :
@@ -47,8 +84,18 @@
 
   // À appeler régulièrement par l'hôte. Renvoie true si un coup automatique a été joué.
   function tic(s) {
-    if (s.etat !== 'manche' || !s.echeance || s.horloge() < s.echeance) return false;
+    if (s.etat !== 'manche') return false;
     const m = s.manche;
+    // Les robots d'abord : un Katapss éventuel, sinon le robot dont c'est le tour.
+    if (s.robotPret && s.horloge() >= s.robotPret) {
+      const candidats = m.katapss.filter((j) => estRobot(s, j));
+      if (estRobot(s, m.joueurCourant)) candidats.push(m.joueurCourant);
+      for (const j of candidats) {
+        const a = choixRobot(s, j);
+        if (a) { K.jouer(m, a); finirMancheSiBesoin(s); armerChrono(s); return true; }
+      }
+    }
+    if (!s.echeance || s.horloge() < s.echeance) return false;
     const j = m.joueurCourant;
     const action = coupAutomatique(m, j);
     if (!action) { armerChrono(s); return false; }
@@ -98,6 +145,7 @@
     switch (msg && msg.type) {
       case 'rejoindre': {
         if (joueur) {
+          if (joueur.robot && joueur.remplace) { joueur.robot = false; joueur.remplace = false; } // le joueur reprend sa place
           joueur.connecte = true;
           if (typeof msg.peerId === 'string') joueur.peerId = msg.peerId.slice(0, 64);
           if (msg.nom && s.etat === 'salon') joueur.nom = nettoyerNom(msg.nom);
@@ -114,6 +162,24 @@
         s.joueurs = s.joueurs.filter((j) => j.id !== msg.cible);
         return { ok: true };
       }
+      case 'ajouterRobot': {
+        if (id !== s.hote || s.etat !== 'salon') return { ok: false, erreur: 'Impossible.' };
+        if (s.joueurs.length >= MAX) return { ok: false, erreur: 'La table est pleine (9 joueurs).' };
+        let n = 1;
+        while (s.joueurs.some((j) => j.nom === 'Robot ' + n)) n++;
+        s.joueurs.push({ id: 'robot-' + n + '-' + Math.floor(s.rng() * 1e6), nom: 'Robot ' + n, connecte: true, robot: true, voix: false, muet: true });
+        return { ok: true };
+      }
+      case 'remplacerParRobot': {
+        const cible = s.joueurs.find((j) => j.id === msg.cible);
+        if (id !== s.hote || !cible || cible.id === s.hote || cible.robot) return { ok: false, erreur: 'Impossible.' };
+        if (s.etat === 'salon') return { ok: false, erreur: 'Retire-le plutôt, puis ajoute un robot.' };
+        cible.robot = true;
+        cible.remplace = true; // il pourra reprendre sa place en revenant
+        cible.connecte = true;
+        armerChrono(s);
+        return { ok: true };
+      }
       case 'reglages': {
         if (id !== s.hote || s.etat !== 'salon' || !DELAIS.includes(msg.delai)) return { ok: false, erreur: 'Impossible.' };
         s.delai = msg.delai;
@@ -122,6 +188,7 @@
       case 'micro': {
         if (!joueur) return { ok: false, erreur: 'Inconnu.' };
         joueur.voix = !!msg.voix;
+        if (typeof msg.peerId === 'string') joueur.peerId = msg.peerId.slice(0, 64);
         joueur.muet = !!msg.muet;
         return { ok: true };
       }
@@ -172,7 +239,7 @@
 
   function deconnecter(s, id) {
     const j = s.joueurs.find((x) => x.id === id);
-    if (j) j.connecte = false;
+    if (j && !j.robot) j.connecte = false;
   }
 
   // Remplace les identifiants par les pseudos dans le journal.
@@ -191,7 +258,7 @@
       etat: s.etat,
       moi: id,
       hote: s.hote,
-      joueurs: s.joueurs.map((j) => ({ id: j.id, nom: j.nom, connecte: j.connecte, peerId: j.peerId || null, voix: !!j.voix, muet: j.muet !== false })),
+      joueurs: s.joueurs.map((j) => ({ id: j.id, nom: j.nom, connecte: j.connecte, peerId: j.peerId || null, voix: !!j.voix, muet: j.muet !== false, robot: !!j.robot, remplace: !!j.remplace })),
       delai: s.delai,
       chrono: s.echeance && s.etat === 'manche' ? { resteMs: Math.max(0, s.echeance - s.horloge()), totalMs: s.delai * 1000 } : null,
       restants: s.restants.slice(),
@@ -227,13 +294,13 @@
   }
   function importer(texte, rng) {
     const s = JSON.parse(texte);
-    s.rng = rng || Math.random;
+    s.rng = rng || hasardFort();
     s.horloge = Date.now;
-    s.joueurs.forEach((j) => (j.connecte = false));
+    s.joueurs.forEach((j) => (j.connecte = !!j.robot));
     return s;
   }
 
-  const KopoSalle = { MIN, MAX, DELAIS, creerSalle, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
+  const KopoSalle = { MIN, MAX, DELAIS, PAUSE_ROBOT, creerSalle, choixRobot, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
   if (typeof module !== 'undefined' && module.exports) module.exports = KopoSalle;
   else root.KopoSalle = KopoSalle;
 })(typeof window !== 'undefined' ? window : globalThis);

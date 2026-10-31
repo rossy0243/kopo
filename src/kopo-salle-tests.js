@@ -11,7 +11,7 @@ function test(nom, fn) {
 }
 
 function salleAvec(n, graine) {
-  const s = S.creerSalle('ABCD', K.hasard(graine || 1));
+  const s = S.creerSalle('ABCD', graine === undefined ? undefined : K.hasard(graine));
   for (let i = 1; i <= n; i++) assert.ok(S.recevoir(s, 'p' + i, { type: 'rejoindre', nom: 'Ami' + i }).ok);
   return s;
 }
@@ -227,6 +227,75 @@ test("Chacun indique s'il a activé ou coupé son micro", () => {
   S.recevoir(s, 'p2', { type: 'micro', voix: true, muet: false });
   const j = S.vue(s, 'p1').joueurs[1];
   assert.deepStrictEqual([j.peerId, j.voix, j.muet], ['abc', true, false]);
+});
+
+console.log('\nRobots');
+test("L'hôte ajoute des robots dans le salon (9 places au total)", () => {
+  const s = salleAvec(2);
+  for (let i = 0; i < 7; i++) assert.ok(S.recevoir(s, 'p1', { type: 'ajouterRobot' }).ok);
+  assert.ok(!S.recevoir(s, 'p1', { type: 'ajouterRobot' }).ok);
+  assert.ok(!S.recevoir(s, 'p2', { type: 'ajouterRobot' }).ok);
+  assert.deepStrictEqual(s.joueurs.filter((j) => j.robot).map((j) => j.nom), ['Robot 1', 'Robot 2', 'Robot 3', 'Robot 4', 'Robot 5', 'Robot 6', 'Robot 7']);
+});
+test('Un humain peut jouer seul contre des robots, qui jouent sans chrono ni clic', () => {
+  for (let n = 1; n <= 8; n++) {
+    const s = salleAvec(1, n);
+    let t = 0; s.horloge = () => t;
+    for (let i = 0; i < n; i++) S.recevoir(s, 'p1', { type: 'ajouterRobot' });
+    S.recevoir(s, 'p1', { type: 'reglages', delai: 0 });
+    S.recevoir(s, 'p1', { type: 'lancer' });
+    let tours = 0;
+    while (s.etat !== 'finPartie') {
+      if (++tours > 20000) throw new Error('bloqué');
+      if (s.etat === 'finManche') { S.recevoir(s, 'p1', { type: 'mancheSuivante' }); continue; }
+      const m = s.manche;
+      if (m.joueurCourant === 'p1' && !m.katapss.some((j) => j !== 'p1' && s.joueurs.find((x) => x.id === j).robot)) {
+        const a = S.vue(s, 'p1').manche.actions.filter((x) => x.type !== 'katapss');
+        assert.ok(S.recevoir(s, 'p1', { type: 'action', action: a[0] }).ok);
+      } else { t += S.PAUSE_ROBOT; assert.ok(S.tic(s), 'le robot devait jouer'); }
+    }
+  }
+});
+test("Un robot attend 1,2 s avant de jouer", () => {
+  const s = salleAvec(1, 3);
+  let t = 0; s.horloge = () => t;
+  S.recevoir(s, 'p1', { type: 'ajouterRobot' });
+  S.recevoir(s, 'p1', { type: 'lancer' });
+  s.manche = K.nouvelleManche([s.joueurs[1].id, 'p1'], { [s.joueurs[1].id]: ['2P', '3C', '4C', '5K'], p1: ['6P', '7C', '8C', '9K'] }, s.joueurs[1].id);
+  S.recevoir(s, 'p1', { type: 'micro', voix: false }); // n'importe quel message ne fait pas jouer le robot
+  t = 1100; assert.ok(!S.tic(s));
+  t = 1200; assert.ok(S.tic(s));
+  assert.strictEqual(s.manche.table.length, 1);
+});
+test("L'hôte remplace un joueur par un robot en cours de partie, et le joueur reprend sa place en revenant", () => {
+  const s = salleAvec(3);
+  assert.ok(!S.recevoir(s, 'p1', { type: 'remplacerParRobot', cible: 'p2' }).ok, 'pas dans le salon');
+  S.recevoir(s, 'p1', { type: 'lancer' });
+  S.deconnecter(s, 'p2');
+  assert.ok(!S.recevoir(s, 'p3', { type: 'remplacerParRobot', cible: 'p2' }).ok, "seul l'hôte");
+  assert.ok(S.recevoir(s, 'p1', { type: 'remplacerParRobot', cible: 'p2' }).ok);
+  const j = S.vue(s, 'p1').joueurs.find((x) => x.id === 'p2');
+  assert.ok(j.robot && j.remplace && j.connecte);
+  S.recevoir(s, 'p2', { type: 'rejoindre' });
+  assert.ok(!s.joueurs.find((x) => x.id === 'p2').robot);
+});
+test('Les mains des robots restent cachées', () => {
+  const s = salleAvec(1);
+  S.recevoir(s, 'p1', { type: 'ajouterRobot' });
+  S.recevoir(s, 'p1', { type: 'lancer' });
+  const texte = JSON.stringify(S.vue(s, 'p1'));
+  for (const c of s.manche.mains[s.joueurs[1].id]) assert.ok(!texte.includes('"' + c + '"'));
+});
+
+console.log('\nMélange');
+test('Distribution équitable : chaque valeur sort aussi souvent (20 000 donnes)', () => {
+  const compte = {};
+  for (let k = 0; k < 20000; k++) {
+    const s = salleAvec(4);
+    S.recevoir(s, 'p1', { type: 'lancer' });
+    for (const c of s.manche.mains.p1) compte[K.valeur(c)] = (compte[K.valeur(c)] || 0) + 1;
+  }
+  for (let v = 2; v <= 10; v++) assert.ok(Math.abs(compte[v] / 80000 - 1 / 9) < 0.01, `valeur ${v} : ${compte[v]}`);
 });
 
 console.log(`\n${ok} tests réussis, ${ko} en échec.`);
