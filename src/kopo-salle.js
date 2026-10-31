@@ -279,7 +279,7 @@
         // Émoji rapide : rien ne change dans la partie, l'hôte (ou le serveur) le relaie à toute la table.
         if (!joueur) return { ok: false, erreur: 'Inconnu.' };
         const emoji = typeof msg.emoji === 'string' ? msg.emoji.trim() : '';
-        if (!emoji || emoji.length > 16 || /[<>]/.test(emoji)) return { ok: false, erreur: 'Réaction invalide.' };
+        if (!emoji || emoji.length > 40 || /[<>]/.test(emoji)) return { ok: false, erreur: 'Réaction invalide.' };
         s.reactions = s.reactions || {};
         const t = s.horloge();
         if (id in s.reactions && t - s.reactions[id] < 1000) return { ok: false, erreur: 'Doucement !' }; // une par seconde
