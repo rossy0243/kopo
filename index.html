@@ -326,6 +326,13 @@ body.accueil .app { max-width: none; min-height: 100vh; min-height: 100dvh; padd
 .onglet { background: none; border: 0; color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; display: grid; justify-items: center; gap: 2px; padding: 4px 14px; border-radius: 12px; }
 .onglet span { font-size: 24px; line-height: 1; color: var(--brass); }
 .onglet:active { background: rgba(255,255,255,.08); }
+.choix-salles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.choix-salles .btn { display: grid; gap: 2px; padding: 10px 6px; }
+.choix-salles .btn b { font-size: 18px; }
+.choix-salles .btn small { font-weight: 500; color: var(--muted); font-size: 12px; }
+.choix-salles .btn.attente small { color: var(--good); }
+.en-ligne-fenetre { color: var(--good) !important; font-weight: 600; }
+.point-en-ligne { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--good); margin: 0 4px 1px 2px; box-shadow: 0 0 6px var(--good); }
 .choix-robots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .choix-robots .btn { font-size: 20px; padding: 12px 0; }
 ul.regles { margin: 0; padding-left: 18px; display: grid; gap: 8px; color: var(--ink); }
@@ -396,7 +403,7 @@ ul.regles { margin: 0; padding-left: 18px; display: grid; gap: 8px; color: var(-
     </div>
     <div class="modes" id="modes">
       <button class="mode mode-creer" data-coin="♠" id="btnCreer"><span class="mode-icone"><svg class="ico"><use href="#i-creer"/></svg></span><b>Créer une partie</b><small>Entre amis, de 2 à 9</small></button>
-      <button class="mode mode-enligne" id="btnInconnus" data-coin="♦" aria-disabled="true" title="Bientôt"><span class="mode-icone"><svg class="ico"><use href="#i-enligne"/></svg></span><b>En ligne</b><small>Avec des inconnus <span id="enLigne"></span></small><span class="ruban">Bientôt</span></button>
+      <button class="mode mode-enligne" id="btnInconnus" data-coin="♦"><span class="mode-icone"><svg class="ico"><use href="#i-enligne"/></svg></span><b>En ligne</b><small>Avec des inconnus <span id="enLigne"></span></small></button>
       <button class="mode mode-rejoindre" data-coin="♥" id="btnModeRejoindre"><span class="mode-icone"><svg class="ico"><use href="#i-rejoindre"/></svg></span><b>Rejoindre</b><small>Avec un code ou le QR</small></button>
       <button class="mode mode-robots" data-coin="♣" id="btnModeRobots"><span class="mode-icone"><svg class="ico"><use href="#i-robots"/></svg></span><b>Contre les robots</b><small>Partie rapide, seul</small></button>
       <div class="mode mode-bientot" data-coin="♠" aria-disabled="true"><span class="mode-icone"><svg class="ico"><use href="#i-tournoi"/></svg></span><b>Tournoi</b><small>Bientôt</small></div>
@@ -414,6 +421,15 @@ ul.regles { margin: 0; padding-left: 18px; display: grid; gap: 8px; color: var(-
         <input class="texte code" id="codeRejoindre" maxlength="4" autocomplete="off" autocapitalize="characters" placeholder="ABCD">
         <button class="btn principal large" id="btnRejoindre">Rejoindre</button>
         <button class="btn large" id="btnFermerRejoindre">Annuler</button>
+      </div>
+    </div>
+    <div class="voile" id="voileSalles" hidden>
+      <div class="fenetre">
+        <h2>En ligne</h2>
+        <p>Choisis la taille de ta salle. La partie démarre dès qu'elle est pleine.</p>
+        <p class="en-ligne-fenetre" id="enLigneSalles"></p>
+        <div class="choix-salles" id="choixSalles"></div>
+        <button class="btn large" id="btnFermerSalles">Annuler</button>
       </div>
     </div>
     <div class="voile" id="voileRobots" hidden>
@@ -445,8 +461,9 @@ ul.regles { margin: 0; padding-left: 18px; display: grid; gap: 8px; color: var(-
   <!-- Salon -->
   <section class="panneau" id="ecranSalon" hidden>
     <div class="colonne">
-    <h2>Salon</h2>
-    <p>Code de la partie :</p>
+    <h2 id="titreSalon">Salon</h2>
+    <p class="suite-auto" id="attentePublique" hidden></p>
+    <p id="texteCode">Code de la partie :</p>
     <div class="code-geant" id="codeSalon"></div>
     <div class="qr" id="qr"></div>
     <div class="lien"><input class="texte" id="lienSalon" readonly><button class="btn" id="btnCopier">Copier</button></div>
@@ -3165,6 +3182,8 @@ var qrcode = function() {
       expirations: {}, // id -> nombre de temps écoulés d'affilée
       chronoTotal: 0,
       suiteA: null, // instant (ms) où la manche suivante se lance seule
+      publique: false, // partie ouverte aux inconnus (recherche de joueurs)
+      taille: null, // partie publique : nombre de joueurs attendus (2 à 9), elle démarre quand la table est pleine
       horloge: Date.now,
       rng: rng || hasardFort(),
     };
@@ -3270,7 +3289,22 @@ var qrcode = function() {
   }
 
   // À appeler régulièrement par l'hôte. Renvoie true si un coup automatique a été joué.
+  function lancer(s) {
+    s.restants = s.joueurs.map((j) => j.id);
+    demarrerManche(s);
+  }
+  // Partie publique : une salle de N joueurs démarre seule dès qu'elle est pleine.
+  function rendrePublique(s, taille) {
+    if (!(taille >= MIN && taille <= MAX)) throw new Error('Taille de salle invalide');
+    s.publique = true;
+    s.taille = taille;
+  }
+
   function tic(s) {
+    if (s.etat === 'salon' && s.publique) {
+      if (s.joueurs.length >= s.taille) { lancer(s); return true; }
+      return false;
+    }
     if (s.etat === 'finManche' && s.suiteA && s.horloge() >= s.suiteA) { demarrerManche(s); return true; }
     if (s.etat !== 'manche') return false;
     const m = s.manche;
@@ -3356,7 +3390,7 @@ var qrcode = function() {
           return { ok: true };
         }
         if (s.etat !== 'salon') return { ok: false, erreur: 'La partie a déjà commencé.' };
-        if (s.joueurs.length >= MAX) return { ok: false, erreur: 'La table est pleine (9 joueurs).' };
+        if (s.joueurs.length >= (s.publique ? s.taille : MAX)) return { ok: false, erreur: 'La table est pleine.' };
         s.joueurs.push({ id, nom: nettoyerNom(msg.nom), connecte: true, peerId: typeof msg.peerId === 'string' ? msg.peerId.slice(0, 64) : null, voix: false, muet: true });
         if (!s.hote) s.hote = id;
         return { ok: true };
@@ -3367,7 +3401,7 @@ var qrcode = function() {
         return { ok: true };
       }
       case 'ajouterRobot': {
-        if (id !== s.hote || s.etat !== 'salon') return { ok: false, erreur: 'Impossible.' };
+        if (id !== s.hote || s.etat !== 'salon' || s.publique) return { ok: false, erreur: 'Impossible.' };
         if (s.joueurs.length >= MAX) return { ok: false, erreur: 'La table est pleine (9 joueurs).' };
         let n = 1;
         while (s.joueurs.some((j) => j.nom === 'Robot ' + n)) n++;
@@ -3398,10 +3432,10 @@ var qrcode = function() {
       }
       case 'lancer': {
         if (id !== s.hote) return { ok: false, erreur: "Seul l'hôte peut lancer." };
+        if (s.publique) return { ok: false, erreur: 'La salle démarre seule quand elle est pleine.' };
         if (s.etat !== 'salon') return { ok: false, erreur: 'Déjà lancée.' };
         if (s.joueurs.length < MIN) return { ok: false, erreur: 'Il faut au moins 2 joueurs.' };
-        s.restants = s.joueurs.map((j) => j.id);
-        demarrerManche(s);
+        lancer(s);
         return { ok: true };
       }
       case 'mancheSuivante': {
@@ -3469,6 +3503,8 @@ var qrcode = function() {
       hote: s.hote,
       joueurs: s.joueurs.map((j) => ({ id: j.id, nom: j.nom, connecte: j.connecte, peerId: j.peerId || null, voix: !!j.voix, muet: j.muet !== false, robot: !!j.robot, remplace: !!j.remplace, absent: estAbsent(s, j.id) })),
       delai: s.delai,
+      publique: !!s.publique,
+      taille: s.taille,
       chrono: s.echeance && s.etat === 'manche' ? { resteMs: Math.max(0, s.echeance - s.horloge()), totalMs: s.chronoTotal || s.delai * 1000 } : null,
       suite: s.etat === 'finManche' && s.suiteA ? { resteMs: Math.max(0, s.suiteA - s.horloge()), totalMs: s.durees.mancheAuto } : null,
       restants: s.restants.slice(),
@@ -3511,7 +3547,7 @@ var qrcode = function() {
     return s;
   }
 
-  const KopoSalle = { MIN, MAX, DELAIS, PAUSE_ROBOT, DUREES, creerSalle, choixRobot, reconnecter, DELAI_ABSENT, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
+  const KopoSalle = { MIN, MAX, DELAIS, PAUSE_ROBOT, DUREES, creerSalle, rendrePublique, choixRobot, reconnecter, DELAI_ABSENT, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
   if (typeof module !== 'undefined' && module.exports) module.exports = KopoSalle;
   else root.KopoSalle = KopoSalle;
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -3648,6 +3684,107 @@ var qrcode = function() {
     };
   }
 
+  // ------------------------------------------------------------------ joueurs en ligne
+  // Chaque page ouverte signale sa présence toutes les 8 s sur un canal commun des relais ;
+  // les salles publiques y annoncent leur taille et leur remplissage.
+  const SUJET_PRESENCE = PREFIXE + 'lobby/presence';
+  const SUJET_SALLES = PREFIXE + 'lobby/salles';
+  const TAILLES = [9, 8, 7, 6, 5, 4, 3, 2];
+  const lobby = {
+    vus: new Map(), salles: new Map(), canaux: [], ecouteurs: [], reponse: null,
+    demarrer() {
+      const recevoir = (sujet, d) => {
+        if (!d) return;
+        const t = Date.now();
+        if (sujet === SUJET_PRESENCE && typeof d.id === 'string') {
+          const nouveau = !this.vus.has(d.id);
+          this.vus.set(d.id, t);
+          // Un nouveau venu demande qui est là : on répond une fois, après un court délai aléatoire.
+          if (d.demande && nouveau && d.id !== monId && !this.reponse) this.reponse = setTimeout(() => { this.reponse = null; this.signaler(); }, 200 + Math.random() * 1500);
+        }
+        if (sujet === SUJET_SALLES && /^[A-Z]{4}$/.test(d.code)) {
+          if (d.ferme) this.salles.delete(d.code);
+          else if (TAILLES.includes(+d.taille)) this.salles.set(d.code, { code: d.code, taille: +d.taille, nb: +d.nb || 0, t });
+        }
+        this.ecouteurs.forEach((f) => f());
+      };
+      if (LOCAL) {
+        const bc = new BroadcastChannel(PREFIXE + 'lobby');
+        bc.onmessage = (e) => recevoir(e.data.sujet, e.data.d);
+        this.canaux.push({ publier: (sujet, d) => bc.postMessage({ sujet, d }) });
+        this.signaler(true);
+      } else if (typeof mqtt !== 'undefined') {
+        for (const url of RELAIS) {
+          const c = mqtt.connect(url, { clientId: idClientMqtt(), keepalive: 30, reconnectPeriod: 5000, connectTimeout: 8000, clean: true });
+          const canal = { publier: (sujet, d) => c.connected && c.publish(sujet, JSON.stringify(d), { qos: 0 }) };
+          c.on('connect', () => c.subscribe([SUJET_PRESENCE, SUJET_SALLES], { qos: 0 }, () => canal.publier(SUJET_PRESENCE, { id: monId, demande: true })));
+          c.on('message', (sujet, buf) => recevoir(sujet, lireJSON(buf)));
+          c.on('error', () => {});
+          this.canaux.push(canal);
+        }
+      }
+      this.vus.set(monId, Date.now());
+      setInterval(() => { this.signaler(); this.ecouteurs.forEach((f) => f()); }, 8000);
+    },
+    publier(sujet, d) { this.canaux.forEach((c) => c.publier(sujet, d)); },
+    signaler(demande) { this.vus.set(monId, Date.now()); this.publier(SUJET_PRESENCE, demande ? { id: monId, demande: true } : { id: monId }); },
+    enLigne() {
+      const limite = Date.now() - 20000;
+      let n = 0;
+      for (const [id, t] of this.vus) { if (t >= limite) n++; else this.vus.delete(id); }
+      return Math.max(1, n);
+    },
+    // Salles publiques encore ouvertes d'une taille donnée, la plus remplie d'abord.
+    ouvertes(taille, exclus) {
+      const limite = Date.now() - 10000;
+      return [...this.salles.values()].filter((x) => x.t >= limite && x.taille === taille && x.nb < x.taille && !(exclus || []).includes(x.code)).sort((a, b) => b.nb - a.nb);
+    },
+  };
+
+  function afficherEnLigne() {
+    const n = lobby.enLigne();
+    const texte = `${n} joueur${n > 1 ? 's' : ''} en ligne`;
+    $('enLigne').replaceChildren(el('span', 'point-en-ligne'), texte);
+    $('enLigneSalles').replaceChildren(el('span', 'point-en-ligne'), texte);
+    if (!$('voileSalles').hidden) dessinerSalles();
+    if (vueActuelle && vueActuelle.etat === 'salon' && vueActuelle.publique) afficherSalon(vueActuelle);
+  }
+  lobby.ecouteurs.push(afficherEnLigne);
+
+  function dessinerSalles() {
+    const box = $('choixSalles'); box.replaceChildren();
+    for (const t of TAILLES) {
+      const meilleure = lobby.ouvertes(t)[0];
+      const b = el('button', 'btn' + (meilleure ? ' attente' : ''));
+      b.append(el('b', null, `Salle de ${t}`), el('small', null, meilleure ? `${meilleure.nb}/${t} en attente` : 'nouvelle salle'));
+      b.onclick = () => { const p = lirePseudo(); if (p) { $('voileSalles').hidden = true; chercherSalle(p, t); } };
+      box.append(b);
+    }
+  }
+
+  // Rejoint la salle publique la plus remplie de cette taille ; s'il n'y en a pas, en crée une.
+  let rechercheEnCours = null;
+  function chercherSalle(nom, taille, exclus) {
+    afficherConnexion(`Recherche d'une salle de ${taille}…`);
+    clearTimeout(rechercheEnCours);
+    const debut = Date.now();
+    const essayer = () => {
+      const libre = lobby.ouvertes(taille, exclus)[0];
+      if (libre) return demarrerClient(libre.code, nom, taille, exclus);
+      if (Date.now() - debut < 3500) { rechercheEnCours = setTimeout(essayer, 300); return; }
+      demarrerHote(nouveauCode(), nom, false, taille);
+    };
+    essayer();
+  }
+
+  // L'hôte d'une salle publique l'annonce toutes les 3 s tant qu'elle n'est pas pleine.
+  setInterval(() => {
+    if (!hote || !hote.salle.publique) return;
+    const s = hote.salle;
+    if (s.etat === 'salon' && s.joueurs.length < s.taille) { lobby.publier(SUJET_SALLES, { code: s.code, taille: s.taille, nb: s.joueurs.length }); hote.annonceFermee = false; }
+    else if (!hote.annonceFermee) { hote.annonceFermee = true; lobby.publier(SUJET_SALLES, { code: s.code, ferme: true }); }
+  }, 3000);
+
   // ------------------------------------------------------------------ hôte
   // L'hôte est aussi un joueur : ses propres messages sont traités directement.
   let hote = null; // { salle, reseau, vus: Map(id -> dernier signe de vie) }
@@ -3655,9 +3792,10 @@ var qrcode = function() {
   let vueActuelle = null;
   let session = stock.lire(cleSession);
 
-  function demarrerHote(code, nom, reprise) {
+  function demarrerHote(code, nom, reprise, taille) {
     const sauvee = reprise && stock.lire(PREFIXE + 'salle-' + code);
     const salle = sauvee ? S.importer(sauvee) : S.creerSalle(code);
+    if (taille && !sauvee) S.rendrePublique(salle, taille);
     hote = { salle, vus: new Map(), reseau: null };
     session = { code, role: 'hote', nom };
     stock.ecrire(cleSession, session);
@@ -3712,8 +3850,8 @@ var qrcode = function() {
   }, 2000);
 
   // ------------------------------------------------------------------ client
-  function demarrerClient(code, nom) {
-    session = { code, role: 'joueur', nom };
+  function demarrerClient(code, nom, taille, exclus) {
+    session = { code, role: 'joueur', nom, taille: taille || null };
     stock.ecrire(cleSession, session);
     afficherConnexion('Connexion à la partie ' + code + '…');
     client = { dernierMessage: Date.now(), reseau: null };
@@ -3729,7 +3867,11 @@ var qrcode = function() {
         cacherBandeau();
         if (msg.type === 'vue') afficher(msg.vue);
         else if (msg.type === 'erreur') {
-          if (msg.refus) { quitter(); toast(msg.texte); } else toast(msg.texte);
+          if (msg.refus && taille) {
+            // La salle publique vient de se remplir : on en cherche une autre de la même taille.
+            client.reseau.fermer(); client = null; vueActuelle = null;
+            chercherSalle(nom, taille, (exclus || []).concat(code));
+          } else if (msg.refus) { quitter(); toast(msg.texte); } else toast(msg.texte);
         }
       },
       ferme() { montrerBandeau("Connexion perdue avec l'hôte. Reconnexion…"); },
@@ -3755,6 +3897,8 @@ var qrcode = function() {
   function quitter() {
     if (hote) { hote.reseau.fermer(); stock.effacer(PREFIXE + 'salle-' + hote.salle.code); stock.effacer(PREFIXE + 'cles-' + hote.salle.code); }
     if (client) client.reseau.fermer();
+    if (hote && hote.salle.publique && hote.salle.etat === 'salon') lobby.publier(SUJET_SALLES, { code: hote.salle.code, ferme: true });
+    clearTimeout(rechercheEnCours);
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
     vocal.arreter();
     hote = client = vueActuelle = null;
@@ -3776,7 +3920,7 @@ var qrcode = function() {
 
   // ------------------------------------------------------------------ affichage
   const ecrans = ['ecranAccueil', 'ecranConnexion', 'ecranSalon', 'ecranPartie'];
-  function montrerEcran(nom) { for (const e of ecrans) $(e).hidden = e !== nom; $('btnQuitter').hidden = nom === 'ecranAccueil'; document.body.classList.toggle('en-jeu', nom === 'ecranPartie'); document.body.classList.toggle('accueil', nom === 'ecranAccueil'); if (nom !== 'ecranAccueil') $('voileRejoindre').hidden = $('voileRobots').hidden = true; majPleinEcran(); }
+  function montrerEcran(nom) { for (const e of ecrans) $(e).hidden = e !== nom; $('btnQuitter').hidden = nom === 'ecranAccueil'; document.body.classList.toggle('en-jeu', nom === 'ecranPartie'); document.body.classList.toggle('accueil', nom === 'ecranAccueil'); if (nom !== 'ecranAccueil') $('voileRejoindre').hidden = $('voileRobots').hidden = $('voileSalles').hidden = true; majPleinEcran(); }
   // Plein écran (Android) : cache les barres du navigateur et bloque le téléphone en paysage.
   const peutPleinEcran = !!(document.fullscreenEnabled && document.documentElement.requestFullscreen);
   function majPleinEcran() {
@@ -3801,6 +3945,7 @@ var qrcode = function() {
     montrerEcran('ecranAccueil');
     $('info').textContent = '';
     $('pseudo').value = stock.lire('kopo-pseudo') || '';
+    afficherEnLigne();
     const h = location.hash.slice(1).toUpperCase();
     majAvatar(); majSolde();
     if (/^[A-Z]{4}$/.test(h)) { $('codeRejoindre').value = h; $('voileRejoindre').hidden = false; }
@@ -4048,7 +4193,11 @@ var qrcode = function() {
   let qrPour = null;
   function afficherSalon(v) {
     montrerEcran('ecranSalon');
-    $('info').textContent = 'Salon · ' + v.code;
+    $('info').textContent = (v.publique ? 'Salle publique · ' : 'Salon · ') + v.code;
+    $('titreSalon').textContent = v.publique ? `Salle de ${v.taille}` : 'Salon';
+    $('attentePublique').hidden = !v.publique;
+    if (v.publique) $('attentePublique').replaceChildren('En attente de joueurs : ', el('strong', null, `${v.joueurs.length}/${v.taille}`), `. La partie démarre dès que la salle est pleine. ${lobby.enLigne()} en ligne.`);
+    $('texteCode').textContent = v.publique ? 'Tes amis peuvent aussi rejoindre avec ce code :' : 'Code de la partie :';
     $('codeSalon').textContent = v.code;
     const lien = lienPartie(v.code);
     $('lienSalon').value = lien;
@@ -4060,13 +4209,13 @@ var qrcode = function() {
     const rg = $('reglage'); rg.replaceChildren(el('span', null, 'Temps pour jouer :'));
     for (const d of S.DELAIS) {
       const libelle = d ? d + ' s' : 'sans';
-      if (jeSuisHote) {
+      if (jeSuisHote && !v.publique) {
         const b = el('button', 'btn' + (v.delai === d ? ' actif' : ''), libelle);
         b.onclick = () => envoyer({ type: 'reglages', delai: d });
         rg.append(b);
       } else if (v.delai === d) rg.append(el('strong', null, d ? d + ' secondes par joueur' : 'sans chrono'));
     }
-    $('titreJoueurs').textContent = `Joueurs (${v.joueurs.length}/9)`;
+    $('titreJoueurs').textContent = `Joueurs (${v.joueurs.length}/${v.publique ? v.taille : 9})`;
     const ul = $('listeJoueurs'); ul.replaceChildren();
     for (const j of v.joueurs) {
       const li = el('li');
@@ -4075,18 +4224,18 @@ var qrcode = function() {
       if (j.id === v.moi) li.append(el('span', 'pastille neutre', 'toi'));
       if (!j.connecte && !j.robot) li.append(el('span', 'pastille ko', 'déconnecté'));
       if (j.voix) li.append(el('span', null, j.muet ? '🔇' : '🎤'));
-      if (jeSuisHote && j.id !== v.moi) {
+      if (jeSuisHote && j.id !== v.moi && !v.publique) {
         const b = el('button', 'btn', 'Retirer');
         b.onclick = () => envoyer({ type: 'retirer', cible: j.id });
         li.append(b);
       }
       ul.append(li);
     }
-    $('btnRobot').hidden = !jeSuisHote || v.joueurs.length >= 9;
-    $('btnLancer').hidden = !jeSuisHote;
+    $('btnRobot').hidden = !jeSuisHote || v.joueurs.length >= 9 || v.publique;
+    $('btnLancer').hidden = !jeSuisHote || v.publique;
     $('btnLancer').disabled = v.joueurs.length < 2;
     $('btnLancer').textContent = v.joueurs.length < 2 ? 'En attente d\'au moins 2 joueurs' : `Lancer la partie (${v.joueurs.length} joueurs)`;
-    $('attenteHote').hidden = jeSuisHote;
+    $('attenteHote').hidden = jeSuisHote || v.publique;
   }
 
   function afficherPartie(v) {
@@ -4497,7 +4646,8 @@ var qrcode = function() {
   $('btnBourse').onclick = () => fenetrePieces(0, lirePieces().bonusSerie || 0);
   function majAvatar() { const p = $('pseudo').value.trim(); $('avatar').textContent = p ? p[0].toUpperCase() : '?'; }
   $('pseudo').addEventListener('input', majAvatar);
-  $('btnInconnus').onclick = () => { if ($('btnInconnus').hasAttribute('aria-disabled')) toast('Les salles en ligne arrivent bientôt.'); };
+  $('btnInconnus').onclick = () => { if (!lirePseudo()) return; dessinerSalles(); afficherEnLigne(); $('voileSalles').hidden = false; };
+  $('btnFermerSalles').onclick = () => ($('voileSalles').hidden = true);
   $('btnModeRejoindre').onclick = () => { $('voileRejoindre').hidden = false; setTimeout(() => $('codeRejoindre').focus(), 50); };
   $('btnFermerRejoindre').onclick = () => ($('voileRejoindre').hidden = true);
   $('btnModeRobots').onclick = () => { if (lirePseudo()) $('voileRobots').hidden = false; };
@@ -4546,10 +4696,11 @@ var qrcode = function() {
   // ------------------------------------------------------------------ démarrage
   setTimeout(() => { $('splash').classList.add('fini'); setTimeout(() => $('splash').remove(), 500); }, 1300);
   if (typeof mqtt === 'undefined' && !LOCAL) montrerBandeau("La bibliothèque réseau n'a pas pu se charger.");
+  lobby.demarrer();
   const codeLien = location.hash.slice(1).toUpperCase();
   if (session && (!/^[A-Z]{4}$/.test(codeLien) || codeLien === session.code)) {
     if (session.role === 'hote') demarrerHote(session.code, session.nom, true);
-    else demarrerClient(session.code, session.nom);
+    else demarrerClient(session.code, session.nom, session.taille);
   } else {
     if (session) { stock.effacer(cleSession); session = null; }
     afficherAccueil();

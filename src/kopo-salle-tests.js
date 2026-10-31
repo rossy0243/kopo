@@ -12,7 +12,7 @@ function test(nom, fn) {
 
 function salleAvec(n, graine) {
   const s = S.creerSalle('ABCD', graine === undefined ? undefined : K.hasard(graine));
-  s.durees = { depart: 0, finTour: 0, mancheAuto: 0 }; // les pauses ont leurs propres tests
+  s.durees = { depart: 0, finTour: 0, mancheAuto: 0, lancementPublic: 20000 }; // les pauses ont leurs propres tests
   for (let i = 1; i <= n; i++) assert.ok(S.recevoir(s, 'p' + i, { type: 'rejoindre', nom: 'Ami' + i }).ok);
   return s;
 }
@@ -442,6 +442,41 @@ test("La manche suivante se lance seule après 10 s, ou plus tôt par l'hôte", 
   assert.strictEqual(s.etat, 'manche');
   assert.strictEqual(s.numeroManche, 2);
   assert.strictEqual(S.vue(s, 'p2').suite, null);
+});
+
+console.log('\nSalles publiques (joueurs inconnus)');
+test('Une salle publique de 6 attend 6 joueurs puis démarre seule', () => {
+  const s = salleAvec(1);
+  S.rendrePublique(s, 6);
+  for (let i = 2; i <= 5; i++) { S.recevoir(s, 'p' + i, { type: 'rejoindre', nom: 'Inconnu' + i }); assert.ok(!S.tic(s)); }
+  assert.strictEqual(S.vue(s, 'p3').taille, 6);
+  S.recevoir(s, 'p6', { type: 'rejoindre', nom: 'Inconnu6' });
+  assert.ok(S.tic(s));
+  assert.strictEqual(s.etat, 'manche');
+  assert.strictEqual(s.manche.sieges.length, 6);
+});
+test('Une salle publique pleine refuse les suivants', () => {
+  const s = salleAvec(3);
+  S.rendrePublique(s, 3);
+  assert.ok(!S.recevoir(s, 'p4', { type: 'rejoindre', nom: 'X' }).ok);
+});
+test("Dans une salle publique, l'hôte ne lance pas à la main et n'ajoute pas de robots", () => {
+  const s = salleAvec(2);
+  S.rendrePublique(s, 9);
+  assert.ok(!S.recevoir(s, 'p1', { type: 'lancer' }).ok);
+  assert.ok(!S.recevoir(s, 'p1', { type: 'ajouterRobot' }).ok);
+});
+test('Tailles de salle de 2 à 9 seulement', () => {
+  const s = salleAvec(1);
+  assert.throws(() => S.rendrePublique(s, 1));
+  assert.throws(() => S.rendrePublique(s, 10));
+});
+test('Une partie entre amis ne démarre jamais seule', () => {
+  const s = salleAvec(3);
+  let t = 0; s.horloge = () => t;
+  t += 60000;
+  assert.ok(!S.tic(s));
+  assert.strictEqual(s.etat, 'salon');
 });
 
 console.log('\nMélange');
