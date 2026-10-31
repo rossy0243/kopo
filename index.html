@@ -3791,7 +3791,7 @@ var qrcode = function() {
       if (o.cible) {
         const n = (enVol.get(o.cible) || 1) - 1;
         if (n > 0) enVol.set(o.cible, n);
-        else { enVol.delete(o.cible); document.querySelectorAll(o.cible).forEach((x) => { x.style.visibility = ''; x.animate([{ transform: 'scale(1.12)' }, { transform: 'scale(1)' }], { duration: 220 }); }); }
+        else { enVol.delete(o.cible); document.querySelectorAll(o.cible).forEach((x) => { x.style.visibility = ''; x.animate([{ scale: '1.12' }, { scale: '1' }], { duration: 220 }); }); }
       }
     };
     a.onfinish = fin; a.oncancel = fin;
@@ -3829,7 +3829,7 @@ var qrcode = function() {
       { transform: 'translate(-50%, -50%) rotate(-8deg) scale(1.1)', opacity: 0 },
     ], { duration: 1900, easing: 'ease-out' }).onfinish = () => t.remove();
   }
-  function pop(e, ampleur = 1.25, duree = 400) { if (e && !sansAnim) e.animate([{ transform: `scale(${ampleur})` }, { transform: 'scale(1)' }], { duration: duree, easing: 'cubic-bezier(.3,1.6,.5,1)' }); }
+  function pop(e, ampleur = 1.25, duree = 400) { if (e && !sansAnim) e.animate([{ scale: String(ampleur) }, { scale: '1' }], { duration: duree, easing: 'cubic-bezier(.3,1.6,.5,1)' }); }
 
   // Distribution : les cartes partent du centre vers chaque joueur, à tour de rôle.
   function distribuer(v) {
