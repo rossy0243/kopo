@@ -376,6 +376,12 @@ ul.regles { margin: 0; padding-left: 18px; display: grid; gap: 8px; color: var(-
 .choix button { border: 0; background: transparent; color: var(--ink); padding: 8px 10px; font-weight: 600; font-size: 13px; }
 .choix button[aria-pressed="true"] { background: var(--brass); color: #1d1606; }
 .reglages .bientot { opacity: .5; }
+/* Icônes au style Kopo (docs/icones-kopo.md) : carte à jouer, trait laiton, une touche de rouge */
+.ico-k { width: 24px; height: 24px; fill: none; stroke: #e2b04a; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; display: block; }
+.ico-k .fond { fill: var(--table-2, #183252); }
+.ico-k .acc { fill: #c7362f; stroke: none; }
+.ico-k.gris { stroke: var(--muted, #9fb2c8); }
+.btn.btn-ico { padding: 7px 9px; display: grid; place-items: center; }
 .reglages .version { color: var(--muted); font-size: 12px; text-align: center; }
 /* Cartes à 4 couleurs (plus lisibles, aide les daltoniens) */
 body.quatre-couleurs .carte[data-carte$="C"] { color: #c62828; }
@@ -390,7 +396,7 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
     <div class="info" id="info"></div>
     <div class="vocal" id="vocal" hidden></div>
     <button class="btn" id="btnPleinEcranEntete" hidden title="Plein écran" aria-label="Plein écran">⛶</button>
-    <button class="btn" id="btnParametres" title="Paramètres" aria-label="Paramètres">⚙</button>
+    <button class="btn btn-ico" id="btnParametres" title="Paramètres" aria-label="Paramètres"><svg class="ico-k" viewBox="0 0 32 32" aria-hidden="true"><rect x="8" y="4" width="16" height="24" rx="2.5"/><path d="M12 10h8M12 16h8M12 22h8"/><circle cx="15" cy="10" r="1.8" class="fond"/><circle cx="18.5" cy="16" r="1.8" class="fond"/><circle cx="14" cy="22" r="1.8" class="acc"/></svg></button>
     <button class="btn" id="btnQuitter" hidden>Quitter</button>
   </header>
   <div class="bandeau" id="bandeau" hidden></div>
@@ -1593,6 +1599,7 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
   }
 
   // Écran Paramètres. ouvrirParametres() peut aussi être appelé depuis l'accueil.
+  function iconeCadenas() { const t = document.createElement('template'); t.innerHTML = '<svg class="ico-k gris" viewBox="0 0 32 32" aria-hidden="true"><rect x="8" y="14" width="16" height="13" rx="2.5"/><path d="M11.5 14v-3.5a4.5 4.5 0 0 1 9 0V14M16 19v3"/></svg>'; return t.content.firstChild; }
   function ouvrirParametres() {
     const z = el('div', 'reglages');
     const titre = (t) => z.append(el('h3', null, t));
@@ -1626,7 +1633,7 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
     const ps = el('input', 'texte'); ps.maxLength = 16; ps.value = stock.lire('kopo-pseudo') || ''; ps.placeholder = 'Ex. Mundyo'; ps.setAttribute('aria-label', 'Pseudo');
     ps.onchange = () => { const p = ps.value.trim(); if (p.length >= 3) { stock.ecrire('kopo-pseudo', p); if ($('pseudo')) $('pseudo').value = p; toast('Pseudo enregistré. Il servira à ta prochaine partie.'); } else toast('Le pseudo fait au moins 3 caractères.'); };
     ligne('Pseudo', null, ps).style.flexWrap = 'wrap';
-    ligne('Connexion Google ou téléphone', 'Bientôt : pour garder tes pièces sur tous tes téléphones', el('span', 'bientot', '🔒')).classList.add('bientot');
+    ligne('Connexion Google ou téléphone', 'Bientôt : pour garder tes pièces sur tous tes téléphones', iconeCadenas()).classList.add('bientot');
     titre('Aide');
     const reinit = el('button', 'btn', 'Remettre les réglages par défaut');
     reinit.onclick = () => { Object.assign(prefs, PREFS_DEFAUT); enregistrerPrefs(); ouvrirParametres(); if (vueActuelle) afficher(vueActuelle); };
