@@ -12,7 +12,7 @@ function test(nom, fn) {
 
 function salleAvec(n, graine) {
   const s = S.creerSalle('ABCD', graine === undefined ? undefined : K.hasard(graine));
-  s.durees = { depart: 0, finTour: 0 }; // les pauses ont leurs propres tests
+  s.durees = { depart: 0, finTour: 0, mancheAuto: 0 }; // les pauses ont leurs propres tests
   for (let i = 1; i <= n; i++) assert.ok(S.recevoir(s, 'p' + i, { type: 'rejoindre', nom: 'Ami' + i }).ok);
   return s;
 }
@@ -292,7 +292,7 @@ console.log('\nPauses (compte à rebours, cartes laissées sur la table)');
 function sallePauses() {
   const s = salleAvec(3);
   let t = 0; s.horloge = () => t;
-  s.durees = { depart: 5000, finTour: 2000 };
+  s.durees = { depart: 5000, finTour: 5000, mancheAuto: 0 };
   S.recevoir(s, 'p1', { type: 'lancer' });
   return { s, avancer: (ms) => (t += ms) };
 }
@@ -321,7 +321,7 @@ function finDeTour() {
   }, 'p1');
   return { s, avancer };
 }
-test('Fin de tour : les cartes restent 2 s sur la table avec celui qui reprend la main', () => {
+test('Fin de tour : les cartes restent 5 s sur la table avec celui qui reprend la main', () => {
   const { s, avancer } = finDeTour();
   for (const [j, c] of [['p1', '2P'], ['p2', '9P'], ['p3', '5P']]) assert.ok(S.recevoir(s, j, { type: 'action', action: { type: 'jouer', carte: c } }).ok);
   const v = S.vue(s, 'p1');
@@ -329,7 +329,8 @@ test('Fin de tour : les cartes restent 2 s sur la table avec celui qui reprend l
   assert.deepStrictEqual(v.manche.table.map((p) => p.cartes[0]), ['2P', '9P', '5P']);
   assert.deepStrictEqual(v.manche.pause.annonce, { type: 'suivi', gagnant: 'p2', carte: '9P', meneur: 'p2' });
   assert.ok(!S.recevoir(s, 'p2', { type: 'action', action: { type: 'jouer', carte: '2K' } }).ok, 'on attend');
-  avancer(2000); assert.ok(S.tic(s));
+  avancer(4999); assert.ok(!S.tic(s));
+  avancer(1); assert.ok(S.tic(s));
   assert.strictEqual(S.vue(s, 'p1').manche.table.length, 0);
   assert.ok(S.recevoir(s, 'p2', { type: 'action', action: { type: 'jouer', carte: '2K' } }).ok);
 });
@@ -349,13 +350,13 @@ test('La dernière séquence de la manche reste visible avant le bilan', () => {
   S.recevoir(s, 'p1', { type: 'action', action: { type: 'toutPoser' } });
   assert.strictEqual(s.etat, 'manche');
   assert.strictEqual(S.vue(s, 'p2').manche.pause.annonce.type, 'sortie');
-  avancer(2000); S.tic(s);
+  avancer(5000); S.tic(s);
   assert.strictEqual(s.etat, 'finPartie');
 });
 test('Partie complète avec les pauses, robots et chrono', () => {
   const s = salleAvec(1, 5);
   let t = 0; s.horloge = () => t;
-  s.durees = { depart: 5000, finTour: 2000 };
+  s.durees = { depart: 5000, finTour: 5000, mancheAuto: 0 };
   for (let i = 0; i < 5; i++) S.recevoir(s, 'p1', { type: 'ajouterRobot' });
   S.recevoir(s, 'p1', { type: 'lancer' });
   let n = 0;
@@ -364,6 +365,83 @@ test('Partie complète avec les pauses, robots et chrono', () => {
     if (s.etat === 'finManche') { S.recevoir(s, 'p1', { type: 'mancheSuivante' }); continue; }
     t += 250; S.tic(s);
   }
+});
+
+console.log('\nJoueur absent et manche suivante automatique');
+function salleLente() {
+  const s = salleAvec(3);
+  let t = 0; s.horloge = () => t;
+  S.recevoir(s, 'p1', { type: 'reglages', delai: 15 });
+  S.recevoir(s, 'p1', { type: 'lancer' });
+  s.manche = K.nouvelleManche(['p1', 'p2', 'p3'], {
+    p1: ['2P', '3P', '4C', '5C'], p2: ['6P', '7P', '6C', '7C'], p3: ['8P', '9P', '8C', '9C'],
+  }, 'p2');
+  s.echeance = t + 15000; s.chronoTotal = 15000;
+  return { s, avancer: (ms) => (t += ms) };
+}
+test("Après 2 temps écoulés d'affilée, le joueur n'a plus que 5 s, jusqu'à ce qu'il rejoue", () => {
+  const { s, avancer } = salleLente();
+  avancer(15000); assert.ok(S.tic(s)); // 1er temps écoulé (p2 ouvre automatiquement)
+  // p3 et p1 jouent, la main revient à p2 au tour suivant
+  for (let k = 0; k < 10 && s.manche.joueurCourant !== 'p2'; k++) {
+    const j = s.manche.joueurCourant;
+    const a = S.vue(s, j).manche.actions.filter((x) => x.type !== 'katapss');
+    if (a.length) S.recevoir(s, j, { type: 'action', action: a[0] }); else { avancer(5000); S.tic(s); }
+  }
+  assert.strictEqual(s.manche.joueurCourant, 'p2');
+  assert.strictEqual(S.vue(s, 'p1').chrono.totalMs, 15000, 'un seul temps écoulé : toujours 15 s');
+  avancer(15000); assert.ok(S.tic(s)); // 2e temps écoulé
+  assert.strictEqual(s.expirations.p2, 2);
+  assert.ok(S.vue(s, 'p1').joueurs.find((j) => j.id === 'p2').absent);
+  s.manche.joueurCourant = 'p2'; s.manche.phase = s.manche.phase; // on lui redonne la main pour mesurer
+  s.echeance = null; S.tic(s);
+  assert.strictEqual(S.vue(s, 'p1').chrono.totalMs, 5000);
+  S.recevoir(s, 'p2', { type: 'rejoindre' });
+  assert.ok(!S.vue(s, 'p1').joueurs.find((j) => j.id === 'p2').absent, 'revenu');
+});
+test("Un joueur qui se déconnecte pendant son tour n'a plus que 5 s", () => {
+  const { s, avancer } = salleLente();
+  avancer(2000);
+  S.deconnecter(s, 'p2');
+  S.tic(s);
+  assert.strictEqual(S.vue(s, 'p1').chrono.resteMs, 5000);
+  avancer(5000); assert.ok(S.tic(s));
+  assert.strictEqual(s.manche.table.length, 1, 'p2 a joué automatiquement');
+});
+test('Même sans chrono, un joueur déconnecté ne bloque pas la partie', () => {
+  const s = salleAvec(3);
+  let t = 0; s.horloge = () => t;
+  S.recevoir(s, 'p1', { type: 'reglages', delai: 0 });
+  S.recevoir(s, 'p1', { type: 'lancer' });
+  const j = s.manche.joueurCourant;
+  assert.strictEqual(S.vue(s, j).chrono, null);
+  S.deconnecter(s, j);
+  S.tic(s);
+  assert.strictEqual(S.vue(s, 'p1').chrono.resteMs, 5000);
+  t += 5000; assert.ok(S.tic(s));
+});
+test("Reconnexion : le joueur retrouve son temps normal", () => {
+  const { s } = salleLente();
+  S.deconnecter(s, 'p3');
+  assert.ok(S.vue(s, 'p1').joueurs.find((j) => j.id === 'p3').absent);
+  S.reconnecter(s, 'p3');
+  assert.ok(!S.vue(s, 'p1').joueurs.find((j) => j.id === 'p3').absent);
+});
+test("La manche suivante se lance seule après 10 s, ou plus tôt par l'hôte", () => {
+  const s = salleAvec(3);
+  let t = 0; s.horloge = () => t;
+  s.durees.mancheAuto = 10000;
+  S.recevoir(s, 'p1', { type: 'lancer' });
+  s.manche = K.nouvelleManche(['p1', 'p2', 'p3'], { p1: ['2P', '3P', '4P', '5P'], p2: ['2C', '3C', '4C', '5C'], p3: ['6P', '6C', '6K', '6T'] }, 'p3');
+  S.recevoir(s, 'p1', { type: 'action', action: { type: 'katapss' } });
+  S.recevoir(s, 'p2', { type: 'action', action: { type: 'katapss' } });
+  assert.strictEqual(s.etat, 'finManche');
+  assert.strictEqual(S.vue(s, 'p2').suite.resteMs, 10000);
+  t += 9999; assert.ok(!S.tic(s));
+  t += 1; assert.ok(S.tic(s));
+  assert.strictEqual(s.etat, 'manche');
+  assert.strictEqual(s.numeroManche, 2);
+  assert.strictEqual(S.vue(s, 'p2').suite, null);
 });
 
 console.log('\nMélange');

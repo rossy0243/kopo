@@ -136,6 +136,7 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
 .decompte { font-family: var(--display); font-size: 72px; line-height: 1; color: var(--brass); }
 .depart-qui { font-size: 20px; font-weight: 600; }
 .meneur { color: var(--brass); }
+.suite-auto strong { color: var(--brass); font-size: 20px; font-variant-numeric: tabular-nums; }
 .chrono.barre-pause span { background: var(--muted); }
 .toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: #2a1716; color: #ffd7d3; border: 1px solid var(--bad); border-radius: 10px; padding: 10px 14px; z-index: 20; max-width: 90vw; font-size: 14px; }
 </style>
@@ -374,7 +375,7 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
         hote.vus.set(id, Date.now());
         if (msg && msg.type === 'ping') {
           const j = salle.joueurs.find((x) => x.id === id);
-          if (j && !j.connecte && !j.robot) { j.connecte = true; diffuser(); }
+          if (j && !j.connecte && !j.robot) { S.reconnecter(salle, id); diffuser(); }
           else hote.reseau.envoyer(id, { type: 'pong' });
           return;
         }
@@ -605,6 +606,7 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
           d.append(b);
         }
       } else if (joueur.remplace) d.append(el('span', 'pastille neutre', 'remplacé'));
+      else if (joueur.absent && m.enJeu.includes(id)) d.append(el('span', 'pastille ko', 'absent · 5 s'));
       box.append(d);
     });
 
@@ -710,12 +712,14 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
   let finChrono = null, totalChrono = 0;
   function demarrerChrono(v) {
     const p = v.manche && v.manche.pause;
-    const c = p ? { resteMs: p.resteMs, totalMs: p.totalMs } : v.chrono;
+    const c = p ? { resteMs: p.resteMs, totalMs: p.totalMs } : v.etat === 'finManche' ? v.suite : v.chrono;
     finChrono = c ? performance.now() + c.resteMs : null;
     totalChrono = c ? c.totalMs : 0;
   }
   function majChrono() {
     if (finChrono == null) return;
+    const ds = document.querySelector('.decompte-suite');
+    if (ds) ds.textContent = Math.max(0, Math.ceil((finChrono - performance.now()) / 1000));
     const d = document.querySelector('.decompte');
     if (d) d.textContent = Math.max(1, Math.ceil((finChrono - performance.now()) / 1000));
     const reste = Math.max(0, finChrono - performance.now());
@@ -856,11 +860,16 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
     const li = el('li'); li.append(el('span', null, nom(v, m.elimine)), el('span', 'pastille ko', 'éliminé')); ul.append(li);
     const contenu = [el('h2', null, `Fin de la manche ${v.numeroManche}`), el('p', null, m.elimine === v.moi ? 'Tu es éliminé. Tu peux continuer à regarder la partie.' : `${nom(v, m.elimine)} est éliminé.`), ul];
     const suivants = v.restants.length;
+    if (v.suite) {
+      const p = el('p', 'suite-auto');
+      p.append(suivants === 2 ? 'La finale démarre dans ' : 'La manche suivante démarre dans ', el('strong', 'decompte-suite', String(Math.ceil(v.suite.resteMs / 1000))), ' s.');
+      contenu.push(p);
+    }
     if (v.hote === v.moi) {
-      const b = el('button', 'btn principal large', suivants === 2 ? 'Lancer la finale' : `Manche suivante (${suivants} joueurs)`);
+      const b = el('button', 'btn principal large', 'Lancer maintenant' + (suivants === 2 ? ' la finale' : ''));
       b.onclick = () => envoyer({ type: 'mancheSuivante' });
       contenu.push(b);
-    } else contenu.push(el('p', null, "En attente de l'hôte pour la manche suivante…"));
+    } else if (!v.suite) contenu.push(el('p', null, "En attente de l'hôte pour la manche suivante…"));
     ouvrirFenetre(contenu);
   }
 

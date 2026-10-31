@@ -9,7 +9,8 @@
   const MIN = 2, MAX = 9;
   const DELAIS = [0, 3, 5, 10, 15]; // secondes par tour (0 = sans chrono)
   const PAUSE_ROBOT = 1200; // un robot réfléchit 1,2 s avant de jouer
-  const DUREES = { depart: 5000, finTour: 2000 }; // compte à rebours de départ, cartes laissées sur la table
+  const DUREES = { depart: 5000, finTour: 5000, mancheAuto: 10000 }; // compte à rebours de départ, cartes laissées sur la table, manche suivante automatique
+  const DELAI_ABSENT = 5; // secondes accordées à un joueur déconnecté ou absent (2 temps écoulés d'affilée)
 
   // Hasard de qualité cryptographique quand le navigateur le permet.
   function hasardFort() {
@@ -35,6 +36,9 @@
       robotPret: null, // instant (ms) où un robot peut agir
       pause: null, // { type: 'depart' | 'finTour', jusqua, total, table?, annonce? } : personne ne joue
       durees: Object.assign({}, DUREES),
+      expirations: {}, // id -> nombre de temps écoulés d'affilée
+      chronoTotal: 0,
+      suiteA: null, // instant (ms) où la manche suivante se lance seule
       horloge: Date.now,
       rng: rng || hasardFort(),
     };
@@ -69,9 +73,23 @@
   function armerChrono(s) {
     const m = s.manche;
     const enCours = s.etat === 'manche' && m && m.phase !== 'terminee' && !s.pause;
-    s.echeance = s.delai && enCours ? s.horloge() + s.delai * 1000 : null;
+    const d = enCours ? delaiPour(s, m.joueurCourant) : 0;
+    s.echeance = d ? s.horloge() + d * 1000 : null;
+    s.chronoTotal = d * 1000;
     s.robotPret = enCours ? s.horloge() + PAUSE_ROBOT : null;
   }
+
+  // Un joueur déconnecté, ou dont le temps s'est écoulé deux fois d'affilée, n'a plus
+  // que 5 s par tour (même sans chrono) jusqu'à ce qu'il revienne ou joue lui-même.
+  function estAbsent(s, id) {
+    const j = s.joueurs.find((x) => x.id === id);
+    return !!j && !j.robot && (!j.connecte || (s.expirations[id] || 0) >= 2);
+  }
+  function delaiPour(s, id) {
+    if (!estAbsent(s, id)) return s.delai;
+    return s.delai ? Math.min(s.delai, DELAI_ABSENT) : DELAI_ABSENT;
+  }
+  function revenu(s, id) { s.expirations[id] = 0; }
 
   // Coup joué automatiquement quand le temps est écoulé (ou le joueur hors ligne) :
   // en suite il ramasse (pioche) ; en ouverture, où il n'y a rien à ramasser,
@@ -127,6 +145,7 @@
 
   // À appeler régulièrement par l'hôte. Renvoie true si un coup automatique a été joué.
   function tic(s) {
+    if (s.etat === 'finManche' && s.suiteA && s.horloge() >= s.suiteA) { demarrerManche(s); return true; }
     if (s.etat !== 'manche') return false;
     const m = s.manche;
     if (s.pause) {
@@ -145,8 +164,14 @@
         if (a) { appliquer(s, a); return true; }
       }
     }
+    // Le joueur courant vient de se déconnecter : son temps est ramené à 5 s.
+    if (m.joueurCourant && estAbsent(s, m.joueurCourant)) {
+      const limite = s.horloge() + delaiPour(s, m.joueurCourant) * 1000;
+      if (!s.echeance || s.echeance > limite) { s.echeance = limite; s.chronoTotal = delaiPour(s, m.joueurCourant) * 1000; }
+    }
     if (!s.echeance || s.horloge() < s.echeance) return false;
     const j = m.joueurCourant;
+    s.expirations[j] = (s.expirations[j] || 0) + 1;
     const action = coupAutomatique(m, j);
     if (!action) { armerChrono(s); return false; }
     m.journal.push(`Temps écoulé pour ${j} : coup automatique.`);
@@ -167,6 +192,7 @@
     sieges.forEach((j, i) => (mains[j] = paquet.slice(i * 4, i * 4 + 4)));
     const premier = sieges[Math.floor(s.rng() * sieges.length)];
     s.numeroManche++;
+    s.suiteA = null;
     s.manche = K.nouvelleManche(sieges, mains, premier);
     s.etat = 'manche';
     // Compte à rebours : chacun découvre ses cartes et qui commence.
@@ -184,6 +210,7 @@
       s.etat = 'finPartie';
     } else {
       s.etat = 'finManche';
+      s.suiteA = s.durees.mancheAuto > 0 ? s.horloge() + s.durees.mancheAuto : null; // l'hôte peut lancer plus tôt
     }
   }
 
@@ -195,6 +222,7 @@
     switch (msg && msg.type) {
       case 'rejoindre': {
         if (joueur) {
+          revenu(s, id);
           if (joueur.robot && joueur.remplace) { joueur.robot = false; joueur.remplace = false; } // le joueur reprend sa place
           joueur.connecte = true;
           if (typeof msg.peerId === 'string') joueur.peerId = msg.peerId.slice(0, 64);
@@ -276,6 +304,7 @@
         if (a.carte) action.carte = a.carte;
         try {
           appliquer(s, action);
+          revenu(s, id);
         } catch (e) {
           // Clic devenu périmé (ex. Katapss déjà annoncé par un autre) : on ignore.
           return { ok: false, erreur: 'Action impossible maintenant.' };
@@ -290,6 +319,10 @@
   function deconnecter(s, id) {
     const j = s.joueurs.find((x) => x.id === id);
     if (j && !j.robot) j.connecte = false;
+  }
+  function reconnecter(s, id) {
+    const j = s.joueurs.find((x) => x.id === id);
+    if (j && !j.robot) { j.connecte = true; revenu(s, id); }
   }
 
   // Remplace les identifiants par les pseudos dans le journal.
@@ -308,9 +341,10 @@
       etat: s.etat,
       moi: id,
       hote: s.hote,
-      joueurs: s.joueurs.map((j) => ({ id: j.id, nom: j.nom, connecte: j.connecte, peerId: j.peerId || null, voix: !!j.voix, muet: j.muet !== false, robot: !!j.robot, remplace: !!j.remplace })),
+      joueurs: s.joueurs.map((j) => ({ id: j.id, nom: j.nom, connecte: j.connecte, peerId: j.peerId || null, voix: !!j.voix, muet: j.muet !== false, robot: !!j.robot, remplace: !!j.remplace, absent: estAbsent(s, j.id) })),
       delai: s.delai,
-      chrono: s.echeance && s.etat === 'manche' ? { resteMs: Math.max(0, s.echeance - s.horloge()), totalMs: s.delai * 1000 } : null,
+      chrono: s.echeance && s.etat === 'manche' ? { resteMs: Math.max(0, s.echeance - s.horloge()), totalMs: s.chronoTotal || s.delai * 1000 } : null,
+      suite: s.etat === 'finManche' && s.suiteA ? { resteMs: Math.max(0, s.suiteA - s.horloge()), totalMs: s.durees.mancheAuto } : null,
       restants: s.restants.slice(),
       elimines: s.elimines.slice(),
       numeroManche: s.numeroManche,
@@ -351,7 +385,7 @@
     return s;
   }
 
-  const KopoSalle = { MIN, MAX, DELAIS, PAUSE_ROBOT, DUREES, creerSalle, choixRobot, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
+  const KopoSalle = { MIN, MAX, DELAIS, PAUSE_ROBOT, DUREES, creerSalle, choixRobot, reconnecter, DELAI_ABSENT, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
   if (typeof module !== 'undefined' && module.exports) module.exports = KopoSalle;
   else root.KopoSalle = KopoSalle;
 })(typeof window !== 'undefined' ? window : globalThis);

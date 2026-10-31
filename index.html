@@ -136,6 +136,7 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
 .decompte { font-family: var(--display); font-size: 72px; line-height: 1; color: var(--brass); }
 .depart-qui { font-size: 20px; font-weight: 600; }
 .meneur { color: var(--brass); }
+.suite-auto strong { color: var(--brass); font-size: 20px; font-variant-numeric: tabular-nums; }
 .chrono.barre-pause span { background: var(--muted); }
 .toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: #2a1716; color: #ffd7d3; border: 1px solid var(--bad); border-radius: 10px; padding: 10px 14px; z-index: 20; max-width: 90vw; font-size: 14px; }
 </style>
@@ -2859,7 +2860,8 @@ var qrcode = function() {
   const MIN = 2, MAX = 9;
   const DELAIS = [0, 3, 5, 10, 15]; // secondes par tour (0 = sans chrono)
   const PAUSE_ROBOT = 1200; // un robot réfléchit 1,2 s avant de jouer
-  const DUREES = { depart: 5000, finTour: 2000 }; // compte à rebours de départ, cartes laissées sur la table
+  const DUREES = { depart: 5000, finTour: 5000, mancheAuto: 10000 }; // compte à rebours de départ, cartes laissées sur la table, manche suivante automatique
+  const DELAI_ABSENT = 5; // secondes accordées à un joueur déconnecté ou absent (2 temps écoulés d'affilée)
 
   // Hasard de qualité cryptographique quand le navigateur le permet.
   function hasardFort() {
@@ -2885,6 +2887,9 @@ var qrcode = function() {
       robotPret: null, // instant (ms) où un robot peut agir
       pause: null, // { type: 'depart' | 'finTour', jusqua, total, table?, annonce? } : personne ne joue
       durees: Object.assign({}, DUREES),
+      expirations: {}, // id -> nombre de temps écoulés d'affilée
+      chronoTotal: 0,
+      suiteA: null, // instant (ms) où la manche suivante se lance seule
       horloge: Date.now,
       rng: rng || hasardFort(),
     };
@@ -2919,9 +2924,23 @@ var qrcode = function() {
   function armerChrono(s) {
     const m = s.manche;
     const enCours = s.etat === 'manche' && m && m.phase !== 'terminee' && !s.pause;
-    s.echeance = s.delai && enCours ? s.horloge() + s.delai * 1000 : null;
+    const d = enCours ? delaiPour(s, m.joueurCourant) : 0;
+    s.echeance = d ? s.horloge() + d * 1000 : null;
+    s.chronoTotal = d * 1000;
     s.robotPret = enCours ? s.horloge() + PAUSE_ROBOT : null;
   }
+
+  // Un joueur déconnecté, ou dont le temps s'est écoulé deux fois d'affilée, n'a plus
+  // que 5 s par tour (même sans chrono) jusqu'à ce qu'il revienne ou joue lui-même.
+  function estAbsent(s, id) {
+    const j = s.joueurs.find((x) => x.id === id);
+    return !!j && !j.robot && (!j.connecte || (s.expirations[id] || 0) >= 2);
+  }
+  function delaiPour(s, id) {
+    if (!estAbsent(s, id)) return s.delai;
+    return s.delai ? Math.min(s.delai, DELAI_ABSENT) : DELAI_ABSENT;
+  }
+  function revenu(s, id) { s.expirations[id] = 0; }
 
   // Coup joué automatiquement quand le temps est écoulé (ou le joueur hors ligne) :
   // en suite il ramasse (pioche) ; en ouverture, où il n'y a rien à ramasser,
@@ -2977,6 +2996,7 @@ var qrcode = function() {
 
   // À appeler régulièrement par l'hôte. Renvoie true si un coup automatique a été joué.
   function tic(s) {
+    if (s.etat === 'finManche' && s.suiteA && s.horloge() >= s.suiteA) { demarrerManche(s); return true; }
     if (s.etat !== 'manche') return false;
     const m = s.manche;
     if (s.pause) {
@@ -2995,8 +3015,14 @@ var qrcode = function() {
         if (a) { appliquer(s, a); return true; }
       }
     }
+    // Le joueur courant vient de se déconnecter : son temps est ramené à 5 s.
+    if (m.joueurCourant && estAbsent(s, m.joueurCourant)) {
+      const limite = s.horloge() + delaiPour(s, m.joueurCourant) * 1000;
+      if (!s.echeance || s.echeance > limite) { s.echeance = limite; s.chronoTotal = delaiPour(s, m.joueurCourant) * 1000; }
+    }
     if (!s.echeance || s.horloge() < s.echeance) return false;
     const j = m.joueurCourant;
+    s.expirations[j] = (s.expirations[j] || 0) + 1;
     const action = coupAutomatique(m, j);
     if (!action) { armerChrono(s); return false; }
     m.journal.push(`Temps écoulé pour ${j} : coup automatique.`);
@@ -3017,6 +3043,7 @@ var qrcode = function() {
     sieges.forEach((j, i) => (mains[j] = paquet.slice(i * 4, i * 4 + 4)));
     const premier = sieges[Math.floor(s.rng() * sieges.length)];
     s.numeroManche++;
+    s.suiteA = null;
     s.manche = K.nouvelleManche(sieges, mains, premier);
     s.etat = 'manche';
     // Compte à rebours : chacun découvre ses cartes et qui commence.
@@ -3034,6 +3061,7 @@ var qrcode = function() {
       s.etat = 'finPartie';
     } else {
       s.etat = 'finManche';
+      s.suiteA = s.durees.mancheAuto > 0 ? s.horloge() + s.durees.mancheAuto : null; // l'hôte peut lancer plus tôt
     }
   }
 
@@ -3045,6 +3073,7 @@ var qrcode = function() {
     switch (msg && msg.type) {
       case 'rejoindre': {
         if (joueur) {
+          revenu(s, id);
           if (joueur.robot && joueur.remplace) { joueur.robot = false; joueur.remplace = false; } // le joueur reprend sa place
           joueur.connecte = true;
           if (typeof msg.peerId === 'string') joueur.peerId = msg.peerId.slice(0, 64);
@@ -3126,6 +3155,7 @@ var qrcode = function() {
         if (a.carte) action.carte = a.carte;
         try {
           appliquer(s, action);
+          revenu(s, id);
         } catch (e) {
           // Clic devenu périmé (ex. Katapss déjà annoncé par un autre) : on ignore.
           return { ok: false, erreur: 'Action impossible maintenant.' };
@@ -3140,6 +3170,10 @@ var qrcode = function() {
   function deconnecter(s, id) {
     const j = s.joueurs.find((x) => x.id === id);
     if (j && !j.robot) j.connecte = false;
+  }
+  function reconnecter(s, id) {
+    const j = s.joueurs.find((x) => x.id === id);
+    if (j && !j.robot) { j.connecte = true; revenu(s, id); }
   }
 
   // Remplace les identifiants par les pseudos dans le journal.
@@ -3158,9 +3192,10 @@ var qrcode = function() {
       etat: s.etat,
       moi: id,
       hote: s.hote,
-      joueurs: s.joueurs.map((j) => ({ id: j.id, nom: j.nom, connecte: j.connecte, peerId: j.peerId || null, voix: !!j.voix, muet: j.muet !== false, robot: !!j.robot, remplace: !!j.remplace })),
+      joueurs: s.joueurs.map((j) => ({ id: j.id, nom: j.nom, connecte: j.connecte, peerId: j.peerId || null, voix: !!j.voix, muet: j.muet !== false, robot: !!j.robot, remplace: !!j.remplace, absent: estAbsent(s, j.id) })),
       delai: s.delai,
-      chrono: s.echeance && s.etat === 'manche' ? { resteMs: Math.max(0, s.echeance - s.horloge()), totalMs: s.delai * 1000 } : null,
+      chrono: s.echeance && s.etat === 'manche' ? { resteMs: Math.max(0, s.echeance - s.horloge()), totalMs: s.chronoTotal || s.delai * 1000 } : null,
+      suite: s.etat === 'finManche' && s.suiteA ? { resteMs: Math.max(0, s.suiteA - s.horloge()), totalMs: s.durees.mancheAuto } : null,
       restants: s.restants.slice(),
       elimines: s.elimines.slice(),
       numeroManche: s.numeroManche,
@@ -3201,7 +3236,7 @@ var qrcode = function() {
     return s;
   }
 
-  const KopoSalle = { MIN, MAX, DELAIS, PAUSE_ROBOT, DUREES, creerSalle, choixRobot, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
+  const KopoSalle = { MIN, MAX, DELAIS, PAUSE_ROBOT, DUREES, creerSalle, choixRobot, reconnecter, DELAI_ABSENT, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
   if (typeof module !== 'undefined' && module.exports) module.exports = KopoSalle;
   else root.KopoSalle = KopoSalle;
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -3360,7 +3395,7 @@ var qrcode = function() {
         hote.vus.set(id, Date.now());
         if (msg && msg.type === 'ping') {
           const j = salle.joueurs.find((x) => x.id === id);
-          if (j && !j.connecte && !j.robot) { j.connecte = true; diffuser(); }
+          if (j && !j.connecte && !j.robot) { S.reconnecter(salle, id); diffuser(); }
           else hote.reseau.envoyer(id, { type: 'pong' });
           return;
         }
@@ -3591,6 +3626,7 @@ var qrcode = function() {
           d.append(b);
         }
       } else if (joueur.remplace) d.append(el('span', 'pastille neutre', 'remplacé'));
+      else if (joueur.absent && m.enJeu.includes(id)) d.append(el('span', 'pastille ko', 'absent · 5 s'));
       box.append(d);
     });
 
@@ -3696,12 +3732,14 @@ var qrcode = function() {
   let finChrono = null, totalChrono = 0;
   function demarrerChrono(v) {
     const p = v.manche && v.manche.pause;
-    const c = p ? { resteMs: p.resteMs, totalMs: p.totalMs } : v.chrono;
+    const c = p ? { resteMs: p.resteMs, totalMs: p.totalMs } : v.etat === 'finManche' ? v.suite : v.chrono;
     finChrono = c ? performance.now() + c.resteMs : null;
     totalChrono = c ? c.totalMs : 0;
   }
   function majChrono() {
     if (finChrono == null) return;
+    const ds = document.querySelector('.decompte-suite');
+    if (ds) ds.textContent = Math.max(0, Math.ceil((finChrono - performance.now()) / 1000));
     const d = document.querySelector('.decompte');
     if (d) d.textContent = Math.max(1, Math.ceil((finChrono - performance.now()) / 1000));
     const reste = Math.max(0, finChrono - performance.now());
@@ -3842,11 +3880,16 @@ var qrcode = function() {
     const li = el('li'); li.append(el('span', null, nom(v, m.elimine)), el('span', 'pastille ko', 'éliminé')); ul.append(li);
     const contenu = [el('h2', null, `Fin de la manche ${v.numeroManche}`), el('p', null, m.elimine === v.moi ? 'Tu es éliminé. Tu peux continuer à regarder la partie.' : `${nom(v, m.elimine)} est éliminé.`), ul];
     const suivants = v.restants.length;
+    if (v.suite) {
+      const p = el('p', 'suite-auto');
+      p.append(suivants === 2 ? 'La finale démarre dans ' : 'La manche suivante démarre dans ', el('strong', 'decompte-suite', String(Math.ceil(v.suite.resteMs / 1000))), ' s.');
+      contenu.push(p);
+    }
     if (v.hote === v.moi) {
-      const b = el('button', 'btn principal large', suivants === 2 ? 'Lancer la finale' : `Manche suivante (${suivants} joueurs)`);
+      const b = el('button', 'btn principal large', 'Lancer maintenant' + (suivants === 2 ? ' la finale' : ''));
       b.onclick = () => envoyer({ type: 'mancheSuivante' });
       contenu.push(b);
-    } else contenu.push(el('p', null, "En attente de l'hôte pour la manche suivante…"));
+    } else if (!v.suite) contenu.push(el('p', null, "En attente de l'hôte pour la manche suivante…"));
     ouvrirFenetre(contenu);
   }
 
