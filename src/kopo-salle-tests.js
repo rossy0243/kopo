@@ -145,6 +145,130 @@ test("L'hôte rejoue une partie avec les mêmes joueurs", () => {
   assert.strictEqual(s.etat, 'salon');
   assert.strictEqual(s.joueurs.length, 3);
 });
+console.log('\nRevanche');
+function finie(n, graine) {
+  const s = salleAvec(n, graine);
+  let t = 1000; s.horloge = () => t; s.avancer = (ms) => (t += ms);
+  s.durees.revanche = 15000;
+  S.recevoir(s, 'p1', { type: 'lancer' });
+  jouerPartieParLesVues(s, K.hasard(graine || 1));
+  return s;
+}
+test('Tout le monde accepte : la partie repart aussitôt, à la même table', () => {
+  const s = finie(3, 11);
+  assert.ok(S.recevoir(s, 'p2', { type: 'revanche' }).ok);
+  assert.strictEqual(s.etat, 'finPartie');
+  assert.deepStrictEqual(S.vue(s, 'p1').revanche.oui, ['p2']);
+  S.recevoir(s, 'p1', { type: 'revanche' });
+  S.recevoir(s, 'p3', { type: 'revanche' });
+  assert.strictEqual(s.etat, 'manche');
+  assert.strictEqual(s.numeroManche, 1);
+  assert.strictEqual(s.manche.sieges.length, 3);
+  assert.deepStrictEqual(s.elimines, []);
+  assert.strictEqual(s.vainqueur, null);
+});
+test('Deux acceptent, un refuse : la revanche part sans lui', () => {
+  const s = finie(3, 12);
+  S.recevoir(s, 'p1', { type: 'revanche' });
+  S.recevoir(s, 'p2', { type: 'revancheNon' });
+  assert.strictEqual(s.etat, 'finPartie');
+  S.recevoir(s, 'p3', { type: 'revanche' });
+  assert.strictEqual(s.etat, 'manche');
+  assert.deepStrictEqual(s.joueurs.map((j) => j.id).sort(), ['p1', 'p3']);
+  assert.deepStrictEqual(S.vue(s, 'p2').manche.actions, []);
+});
+test('Fin du temps : on part avec ceux qui ont accepté (au moins 2)', () => {
+  const s = finie(4, 13);
+  S.recevoir(s, 'p3', { type: 'revanche' });
+  S.recevoir(s, 'p4', { type: 'revanche' });
+  s.avancer(14000); assert.strictEqual(S.tic(s), false);
+  s.avancer(1500); assert.strictEqual(S.tic(s), true);
+  assert.strictEqual(s.etat, 'manche');
+  assert.deepStrictEqual(s.joueurs.map((j) => j.id).sort(), ['p3', 'p4']);
+  assert.strictEqual(s.hote, 'p3', "l'hôte parti, un joueur restant devient hôte");
+});
+test('Un seul joueur accepte : pas de revanche, on peut relancer l\'appel', () => {
+  const s = finie(3, 14);
+  S.recevoir(s, 'p1', { type: 'revanche' });
+  S.recevoir(s, 'p2', { type: 'revancheNon' });
+  S.recevoir(s, 'p3', { type: 'revancheNon' });
+  assert.strictEqual(s.etat, 'finPartie');
+  assert.strictEqual(S.vue(s, 'p1').revancheRatee, true);
+  assert.strictEqual(S.vue(s, 'p1').revanche, null);
+  assert.ok(S.recevoir(s, 'p2', { type: 'revanche' }).ok);
+  assert.strictEqual(S.vue(s, 'p1').revancheRatee, false);
+});
+test('Un joueur déconnecté ne bloque pas la revanche', () => {
+  const s = finie(3, 15);
+  S.deconnecter(s, 'p3');
+  S.recevoir(s, 'p1', { type: 'revanche' });
+  S.recevoir(s, 'p2', { type: 'revanche' });
+  assert.strictEqual(s.etat, 'manche');
+  assert.strictEqual(s.joueurs.length, 2);
+});
+test('Contre les robots : un seul geste suffit, les robots acceptent toujours', () => {
+  const s = salleAvec(1, 16);
+  let t = 1000; s.horloge = () => t;
+  S.recevoir(s, 'p1', { type: 'ajouterRobot' }); S.recevoir(s, 'p1', { type: 'ajouterRobot' });
+  S.recevoir(s, 'p1', { type: 'lancer' });
+  for (let i = 0; i < 20000 && s.etat !== 'finPartie'; i++) {
+    if (s.etat === 'finManche') { S.recevoir(s, 'p1', { type: 'mancheSuivante' }); continue; }
+    t += 2000;
+    const v = S.vue(s, 'p1');
+    const a = v.manche.actions.find((x) => x.type !== 'katapss');
+    if (v.manche.joueurCourant === 'p1' && a) S.recevoir(s, 'p1', { type: 'action', action: a }); else S.tic(s);
+  }
+  assert.strictEqual(s.etat, 'finPartie');
+  S.recevoir(s, 'p1', { type: 'revanche' });
+  assert.strictEqual(s.etat, 'manche');
+  assert.strictEqual(s.joueurs.length, 3);
+});
+test('Revanche refusée hors fin de partie, et par un inconnu', () => {
+  const s = salleAvec(2);
+  assert.strictEqual(S.recevoir(s, 'p1', { type: 'revanche' }).ok, false);
+  const f = finie(2, 17);
+  assert.strictEqual(S.recevoir(f, 'intrus', { type: 'revanche' }).ok, false);
+});
+
+console.log('\nPremière partie guidée');
+test('Robots gentils : seulement pour une partie privée, choisis par l\'hôte', () => {
+  const s = salleAvec(1);
+  assert.ok(S.recevoir(s, 'p1', { type: 'reglages', robots: 'gentils', delai: 0 }).ok);
+  assert.strictEqual(s.robots, 'gentils');
+  assert.strictEqual(s.delai, 0);
+  assert.strictEqual(S.recevoir(s, 'p1', { type: 'reglages', robots: 'mechants' }).ok, false);
+  const p = S.creerSalle('PUBL'); S.rendrePublique(p, 2); S.recevoir(p, 'a', { type: 'rejoindre', nom: 'A' });
+  assert.strictEqual(S.recevoir(p, 'a', { type: 'reglages', robots: 'gentils' }).ok, false);
+});
+test('Robots gentils : leurs coups sont toujours permis, et le joueur gagne plus souvent', () => {
+  const victoires = { normaux: 0, gentils: 0 };
+  for (const genre of ['normaux', 'gentils']) {
+    for (let k = 0; k < 300; k++) {
+      const s = salleAvec(1, 1000 + k);
+      let t = 1000; s.horloge = () => t;
+      S.recevoir(s, 'p1', { type: 'reglages', robots: genre, delai: 0 });
+      S.recevoir(s, 'p1', { type: 'ajouterRobot' }); S.recevoir(s, 'p1', { type: 'ajouterRobot' });
+      S.recevoir(s, 'p1', { type: 'lancer' });
+      const rng = K.hasard(k);
+      for (let i = 0; i < 20000 && s.etat !== 'finPartie'; i++) {
+        if (s.etat === 'finManche') { S.recevoir(s, 'p1', { type: 'mancheSuivante' }); continue; }
+        t += 2000;
+        const v = S.vue(s, 'p1');
+        const kat = v.manche.actions.find((x) => x.type === 'katapss');
+        if (kat) { S.recevoir(s, 'p1', { type: 'action', action: kat }); continue; }
+        const tout = v.manche.actions.find((x) => x.type === 'toutPoser');
+        const jouables = v.manche.actions.filter((x) => x.type === 'jouer').sort((a, b) => K.valeur(a.carte) - K.valeur(b.carte));
+        const a = tout || jouables[0] || v.manche.actions[0];
+        if (v.manche.joueurCourant === 'p1' && a) assert.ok(S.recevoir(s, 'p1', { type: 'action', action: a }).ok); else S.tic(s);
+      }
+      assert.strictEqual(s.etat, 'finPartie');
+      if (s.vainqueur === 'p1') victoires[genre]++;
+    }
+  }
+  console.log("      victoires du joueur sur 300 : " + JSON.stringify(victoires));
+  assert.ok(victoires.gentils > victoires.normaux * 1.2, JSON.stringify(victoires));
+});
+
 test("Sauvegarde et reprise si l'hôte recharge sa page", () => {
   const s = salleAvec(4, 9);
   S.recevoir(s, 'p1', { type: 'lancer' });

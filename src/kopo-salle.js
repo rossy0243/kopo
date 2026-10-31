@@ -9,7 +9,7 @@
   const MIN = 2, MAX = 9;
   const DELAIS = [0, 3, 5, 10, 15]; // secondes par tour (0 = sans chrono)
   const PAUSE_ROBOT = 1200; // un robot réfléchit 1,2 s avant de jouer
-  const DUREES = { depart: 5000, finTour: 5000, mancheAuto: 10000 }; // compte à rebours de départ, cartes laissées sur la table, manche suivante automatique
+  const DUREES = { depart: 5000, finTour: 5000, mancheAuto: 10000, revanche: 15000 }; // compte à rebours de départ, cartes laissées sur la table, manche suivante automatique, temps pour accepter la revanche
   const DELAI_ABSENT = 5; // secondes accordées à un joueur déconnecté ou absent (2 temps écoulés d'affilée)
 
   // Hasard de qualité cryptographique quand le navigateur le permet.
@@ -41,6 +41,9 @@
       suiteA: null, // instant (ms) où la manche suivante se lance seule
       publique: false, // partie ouverte aux inconnus (recherche de joueurs)
       taille: null, // partie publique : nombre de joueurs attendus (2 à 9), elle démarre quand la table est pleine
+      robots: 'normaux', // 'gentils' pour la première partie guidée
+      revanche: null, // fin de partie : { oui: [ids], non: [ids], jusqua } ; la partie repart si au moins 2 joueurs acceptent
+      revancheRatee: false,
       horloge: Date.now,
       rng: rng || hasardFort(),
     };
@@ -51,6 +54,7 @@
   // Robot : annonce Katapss, pose tout dès qu'il peut, ouvre dans sa couleur la plus longue
   // avec sa plus petite carte, suit avec sa plus petite carte, bluffe rarement.
   function choixRobot(s, j) {
+    if (s.robots === 'gentils') return choixRobotGentil(s, j);
     const m = s.manche;
     const actions = K.actionsPossibles(m, j);
     const k = actions.find((a) => a.type === 'katapss');
@@ -69,6 +73,22 @@
     if (s.rng() < 0.05) return actions.find((a) => a.type === 'ramasser');
     cartes.sort((a, b) => K.valeur(a.carte) - K.valeur(b.carte));
     return cartes[0];
+  }
+
+  // Robot gentil (première partie guidée) : il oublie souvent le Katapss, ne sort pas toujours
+  // quand il pourrait, gaspille ses fortes cartes et ramasse plus souvent. Il respecte les règles.
+  function choixRobotGentil(s, j) {
+    const m = s.manche;
+    const actions = K.actionsPossibles(m, j);
+    const k = actions.find((a) => a.type === 'katapss');
+    if (k && (j !== m.joueurCourant || s.rng() < 0.3)) return s.rng() < 0.3 ? k : null;
+    if (j !== m.joueurCourant) return null;
+    const cartes = actions.filter((a) => a.type === 'jouer').sort((a, b) => K.valeur(b.carte) - K.valeur(a.carte));
+    const tout = actions.find((a) => a.type === 'toutPoser');
+    if (tout && (!cartes.length || s.rng() < 0.35)) return tout;
+    const ramasser = actions.find((a) => a.type === 'ramasser');
+    if (ramasser && (!cartes.length || s.rng() < 0.3)) return ramasser;
+    return cartes[0] || tout || ramasser || null;
   }
 
   // Relance le chrono du joueur courant.
@@ -163,6 +183,7 @@
       return false;
     }
     if (s.etat === 'finManche' && s.suiteA && s.horloge() >= s.suiteA) { demarrerManche(s); return true; }
+    if (s.etat === 'finPartie') return verifierRevanche(s);
     if (s.etat !== 'manche') return false;
     const m = s.manche;
     if (s.pause) {
@@ -217,6 +238,44 @@
     armerChrono(s);
   }
 
+  // Remet la salle à zéro pour une nouvelle partie (mêmes joueurs).
+  function reinitialiser(s) {
+    s.restants = [];
+    s.elimines = [];
+    s.numeroManche = 0;
+    s.manche = null;
+    s.vainqueur = null;
+    s.echeance = null;
+    s.pause = null;
+    s.suiteA = null;
+    s.revanche = null;
+    s.revancheRatee = false;
+    s.expirations = {};
+  }
+
+  // Revanche : ceux qui acceptent (et les robots) rejouent tout de suite, à la même table.
+  // Elle part dès que tous les joueurs présents ont répondu, ou à la fin du temps.
+  const humainsPresents = (s) => s.joueurs.filter((j) => !j.robot && j.connecte);
+  function verifierRevanche(s) {
+    const r = s.revanche;
+    if (!r) return false;
+    const presents = humainsPresents(s);
+    const tousOntRepondu = presents.every((j) => r.oui.includes(j.id) || r.non.includes(j.id));
+    const finTemps = r.jusqua && s.horloge() >= r.jusqua;
+    if (!tousOntRepondu && !finTemps) return false;
+    const partants = s.joueurs.filter((j) => (j.robot && !j.remplace) || (r.oui.includes(j.id) && j.connecte && !j.robot));
+    if (partants.length < MIN || !partants.some((j) => !j.robot)) {
+      s.revanche = null;
+      s.revancheRatee = true;
+      return true;
+    }
+    s.joueurs = partants;
+    if (!partants.some((j) => j.id === s.hote)) s.hote = partants.find((j) => !j.robot).id;
+    reinitialiser(s);
+    lancer(s);
+    return true;
+  }
+
   function finirMancheSiBesoin(s) {
     const m = s.manche;
     if (!m || m.phase !== 'terminee' || s.etat !== 'manche') return;
@@ -225,6 +284,8 @@
     if (s.restants.length === 1) {
       s.vainqueur = s.restants[0];
       s.etat = 'finPartie';
+      s.revanche = null;
+      s.revancheRatee = false;
     } else {
       s.etat = 'finManche';
       s.suiteA = s.durees.mancheAuto > 0 ? s.horloge() + s.durees.mancheAuto : null; // l'hôte peut lancer plus tôt
@@ -287,8 +348,15 @@
         return { ok: true, evenement: { type: 'reaction', joueur: id, emoji } };
       }
       case 'reglages': {
-        if (id !== s.hote || s.etat !== 'salon' || !DELAIS.includes(msg.delai)) return { ok: false, erreur: 'Impossible.' };
-        s.delai = msg.delai;
+        if (id !== s.hote || s.etat !== 'salon') return { ok: false, erreur: 'Impossible.' };
+        if (msg.robots !== undefined) { // première partie guidée : robots gentils
+          if (s.publique || !['normaux', 'gentils'].includes(msg.robots)) return { ok: false, erreur: 'Impossible.' };
+          s.robots = msg.robots;
+        }
+        if (msg.delai !== undefined || msg.robots === undefined) {
+          if (!DELAIS.includes(msg.delai)) return { ok: false, erreur: 'Impossible.' };
+          s.delai = msg.delai;
+        }
         return { ok: true };
       }
       case 'micro': {
@@ -311,16 +379,22 @@
         demarrerManche(s);
         return { ok: true };
       }
-      case 'rejouer': {
+      case 'rejouer': { // retour au salon avec les mêmes joueurs (l'hôte peut en changer)
         if (id !== s.hote || s.etat !== 'finPartie') return { ok: false, erreur: 'Impossible.' };
         s.etat = 'salon';
-        s.restants = [];
-        s.elimines = [];
-        s.numeroManche = 0;
-        s.manche = null;
-        s.vainqueur = null;
-        s.echeance = null;
-        s.pause = null;
+        reinitialiser(s);
+        return { ok: true };
+      }
+      case 'revanche':
+      case 'revancheNon': {
+        if (s.etat !== 'finPartie' || !joueur || joueur.robot) return { ok: false, erreur: 'Impossible.' };
+        if (s.revancheRatee && msg.type === 'revanche') s.revancheRatee = false; // on peut relancer l'appel
+        const duree = s.durees.revanche === undefined ? DUREES.revanche : s.durees.revanche;
+        if (!s.revanche) s.revanche = { oui: [], non: [], jusqua: duree > 0 ? s.horloge() + duree : null };
+        const r = s.revanche;
+        r.oui = r.oui.filter((x) => x !== id); r.non = r.non.filter((x) => x !== id);
+        (msg.type === 'revanche' ? r.oui : r.non).push(id);
+        verifierRevanche(s);
         return { ok: true };
       }
       case 'action': {
@@ -375,6 +449,9 @@
       taille: s.taille,
       chrono: s.echeance && s.etat === 'manche' ? { resteMs: Math.max(0, s.echeance - s.horloge()), totalMs: s.chronoTotal || s.delai * 1000 } : null,
       suite: s.etat === 'finManche' && s.suiteA ? { resteMs: Math.max(0, s.suiteA - s.horloge()), totalMs: s.durees.mancheAuto } : null,
+      revanche: s.etat === 'finPartie' && s.revanche ? { oui: s.revanche.oui.slice(), non: s.revanche.non.slice(), resteMs: s.revanche.jusqua ? Math.max(0, s.revanche.jusqua - s.horloge()) : null, totalMs: s.durees.revanche === undefined ? DUREES.revanche : s.durees.revanche } : null,
+      revancheRatee: s.etat === 'finPartie' && !!s.revancheRatee,
+      robots: s.robots || 'normaux',
       restants: s.restants.slice(),
       elimines: s.elimines.slice(),
       numeroManche: s.numeroManche,
