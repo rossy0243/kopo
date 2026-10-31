@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#10233a">
+<title>Kopo · multijoueur</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --table: #10233a; --table-2: #183252; --ink: #eef2f7; --muted: #9fb2c8; --brass: #e2b04a;
+  --card: #fbf7ee; --card-ink: #1b2533; --red: #c7362f; --good: #3fbf7f; --bad: #ef6b5f;
+  --line: rgba(255,255,255,.12);
+  --display: "Bebas Neue", Impact, "Arial Narrow Bold", sans-serif;
+  --body: "Outfit", "Segoe UI", system-ui, -apple-system, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; min-height: 100%; }
+body {
+  background: radial-gradient(ellipse at 50% 20%, var(--table-2), var(--table) 70%) fixed, var(--table);
+  color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.4;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+button { font: inherit; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--brass); outline-offset: 2px; }
+[hidden] { display: none !important; }
+.app { max-width: 720px; margin: 0 auto; padding: 10px 12px 24px; display: grid; gap: 12px; }
+header { display: flex; align-items: center; gap: 10px; }
+.logo { font-family: var(--display); font-size: 36px; letter-spacing: 3px; color: var(--brass); line-height: 1; }
+.info { color: var(--muted); font-size: 14px; }
+.info strong { color: var(--ink); }
+header .btn { margin-left: auto; padding: 6px 10px; font-size: 13px; }
+.btn { border: 1px solid var(--line); background: rgba(255,255,255,.07); color: var(--ink); border-radius: 10px; padding: 11px 16px; font-weight: 600; }
+.btn:active:not(:disabled) { background: rgba(255,255,255,.14); }
+.btn:disabled { opacity: .35; cursor: not-allowed; }
+.btn.principal { background: var(--brass); color: #1d1606; border-color: var(--brass); }
+.btn.large { width: 100%; font-size: 17px; padding: 14px; }
+.btn.katapss { background: var(--red); border-color: var(--red); color: #fff; letter-spacing: 2px; font-family: var(--display); font-size: 30px; padding: 6px 18px; width: 100%; animation: pulse 1.6s ease-in-out infinite; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 8px rgba(199,54,47,.25); } }
+.bandeau { background: rgba(239,107,95,.15); color: var(--bad); border: 1px solid rgba(239,107,95,.4); border-radius: 10px; padding: 8px 12px; font-size: 14px; }
+.bandeau.info-hote { background: rgba(226,176,74,.1); color: var(--brass); border-color: rgba(226,176,74,.35); }
+
+/* Panneaux */
+.panneau { border: 1px solid var(--line); border-radius: 16px; padding: 18px; background: rgba(0,0,0,.22); display: grid; gap: 14px; }
+.panneau h2 { margin: 0; font-family: var(--display); font-size: 34px; letter-spacing: 2px; color: var(--brass); font-weight: 400; line-height: 1; }
+.panneau p { margin: 0; color: var(--muted); }
+label.champ { display: grid; gap: 5px; font-size: 14px; color: var(--muted); }
+input.texte { background: var(--table); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 12px; font: inherit; font-size: 17px; width: 100%; }
+input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; text-align: center; font-size: 24px; }
+.ou { text-align: center; color: var(--muted); font-size: 13px; }
+.rappel { font-size: 13px; color: var(--muted); }
+.rappel ul { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 3px; }
+
+/* Salon */
+.code-geant { font-family: var(--display); font-size: 64px; letter-spacing: 12px; color: var(--ink); text-align: center; line-height: 1; }
+.qr { display: grid; place-items: center; }
+.qr svg { width: 180px; height: 180px; background: #fff; border-radius: 10px; padding: 8px; }
+.lien { display: flex; gap: 8px; }
+.lien input { flex: 1; font-size: 13px; padding: 8px; }
+.liste-joueurs { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.liste-joueurs li { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; background: rgba(255,255,255,.03); }
+.liste-joueurs li .btn { margin-left: auto; padding: 4px 10px; font-size: 13px; }
+.pastille { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 99px; white-space: nowrap; }
+.pastille.ok { background: rgba(63,191,127,.18); color: var(--good); }
+.pastille.ko { background: rgba(239,107,95,.18); color: var(--bad); }
+.pastille.tour { background: var(--brass); color: #1d1606; }
+.pastille.neutre { background: rgba(255,255,255,.1); color: var(--muted); }
+
+/* Partie */
+.sieges { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 6px; }
+.siege { border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; background: rgba(0,0,0,.18); display: grid; gap: 3px; }
+.siege .nom { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.siege .dos { display: flex; gap: 2px; flex-wrap: wrap; min-height: 14px; }
+.siege .dos span { width: 9px; height: 13px; border-radius: 2px; background: repeating-linear-gradient(45deg, var(--brass) 0 3px, #9c7524 3px 6px); }
+.siege.courant { border-color: var(--brass); box-shadow: 0 0 0 2px var(--brass) inset; }
+.siege.sorti { opacity: .55; }
+.siege.vous { background: rgba(226,176,74,.09); }
+.table { border: 1px solid var(--line); border-radius: 18px; padding: 12px; background: rgba(0,0,0,.22); display: grid; gap: 10px; }
+.table-entete { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.chip { border: 1px solid var(--line); border-radius: 99px; padding: 2px 10px; font-size: 13px; display: inline-flex; gap: 6px; align-items: center; }
+.chip b { font-size: 17px; line-height: 1; }
+.chip.interdit { border-color: var(--bad); color: var(--bad); }
+.chip.interdit b { text-decoration: line-through; }
+.poses { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; min-height: 100px; }
+.pose { display: grid; justify-items: center; gap: 3px; font-size: 12px; color: var(--muted); max-width: 90px; }
+.pose .legende { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 90px; }
+.pose .groupe { display: flex; }
+.pose .groupe .carte + .carte { margin-left: -34px; }
+.pose.compte-pas .carte { opacity: .45; }
+.pose.compte-pas .legende { color: var(--bad); }
+.pose.forte .carte { box-shadow: 0 0 0 3px var(--brass), 0 6px 14px rgba(0,0,0,.35); }
+.vide { color: var(--muted); font-style: italic; align-self: center; }
+.consigne { font-size: 17px; font-weight: 500; }
+.consigne em { font-style: normal; color: var(--brass); }
+
+.carte { width: 54px; height: 78px; border-radius: 7px; background: var(--card); color: var(--card-ink); display: grid; grid-template-rows: auto 1fr; padding: 3px 5px; box-shadow: 0 4px 10px rgba(0,0,0,.35); border: 0; font-family: var(--body); user-select: none; }
+.carte .coin { font-weight: 700; font-size: 15px; line-height: 1; text-align: left; }
+.carte .centre { font-size: 28px; display: grid; place-items: center; line-height: 1; }
+.carte.rouge { color: var(--red); }
+.zone-main { border: 1px solid var(--line); border-radius: 16px; padding: 12px; background: rgba(226,176,74,.06); display: grid; gap: 10px; }
+.zone-main h3 { margin: 0; font-size: 14px; font-weight: 600; color: var(--muted); }
+.main { display: flex; gap: 6px; flex-wrap: wrap; min-height: 96px; align-items: flex-end; }
+.main .carte { width: 66px; height: 96px; transition: transform .12s ease; }
+.main .carte .coin { font-size: 18px; }
+.main .carte .centre { font-size: 36px; }
+.main .carte.jouable { cursor: pointer; }
+.main .carte.choisie { transform: translateY(-12px); box-shadow: 0 0 0 3px var(--brass), 0 10px 18px rgba(0,0,0,.4); }
+.main .carte:disabled { opacity: .4; filter: grayscale(.4); }
+.actions { display: grid; gap: 8px; }
+details.journal { border: 1px solid var(--line); border-radius: 14px; background: rgba(0,0,0,.2); padding: 10px 12px; }
+details.journal summary { color: var(--muted); font-size: 14px; cursor: pointer; }
+details.journal ol { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 3px; font-size: 13.5px; }
+@media (prefers-reduced-motion: reduce) { .main .carte, .btn.katapss { transition: none; animation: none; } }
+
+/* Fenêtres */
+.voile { position: fixed; inset: 0; background: rgba(6,14,24,.75); display: grid; place-items: center; padding: 16px; z-index: 10; }
+.fenetre { background: var(--table-2); border: 1px solid var(--line); border-radius: 16px; padding: 20px; width: min(440px, 100%); display: grid; gap: 12px; box-shadow: 0 20px 50px rgba(0,0,0,.5); max-height: 90vh; overflow-y: auto; }
+.fenetre h2 { margin: 0; font-family: var(--display); font-size: 36px; letter-spacing: 2px; color: var(--brass); font-weight: 400; line-height: 1; }
+.fenetre p { margin: 0; color: var(--muted); }
+.bilan { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.bilan li { display: flex; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--line); padding: 5px 0; }
+.chrono { height: 4px; border-radius: 2px; background: rgba(255,255,255,.12); overflow: hidden; }
+.chrono span { display: block; height: 100%; background: var(--brass); width: 100%; }
+.chrono.urgent span { background: var(--bad); }
+.secondes { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--brass); }
+.secondes.urgent { color: var(--bad); }
+.vocal { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; font-size: 13px; color: var(--muted); }
+.vocal .btn { padding: 7px 12px; font-size: 14px; }
+.vocal .btn.ouvert { background: rgba(63,191,127,.18); border-color: var(--good); color: var(--good); }
+.vocal .btn.coupe { background: rgba(239,107,95,.15); border-color: var(--bad); color: var(--bad); }
+.reglage { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; color: var(--muted); font-size: 14px; }
+.reglage .btn { padding: 6px 12px; font-size: 14px; }
+.reglage .btn.actif { background: var(--brass); color: #1d1606; border-color: var(--brass); }
+.toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: #2a1716; color: #ffd7d3; border: 1px solid var(--bad); border-radius: 10px; padding: 10px 14px; z-index: 20; max-width: 90vw; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo">KOPO</div>
+    <div class="info" id="info"></div>
+    <button class="btn" id="btnQuitter" hidden>Quitter</button>
+  </header>
+  <div class="bandeau" id="bandeau" hidden></div>
+  <div class="vocal" id="vocal" hidden></div>
+  <div id="audios" hidden></div>
+
+  <!-- Accueil -->
+  <section class="panneau" id="ecranAccueil" hidden>
+    <h2>Jouer entre amis</h2>
+    <p>De 2 à 9 joueurs, chacun sur son téléphone. Une personne crée la partie, les autres la rejoignent avec le code.</p>
+    <label class="champ">Ton pseudo<input class="texte" id="pseudo" maxlength="16" autocomplete="nickname" placeholder="Ex. Mundyo"></label>
+    <button class="btn principal large" id="btnCreer">Créer une partie</button>
+    <div class="ou">ou</div>
+    <label class="champ">Code de la partie<input class="texte code" id="codeRejoindre" maxlength="4" autocomplete="off" autocapitalize="characters" placeholder="ABCD"></label>
+    <button class="btn large" id="btnRejoindre">Rejoindre</button>
+    <div class="rappel">Rappel des règles
+      <ul>
+        <li>Suis la couleur, ou ramasse la plus forte carte de la table (permis même pour bluffer).</li>
+        <li>Si tout le monde suit, la plus forte carte relance, dans une autre couleur.</li>
+        <li>Plus qu'une couleur en main ? Tu peux tout poser d'un coup pour sortir.</li>
+        <li>4 cartes d'une même couleur à la distribution : annonce <b>Katapss</b> avant d'agir.</li>
+        <li>Le dernier joueur qui garde des cartes est éliminé, jusqu'à la finale à deux.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- Connexion -->
+  <section class="panneau" id="ecranConnexion" hidden>
+    <h2>Connexion…</h2>
+    <p id="texteConnexion">Connexion à la partie en cours.</p>
+    <button class="btn" id="btnAnnuler">Annuler</button>
+  </section>
+
+  <!-- Salon -->
+  <section class="panneau" id="ecranSalon" hidden>
+    <h2>Salon</h2>
+    <p>Code de la partie :</p>
+    <div class="code-geant" id="codeSalon"></div>
+    <div class="qr" id="qr"></div>
+    <div class="lien"><input class="texte" id="lienSalon" readonly><button class="btn" id="btnCopier">Copier</button></div>
+    <div class="bandeau info-hote" id="noteHote" hidden>Tu es l'hôte : c'est ton téléphone qui fait tourner la partie. Garde cette page ouverte jusqu'à la fin.</div>
+    <div class="reglage" id="reglage"></div>
+    <h3 style="margin:0;font-size:15px" id="titreJoueurs"></h3>
+    <ul class="liste-joueurs" id="listeJoueurs"></ul>
+    <button class="btn principal large" id="btnLancer" hidden>Lancer la partie</button>
+    <p id="attenteHote" hidden>En attente du lancement par l'hôte…</p>
+  </section>
+
+  <!-- Partie -->
+  <section id="ecranPartie" hidden style="display:grid;gap:12px">
+    <div class="sieges" id="sieges" aria-label="Joueurs, dans l'ordre de jeu"></div>
+    <section class="table" aria-label="Table">
+      <div class="table-entete" id="entete"></div>
+      <div class="poses" id="poses"></div>
+      <div class="consigne" id="consigne" aria-live="polite"></div>
+      <div class="chrono" id="barreChrono" hidden><span></span></div>
+    </section>
+    <section class="zone-main" id="zoneMain" aria-label="Ta main">
+      <div id="zoneKatapss"></div>
+      <h3 id="titreMain">Ta main</h3>
+      <div class="main" id="main"></div>
+      <div class="actions" id="actions"></div>
+    </section>
+    <details class="journal"><summary>Derniers coups</summary><ol id="journal"></ol></details>
+  </section>
+</div>
+
+<div class="voile" id="voile" hidden><div class="fenetre" id="fenetre"></div></div>
+<div class="toast" id="toast" hidden role="status"></div>
+
+<script>/*PEERJS*/</script>
+<script>/*QRCODE*/</script>
+<script>/*MOTEUR*/</script>
+<script>/*SALLE*/</script>
+<script>
+(function () {
+  'use strict';
+  const K = window.Kopo, S = window.KopoSalle;
+  const $ = (id) => document.getElementById(id);
+  const PREFIXE = 'kopo-mj-v1-';
+  const LETTRES = 'ABCDEFGHJKMNPQRSTUVWXYZ';
+  const LOCAL = new URLSearchParams(location.search).has('local'); // test sur un seul appareil (plusieurs onglets)
+
+  // ------------------------------------------------------------------ stockage
+  const stock = {
+    lire(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
+    ecrire(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+    effacer(k) { try { localStorage.removeItem(k); } catch (e) {} },
+  };
+  // Identifiant du joueur : par onglet en mode local, par appareil sinon.
+  function idAleatoire() { return 'j' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4); }
+  let monId = LOCAL ? sessionStorage.getItem('kopo-id') : stock.lire('kopo-id');
+  if (!monId) { monId = idAleatoire(); LOCAL ? sessionStorage.setItem('kopo-id', monId) : stock.ecrire('kopo-id', monId); }
+  const cleSession = LOCAL ? 'kopo-session-local-' + monId : 'kopo-session';
+
+  // ------------------------------------------------------------------ réseau
+  // Deux transports : PeerJS (téléphones différents) et BroadcastChannel (onglets, pour tester).
+  // Interface commune : hôte { envoyer(id, msg), fermer() } ; client { envoyer(msg), fermer() }.
+  function reseauHote(code, cb) {
+    if (LOCAL) {
+      const bc = new BroadcastChannel(PREFIXE + code);
+      bc.onmessage = (e) => { const d = e.data; if (d.a === 'hote') cb.message(d.de, d.msg); };
+      setTimeout(cb.pret, 0);
+      return { envoyer: (id, msg) => bc.postMessage({ a: id, msg }), fermer: () => bc.close() };
+    }
+    const conns = new Map(); // id joueur -> connexion
+    let peer = null, ferme = false, essais = 0;
+    function ouvrir() {
+      peer = new Peer(PREFIXE + code.toLowerCase());
+      peer.on('open', () => { essais = 0; cb.pret(); });
+      peer.on('call', (appel) => vocal.recevoirAppel(appel));
+      peer.on('connection', (conn) => {
+        const id = conn.metadata && conn.metadata.id;
+        if (!id) return conn.close();
+        conn.on('open', () => {
+          const ancien = conns.get(id);
+          if (ancien && ancien !== conn) try { ancien.close(); } catch (e) {}
+          conns.set(id, conn);
+        });
+        conn.on('data', (msg) => { if (conns.get(id) === conn) cb.message(id, msg); });
+        conn.on('close', () => { if (conns.get(id) === conn) { conns.delete(id); cb.deconnexion(id); } });
+      });
+      peer.on('disconnected', () => { if (!ferme) setTimeout(() => { try { peer.reconnect(); } catch (e) {} }, 1500); });
+      peer.on('error', (err) => {
+        if (err.type === 'unavailable-id') {
+          // Code déjà pris : à la création on en change, à la reprise on attend que l'ancien se libère.
+          if (cb.codePris && cb.codePris()) return;
+          if (++essais < 20) { try { peer.destroy(); } catch (e) {} setTimeout(ouvrir, 3000); }
+          else cb.erreur("Impossible de reprendre la partie. Réessaie dans une minute.");
+        } else if (err.type === 'network' || err.type === 'server-error' || err.type === 'socket-error') {
+          cb.erreur('Connexion au serveur de mise en relation perdue, nouvel essai…');
+        } else if (err.type === 'browser-incompatible') {
+          cb.erreur("Ce navigateur ne permet pas de jouer en ligne. Essaie Chrome ou Safari à jour.");
+        }
+      });
+    }
+    ouvrir();
+    return {
+      envoyer(id, msg) { const c = conns.get(id); if (c && c.open) try { c.send(msg); } catch (e) {} },
+      peer: () => peer,
+      fermer() { ferme = true; try { peer.destroy(); } catch (e) {} },
+    };
+  }
+
+  function reseauClient(code, cb) {
+    if (LOCAL) {
+      const bc = new BroadcastChannel(PREFIXE + code);
+      bc.onmessage = (e) => { const d = e.data; if (d.a === monId) cb.message(d.msg); };
+      setTimeout(cb.ouvert, 0);
+      return { envoyer: (msg) => bc.postMessage({ a: 'hote', de: monId, msg }), fermer: () => bc.close() };
+    }
+    let peer = null, conn = null, ferme = false;
+    function connecter() {
+      if (ferme) return;
+      if (!peer || peer.destroyed) {
+        peer = new Peer();
+        peer.on('open', connecter);
+        peer.on('call', (appel) => vocal.recevoirAppel(appel));
+        peer.on('error', (err) => {
+          if (err.type === 'peer-unavailable') cb.erreur("Partie introuvable. Vérifie le code, ou l'hôte n'est plus connecté.");
+          else if (err.type === 'browser-incompatible') cb.erreur("Ce navigateur ne permet pas de jouer en ligne. Essaie Chrome ou Safari à jour.");
+          setTimeout(reessayer, 3000);
+        });
+        peer.on('disconnected', () => { if (!ferme) setTimeout(() => { try { peer.reconnect(); } catch (e) {} }, 1500); });
+        return;
+      }
+      if (!peer.open) return;
+      conn = peer.connect(PREFIXE + code.toLowerCase(), { metadata: { id: monId }, reliable: true });
+      const c = conn;
+      c.on('open', () => { if (c === conn) cb.ouvert(); });
+      c.on('data', (msg) => { if (c === conn) cb.message(msg); });
+      c.on('close', () => { if (c === conn) { cb.ferme(); setTimeout(reessayer, 2000); } });
+    }
+    function reessayer() { if (ferme) return; if (conn && conn.open) return; connecter(); }
+    connecter();
+    return {
+      envoyer(msg) { if (conn && conn.open) try { conn.send(msg); } catch (e) {} },
+      peer: () => peer,
+      reconnecter() { try { conn && conn.close(); } catch (e) {} conn = null; connecter(); },
+      fermer() { ferme = true; try { peer && peer.destroy(); } catch (e) {} },
+    };
+  }
+
+  // ------------------------------------------------------------------ hôte
+  // L'hôte est aussi un joueur : ses propres messages sont traités directement.
+  let hote = null; // { salle, reseau, vus: Map(id -> dernier signe de vie) }
+  let client = null; // { reseau, dernierMessage }
+  let vueActuelle = null;
+  let session = stock.lire(cleSession);
+
+  function demarrerHote(code, nom, reprise) {
+    const sauvee = reprise && stock.lire(PREFIXE + 'salle-' + code);
+    const salle = sauvee ? S.importer(sauvee) : S.creerSalle(code);
+    hote = { salle, vus: new Map(), reseau: null };
+    session = { code, role: 'hote', nom };
+    stock.ecrire(cleSession, session);
+    S.recevoir(salle, monId, { type: 'rejoindre', nom, peerId: LOCAL ? null : PREFIXE + code.toLowerCase() });
+    salle.joueurs.forEach((j) => { j.voix = j.id === monId ? vocal.actif : false; });
+    afficherConnexion("Ouverture de la partie…");
+    hote.reseau = reseauHote(code, {
+      pret() { majHash(code); diffuser(); },
+      message(id, msg) {
+        hote.vus.set(id, Date.now());
+        if (msg && msg.type === 'ping') {
+          const j = salle.joueurs.find((x) => x.id === id);
+          if (j && !j.connecte) { j.connecte = true; diffuser(); }
+          return;
+        }
+        traiter(id, msg);
+      },
+      deconnexion(id) { S.deconnecter(salle, id); diffuser(); },
+      codePris() {
+        if (reprise) return false;
+        // Collision à la création : on prend un autre code.
+        hote.reseau.fermer(); stock.effacer(PREFIXE + 'salle-' + code);
+        demarrerHote(nouveauCode(), nom, false);
+        return true;
+      },
+      erreur: montrerBandeau,
+    });
+  }
+
+  function traiter(id, msg) {
+    const r = S.recevoir(hote.salle, id, msg);
+    if (!r.ok) {
+      if (id === monId) toast(r.erreur);
+      else hote.reseau.envoyer(id, { type: 'erreur', texte: r.erreur, refus: msg && msg.type === 'rejoindre' });
+    }
+    diffuser();
+  }
+
+  function diffuser() {
+    const s = hote.salle;
+    stock.ecrire(PREFIXE + 'salle-' + s.code, S.exporter(s));
+    for (const j of s.joueurs) if (j.id !== monId) hote.reseau.envoyer(j.id, { type: 'vue', vue: S.vue(s, j.id) });
+    afficher(S.vue(s, monId));
+  }
+
+  // Chrono : l'hôte vérifie 4 fois par seconde si le joueur courant a épuisé son temps.
+  setInterval(() => { if (hote && S.tic(hote.salle)) diffuser(); }, 250);
+
+  // Un joueur silencieux depuis 8 s est marqué déconnecté.
+  setInterval(() => {
+    if (!hote) return;
+    let change = false;
+    const maintenant = Date.now();
+    for (const j of hote.salle.joueurs) {
+      if (j.id === monId || !j.connecte) continue;
+      if (maintenant - (hote.vus.get(j.id) || 0) > 8000) { j.connecte = false; change = true; }
+    }
+    if (change) diffuser();
+  }, 2000);
+
+  // ------------------------------------------------------------------ client
+  function demarrerClient(code, nom) {
+    session = { code, role: 'joueur', nom };
+    stock.ecrire(cleSession, session);
+    afficherConnexion('Connexion à la partie ' + code + '…');
+    client = { dernierMessage: Date.now(), reseau: null };
+    client.reseau = reseauClient(code, {
+      ouvert() {
+        cacherBandeau(); client.dernierMessage = Date.now();
+        const pr = client.reseau.peer && client.reseau.peer();
+        client.reseau.envoyer({ type: 'rejoindre', nom, peerId: pr ? pr.id : null });
+        if (vocal.actif) client.reseau.envoyer({ type: 'micro', voix: true, muet: vocal.muet });
+        majHash(code);
+      },
+      message(msg) {
+        client.dernierMessage = Date.now();
+        cacherBandeau();
+        if (msg.type === 'vue') afficher(msg.vue);
+        else if (msg.type === 'erreur') {
+          if (msg.refus) { quitter(); toast(msg.texte); } else toast(msg.texte);
+        }
+      },
+      ferme() { montrerBandeau("Connexion perdue avec l'hôte. Reconnexion…"); },
+      erreur(texte) { if (!vueActuelle) $('texteConnexion').textContent = texte; else montrerBandeau(texte); },
+    });
+  }
+  // Signe de vie toutes les 2 s ; sans nouvelles de l'hôte depuis 10 s, on se reconnecte.
+  setInterval(() => {
+    if (!client) return;
+    client.reseau.envoyer({ type: 'ping' });
+    if (vueActuelle && Date.now() - client.dernierMessage > 10000) {
+      montrerBandeau("L'hôte ne répond plus. Reconnexion…");
+      client.dernierMessage = Date.now();
+      if (client.reseau.reconnecter) client.reseau.reconnecter();
+    }
+  }, 2000);
+
+  function envoyer(msg) {
+    if (hote) traiter(monId, msg);
+    else if (client) client.reseau.envoyer(msg);
+  }
+
+  function quitter() {
+    if (hote) { hote.reseau.fermer(); stock.effacer(PREFIXE + 'salle-' + hote.salle.code); }
+    if (client) client.reseau.fermer();
+    vocal.arreter();
+    hote = client = vueActuelle = null;
+    session = null;
+    stock.effacer(cleSession);
+    history.replaceState(null, '', location.pathname + location.search);
+    fermerFenetre();
+    cacherBandeau();
+    afficherAccueil();
+  }
+
+  function nouveauCode() {
+    let c = '';
+    for (let i = 0; i < 4; i++) c += LETTRES[Math.floor(Math.random() * LETTRES.length)];
+    return c;
+  }
+  function majHash(code) { if (location.hash !== '#' + code) history.replaceState(null, '', '#' + code); }
+  function lienPartie(code) { return location.origin + location.pathname + location.search + '#' + code; }
+
+  // ------------------------------------------------------------------ affichage
+  const ecrans = ['ecranAccueil', 'ecranConnexion', 'ecranSalon', 'ecranPartie'];
+  function montrerEcran(nom) { for (const e of ecrans) $(e).hidden = e !== nom; $('btnQuitter').hidden = nom === 'ecranAccueil'; }
+  function el(tag, cls, texte) { const e = document.createElement(tag); if (cls) e.className = cls; if (texte != null) e.textContent = texte; return e; }
+  function montrerBandeau(t) { $('bandeau').textContent = t; $('bandeau').hidden = false; }
+  function cacherBandeau() { $('bandeau').hidden = true; }
+  let minuteurToast = null;
+  function toast(t) { $('toast').textContent = t; $('toast').hidden = false; clearTimeout(minuteurToast); minuteurToast = setTimeout(() => ($('toast').hidden = true), 3500); }
+
+  function afficherAccueil() {
+    montrerEcran('ecranAccueil');
+    $('info').textContent = '';
+    $('pseudo').value = stock.lire('kopo-pseudo') || '';
+    const h = location.hash.slice(1).toUpperCase();
+    if (/^[A-Z]{4}$/.test(h)) $('codeRejoindre').value = h;
+  }
+  function afficherConnexion(t) { montrerEcran('ecranConnexion'); $('texteConnexion').textContent = t; }
+
+  const nom = (v, id) => (v.joueurs.find((j) => j.id === id) || {}).nom || '?';
+  const estRouge = (c) => K.couleur(c) === 'C' || K.couleur(c) === 'K';
+  function carteEl(c, tag) {
+    const e = el(tag || 'div', 'carte' + (estRouge(c) ? ' rouge' : ''));
+    const s = K.SYMBOLES[K.couleur(c)];
+    e.append(el('span', 'coin', K.valeur(c) + s), el('span', 'centre', s));
+    e.setAttribute('aria-label', K.valeur(c) + ' de ' + K.NOMS_COULEURS[K.couleur(c)]);
+    return e;
+  }
+  const trierMain = (main) => main.slice().sort((a, b) => K.COULEURS.indexOf(K.couleur(a)) - K.COULEURS.indexOf(K.couleur(b)) || K.valeur(a) - K.valeur(b));
+
+  let carteChoisie = null;
+  let etaitMonTour = false;
+  let wakeLock = null;
+  async function garderEcranAllume() {
+    try { if ('wakeLock' in navigator && !wakeLock) { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => (wakeLock = null)); } } catch (e) {}
+  }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && vueActuelle) garderEcranAllume(); });
+
+  function afficher(v) {
+    const ancienne = vueActuelle;
+    vueActuelle = v;
+    garderEcranAllume();
+    vocal.maj(v);
+    demarrerChrono(v);
+    if (!ancienne || ancienne.etat !== v.etat || ancienne.numeroManche !== v.numeroManche) carteChoisie = null;
+    if (v.etat === 'salon') { fermerFenetre(); return afficherSalon(v); }
+    afficherPartie(v);
+    if (v.etat === 'finManche') afficherFinManche(v);
+    else if (v.etat === 'finPartie') afficherFinPartie(v);
+    else fermerFenetre();
+  }
+
+  let qrPour = null;
+  function afficherSalon(v) {
+    montrerEcran('ecranSalon');
+    $('info').textContent = 'Salon · ' + v.code;
+    $('codeSalon').textContent = v.code;
+    const lien = lienPartie(v.code);
+    $('lienSalon').value = lien;
+    if (qrPour !== lien && window.qrcode) {
+      try { const q = qrcode(0, 'M'); q.addData(lien); q.make(); $('qr').innerHTML = q.createSvgTag({ cellSize: 4, margin: 0, scalable: true }); qrPour = lien; } catch (e) {}
+    }
+    const jeSuisHote = v.hote === v.moi;
+    $('noteHote').hidden = !jeSuisHote;
+    const rg = $('reglage'); rg.replaceChildren(el('span', null, 'Temps pour jouer :'));
+    for (const d of S.DELAIS) {
+      const libelle = d ? d + ' s' : 'sans';
+      if (jeSuisHote) {
+        const b = el('button', 'btn' + (v.delai === d ? ' actif' : ''), libelle);
+        b.onclick = () => envoyer({ type: 'reglages', delai: d });
+        rg.append(b);
+      } else if (v.delai === d) rg.append(el('strong', null, d ? d + ' secondes par joueur' : 'sans chrono'));
+    }
+    $('titreJoueurs').textContent = `Joueurs (${v.joueurs.length}/9)`;
+    const ul = $('listeJoueurs'); ul.replaceChildren();
+    for (const j of v.joueurs) {
+      const li = el('li');
+      li.append(el('span', null, j.nom));
+      if (j.id === v.hote) li.append(el('span', 'pastille tour', 'hôte'));
+      if (j.id === v.moi) li.append(el('span', 'pastille neutre', 'toi'));
+      if (!j.connecte) li.append(el('span', 'pastille ko', 'déconnecté'));
+      if (j.voix) li.append(el('span', null, j.muet ? '🔇' : '🎤'));
+      if (jeSuisHote && j.id !== v.moi) {
+        const b = el('button', 'btn', 'Retirer');
+        b.onclick = () => envoyer({ type: 'retirer', cible: j.id });
+        li.append(b);
+      }
+      ul.append(li);
+    }
+    $('btnLancer').hidden = !jeSuisHote;
+    $('btnLancer').disabled = v.joueurs.length < 2;
+    $('btnLancer').textContent = v.joueurs.length < 2 ? 'En attente d\'au moins 2 joueurs' : `Lancer la partie (${v.joueurs.length} joueurs)`;
+    $('attenteHote').hidden = jeSuisHote;
+  }
+
+  function afficherPartie(v) {
+    montrerEcran('ecranPartie');
+    const m = v.manche;
+    const finale = v.restants.length === 2;
+    $('info').innerHTML = '';
+    $('info').append(el('strong', null, finale ? 'Finale' : 'Manche ' + v.numeroManche), document.createTextNode(` · ${m.sieges.length} joueurs · ${v.code}`));
+
+    // Sièges, en partant de moi, dans le sens des aiguilles d'une montre.
+    const i0 = Math.max(0, m.sieges.indexOf(v.moi));
+    const ordre = m.sieges.slice(i0).concat(m.sieges.slice(0, i0));
+    const box = $('sieges'); box.replaceChildren();
+    ordre.forEach((id) => {
+      const d = el('div', 'siege');
+      const q = m.qualifies.findIndex((x) => x.joueur === id);
+      const joueur = v.joueurs.find((j) => j.id === id) || {};
+      if (id === m.joueurCourant) d.classList.add('courant');
+      if (id === v.moi) d.classList.add('vous');
+      if (q >= 0 || m.elimine === id) d.classList.add('sorti');
+      d.append(el('div', 'nom', (joueur.voix ? (joueur.muet ? '🔇 ' : '🎤 ') : '') + (id === v.moi ? 'Toi' : joueur.nom || '?')));
+      const dos = el('div', 'dos');
+      for (let k = 0; k < m.nbCartes[id]; k++) dos.append(el('span'));
+      d.append(dos);
+      if (q >= 0) d.append(el('span', 'pastille ok', m.qualifies[q].raison === 'Katapss' ? 'Katapss ✓' : `qualifié ${q + 1}e`.replace('1e', '1er')));
+      else if (m.elimine === id) d.append(el('span', 'pastille ko', 'éliminé'));
+      else if (id === m.joueurCourant) { d.append(el('span', 'pastille tour', 'à jouer')); if (v.chrono) { const c = el('div', 'chrono chrono-siege'); c.append(el('span')); d.append(c); } }
+      if (!joueur.connecte) d.append(el('span', 'pastille ko', 'déconnecté'));
+      box.append(d);
+    });
+
+    // Table
+    const ent = $('entete'); ent.replaceChildren();
+    if (m.couleurTour) { const c = el('span', 'chip'); c.append('Couleur du tour ', el('b', null, K.SYMBOLES[m.couleurTour])); ent.append(c); }
+    if (m.couleurInterdite && m.phase === 'ouverture') { const c = el('span', 'chip interdit'); c.append('Interdit pour ouvrir ', el('b', null, K.SYMBOLES[m.couleurInterdite])); ent.append(c); }
+    let forte = null;
+    m.table.forEach((p, i) => { if (p.compte) for (const c of p.cartes) if (!forte || K.valeur(c) > K.valeur(forte.carte)) forte = { carte: c, i }; });
+    const poses = $('poses'); poses.replaceChildren();
+    if (!m.table.length) poses.append(el('span', 'vide', m.phase === 'terminee' ? 'Manche terminée.' : 'La table est vide.'));
+    m.table.forEach((p, i) => {
+      const d = el('div', 'pose' + (p.compte ? '' : ' compte-pas') + (forte && forte.i === i ? ' forte' : ''));
+      const g = el('div', 'groupe'); p.cartes.forEach((c) => g.append(carteEl(c)));
+      d.append(g, el('span', 'legende', (p.joueur === v.moi ? 'Toi' : nom(v, p.joueur)) + (p.compte ? '' : ' · sort')));
+      poses.append(d);
+    });
+
+    // Consigne
+    const cons = $('consigne'); cons.replaceChildren();
+    const monTour = m.joueurCourant === v.moi;
+    const jeJoue = m.enJeu.includes(v.moi);
+    if (v.chrono && m.phase !== 'terminee' && m.joueurCourant) cons.append(el('span', 'secondes', ''), ' ');
+    if (m.phase === 'terminee') cons.append('Manche terminée.');
+    else if (!v.restants.includes(v.moi)) cons.append('Tu es éliminé. Tu regardes la partie. ', el('em', null, nom(v, m.joueurCourant)), ' doit jouer.');
+    else if (!jeJoue) cons.append('Tu es qualifié pour la manche suivante. ', el('em', null, nom(v, m.joueurCourant)), ' doit jouer.');
+    else if (monTour && m.phase === 'ouverture') cons.append(el('em', null, "À toi d'ouvrir."), m.couleurInterdite ? ` Pas de ${K.SYMBOLES[m.couleurInterdite]}.` : ' Joue la couleur de ton choix.');
+    else if (monTour) cons.append(el('em', null, 'À toi.'), ` Suis à ${K.SYMBOLES[m.couleurTour]} ou ramasse le ${K.afficher(forte.carte)}.`);
+    else cons.append('En attente de ', el('em', null, nom(v, m.joueurCourant)), '…');
+    $('barreChrono').hidden = !(v.chrono && monTour);
+    if (monTour && !etaitMonTour && navigator.vibrate) try { navigator.vibrate(120); } catch (e) {}
+    etaitMonTour = monTour;
+
+    // Main et actions
+    $('zoneMain').hidden = !jeJoue;
+    const actions = m.actions;
+    const jouables = new Set(actions.filter((a) => a.type === 'jouer').map((a) => a.carte));
+    if (carteChoisie && !jouables.has(carteChoisie)) carteChoisie = null;
+    const zk = $('zoneKatapss'); zk.replaceChildren();
+    if (actions.some((a) => a.type === 'katapss')) {
+      const b = el('button', 'btn katapss', 'KATAPSS !');
+      b.onclick = () => { b.disabled = true; envoyer({ type: 'action', action: { type: 'katapss' } }); };
+      zk.append(b);
+    }
+    $('titreMain').textContent = `Ta main (${m.main.length} carte${m.main.length > 1 ? 's' : ''})` + (jouables.size ? ' · touche une carte pour la choisir' : '');
+    const main = $('main'); main.replaceChildren();
+    for (const c of trierMain(m.main)) {
+      const b = carteEl(c, 'button');
+      b.type = 'button';
+      if (jouables.has(c)) {
+        b.classList.add('jouable');
+        if (c === carteChoisie) b.classList.add('choisie');
+        b.onclick = () => {
+          if (carteChoisie === c) jouerCarte(c);
+          else { carteChoisie = c; afficherPartie(vueActuelle); }
+        };
+      } else if (monTour) b.disabled = true;
+      main.append(b);
+    }
+    const act = $('actions'); act.replaceChildren();
+    if (jouables.size) {
+      const b = el('button', 'btn principal large', carteChoisie ? `Jouer le ${K.afficher(carteChoisie)}` : 'Choisis une carte');
+      b.disabled = !carteChoisie;
+      b.onclick = () => jouerCarte(carteChoisie);
+      act.append(b);
+    }
+    if (actions.some((a) => a.type === 'toutPoser')) {
+      const b = el('button', 'btn large' + (jouables.size ? '' : ' principal'), `Tout poser (${m.main.length} carte${m.main.length > 1 ? 's' : ''}) et sortir`);
+      b.onclick = () => { b.disabled = true; envoyer({ type: 'action', action: { type: 'toutPoser' } }); };
+      act.append(b);
+    }
+    if (actions.some((a) => a.type === 'ramasser')) {
+      const bluff = jouables.size > 0 || actions.some((a) => a.type === 'toutPoser');
+      const b = el('button', 'btn large' + (jouables.size || bluff ? '' : ' principal'), `Ramasser le ${K.afficher(forte.carte)}` + (bluff ? ' (bluff)' : ''));
+      b.onclick = () => { b.disabled = true; envoyer({ type: 'action', action: { type: 'ramasser' } }); };
+      act.append(b);
+    }
+
+    const ol = $('journal'); ol.replaceChildren();
+    m.journal.slice().reverse().forEach((t) => ol.append(el('li', null, t)));
+  }
+
+  // ------------------------------------------------------------------ chrono (affichage)
+  // L'hôte envoie le temps restant ; chaque téléphone le décompte avec sa propre horloge.
+  let finChrono = null, totalChrono = 0;
+  function demarrerChrono(v) {
+    finChrono = v.chrono ? performance.now() + v.chrono.resteMs : null;
+    totalChrono = v.chrono ? v.chrono.totalMs : 0;
+  }
+  function majChrono() {
+    if (finChrono == null) return;
+    const reste = Math.max(0, finChrono - performance.now());
+    const urgent = reste < 2000;
+    const sec = Math.ceil(reste / 1000);
+    document.querySelectorAll('.secondes').forEach((e) => { e.textContent = sec + ' s'; e.classList.toggle('urgent', urgent); });
+    document.querySelectorAll('.chrono').forEach((c) => { c.firstChild.style.width = (100 * reste / (totalChrono || 1)) + '%'; c.classList.toggle('urgent', urgent); });
+  }
+  (function boucle() { majChrono(); requestAnimationFrame(boucle); })();
+
+  // ------------------------------------------------------------------ micro
+  // Chaque téléphone appelle directement les autres (audio seulement). Le micro est coupé
+  // tant que le joueur ne l'a pas activé, et chacun peut le couper à tout moment.
+  const vocal = {
+    actif: false, muet: true, sonCoupe: false, flux: null, appels: new Map(), vue: null,
+    peer() { const r = hote ? hote.reseau : client && client.reseau; return r && r.peer ? r.peer() : null; },
+    async activer() {
+      try {
+        this.flux = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false });
+        this.muet = false;
+      } catch (e) {
+        // Micro refusé : on écoute quand même, avec un flux silencieux.
+        try { const ctx = new (window.AudioContext || window.webkitAudioContext)(); this.flux = ctx.createMediaStreamDestination().stream; } catch (e2) { this.flux = null; }
+        this.muet = true;
+        toast("Micro non autorisé : tu entends les autres mais ils ne t'entendent pas.");
+      }
+      this.actif = true;
+      this.appliquerMuet();
+      this.signaler();
+      this.dessiner();
+      if (this.vue) this.maj(this.vue);
+    },
+    appliquerMuet() { if (this.flux) this.flux.getAudioTracks().forEach((t) => (t.enabled = !this.muet)); },
+    basculerMicro() {
+      if (!this.flux || !this.flux.getAudioTracks().some((t) => t.label !== '' || t.kind === 'audio')) return;
+      this.muet = !this.muet; this.appliquerMuet(); this.signaler(); this.dessiner();
+    },
+    basculerSon() {
+      this.sonCoupe = !this.sonCoupe;
+      $('audios').querySelectorAll('audio').forEach((a) => (a.muted = this.sonCoupe));
+      this.dessiner();
+    },
+    signaler() { envoyer({ type: 'micro', voix: this.actif, muet: this.muet }); },
+    brancher(appel) {
+      const pid = appel.peer;
+      const ancien = this.appels.get(pid);
+      if (ancien && ancien !== appel) try { ancien.close(); } catch (e) {}
+      this.appels.set(pid, appel);
+      appel.on('stream', (flux) => {
+        let a = $('audios').querySelector(`audio[data-peer="${CSS.escape(pid)}"]`);
+        if (!a) { a = document.createElement('audio'); a.dataset.peer = pid; a.autoplay = true; a.setAttribute('playsinline', ''); $('audios').append(a); }
+        a.srcObject = flux; a.muted = this.sonCoupe;
+        a.play().catch(() => {});
+      });
+      const fin = () => { if (this.appels.get(pid) === appel) { this.appels.delete(pid); const a = $('audios').querySelector(`audio[data-peer="${CSS.escape(pid)}"]`); if (a) a.remove(); } };
+      appel.on('close', fin); appel.on('error', fin);
+    },
+    recevoirAppel(appel) {
+      if (!this.actif || !this.flux) { try { appel.close(); } catch (e) {} return; }
+      appel.answer(this.flux);
+      this.brancher(appel);
+    },
+    // À chaque mise à jour : appeler les joueurs qui ont activé le son et qu'on n'entend pas encore.
+    // Pour éviter les appels croisés, c'est l'identifiant le plus petit qui appelle.
+    maj(v) {
+      this.vue = v;
+      this.dessiner();
+      const pr = this.peer();
+      if (!this.actif || !this.flux || !pr || !pr.open) return;
+      const voulus = new Set();
+      for (const j of v.joueurs) {
+        if (j.id === v.moi || !j.voix || !j.peerId || !j.connecte) continue;
+        voulus.add(j.peerId);
+        if (!this.appels.has(j.peerId) && pr.id < j.peerId) this.brancher(pr.call(j.peerId, this.flux));
+      }
+      for (const [pid, appel] of this.appels) if (!voulus.has(pid)) try { appel.close(); } catch (e) {}
+    },
+    arreter() {
+      for (const appel of this.appels.values()) try { appel.close(); } catch (e) {}
+      this.appels.clear();
+      if (this.flux) this.flux.getTracks().forEach((t) => t.stop());
+      this.flux = null; this.actif = false; this.muet = true; this.vue = null;
+      $('audios').replaceChildren();
+      this.dessiner();
+    },
+    dessiner() {
+      const box = $('vocal');
+      box.hidden = !this.vue;
+      if (!this.vue) return;
+      box.replaceChildren();
+      if (LOCAL) { box.append(el('span', null, 'Micro indisponible en mode test.')); return; }
+      if (!this.actif) {
+        const b = el('button', 'btn', '🎙️ Activer le micro');
+        b.onclick = () => this.activer();
+        box.append(b, el('span', null, 'pour discuter avec les autres'));
+        return;
+      }
+      const m = el('button', 'btn ' + (this.muet ? 'coupe' : 'ouvert'), this.muet ? '🔇 Micro coupé' : '🎤 Micro ouvert');
+      m.onclick = () => this.basculerMicro();
+      const so = el('button', 'btn' + (this.sonCoupe ? ' coupe' : ''), this.sonCoupe ? '🔈 Son coupé' : '🔊 Son');
+      so.onclick = () => this.basculerSon();
+      const n = this.vue.joueurs.filter((j) => j.voix && j.id !== this.vue.moi).length;
+      box.append(m, so, el('span', null, n ? `${n} autre${n > 1 ? 's' : ''} en vocal` : 'personne d\'autre en vocal'));
+    },
+  };
+
+  function jouerCarte(c) {
+    if (!c) return;
+    carteChoisie = null;
+    envoyer({ type: 'action', action: { type: 'jouer', carte: c } });
+  }
+
+  function ouvrirFenetre(contenu) { $('fenetre').replaceChildren(...contenu); $('voile').hidden = false; }
+  function fermerFenetre() { $('voile').hidden = true; }
+
+  function afficherFinManche(v) {
+    const m = v.manche;
+    const ul = el('ul', 'bilan');
+    m.qualifies.forEach((q, i) => { const li = el('li'); li.append(el('span', null, `${i + 1}. ${nom(v, q.joueur)}`), el('span', 'pastille ok', q.raison === 'Katapss' ? 'Katapss' : 'qualifié')); ul.append(li); });
+    const li = el('li'); li.append(el('span', null, nom(v, m.elimine)), el('span', 'pastille ko', 'éliminé')); ul.append(li);
+    const contenu = [el('h2', null, `Fin de la manche ${v.numeroManche}`), el('p', null, m.elimine === v.moi ? 'Tu es éliminé. Tu peux continuer à regarder la partie.' : `${nom(v, m.elimine)} est éliminé.`), ul];
+    const suivants = v.restants.length;
+    if (v.hote === v.moi) {
+      const b = el('button', 'btn principal large', suivants === 2 ? 'Lancer la finale' : `Manche suivante (${suivants} joueurs)`);
+      b.onclick = () => envoyer({ type: 'mancheSuivante' });
+      contenu.push(b);
+    } else contenu.push(el('p', null, "En attente de l'hôte pour la manche suivante…"));
+    ouvrirFenetre(contenu);
+  }
+
+  function afficherFinPartie(v) {
+    const ul = el('ul', 'bilan');
+    const classement = [v.vainqueur].concat(v.elimines.slice().reverse());
+    classement.forEach((id, i) => { const li = el('li'); li.append(el('span', null, `${i + 1}. ${nom(v, id)}`), el('span', 'pastille ' + (i ? 'neutre' : 'ok'), i ? `éliminé manche ${v.elimines.length - i + 1}` : 'vainqueur')); ul.append(li); });
+    const contenu = [el('h2', null, v.vainqueur === v.moi ? 'Tu as gagné !' : `${nom(v, v.vainqueur)} gagne !`), ul];
+    if (v.hote === v.moi) {
+      const b = el('button', 'btn principal large', 'Rejouer avec les mêmes joueurs');
+      b.onclick = () => envoyer({ type: 'rejouer' });
+      contenu.push(b);
+    } else contenu.push(el('p', null, "L'hôte peut relancer une partie."));
+    const q = el('button', 'btn large', 'Quitter'); q.onclick = quitter; contenu.push(q);
+    ouvrirFenetre(contenu);
+  }
+
+  function demanderConfirmation(texte, ok) {
+    const b1 = el('button', 'btn principal large', 'Oui, quitter');
+    const b2 = el('button', 'btn large', 'Annuler');
+    b1.onclick = () => { fermerFenetre(); ok(); };
+    b2.onclick = () => { fermerFenetre(); if (vueActuelle) afficher(vueActuelle); };
+    ouvrirFenetre([el('h2', null, 'Quitter ?'), el('p', null, texte), b1, b2]);
+  }
+
+  // ------------------------------------------------------------------ boutons
+  function lirePseudo() {
+    const p = $('pseudo').value.trim();
+    if (!p) { toast("Choisis d'abord un pseudo."); $('pseudo').focus(); return null; }
+    stock.ecrire('kopo-pseudo', p);
+    return p;
+  }
+  $('btnCreer').onclick = () => { const p = lirePseudo(); if (p) demarrerHote(nouveauCode(), p, false); };
+  $('btnRejoindre').onclick = () => {
+    const p = lirePseudo(); if (!p) return;
+    const code = $('codeRejoindre').value.trim().toUpperCase();
+    if (!/^[A-Z]{4}$/.test(code)) { toast('Le code fait 4 lettres.'); return; }
+    demarrerClient(code, p);
+  };
+  $('codeRejoindre').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('btnRejoindre').click(); });
+  $('btnLancer').onclick = () => envoyer({ type: 'lancer' });
+  $('btnAnnuler').onclick = quitter;
+  $('btnQuitter').onclick = () => demanderConfirmation(
+    hote ? "Tu es l'hôte : si tu quittes, la partie s'arrête pour tout le monde." : (vueActuelle && vueActuelle.etat === 'manche' ? 'Tu ne pourras pas revenir dans cette partie avec un autre code.' : 'Tu quittes la partie.'),
+    () => { if (client && vueActuelle && vueActuelle.etat === 'salon') {} quitter(); });
+  $('btnCopier').onclick = async () => {
+    try { await navigator.clipboard.writeText($('lienSalon').value); toast('Lien copié.'); }
+    catch (e) { $('lienSalon').select(); toast('Sélectionne le lien et copie-le.'); }
+  };
+
+  // ------------------------------------------------------------------ démarrage
+  if (typeof Peer === 'undefined' && !LOCAL) montrerBandeau("La bibliothèque réseau n'a pas pu se charger.");
+  const codeLien = location.hash.slice(1).toUpperCase();
+  if (session && (!/^[A-Z]{4}$/.test(codeLien) || codeLien === session.code)) {
+    if (session.role === 'hote') demarrerHote(session.code, session.nom, true);
+    else demarrerClient(session.code, session.nom);
+  } else {
+    if (session) { stock.effacer(cleSession); session = null; }
+    afficherAccueil();
+  }
+  window.__kopo = { get vue() { return vueActuelle; }, monId };
+})();
+</script>
+</body>
+</html>
