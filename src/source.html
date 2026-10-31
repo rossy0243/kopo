@@ -209,6 +209,7 @@ details.rappel summary { cursor: pointer; font-weight: 600; }
   body.en-jeu .siege .nom { font-size: 14px; font-weight: 700; text-align: center; }
   body.en-jeu .siege.courant .ligne { background: var(--brass); color: #1d1606; border-color: #f6d488; box-shadow: 0 0 0 4px rgba(226,176,74,.35), 0 3px 8px rgba(0,0,0,.4); }
   body.en-jeu .siege.courant .compte::before { background: #1d1606; }
+  body.en-jeu .siege.courant:not(.vous) { animation: none; }
   body.en-jeu .siege .chrono { width: 80px; }
   body.en-jeu .siege.vous { left: max(10px, env(safe-area-inset-left)); top: auto; bottom: max(10px, env(safe-area-inset-bottom)); transform: none; justify-items: start; }
   body.en-jeu .siege.vous .eventail { display: none; }
@@ -249,6 +250,29 @@ details.rappel summary { cursor: pointer; font-weight: 600; }
   #ecranSalon .code-geant { font-size: 52px; }
   .app { max-width: 900px; }
 }
+
+/* Animations : cartes qui volent, bulles au-dessus des joueurs, tampons. */
+#calque { position: fixed; inset: 0; pointer-events: none; z-index: 15; overflow: hidden; }
+.carte { position: relative; }
+.volante { position: fixed; margin: 0 !important; z-index: 16; will-change: transform; box-shadow: 0 10px 22px rgba(0,0,0,.45); }
+.carte.verso::after, .carte.dos-carte::after { content: ''; position: absolute; inset: 0; border-radius: inherit; border: 2px solid #f3e3bd; background: repeating-linear-gradient(45deg, var(--brass) 0 4px, #9c7524 4px 8px); }
+.bulle { position: fixed; transform: translate(-50%, -50%); font-size: 30px; font-weight: 700; line-height: 1; white-space: nowrap; filter: drop-shadow(0 3px 6px rgba(0,0,0,.7)); }
+.bulle.texte { font-size: 16px; padding: 5px 10px; border-radius: 99px; background: var(--good); color: #062014; }
+.bulle.ko { font-size: 46px; color: var(--bad); }
+.tampon { position: fixed; left: 50%; top: 45%; font-family: var(--display); font-size: min(17vw, 26vh, 120px); line-height: 1; color: #fff; background: var(--red); padding: .05em .3em; border: 6px solid #fff; border-radius: 18px; letter-spacing: 3px; box-shadow: 0 12px 34px rgba(0,0,0,.6); text-align: center; white-space: nowrap; }
+.tampon small { display: block; font-family: var(--body); font-weight: 700; font-size: .2em; letter-spacing: 0; padding-bottom: .2em; }
+.siege.courant .ligne, .siege.courant:not(.vous) { animation: battement 1.2s ease-in-out infinite; }
+@keyframes battement { 50% { box-shadow: 0 0 0 7px rgba(226,176,74,.22); } }
+.siege.meneur .ligne::after { content: '↻'; margin-left: 4px; color: var(--brass); font-weight: 800; animation: tourne 1.4s linear infinite; display: inline-block; }
+.siege.courant.meneur .ligne::after { color: #1d1606; }
+@keyframes tourne { to { transform: rotate(360deg); } }
+.pose .carte.gagnante { animation: gagne .7s ease-in-out infinite alternate; }
+@keyframes gagne { to { transform: translateY(-6px) scale(1.08); box-shadow: 0 0 0 3px var(--brass), 0 0 22px rgba(226,176,74,.8); } }
+.pose .carte.ramassee { opacity: .2; }
+.main .carte.recue { box-shadow: 0 0 0 3px var(--good), 0 6px 14px rgba(0,0,0,.45); }
+.trophee { font-size: 64px; text-align: center; line-height: 1; animation: saut 1s ease-in-out infinite; }
+.consigne:empty { display: none; }
+@media (prefers-reduced-motion: reduce) { .siege.courant .ligne, .siege.courant, .siege.meneur .ligne::after, .pose .carte.gagnante, .trophee { animation: none; } }
 
 /* Écran de démarrage */
 .splash { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; align-content: center; gap: 14px; background: radial-gradient(ellipse at 50% 45%, var(--table-2), #08131f 75%); transition: opacity .45s ease; }
@@ -355,6 +379,7 @@ details.rappel summary { cursor: pointer; font-weight: 600; }
 </div>
 <div class="voile" id="voile" hidden><div class="fenetre" id="fenetre"></div></div>
 <div class="toast" id="toast" hidden role="status"></div>
+<div id="calque" aria-hidden="true"></div>
 
 <script>/*MQTT*/</script>
 <script>/*PEERJS*/</script>
@@ -657,6 +682,7 @@ details.rappel summary { cursor: pointer; font-weight: 600; }
     const s = K.SYMBOLES[K.couleur(c)];
     e.append(el('span', 'coin', K.valeur(c) + s), el('span', 'centre', s));
     e.setAttribute('aria-label', K.valeur(c) + ' de ' + K.NOMS_COULEURS[K.couleur(c)]);
+    e.dataset.carte = c;
     return e;
   }
   const trierMain = (main) => main.slice().sort((a, b) => K.COULEURS.indexOf(K.couleur(a)) - K.COULEURS.indexOf(K.couleur(b)) || K.valeur(a) - K.valeur(b));
@@ -674,13 +700,216 @@ details.rappel summary { cursor: pointer; font-weight: 600; }
     vueActuelle = v;
     garderEcranAllume();
     vocal.maj(v);
+    const finAvant = finChrono;
     demarrerChrono(v);
-    if (!ancienne || ancienne.etat !== v.etat || ancienne.numeroManche !== v.numeroManche) carteChoisie = null;
+    if (!ancienne || ancienne.etat !== v.etat || ancienne.numeroManche !== v.numeroManche) { carteChoisie = null; cartesRecues.clear(); }
     if (v.etat === 'salon') { fermerFenetre(); return afficherSalon(v); }
+    const avant = positionsAvant();
     afficherPartie(v);
-    if (v.etat === 'finManche') afficherFinManche(v);
-    else if (v.etat === 'finPartie') afficherFinPartie(v);
-    else fermerFenetre();
+    try { animer(ancienne, v, avant, finAvant); } catch (e) { console.error(e); }
+    if (v.etat === 'finManche' || v.etat === 'finPartie') {
+      // On laisse le temps de voir l'élimination avant d'ouvrir le bilan.
+      const attente = retardFenetre - Date.now();
+      clearTimeout(minuteurFenetre);
+      if (attente > 0) {
+        fermerFenetre();
+        minuteurFenetre = setTimeout(() => { const w = vueActuelle; if (w && w.etat === 'finManche') afficherFinManche(w); else if (w && w.etat === 'finPartie') afficherFinPartie(w); }, attente);
+      } else if (v.etat === 'finManche') afficherFinManche(v);
+      else afficherFinPartie(v);
+    } else fermerFenetre();
+  }
+
+  // ------------------------------------------------------------------ animations
+  // Chaque nouvelle vue est comparée à la précédente : ce qui a changé est animé.
+  const sansAnim = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const enVol = new Map(); // sélecteur d'une carte en vol -> nombre de vols : cachée jusqu'à l'arrivée
+  const cartesRecues = new Set(); // cartes ramassées, mises en évidence dans ta main
+  let retardFenetre = 0, minuteurFenetre = null;
+  const calque = $('calque');
+
+  function positionsAvant() {
+    const r = { main: {}, table: {} };
+    document.querySelectorAll('#main [data-carte]').forEach((e) => (r.main[e.dataset.carte] = e.getBoundingClientRect()));
+    document.querySelectorAll('#poses [data-carte]').forEach((e) => (r.table[e.dataset.carte] = e.getBoundingClientRect()));
+    return r;
+  }
+  const visible = (r) => r && r.width > 0 && r.height > 0;
+  function siegeEl(id) { return document.querySelector(`.siege[data-id="${CSS.escape(id)}"]`); }
+  function rectSiege(id) {
+    const s = siegeEl(id); if (!s) return null;
+    const e = s.querySelector('.eventail');
+    const r = e && e.getBoundingClientRect();
+    return visible(r) ? r : s.getBoundingClientRect();
+  }
+  function rectCarte(sel) { const e = document.querySelector(sel); const r = e && e.getBoundingClientRect(); return visible(r) ? r : null; }
+  // Rectangle de la taille d'une carte, centré sur un autre rectangle.
+  function rectCentre(r, w, h) { return r && { left: r.left + r.width / 2 - w / 2, top: r.top + r.height / 2 - h / 2, width: w, height: h }; }
+  function rectTas() {
+    const t = $('poses').getBoundingClientRect();
+    return rectCentre(visible(t) ? t : { left: innerWidth / 2, top: innerHeight / 2, width: 0, height: 0 }, 54, 78);
+  }
+
+  // Fait voler une carte (face visible, ou de dos si c est null) d'un rectangle à un autre.
+  function voler(c, de, vers, o = {}) {
+    if (sansAnim || !visible(de) || !visible(vers)) return;
+    const e = c ? carteEl(c) : el('div', 'carte dos-carte');
+    e.classList.add('volante');
+    if (o.verso) e.classList.add('verso');
+    Object.assign(e.style, { left: vers.left + 'px', top: vers.top + 'px', width: vers.width + 'px', height: vers.height + 'px' });
+    const dx = de.left + de.width / 2 - (vers.left + vers.width / 2), dy = de.top + de.height / 2 - (vers.top + vers.height / 2);
+    const s0 = Math.min(1.6, Math.max(0.35, de.width / vers.width));
+    const duree = o.duree || 480, delai = o.delai || 0;
+    const kf = [{ transform: `translate(${dx}px, ${dy}px) scale(${s0}, ${s0}) rotate(${o.rot ?? -12}deg)`, opacity: 1 }];
+    if (o.retourner) kf.push({ offset: 0.5, transform: `translate(${dx / 2}px, ${dy / 2 - 30}px) scale(0.02, ${(s0 + 1) / 2}) rotate(-6deg)`, opacity: 1 });
+    kf.push(o.disparaitre ? { transform: 'translate(0px, 0px) scale(0.4, 0.4) rotate(0deg)', opacity: 0 } : { transform: 'translate(0px, 0px) scale(1, 1) rotate(0deg)', opacity: 1 });
+    if (o.cible) { enVol.set(o.cible, (enVol.get(o.cible) || 0) + 1); document.querySelectorAll(o.cible).forEach((x) => (x.style.visibility = 'hidden')); }
+    calque.append(e);
+    if (o.retourner) setTimeout(() => e.classList.toggle('verso'), delai + duree / 2);
+    const a = e.animate(kf, { duration: duree, delay: delai, easing: 'cubic-bezier(.25,.8,.3,1)', fill: 'backwards' });
+    const fin = () => {
+      e.remove();
+      if (o.cible) {
+        const n = (enVol.get(o.cible) || 1) - 1;
+        if (n > 0) enVol.set(o.cible, n);
+        else { enVol.delete(o.cible); document.querySelectorAll(o.cible).forEach((x) => { x.style.visibility = ''; x.animate([{ transform: 'scale(1.12)' }, { transform: 'scale(1)' }], { duration: 220 }); }); }
+      }
+    };
+    a.onfinish = fin; a.oncancel = fin;
+  }
+  // Petite icône qui surgit au-dessus d'un joueur.
+  function bulle(id, texte, o = {}) {
+    const r = rectSiege(id);
+    if (sansAnim || !visible(r)) return;
+    const b = el('div', 'bulle' + (o.cls ? ' ' + o.cls : ''), texte);
+    b.style.left = r.left + r.width / 2 + 'px'; b.style.top = r.top + r.height / 2 + 'px';
+    calque.append(b);
+    b.animate([
+      { transform: 'translate(-50%, -50%) scale(.2)', opacity: 0 },
+      { transform: 'translate(-50%, -95%) scale(1.3)', opacity: 1, offset: 0.2 },
+      { transform: 'translate(-50%, -110%) scale(1)', opacity: 1, offset: 0.8 },
+      { transform: 'translate(-50%, -150%) scale(.9)', opacity: 0 },
+    ], { duration: o.duree || 1700, delay: o.delai || 0, easing: 'ease-out', fill: 'backwards' }).onfinish = () => b.remove();
+  }
+  function secouer(id) {
+    const s = siegeEl(id);
+    if (!s || sansAnim) return;
+    s.animate([{ rotate: '0deg' }, { rotate: '-7deg' }, { rotate: '7deg' }, { rotate: '-5deg' }, { rotate: '5deg' }, { rotate: '0deg' }], { duration: 600, delay: 200 });
+  }
+  // Grand tampon au milieu de l'écran (KATAPSS).
+  function tampon(texte, sous) {
+    if (sansAnim) return;
+    const t = el('div', 'tampon', texte);
+    if (sous) t.append(el('small', null, sous));
+    calque.append(t);
+    t.animate([
+      { transform: 'translate(-50%, -50%) rotate(-8deg) scale(3)', opacity: 0 },
+      { transform: 'translate(-50%, -50%) rotate(-8deg) scale(.92)', opacity: 1, offset: 0.15 },
+      { transform: 'translate(-50%, -50%) rotate(-8deg) scale(1)', opacity: 1, offset: 0.25 },
+      { transform: 'translate(-50%, -50%) rotate(-8deg) scale(1)', opacity: 1, offset: 0.85 },
+      { transform: 'translate(-50%, -50%) rotate(-8deg) scale(1.1)', opacity: 0 },
+    ], { duration: 1900, easing: 'ease-out' }).onfinish = () => t.remove();
+  }
+  function pop(e, ampleur = 1.25, duree = 400) { if (e && !sansAnim) e.animate([{ transform: `scale(${ampleur})` }, { transform: 'scale(1)' }], { duration: duree, easing: 'cubic-bezier(.3,1.6,.5,1)' }); }
+
+  // Distribution : les cartes partent du centre vers chaque joueur, à tour de rôle.
+  function distribuer(v) {
+    const m = v.manche, tas = rectTas();
+    const mesCartes = Array.from(document.querySelectorAll('#main [data-carte]'));
+    const max = Math.max(0, ...m.sieges.map((id) => m.nbCartes[id] || 0));
+    let k = 0;
+    for (let tour = 0; tour < max; tour++) {
+      for (const id of m.sieges) {
+        if (id === v.moi) {
+          const e = mesCartes[tour]; if (!e) continue;
+          const c = e.dataset.carte;
+          voler(c, tas, e.getBoundingClientRect(), { delai: k * 70, retourner: true, verso: true, duree: 520, cible: `#main [data-carte="${c}"]` });
+        } else if (tour < (m.nbCartes[id] || 0)) {
+          voler(null, tas, rectCentre(rectSiege(id), 30, 44), { delai: k * 70, disparaitre: true, duree: 520 });
+        } else continue;
+        k++;
+      }
+    }
+  }
+
+  function animer(A, N, avant, finAvant) {
+    if (sansAnim || !N.manche || !document.body.classList.contains('en-jeu')) return;
+    const m = N.manche, moi = N.moi;
+    const a = A && A.manche;
+    const memeManche = a && (A.etat === 'manche' || A.etat === 'finManche') && A.numeroManche === N.numeroManche;
+    // Nouvelle manche : distribution.
+    if (m.pause && m.pause.type === 'depart' && !(memeManche && a.pause && a.pause.type === 'depart')) distribuer(N);
+    if (!a) return;
+
+    // Joueurs : déconnexion, retour, remplacement par un robot.
+    for (const j of N.joueurs) {
+      const o = A.joueurs.find((x) => x.id === j.id);
+      if (!o || j.robot) continue;
+      if (!o.remplace && j.remplace) bulle(j.id, '🤖');
+      else if (o.connecte && !j.connecte) bulle(j.id, '📵');
+      else if (!o.connecte && j.connecte) bulle(j.id, '👋');
+    }
+    if (!memeManche) return;
+
+    // Cartes posées : de la main (ou du joueur) vers la table, retournées pour les adversaires.
+    const cle = (p) => p.joueur + ':' + p.cartes.join(',');
+    const clesA = new Set(a.table.map(cle)), clesN = new Set(m.table.map(cle));
+    m.table.filter((p) => !clesA.has(cle(p))).forEach((p) => {
+      p.cartes.forEach((c, i) => {
+        const sel = `#poses [data-carte="${c}"]`, vers = rectCarte(sel);
+        if (!vers) return;
+        const de = p.joueur === moi ? (avant.main[c] || rectSiege(moi)) : rectCentre(rectSiege(p.joueur), vers.width * 0.6, vers.height * 0.6);
+        voler(c, de, vers, { retourner: p.joueur !== moi, verso: p.joueur !== moi, delai: i * 110, cible: sel });
+      });
+    });
+    // Fin de tour terminée : les cartes quittent la table (sauf celle qui a été ramassée).
+    const ramassee = a.pause && a.pause.annonce && a.pause.annonce.type === 'ramasse' ? a.pause.annonce.carte : null;
+    const tas = rectTas();
+    a.table.filter((p) => !clesN.has(cle(p))).forEach((p, j) => p.cartes.forEach((c, i) => {
+      if (c === ramassee) return;
+      voler(c, avant.table[c], tas, { disparaitre: true, rot: 0, delai: (j + i) * 50, duree: 420 });
+    }));
+
+    // Début de la fin de tour : ramassage, carte gagnante, sortie, joueur qui relance.
+    const an = m.pause && m.pause.annonce;
+    if (an && !(a.pause && a.pause.annonce)) {
+      if (an.type === 'ramasse') {
+        const de = rectCarte(`#poses [data-carte="${an.carte}"]`) || avant.table[an.carte];
+        if (an.joueur === moi) {
+          const sel = `#main [data-carte="${an.carte}"]`;
+          cartesRecues.add(an.carte);
+          voler(an.carte, de, rectCarte(sel), { rot: 10, duree: 650, cible: sel });
+          const e = document.querySelector(sel); if (e) e.classList.add('recue');
+        } else voler(an.carte, de, rectCentre(rectSiege(an.joueur), 36, 52), { rot: 10, duree: 650, disparaitre: true });
+        bulle(an.joueur, '✋', { delai: 300 });
+      } else if (an.type === 'suivi') bulle(an.gagnant, '👑', { delai: 500, duree: 2200 });
+      else if (an.type === 'sortie') bulle(an.joueur, '🏁', { delai: 400 });
+      if (an.meneur) bulle(an.meneur, '↻', { delai: 1400, duree: 1500 });
+    }
+
+    // Changement de tour ; chrono écoulé (coup joué automatiquement).
+    if (a.joueurCourant && a.joueurCourant !== m.joueurCourant && A.chrono && finAvant != null && performance.now() > finAvant - 350) bulle(a.joueurCourant, '⏱');
+    if (m.joueurCourant && !m.pause && (m.joueurCourant !== a.joueurCourant || a.pause)) {
+      const s = siegeEl(m.joueurCourant); pop(s && (s.querySelector('.ligne') || s), 1.2, 450);
+      if (m.joueurCourant === moi) pop($('main'), 1.06, 500);
+    }
+    // Nouvelle couleur du tour.
+    if (m.couleurTour && m.couleurTour !== a.couleurTour) pop(document.querySelector('#entete .chip'), 1.4, 500);
+
+    // KATAPSS et qualifications.
+    m.qualifies.forEach((q, rang) => {
+      if (a.qualifies.some((x) => x.joueur === q.joueur)) return;
+      if (q.raison === 'Katapss') {
+        tampon('KATAPSS !', q.joueur === moi ? 'Toi' : nom(N, q.joueur));
+        bulle(q.joueur, '✓', { cls: 'texte', delai: 800 });
+        retardFenetre = Date.now() + 2000;
+      } else bulle(q.joueur, rang === 0 ? '✓ 1er' : `✓ ${rang + 1}e`, { cls: 'texte', delai: 300 });
+    });
+    // Élimination : le joueur tremble, croix rouge, puis le bilan s'ouvre.
+    if (m.elimine && !a.elimine) {
+      secouer(m.elimine);
+      bulle(m.elimine, '✕', { cls: 'ko', delai: 200, duree: 1800 });
+      retardFenetre = Math.max(retardFenetre, Date.now() + 1900);
+    }
   }
 
   let qrPour = null;
@@ -737,11 +966,14 @@ details.rappel summary { cursor: pointer; font-weight: 600; }
     // Sièges, en partant de moi, dans le sens des aiguilles d'une montre.
     const i0 = Math.max(0, m.sieges.indexOf(v.moi));
     const ordre = m.sieges.slice(i0).concat(m.sieges.slice(0, i0));
+    const pause = m.pause;
     const box = $('sieges'); box.replaceChildren();
     // En paysage, les adversaires sont placés sur le bord de la table, de ta gauche à ta droite.
     const autres = ordre.filter((id) => id !== v.moi);
     ordre.forEach((id) => {
       const d = el('div', 'siege');
+      d.dataset.id = id;
+      if (pause && pause.annonce && pause.annonce.meneur === id) d.classList.add('meneur');
       const k = autres.indexOf(id);
       if (k >= 0) {
         const angle = Math.PI * (1 - (k + 0.5) / autres.length);
@@ -778,7 +1010,6 @@ details.rappel summary { cursor: pointer; font-weight: 600; }
     });
 
     // Table
-    const pause = m.pause;
     const ent = $('entete'); ent.replaceChildren();
     if (pause) {} else if (m.couleurTour) { const c = el('span', 'chip'); c.append('Couleur du tour ', el('b', null, K.SYMBOLES[m.couleurTour])); ent.append(c); }
     if (!pause && m.couleurInterdite && m.phase === 'ouverture') { const c = el('span', 'chip interdit'); c.append('Interdit pour ouvrir ', el('b', null, K.SYMBOLES[m.couleurInterdite])); ent.append(c); }
@@ -792,12 +1023,17 @@ details.rappel summary { cursor: pointer; font-weight: 600; }
       const d = el('div', 'depart');
       d.append(el('div', 'depart-titre', v.restants.length === 2 ? 'Finale' : 'Manche ' + v.numeroManche),
         el('div', 'decompte', ''),
-        el('div', 'depart-qui', m.joueurCourant === v.moi ? '🎯 Tu commences !' : '🎯 ' + nom(v, m.joueurCourant) + ' commence'));
+        el('div', 'depart-qui', m.joueurCourant === v.moi ? '🎯 Toi' : '🎯 ' + nom(v, m.joueurCourant)));
       poses.append(d);
-    } else if (!m.table.length) poses.append(el('span', 'vide', m.phase === 'terminee' ? 'Manche terminée.' : 'La table est vide.'));
+    }
     m.table.forEach((p, i) => {
       const d = el('div', 'pose' + (p.compte ? '' : ' compte-pas') + (forte && forte.i === i ? ' forte' : ''));
-      const g = el('div', 'groupe'); p.cartes.forEach((c) => g.append(carteEl(c)));
+      const g = el('div', 'groupe');
+      p.cartes.forEach((c) => {
+        const e = carteEl(c);
+        if (pause && pause.annonce && pause.annonce.carte === c) e.classList.add(pause.annonce.type === 'ramasse' ? 'ramassee' : 'gagnante');
+        g.append(e);
+      });
       d.append(g, el('span', 'legende', (p.joueur === v.moi ? 'Toi' : nom(v, p.joueur)) + (p.compte ? '' : ' · sort')));
       poses.append(d);
     });
@@ -806,23 +1042,10 @@ details.rappel summary { cursor: pointer; font-weight: 600; }
     const cons = $('consigne'); cons.replaceChildren();
     const monTour = m.joueurCourant === v.moi;
     const jeJoue = m.enJeu.includes(v.moi);
-    const a = pause && pause.annonce;
-    if (pause && pause.type === 'depart') cons.append('Prépare-toi, regarde tes cartes.');
-    else if (a) {
-      // Fin de tour : on annonce clairement qui reprend la main.
-      if (a.type === 'ramasse') cons.append(el('em', null, qui(a.joueur)), ` ${a.joueur === v.moi ? 'ramasses' : 'ramasse'} le ${K.afficher(a.carte)}.`);
-      else if (a.type === 'sortie') cons.append(el('em', null, qui(a.joueur)), ` ${a.joueur === v.moi ? 'sors' : 'sort'} en posant tout.`);
-      else cons.append(el('em', null, qui(a.gagnant)), ` ${a.gagnant === v.moi ? 'remportes' : 'remporte'} le tour avec le ${K.afficher(a.carte)}.`);
-      if (a.meneur) cons.append(' ', el('strong', 'meneur', a.meneur === v.moi ? 'À toi de relancer.' : `${nom(v, a.meneur)} ${a.type === 'sortie' ? 'ouvre' : 'relance'}.`));
-    }
-    else if (v.chrono && m.phase !== 'terminee' && m.joueurCourant) cons.append(el('span', 'secondes', ''), ' ');
-    if (pause) {}
-    else if (m.phase === 'terminee') cons.append('Manche terminée.');
-    else if (!v.restants.includes(v.moi)) cons.append('Tu es éliminé. Tu regardes la partie. ', el('em', null, nom(v, m.joueurCourant)), ' doit jouer.');
-    else if (!jeJoue) cons.append('Tu es qualifié pour la manche suivante. ', el('em', null, nom(v, m.joueurCourant)), ' doit jouer.');
-    else if (monTour && m.phase === 'ouverture') cons.append(el('em', null, "À toi d'ouvrir."), m.couleurInterdite ? ` Pas de ${K.SYMBOLES[m.couleurInterdite]}.` : ' Joue la couleur de ton choix.');
-    else if (monTour) cons.append(el('em', null, 'À toi.'), ` Suis à ${K.SYMBOLES[m.couleurTour]} ou ramasse le ${K.afficher(forte.carte)}.`);
-    else cons.append('En attente de ', el('em', null, nom(v, m.joueurCourant)), '…');
+    // Ce qui se passe est montré par les animations ; on n'écrit que ce que tu dois faire.
+    if (pause || m.phase === 'terminee') {}
+    else if (!v.restants.includes(v.moi) || !jeJoue) cons.append('👀 Tu regardes la partie.');
+    else if (monTour) { if (v.chrono) cons.append(el('span', 'secondes', ''), ' '); cons.append(el('em', null, 'À toi !')); }
     $('barreChrono').hidden = !(v.chrono && monTour) && !pause;
     $('barreChrono').classList.toggle('barre-pause', !!pause);
     if (monTour && !pause && !etaitMonTour && navigator.vibrate) try { navigator.vibrate(120); } catch (e) {}
@@ -860,6 +1083,8 @@ details.rappel summary { cursor: pointer; font-weight: 600; }
       main.append(b);
     });
     ajusterMain();
+    for (const sel of enVol.keys()) document.querySelectorAll(sel).forEach((x) => (x.style.visibility = 'hidden'));
+    for (const c of cartesRecues) { const e = main.querySelector(`[data-carte="${c}"]`); if (e) e.classList.add('recue'); }
     const act = $('actions'); act.replaceChildren();
     if (carteChoisie) {
       const b = el('button', 'btn principal large', `Jouer le ${K.afficher(carteChoisie)}`);
@@ -911,7 +1136,7 @@ details.rappel summary { cursor: pointer; font-weight: 600; }
     const ds = document.querySelector('.decompte-suite');
     if (ds) ds.textContent = Math.max(0, Math.ceil((finChrono - performance.now()) / 1000));
     const d = document.querySelector('.decompte');
-    if (d) d.textContent = Math.max(1, Math.ceil((finChrono - performance.now()) / 1000));
+    if (d) { const t = String(Math.max(1, Math.ceil((finChrono - performance.now()) / 1000))); if (d.textContent !== t) { d.textContent = t; pop(d, 1.6, 600); } }
     const reste = Math.max(0, finChrono - performance.now());
     const urgent = reste < 2000;
     const sec = Math.ceil(reste / 1000);
@@ -1069,7 +1294,7 @@ details.rappel summary { cursor: pointer; font-weight: 600; }
     const ul = el('ul', 'bilan');
     const classement = [v.vainqueur].concat(v.elimines.slice().reverse());
     classement.forEach((id, i) => { const li = el('li'); li.append(el('span', null, `${i + 1}. ${nom(v, id)}`), el('span', 'pastille ' + (i ? 'neutre' : 'ok'), i ? `éliminé manche ${v.elimines.length - i + 1}` : 'vainqueur')); ul.append(li); });
-    const contenu = [el('h2', null, v.vainqueur === v.moi ? 'Tu as gagné !' : `${nom(v, v.vainqueur)} gagne !`), ul];
+    const contenu = [el('div', 'trophee', '🏆'), el('h2', null, v.vainqueur === v.moi ? 'Tu as gagné !' : `${nom(v, v.vainqueur)} gagne !`), ul];
     if (v.hote === v.moi) {
       const b = el('button', 'btn principal large', 'Rejouer avec les mêmes joueurs');
       b.onclick = () => envoyer({ type: 'rejouer' });
@@ -1127,6 +1352,7 @@ details.rappel summary { cursor: pointer; font-weight: 600; }
     afficherAccueil();
   }
   window.__kopo = { get vue() { return vueActuelle; }, monId };
+  if (LOCAL) window.__kopo.afficher = afficher; // tests des animations
 })();
 </script>
 </body>
