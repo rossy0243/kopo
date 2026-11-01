@@ -21,7 +21,8 @@ const OBJETS = {
   'dos-abidjan': { type: 'dos', nom: 'Abidjan', collection: 'abidjan', prix: 2500 },
   'dos-dakar': { type: 'dos', nom: 'Dakar', collection: 'dakar', prix: 2500 },
   'dos-douala': { type: 'dos', nom: 'Douala', collection: 'douala', prix: 2500 },
-  'dos-fondateurs': { type: 'dos', nom: 'Les Fondateurs', collection: 'saison-1', prix: null },
+  'dos-fondateurs': { type: 'dos', nom: 'Les Fondateurs', collection: 'fondateurs', prix: null }, // cadeau de fondateur
+  'dos-goma': { type: 'dos', nom: 'Goma', collection: 'saison-1', prix: null },
   'cadre-kinshasa': { type: 'cadre', nom: 'Kinshasa', collection: 'kinshasa', prix: 1500 },
   'cadre-lubumbashi': { type: 'cadre', nom: 'Lubumbashi', collection: 'lubumbashi', prix: 1500 },
   'cadre-abidjan': { type: 'cadre', nom: 'Abidjan', collection: 'abidjan', prix: 1500 },
@@ -34,9 +35,9 @@ const OBJETS = {
 const DE_BASE = ['av-laiton', 'dos-laiton'];
 
 // Parcours de saison : 30 paliers. Voie gratuite : pièces à chaque palier, apparences tous les 5 ;
-// le dos de cartes de saison au bout. Voie Kopo+ : apparences en plus, jamais de pièces ni d'avantage.
+// le dos de cartes de saison (Goma) au bout. Voie Kopo+ : apparences en plus, jamais de pièces ni d'avantage.
 function contenuParcours(paliers = 30) {
-  const gratuitObjets = { 3: 'av-lubumbashi', 6: 'cadre-lubumbashi', 10: 'dos-lubumbashi', 15: 'av-dakar', 20: 'dos-dakar', 25: 'av-abidjan', 30: 'dos-fondateurs' };
+  const gratuitObjets = { 3: 'av-lubumbashi', 6: 'cadre-lubumbashi', 10: 'dos-lubumbashi', 15: 'av-dakar', 20: 'dos-dakar', 25: 'av-abidjan', 30: 'dos-goma' };
   const plusObjets = { 1: 'av-fondateur', 4: 'cadre-fondateurs', 8: 'dos-abidjan', 12: 'av-douala', 16: 'dos-douala', 20: 'av-brazzaville', 24: 'av-goma', 28: 'cadre-brazzaville', 30: 'cadre-legende' };
   const l = [];
   for (let n = 1; n <= paliers; n++) {

@@ -239,3 +239,6 @@ CREATE TABLE IF NOT EXISTS parcours_parties (
   xp        integer NOT NULL,
   PRIMARY KEY (partie_id, compte_id)
 );
+
+-- ===== Bascule vers les pièces du serveur (décision du 01/11) =====
+ALTER TABLE comptes ADD COLUMN IF NOT EXISTS joker_semaine text;               -- semaine où le joker de série a servi (2026-W45)

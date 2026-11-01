@@ -92,6 +92,8 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours 
   r.get('/classement', joueur, enveloppe(async (req, res) => res.json(await ligue.classement(req.compte, String(req.query.type || 'mondial'), { pays: req.query.pays, limite: req.query.limite }))));
 
   r.post('/bonus-du-jour', joueur, enveloppe(async (req, res) => res.json(await comptes.bonusDuJour(req.compte.id))));
+  r.post('/recompense', joueur, enveloppe(async (req, res) => res.json(await comptes.recompense(req.compte.id, req.body || {}))));
+  r.post('/cadeau-fondateur', joueur, enveloppe(async (req, res) => res.json(await comptes.cadeauFondateur(req.compte.id))));
   r.post('/remise-a-flot', joueur, enveloppe(async (req, res) => res.json(await comptes.remiseAFlot(req.compte.id))));
   r.get('/pieces', joueur, enveloppe(async (req, res) => res.json({ solde: req.compte.solde, historique: await comptes.historique(req.compte.id) })));
 

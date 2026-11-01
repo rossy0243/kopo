@@ -3,6 +3,13 @@
 const crypto = require('crypto');
 
 const jourUTC = (d = new Date()) => d.toISOString().slice(0, 10);
+// Semaine ISO (2026-W45), pour le joker de série.
+function semaineDe(d) {
+  const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
+  const an = t.getUTCFullYear(), n = Math.ceil(((t - Date.UTC(an, 0, 1)) / 864e5 + 1) / 7);
+  return an + '-W' + String(n).padStart(2, '0');
+}
 const idAleatoire = (p) => p + crypto.randomBytes(9).toString('base64url');
 const numeroAleatoire = () => String(crypto.randomInt(0, 10000)).padStart(4, '0');
 
@@ -169,23 +176,54 @@ function creerComptes(base, reglages) {
       return c;
     },
 
-    // Bonus du jour : 50, 60, 70… plafonné à 150 ; revient au départ si on saute un jour.
+    // Bonus du jour : 50, 60, 70… plafonné à 150. Un jour raté par semaine ne casse pas la série (joker, retention §3.3).
     async bonusDuJour(id) {
       const b = reglages.get('bonusJour');
       return base.transaction(async (q) => {
-        const r = await q.query('SELECT serie_bonus, dernier_bonus FROM comptes WHERE id = $1 FOR UPDATE', [id]);
+        const r = await q.query('SELECT serie_bonus, dernier_bonus, joker_semaine FROM comptes WHERE id = $1 FOR UPDATE', [id]);
         const c = r.rows[0];
         if (!c) throw Object.assign(new Error('Compte inconnu.'), { statut: 404 });
         const auj = jourUTC();
         const dernier = c.dernier_bonus ? jourUTC(new Date(c.dernier_bonus)) : null;
-        if (dernier === auj) return { dejaPris: true };
-        const hier = jourUTC(new Date(Date.now() - 864e5));
-        const serie = dernier === hier ? c.serie_bonus + 1 : 1;
+        if (dernier === auj) return { dejaPris: true, serie: c.serie_bonus };
+        const hier = jourUTC(new Date(Date.now() - 864e5)), avantHier = jourUTC(new Date(Date.now() - 2 * 864e5));
+        const semaine = semaineDe(new Date());
+        let serie = 1, joker = false;
+        if (dernier === hier) serie = c.serie_bonus + 1;
+        else if (dernier === avantHier && c.serie_bonus && c.joker_semaine !== semaine) { serie = c.serie_bonus + 1; joker = true; }
         const montant = Math.min(b.depart + b.pas * (serie - 1), b.plafond);
-        await q.query('UPDATE comptes SET serie_bonus = $2, dernier_bonus = $3 WHERE id = $1', [id, serie, auj]);
+        await q.query('UPDATE comptes SET serie_bonus = $2, dernier_bonus = $3, joker_semaine = CASE WHEN $4 THEN $5 ELSE joker_semaine END WHERE id = $1', [id, serie, auj, joker, semaine]);
         const solde = await mouvement(q, id, montant, 'bonus_jour');
-        return { montant, serie, solde };
+        return { montant, gain: montant, serie, joker, prochain: Math.min(b.depart + b.pas * serie, b.plafond), solde, jokerLibre: joker ? false : c.joker_semaine !== semaine };
       });
+    },
+
+    // Récompenses calculées sur le téléphone (missions du jour, défi de la semaine, bienvenue 7 jours).
+    // Le serveur ne peut pas tout vérifier : il plafonne (montant, nombre par jour / semaine) et refuse les doublons.
+    async recompense(id, { motif, montant, ref }) {
+      const L = { mission: { max: 100, parJour: 5 }, defi: { max: 300, parSemaine: 1 }, bienvenue: { max: 300, parJour: 1, total: 7 } }[motif];
+      montant = Math.trunc(Number(montant));
+      if (!L) throw Object.assign(new Error('Récompense inconnue.'), { statut: 400 });
+      if (!(montant > 0 && montant <= L.max)) throw Object.assign(new Error('Montant invalide.'), { statut: 400 });
+      ref = String(ref || '').slice(0, 80);
+      if (motif === 'bienvenue') motif = 'bienvenue7'; // « bienvenue » est déjà le cadeau de création du compte
+      return base.transaction(async (q) => {
+        await q.query('SELECT 1 FROM comptes WHERE id = $1 FOR UPDATE', [id]);
+        const n = (await q.query(`SELECT count(*) FILTER (WHERE cree_le >= date_trunc('day', now()))::int AS jour,
+            count(*) FILTER (WHERE cree_le >= date_trunc('week', now()))::int AS semaine, count(*)::int AS total,
+            count(*) FILTER (WHERE ref = $3 AND $3 <> '')::int AS meme
+          FROM registre_pieces WHERE compte_id = $1 AND motif = $2`, [id, motif, ref])).rows[0];
+        if (n.meme || (L.parJour && n.jour >= L.parJour) || (L.parSemaine && n.semaine >= L.parSemaine) || (L.total && n.total >= L.total)) return { ok: false, erreur: 'Déjà reçu.' };
+        const solde = await mouvement(q, id, montant, motif, ref || null);
+        return { ok: true, montant, solde };
+      });
+    },
+
+    // Cadeau de fondateur : le dos de cartes « Les Fondateurs », une fois par compte, tant que l'admin le laisse actif.
+    async cadeauFondateur(id) {
+      if (!(reglages.get('cadeauFondateur') || {}).actif) return { ok: false, erreur: 'Le cadeau de fondateur n\'est plus distribué.' };
+      const r = await base.query("INSERT INTO inventaire (compte_id, objet, source) VALUES ($1, 'dos-fondateurs', 'fondateur') ON CONFLICT DO NOTHING RETURNING 1", [id]);
+      return { ok: true, nouveau: r.rows.length > 0, objet: 'dos-fondateurs' };
     },
 
     // Remise à flot : si le solde passe sous le seuil, une fois par jour.

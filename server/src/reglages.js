@@ -23,6 +23,8 @@ const DEFAUTS = {
   },
   // Parcours de saison (retention.md §3.5) : environ 50 XP par partie, 100 XP par palier, 30 paliers.
   parcours: { xpPartie: 30, xpManche: 5, xpVictoire: 15, xpPalier: 100, paliers: 30 },
+  // Cadeau de fondateur (dos « Les Fondateurs ») pour ceux qui avaient des pièces d'essai (décision du 01/11).
+  cadeauFondateur: { actif: true },
   // Nom et thème de la prochaine saison (sinon : une ville, thème validé le 31/10).
   prochaineSaison: { nom: '', theme: '' },
   messagesRapides: ['👏', '😂', '😮', '🔥', '😡', '👍', '😭', '🙏', 'Bien joué !', 'Bravo !', 'Joli coup !', 'Belle carte !', 'Bien vu !', 'Trop fort !', 'Merci !', 'Désolé !', 'Oups !', 'Aïe !', 'Pas de chance !', 'Je ramasse…', 'Je t’ai eu !', 'Katapss !', 'Vite !', 'Prends ton temps', 'À toi !', 'Encore une !', 'Bonne chance !', 'Bonne partie !', 'GG !', 'Revanche ?', 'On en refait une ?', 'Je reviens', 'Salut tout le monde !', 'À la prochaine !'],
