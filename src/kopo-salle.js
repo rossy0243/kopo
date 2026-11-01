@@ -45,6 +45,7 @@
       niveauJoueur: 1, // niveau (XP) de l'hôte : les robots se renforcent avec lui
       revanche: null, // fin de partie : { oui: [ids], non: [ids], jusqua } ; la partie repart si au moins 2 joueurs acceptent
       revancheRatee: false,
+      dernierDuel: null, // duel : { paire, ouvreur } de la dernière partie à 2, pour alterner qui commence
       horloge: Date.now,
       rng: rng || hasardFort(),
     };
@@ -283,12 +284,24 @@
     return String(nom || '').replace(/[<>]/g, '').trim().slice(0, 16) || 'Joueur';
   }
 
+  // Qui ouvre la manche : au hasard (règlement 4), sauf en duel (partie à 2 joueurs) :
+  // quand les deux mêmes joueurs rejouent, c'est à tour de rôle (règlement 4).
+  function choisirOuvreur(s, sieges) {
+    const auHasard = sieges[Math.floor(s.rng() * sieges.length)];
+    if (sieges.length !== 2 || s.numeroManche !== 0) return auHasard;
+    const paire = sieges.slice().sort().join('|');
+    const d = s.dernierDuel;
+    const premier = d && d.paire === paire && sieges.includes(d.ouvreur) ? sieges.find((j) => j !== d.ouvreur) : auHasard;
+    s.dernierDuel = { paire, ouvreur: premier }; // gardé d'une partie à l'autre (revanche, rejouer)
+    return premier;
+  }
+
   function demarrerManche(s) {
     const sieges = K.melanger(s.restants, s.rng);
     const paquet = K.melanger(K.nouveauPaquet(), s.rng);
     const mains = {};
     sieges.forEach((j, i) => (mains[j] = paquet.slice(i * 4, i * 4 + 4)));
-    const premier = sieges[Math.floor(s.rng() * sieges.length)];
+    const premier = choisirOuvreur(s, sieges);
     s.numeroManche++;
     s.suiteA = null;
     s.manche = K.nouvelleManche(sieges, mains, premier);
