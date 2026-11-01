@@ -48,7 +48,7 @@ Pour tester à plusieurs onglets sur un seul appareil, sans réseau : ouvrir `in
 1. Render → le Blueprint du dépôt → *Sync* (ou *New → Blueprint*) : le site `kopo` est créé. Noter son adresse (le nom `kopo` étant pris, Render a donné `https://kopo-d655.onrender.com`). Si l'adresse est différente, la mettre dans `SITE_URL` (site) et `ORIGINES` (serveur).
 2. Supabase → *Authentication → URL Configuration* : mettre l'adresse dans *Site URL* et ajouter `https://kopo-d655.onrender.com/**` aux *Redirect URLs* (connexion Google).
 3. Vérifier sur le téléphone : partie, connexion Google, boutique.
-4. Remplir `NOUVELLE_ADRESSE` dans `src/source.html`, `node build.js`, fusionner. Les joueurs qui ouvrent l'ancienne adresse partent sur la nouvelle avec leurs données du téléphone (compte invité, profil, réglages), envoyées dans le `#` de l'adresse.
+4. Fait : `NOUVELLE_ADRESSE` = `https://kopo-d655.onrender.com/` (seule l’adresse `*.github.io` redirige). Pour refaire : remplir `NOUVELLE_ADRESSE` dans `src/source.html`, `node build.js`, fusionner. Les joueurs qui ouvrent l'ancienne adresse partent sur la nouvelle avec leurs données du téléphone (compte invité, profil, réglages), envoyées dans le `#` de l'adresse.
 5. Laisser l'ancienne adresse quelques semaines, puis passer le dépôt en privé (GitHub Pages s'arrête).
 
 ## Licence

@@ -987,7 +987,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   // Passage de GitHub Pages à Render : les données du téléphone (compte invité, profil, réglages) sont liées
   // à l'adresse du site. Quand NOUVELLE_ADRESSE est remplie, l'ancienne adresse envoie ses données kopo-*
   // à la nouvelle dans le # (rien ne passe par un serveur), et la nouvelle les reprend si elle est encore vide.
-  const NOUVELLE_ADRESSE = ''; // ex. 'https://kopo.onrender.com/' (avec le / final)
+  const NOUVELLE_ADRESSE = 'https://kopo-d655.onrender.com/'; // avec le / final
   (function demenagement() {
     const h = location.hash;
     if (h.startsWith('#demenagement=')) {
@@ -1001,7 +1001,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       history.replaceState(null, '', location.pathname + location.search + suite);
       return;
     }
-    if (!NOUVELLE_ADRESSE || LOCAL) return;
+    if (!NOUVELLE_ADRESSE || LOCAL || !location.hostname.endsWith('.github.io')) return; // seule l'ancienne adresse redirige (pas l'appli ni un test local)
     let cible; try { cible = new URL(NOUVELLE_ADRESSE); } catch (e) { return; }
     if (cible.origin === location.origin) return;
     if (h.startsWith('#access_token') || h.startsWith('#error')) return; // retour de Google : on le traite ici
