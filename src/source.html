@@ -199,6 +199,19 @@ details.rappel summary { cursor: pointer; font-weight: 600; }
   body.en-jeu .tourner { display: flex; align-items: center; gap: 8px; flex: none; font-size: 13px; color: var(--brass); background: rgba(226,176,74,.1); border: 1px solid rgba(226,176,74,.35); border-radius: 10px; padding: 6px 10px; }
   body.en-jeu .tourner .btn { margin-left: auto; padding: 4px 10px; font-size: 13px; }
 }
+/* Invitation à tourner le téléphone (au début d'une partie tenue droite, sur téléphone). */
+.voile-tourner { z-index: 12; }
+.fenetre-tourner { width: min(340px, 100%); justify-items: center; text-align: center; }
+.fenetre-tourner h2 { font-size: 32px; }
+.fenetre-tourner .btn { width: 100%; }
+.tel-anim { width: 120px; height: 120px; color: var(--brass); }
+.tel-anim .tel { transform-origin: 60px 60px; animation: tel-tourne 2.6s ease-in-out infinite; }
+.tel-anim .fleche { opacity: 0; animation: tel-fleche 2.6s ease-in-out infinite; }
+@keyframes tel-tourne { 0%, 22% { transform: rotate(0); } 50%, 82% { transform: rotate(-90deg); } 100% { transform: rotate(0); } }
+@keyframes tel-fleche { 0%, 10% { opacity: 0; } 25%, 45% { opacity: 1; } 60%, 100% { opacity: 0; } }
+.tourner .tel-mini { width: 22px; height: 22px; flex: none; }
+.tourner .tel-mini .tel { transform-origin: 12px 12px; animation: tel-tourne 3.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .tel-anim .tel, .tel-anim .fleche, .tourner .tel-mini .tel { animation: none; } .tel-anim .fleche { opacity: 1; } }
 
 /* Partie en paysage : les joueurs autour d'une table ovale, ta main en bas. */
 @media (orientation: landscape) {
@@ -862,7 +875,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   <!-- Partie -->
   <section id="ecranPartie" hidden>
     <div class="tapis" aria-hidden="true"></div>
-    <div class="tourner" id="tourner"><span>↻ Tourne ton téléphone pour voir la table en grand.</span><button class="btn" id="btnPleinEcran" hidden>Plein écran</button></div>
+    <div class="tourner" id="tourner"><svg class="tel-mini" viewBox="0 0 24 24" aria-hidden="true"><g class="tel"><rect x="7" y="2" width="10" height="20" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><line x1="10.5" y1="18.5" x2="13.5" y2="18.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></g></svg><span>Tourne ton téléphone pour voir la table en grand.</span><button class="btn" id="btnPleinEcran" hidden>Plein écran</button></div>
     <div class="sieges" id="sieges" aria-label="Joueurs, dans l'ordre de jeu"></div>
     <section class="table" aria-label="Table">
       <div class="table-entete" id="entete"></div>
@@ -887,6 +900,23 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
 </div>
 <div class="voile" id="voile" hidden><div class="fenetre" id="fenetre"></div></div>
 <div class="toast" id="toast" hidden role="status"></div>
+<div class="voile voile-tourner" id="voileTourner" hidden>
+  <div class="fenetre fenetre-tourner" role="dialog" aria-modal="true" aria-labelledby="titreTourner">
+    <svg class="tel-anim" viewBox="0 0 120 120" aria-hidden="true">
+      <path class="fleche" d="M96 36 A44 44 0 0 0 60 16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+      <path class="fleche" d="M60 16 l9 -6 M60 16 l8 7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+      <g class="tel">
+        <rect x="38" y="16" width="44" height="88" rx="9" fill="rgba(226,176,74,.08)" stroke="currentColor" stroke-width="3.5"/>
+        <line x1="53" y1="94" x2="67" y2="94" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+        <rect x="46" y="46" width="12" height="17" rx="2" fill="#f7efe0"/><rect x="62" y="46" width="12" height="17" rx="2" fill="#f7efe0"/>
+      </g>
+    </svg>
+    <h2 id="titreTourner">Tourne ton téléphone</h2>
+    <p>Kopo se joue mieux en paysage : la table en grand, les joueurs autour de toi et ta main en éventail.</p>
+    <button class="btn principal large" id="btnTournerPleinEcran" hidden>Plein écran en paysage</button>
+    <button class="btn large" id="btnTournerPortrait">Continuer en portrait</button>
+  </div>
+</div>
 <div id="calque" aria-hidden="true"></div>
 <div id="filChat" role="log" aria-live="polite" aria-label="Chat de la partie"></div>
 
@@ -1435,7 +1465,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
 
   // ------------------------------------------------------------------ affichage
   const ecrans = ['ecranAccueil', 'ecranConnexion', 'ecranSalon', 'ecranPartie'];
-  function montrerEcran(nom) { for (const e of ecrans) $(e).hidden = e !== nom; $('btnQuitter').hidden = nom === 'ecranAccueil'; document.body.classList.toggle('en-jeu', nom === 'ecranPartie'); document.body.classList.toggle('accueil', nom === 'ecranAccueil'); if (nom !== 'ecranAccueil') $('voileRejoindre').hidden = $('voileRobots').hidden = $('voileSalles').hidden = true; majPleinEcran(); }
+  function montrerEcran(nom) { for (const e of ecrans) $(e).hidden = e !== nom; $('btnQuitter').hidden = nom === 'ecranAccueil'; document.body.classList.toggle('en-jeu', nom === 'ecranPartie'); document.body.classList.toggle('accueil', nom === 'ecranAccueil'); if (nom !== 'ecranAccueil') $('voileRejoindre').hidden = $('voileRobots').hidden = $('voileSalles').hidden = true; majPleinEcran(); if (nom !== 'ecranPartie') { tournerVu = false; fermerInvitationPaysage(); } }
   // Plein écran (Android) : cache les barres du navigateur et bloque le téléphone en paysage.
   const peutPleinEcran = !!(document.fullscreenEnabled && document.documentElement.requestFullscreen);
   function majPleinEcran() {
@@ -1450,6 +1480,24 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       .catch(() => {});
   }
   document.addEventListener('fullscreenchange', majPleinEcran);
+  // Invitation à tourner le téléphone : au début d'une partie tenue droite, sur un écran tactile.
+  // Elle ne bloque rien : elle se ferme seule quand le téléphone est tourné ou quand c'est ton tour,
+  // et « Continuer en portrait » est retenu (le petit bandeau en haut de la table reste).
+  const mqPortrait = matchMedia('(orientation: portrait)');
+  const mqTactile = matchMedia('(pointer: coarse)');
+  var tournerVu = false;
+  function inviterPaysage() {
+    if (tournerVu || stock.lire('kopo-portrait') || !mqPortrait.matches || !mqTactile.matches) return;
+    if (!document.body.classList.contains('en-jeu')) return;
+    tournerVu = true;
+    $('btnTournerPleinEcran').hidden = !peutPleinEcran;
+    $('voileTourner').hidden = false;
+  }
+  function fermerInvitationPaysage() { $('voileTourner').hidden = true; }
+  $('btnTournerPortrait').onclick = () => { stock.ecrire('kopo-portrait', true); fermerInvitationPaysage(); };
+  $('btnTournerPleinEcran').onclick = () => { fermerInvitationPaysage(); pleinEcran(); };
+  $('voileTourner').onclick = (e) => { if (e.target === e.currentTarget) fermerInvitationPaysage(); };
+  mqPortrait.addEventListener('change', () => { if (!mqPortrait.matches) fermerInvitationPaysage(); });
   // Icône Kopo du sprite (#i-nom) : trait doré, voir docs/icones-kopo.md.
   function ico(nom, cls) { const t = document.createElement('template'); t.innerHTML = '<svg class="ico' + (cls ? ' ' + cls : '') + '" aria-hidden="true"><use href="#i-' + nom + '"/></svg>'; return t.content.firstChild; }
   // Texte précédé d'une icône (dans un bouton, un nom…).
@@ -1795,6 +1843,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
 
   function afficherPartie(v) {
     montrerEcran('ecranPartie');
+    if (!(v.manche && v.manche.joueurCourant === v.moi)) inviterPaysage();
     const m = v.manche;
     const finale = v.restants.length === 2;
     $('info').innerHTML = '';
@@ -1892,7 +1941,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
     }
     $('barreChrono').hidden = !(v.chrono && monTour) && !pause;
     $('barreChrono').classList.toggle('barre-pause', !!pause);
-    if (monTour && !pause && !etaitMonTour) { vibrer(120); Sons.jouer('tour'); }
+    if (monTour && !pause && !etaitMonTour) { vibrer(120); Sons.jouer('tour'); fermerInvitationPaysage(); }
     etaitMonTour = monTour && !pause;
 
     // Main et actions
