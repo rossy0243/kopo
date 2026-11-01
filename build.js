@@ -15,6 +15,9 @@ const rempl = {
   SONS: lire('src/kopo-sons.js'),
 };
 for (const [k, v] of Object.entries(rempl)) html = html.replace(`/*${k}*/`, () => v);
+// Adresse publique du site (aperçus WhatsApp, etc.) : SITE_URL sur Render, GitHub Pages par défaut.
+const site = (process.env.SITE_URL || 'https://rossy0243.github.io/kopo/').replace(/\/?$/, '/');
+html = html.split('__KOPO_SITE__').join(site);
 // Empreinte de la page : le jeu la compare à celle en ligne pour proposer « Mettre à jour ».
 html = html.replace('__KOPO_BUILD__', require('crypto').createHash('sha1').update(html).digest('hex').slice(0, 12));
 fs.writeFileSync(ici('index.html'), html);

@@ -4771,10 +4771,37 @@ var qrcode = function() {
     effacer(k) { try { localStorage.removeItem(k); } catch (e) {} },
   };
 
+  // ------------------------------------------------------------------ changement d'adresse
+  // Passage de GitHub Pages à Render : les données du téléphone (compte invité, profil, réglages) sont liées
+  // à l'adresse du site. Quand NOUVELLE_ADRESSE est remplie, l'ancienne adresse envoie ses données kopo-*
+  // à la nouvelle dans le # (rien ne passe par un serveur), et la nouvelle les reprend si elle est encore vide.
+  const NOUVELLE_ADRESSE = ''; // ex. 'https://kopo.onrender.com/' (avec le / final)
+  (function demenagement() {
+    const h = location.hash;
+    if (h.startsWith('#demenagement=')) {
+      let suite = '';
+      try {
+        const d = JSON.parse(decodeURIComponent(escape(atob(h.slice(14)))));
+        suite = typeof d._hash === 'string' ? d._hash : '';
+        const vide = !Object.keys(localStorage).some((k) => k.startsWith('kopo-'));
+        if (vide && d && typeof d === 'object') for (const [k, v] of Object.entries(d)) if (k.startsWith('kopo-') && typeof v === 'string') localStorage.setItem(k, v);
+      } catch (e) {}
+      history.replaceState(null, '', location.pathname + location.search + suite);
+      return;
+    }
+    if (!NOUVELLE_ADRESSE || LOCAL) return;
+    let cible; try { cible = new URL(NOUVELLE_ADRESSE); } catch (e) { return; }
+    if (cible.origin === location.origin) return;
+    if (h.startsWith('#access_token') || h.startsWith('#error')) return; // retour de Google : on le traite ici
+    const d = { _hash: h };
+    try { for (const k of Object.keys(localStorage)) if (k.startsWith('kopo-')) d[k] = localStorage.getItem(k); } catch (e) {}
+    location.replace(cible.href + location.search + '#demenagement=' + btoa(unescape(encodeURIComponent(JSON.stringify(d)))));
+  })();
+
   // ------------------------------------------------------------------ paramètres
   // Réglages du joueur, gardés sur le téléphone (plus tard : rattachés au compte).
   const VERSION = '1.0-essai';
-  const BUILD = 'ee9a2e82ce9c'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = '3aaf74f6e5c3'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
