@@ -12,6 +12,7 @@ const rempl = {
   MOTEUR: lire('moteur/kopo-moteur.js'),
   SALLE: lire('src/kopo-salle.js'),
   RETENTION: lire('src/kopo-retention.js'),
+  SONS: lire('src/kopo-sons.js'),
 };
 for (const [k, v] of Object.entries(rempl)) html = html.replace(`/*${k}*/`, () => v);
 fs.writeFileSync(ici('index.html'), html);
