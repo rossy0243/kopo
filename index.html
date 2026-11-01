@@ -504,6 +504,7 @@ body.dos-kinshasa { --dos-motif: linear-gradient(135deg, transparent 38%, #f7d03
 .carte-mission .barre-xp span { background: var(--good); }
 .carte-mission .droite { display: flex; align-items: center; gap: 8px; }
 .fenetre[data-type="missions"] { width: min(600px, 100%); }
+.fenetre[data-type="ligue"] { width: min(520px, 100%); }
 .carte-mission { padding: 7px 11px; }
 .carte-mission .recompense { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; color: var(--brass); font-size: 14px; }
 .carte-mission .recompense .piece { width: 20px; height: 20px; font-size: 12px; }
@@ -590,6 +591,37 @@ body.en-jeu #filChat { display: flex; }
 body.quatre-couleurs .carte[data-carte$="C"] { color: #c62828; }
 body.quatre-couleurs .carte[data-carte$="K"] { color: #1565c0; }
 body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
+/* Ligue classée (serveur) : divisions, saison, classements. */
+.ligue { display: grid; gap: 12px; }
+.mode-ligue .mode-icone { position: relative; }
+.mode-ligue .point-nouveau { position: absolute; top: -2px; right: -6px; }
+.ligue-saison { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; color: var(--muted); font-size: 13px; }
+.ligue-saison b { color: var(--brass); font-size: 15px; }
+.ligue-division { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; align-items: center; border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; background: rgba(255,255,255,.04); }
+.ligue-blason { grid-row: span 3; width: 58px; height: 66px; display: grid; place-items: center; border-radius: 10px 10px 50% 50% / 10px 10px 40% 40%; background: var(--div, var(--brass)); color: #1d1606; font: 400 30px/1 var(--display); box-shadow: inset 0 -6px 0 rgba(0,0,0,.18); }
+.ligue-division .nom { font: 400 28px/1 var(--display); letter-spacing: 2px; color: var(--div, var(--brass)); }
+.ligue-division small { color: var(--muted); font-size: 12px; }
+.ligue-division .barre-xp span { background: var(--div, var(--brass)); }
+.ligue-rangs { display: flex; gap: 8px; }
+.ligue-rangs div { flex: 1; text-align: center; border: 1px solid var(--line); border-radius: 12px; padding: 6px; }
+.ligue-rangs b { display: block; font: 400 24px/1 var(--display); color: var(--ink); }
+.ligue-rangs small { color: var(--muted); font-size: 11px; }
+.ligue-onglets { display: flex; gap: 4px; background: rgba(0,0,0,.2); border-radius: 12px; padding: 3px; }
+.ligue-onglets button { flex: 1; background: none; border: 0; color: var(--muted); font: inherit; font-weight: 600; font-size: 13px; padding: 7px; border-radius: 9px; }
+.ligue-onglets button[aria-pressed="true"] { background: var(--brass); color: #1d1606; }
+.ligue-liste { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; max-height: 38vh; overflow: auto; }
+.ligue-liste li { display: grid; grid-template-columns: 34px 1fr auto; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 9px; font-size: 14px; }
+.ligue-liste li.moi { background: rgba(226,176,74,.14); }
+.ligue-liste .rang { color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; }
+.ligue-liste .pts { font-variant-numeric: tabular-nums; font-weight: 700; }
+.ligue-liste i { font-style: normal; display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--div); margin-right: 6px; }
+.ligue-recap { display: flex; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; background: rgba(255,255,255,.04); }
+.ligue-recap .delta { font: 400 28px/1 var(--display); color: var(--good); }
+.ligue-recap .delta.neg { color: #ff8a80; }
+.ligue-recap .delta.nul { color: var(--muted); }
+.ligue-recap .monte { color: var(--brass); font-weight: 700; }
+.ligue-fin { text-align: center; display: grid; gap: 8px; justify-items: center; }
+.ligue-fin .titre { font: 400 34px/1 var(--display); letter-spacing: 2px; color: var(--div, var(--brass)); }
 </style>
 </head>
 <body>
@@ -667,7 +699,8 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
       <button class="mode mode-enligne" id="btnInconnus" data-coin="♦"><span class="mode-icone"><svg class="ico"><use href="#i-enligne"/></svg></span><b>En ligne</b><small>Avec des inconnus <span id="enLigne"></span></small></button>
       <button class="mode mode-rejoindre" data-coin="♥" id="btnModeRejoindre"><span class="mode-icone"><svg class="ico"><use href="#i-rejoindre"/></svg></span><b>Rejoindre</b><small>Avec un code ou le QR</small></button>
       <button class="mode mode-robots" data-coin="♣" id="btnModeRobots"><span class="mode-icone"><svg class="ico"><use href="#i-robots"/></svg></span><b>Contre les robots</b><small>Partie rapide, seul</small></button>
-      <div class="mode mode-bientot" data-coin="♠" aria-disabled="true"><span class="mode-icone"><svg class="ico"><use href="#i-tournoi"/></svg></span><b>Tournoi</b><small>Bientôt</small></div>
+      <button class="mode mode-ligue" data-coin="♠" id="btnLigue" hidden><span class="mode-icone"><svg class="ico"><use href="#i-couronne"/></svg><i class="point-nouveau" id="pointLigue" hidden></i></span><b>Ligue</b><small id="ligueResume">Saison classée</small></button>
+      <div class="mode mode-bientot" id="modeTournoi" data-coin="♠" aria-disabled="true"><span class="mode-icone"><svg class="ico"><use href="#i-tournoi"/></svg></span><b>Tournoi</b><small>Bientôt</small></div>
     </div>
     <nav class="barre-bas">
       <button class="onglet" id="btnMissions"><span><svg class="ico"><use href="#i-missions"/></svg><i class="point-nouveau" id="pointMissions" hidden></i></span>Missions</button>
@@ -5574,6 +5607,7 @@ var qrcode = function() {
     }
     const extra = el('div'); extra.id = 'recapExtra'; // points de ligue (serveur)
     gauche.append(extra);
+    remplirRecapLigue(extra);
     // Boutons : revanche, partie suivante, partager, quitter
     const boutons = el('div', 'recap-boutons');
     const btnRev = el('button', 'btn principal large btn-revanche');
@@ -5650,7 +5684,6 @@ var qrcode = function() {
     recapOuvert = { cle, maj };
     ouvrirFenetre([recap], 'recap');
   }
-  window.addEventListener('kopo-ligue', () => {}); // le récap de ligue (serveur) viendra se placer dans #recapExtra
 
   // Image de victoire à partager (WhatsApp en priorité), dessinée sur le téléphone.
   async function imageVictoire(v, r) {
@@ -5819,6 +5852,149 @@ var qrcode = function() {
   let bloques = new Set(stock.lire('kopo-bloques') || []);
   const memoriserBloques = () => stock.ecrire('kopo-bloques', [...bloques]);
   async function majBloques() { if (!compteLocal()) return; try { bloques = new Set((await apiJoueur('/bloques')).map((b) => b.id)); memoriserBloques(); } catch (e) {} }
+
+  // ------------------------------------------------------------------ ligue classée (serveur)
+  // Le serveur calcule tout (points, divisions, saisons, classements) ; la page ne fait qu'afficher.
+  const DIVISIONS_COULEURS = { bois: '#b07a46', bronze: '#d08a4a', argent: '#c9d1da', or: '#e2b04a', diamant: '#7fd3e6', legende: '#e0564c' };
+  const NOMS_DIVISIONS = { bois: 'Bois', bronze: 'Bronze', argent: 'Argent', or: 'Or', diamant: 'Diamant', legende: 'Légende' };
+  const PAYS = [['CD', 'RD Congo'], ['CG', 'Congo-Brazzaville'], ['CI', 'Côte d\'Ivoire'], ['SN', 'Sénégal'], ['CM', 'Cameroun'], ['GA', 'Gabon'], ['BJ', 'Bénin'], ['TG', 'Togo'], ['BF', 'Burkina Faso'], ['ML', 'Mali'], ['NE', 'Niger'], ['GN', 'Guinée'], ['RW', 'Rwanda'], ['BI', 'Burundi'], ['MG', 'Madagascar'], ['TD', 'Tchad'], ['CF', 'Centrafrique'], ['AO', 'Angola'], ['KE', 'Kenya'], ['TZ', 'Tanzanie'], ['UG', 'Ouganda'], ['NG', 'Nigeria'], ['GH', 'Ghana'], ['ZA', 'Afrique du Sud'], ['MA', 'Maroc'], ['DZ', 'Algérie'], ['TN', 'Tunisie'], ['HT', 'Haïti'], ['FR', 'France'], ['BE', 'Belgique'], ['CH', 'Suisse'], ['CA', 'Canada'], ['US', 'États-Unis'], ['GB', 'Royaume-Uni']];
+  const nomPays = (c) => (PAYS.find((p) => p[0] === c) || [c, c])[1];
+  const couleurDiv = (d) => DIVISIONS_COULEURS[d] || 'var(--brass)';
+  const resteSaison = (fin) => {
+    const ms = new Date(fin) - Date.now();
+    if (ms <= 0) return 'se termine maintenant';
+    const j = Math.floor(ms / 864e5), h = Math.floor((ms % 864e5) / 36e5);
+    return j >= 1 ? `fin dans ${j} j ${h} h` : `fin dans ${h} h ${Math.floor((ms % 36e5) / 6e4)} min`;
+  };
+  let derniereLigue = null; // { recu, detail } : points de la dernière partie classée
+  window.addEventListener('kopo-classee', (e) => { if (e.detail && e.detail.classee) toast('Partie classée : tes points de ligue sont en jeu.'); });
+  window.addEventListener('kopo-ligue', (e) => {
+    derniereLigue = { recu: Date.now(), detail: e.detail };
+    const x = document.getElementById('recapExtra');
+    if (x) remplirRecapLigue(x);
+  });
+  // Récap de fin : « +24 · Bronze 125 pts · Montée ! », placé dans #recapExtra (fil du lot A).
+  function remplirRecapLigue(x) {
+    if (!derniereLigue || Date.now() - derniereLigue.recu > 60000) return;
+    const d = derniereLigue.detail;
+    const b = el('div', 'ligue-recap');
+    b.style.setProperty('--div', couleurDiv(d.division));
+    b.append(el('span', 'delta' + (d.delta < 0 ? ' neg' : d.delta === 0 ? ' nul' : ''), (d.delta > 0 ? '+' : '') + d.delta));
+    const t = el('div'); t.style.display = 'grid';
+    t.append(el('b', null, `Ligue · ${NOMS_DIVISIONS[d.division] || d.division} · ${d.points} pts`));
+    if (d.promu) t.append(el('div', 'monte', `Montée en ${NOMS_DIVISIONS[d.division]} !`));
+    else if (d.relegue) t.append(el('small', 'muted', `Retour en ${NOMS_DIVISIONS[d.division]}.`));
+    else if (d.prochaine) t.append(el('small', 'muted', `Encore ${d.prochaine.manque} pts pour ${NOMS_DIVISIONS[d.prochaine.division]}`));
+    if (d.protection > 0 && d.promu) t.append(el('small', 'muted', ` · ${d.protection} parties protégées`));
+    b.append(t);
+    x.replaceChildren(b);
+    if (!sansAnim) b.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 400, easing: 'ease-out' });
+  }
+
+  // Fin de saison : titre et pièces, montrés une fois.
+  function fenetreFinSaison(r, suite) {
+    const z = el('div', 'ligue-fin');
+    z.style.setProperty('--div', couleurDiv(r.meilleure));
+    const bl = el('div', 'ligue-blason', (NOMS_DIVISIONS[r.meilleure] || '?')[0]);
+    z.append(el('small', 'muted', `Saison ${r.saison} : ${r.nom} terminée`), bl, el('div', 'titre', r.titre), el('div', null, r.rang ? `Classement final : ${r.rang}e` : ''));
+    if (r.pieces) { const g = el('div', 'gain'); g.style.cssText = 'display:flex;align-items:center;gap:8px'; g.append('+' + r.pieces); g.append(el('span', 'piece', 'K')); z.append(g); }
+    z.append(el('small', 'muted', 'Une nouvelle saison commence : tu repars un peu plus bas. À toi de remonter !'));
+    if (!sansAnim) bl.animate([{ transform: 'scale(.3) rotate(-20deg)', opacity: 0 }, { transform: 'scale(1.15)', opacity: 1, offset: .6 }, { transform: 'none' }], { duration: 800, easing: 'ease-out' });
+    const ok = el('button', 'btn principal large', 'Super !');
+    ok.onclick = () => { apiJoueur('/ligue/vu', 'POST').catch(() => {}); fermerFenetre(); if (suite) suite(); };
+    ouvrirFenetre([z, ok]);
+  }
+
+  async function ouvrirLigue() {
+    let L;
+    try {
+      if (!compteLocal()) { const p = lirePseudo(); if (!p) return; await compteServeur(p); } // la ligue demande un compte en ligne (invité suffit)
+      L = await apiJoueur('/ligue');
+    } catch (e) { toast(e.message); return; }
+    $('pointLigue').hidden = true;
+    majOngletLigue();
+    if (L.recompense) return fenetreFinSaison(L.recompense, ouvrirLigue);
+    const m = L.moi, z = el('div', 'ligue');
+    if (L.saison) {
+      const s = el('div', 'ligue-saison');
+      s.append(el('b', null, L.saison.titre), el('span', null, resteSaison(L.saison.fin)));
+      z.append(s);
+    }
+    const dv = el('div', 'ligue-division');
+    dv.style.setProperty('--div', couleurDiv(m.division));
+    const barre = el('div', 'barre-xp'), sp = el('span'); barre.append(sp);
+    const seuil = (L.divisions.find((d) => d.id === m.division) || { seuil: 0 }).seuil;
+    dv.append(el('div', 'ligue-blason', NOMS_DIVISIONS[m.division][0]), el('div', 'nom', NOMS_DIVISIONS[m.division]));
+    dv.append(barre, el('small', null, m.prochaine ? `${m.points} pts · encore ${m.prochaine.manque} pour ${NOMS_DIVISIONS[m.prochaine.division]}` : `${m.points} pts · tout en haut !`));
+    remplir(sp, 0, m.prochaine ? (m.points - seuil) / (m.prochaine.seuil - seuil) : 1, 150);
+    z.append(dv);
+    if (m.protection > 0) z.append(el('small', 'muted', `Protégé : tu ne peux pas redescendre pendant encore ${m.protection} partie${m.protection > 1 ? 's' : ''}.`));
+    const rangs = el('div', 'ligue-rangs');
+    const r = (v, t) => { const d = el('div'); d.append(el('b', null, v == null ? '—' : String(v)), el('small', null, t)); rangs.append(d); return d; };
+    r(m.rangMondial, 'au monde'); const tuilePays = r(m.rangPays, m.pays ? nomPays(m.pays) : 'pays'); r(m.parties, 'parties classées');
+    z.append(rangs);
+    // Classements : entre amis d'abord (c'est le plus parlant), puis pays, puis monde.
+    const onglets = el('div', 'ligue-onglets'), liste = el('ul', 'ligue-liste'), pied = el('div');
+    const types = [['amis', 'Amis'], ['pays', 'Pays'], ['mondial', 'Monde']];
+    const charger = async (type) => {
+      onglets.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.type === type)));
+      liste.replaceChildren(el('li', 'muted', 'Chargement…')); pied.replaceChildren();
+      if (type === 'pays' && !m.pays) { liste.replaceChildren(); pied.append(choixPays()); return; }
+      let c;
+      try { c = await apiJoueur('/classement?type=' + type); } catch (e) { liste.replaceChildren(el('li', 'muted', e.message)); return; }
+      liste.replaceChildren();
+      for (const j of c.liste) liste.append(ligneClassement(j));
+      if (type === 'pays' && c.moi) tuilePays.replaceChildren(el('b', null, String(c.moi.rang)), el('small', null, nomPays(m.pays)));
+      if (c.moi && !c.liste.some((j) => j.id === c.moi.id)) { liste.append(el('li', 'muted', '…')); liste.append(ligneClassement(c.moi)); }
+      if (!c.liste.length) liste.append(el('li', 'muted', type === 'amis' ? 'Ajoute des amis pour vous comparer.' : 'Personne n\'est encore classé cette saison. Sois le premier !'));
+      if (type === 'amis') { const b = el('button', 'btn', 'Ajouter un ami'); b.onclick = ouvrirAmis; pied.append(b); }
+      if (type === 'pays') { const b = el('button', 'btn', `Changer de pays (${nomPays(m.pays)})`); b.onclick = () => { liste.replaceChildren(); pied.replaceChildren(choixPays()); }; pied.append(b); }
+      const moi = liste.querySelector('.moi'); if (moi) moi.scrollIntoView({ block: 'nearest' });
+    };
+    const ligneClassement = (j) => {
+      const li = el('li', j.id === (compteLocal() && compteLocal().compte && compteLocal().compte.id) ? 'moi' : null);
+      li.style.setProperty('--div', couleurDiv(j.division));
+      const n = el('span'); n.append(el('i'), `${j.pseudo}`);
+      li.append(el('span', 'rang', String(j.rang)), n, el('span', 'pts', `${j.points}`));
+      return li;
+    };
+    function choixPays() {
+      const f = el('div', 'ligne');
+      const sel = el('select', 'texte');
+      sel.append(el('option', null, 'Choisis ton pays'));
+      for (const [c, n] of PAYS) { const o = el('option', null, n); o.value = c; if (c === m.pays) o.selected = true; sel.append(o); }
+      const ok = el('button', 'btn principal', 'OK');
+      ok.onclick = async () => {
+        if (!/^[A-Z]{2}$/.test(sel.value)) return;
+        try { await apiJoueur('/moi', 'PATCH', { pays: sel.value }); m.pays = sel.value; charger('pays'); } catch (e) { toast(e.message); }
+      };
+      f.append(sel, ok);
+      const d = el('div'); d.append(el('small', 'muted', 'Pour le classement de ton pays.'), f);
+      return d;
+    }
+    for (const [t, n] of types) { const b = el('button', null, n); b.dataset.type = t; b.onclick = () => charger(t); onglets.append(b); }
+    z.append(onglets, liste, pied);
+    const regle = el('small', 'muted', `Parties classées : seulement « En ligne », avec des inconnus. 1er +${L.points.premier}, 2e +${L.points.deuxieme}, 3e +${L.points.troisieme}, dernier ${L.points.dernier}. Fin de saison : un titre et des pièces selon la division atteinte.`);
+    const fermer = el('button', 'btn principal large', 'Fermer');
+    fermer.onclick = fermerFenetre;
+    ouvrirFenetre([el('h2', null, 'Ligue'), z, regle, fermer], 'ligue');
+    charger('amis');
+  }
+  // Accueil : l'onglet Ligue existe avec le serveur ; un point s'allume si une saison s'est terminée.
+  // La carte Ligue prend la place de « Tournoi (bientôt) » sur l'accueil.
+  async function majOngletLigue() {
+    $('btnLigue').hidden = !MODE_SERVEUR;
+    $('modeTournoi').hidden = MODE_SERVEUR;
+    if (!MODE_SERVEUR || !compteLocal()) return;
+    try {
+      const L = await apiJoueur('/ligue');
+      $('pointLigue').hidden = !L.recompense;
+      $('ligueResume').textContent = (L.moi.parties ? `${NOMS_DIVISIONS[L.moi.division]} · ${L.moi.points} pts` : 'Saison classée') + (L.saison ? ` · ${resteSaison(L.saison.fin).replace('fin dans ', 'encore ')}` : '');
+    } catch (e) {}
+  }
+  $('btnLigue').onclick = ouvrirLigue;
+  setTimeout(majOngletLigue, 1500);
+  window.ouvrirLigue = ouvrirLigue;
 
   // Chat en partie : messages choisis dans le tableau de bord (/api/config), sinon la liste de départ.
   const messagesChat = () => (configServeur && Array.isArray(configServeur.messages) && configServeur.messages.length ? configServeur.messages : REACTIONS);
