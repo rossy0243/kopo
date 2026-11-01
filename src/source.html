@@ -513,6 +513,12 @@ body.dos-kinshasa { --dos-motif: linear-gradient(135deg, transparent 38%, #f7d03
 .carte-mission.finie .ico { color: var(--good); }
 .carte-mission .btn { padding: 3px 9px; font-size: 12px; }
 .carte-mission.defi { border-color: rgba(226,176,74,.5); background: rgba(226,176,74,.07); }
+.fenetre[data-type="boutique"] { width: min(560px, 100%); }
+.boutique-solde { display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 700; font-size: 20px; color: var(--brass); margin-bottom: 6px; }
+.boutique h3 { margin: 14px 0 6px; font-size: 15px; }
+.boutique .objet .prix { display: inline-flex; align-items: center; gap: 3px; font-weight: 700; color: var(--brass); }
+.boutique .objet .prix .piece { width: 14px; height: 14px; font-size: 9px; }
+.boutique .objet.trop-cher .prix { color: var(--muted); }
 .collection { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 8px; }
 .objet { display: grid; justify-items: center; gap: 4px; padding: 8px 4px; border-radius: 12px; border: 1px solid var(--line); background: rgba(255,255,255,.03); color: var(--ink); font-size: 12px; }
 .objet[aria-pressed="true"] { border-color: var(--brass); background: rgba(226,176,74,.12); }
@@ -2790,6 +2796,73 @@ body.dos-fondateurs { --dos-motif: radial-gradient(circle, #e2b04a 18%, transpar
   }
   window.ouvrirParcours = ouvrirParcours;
 
+  // ------------------------------------------------------------------ boutique (serveur)
+  // Apparences à prix affiché, rangées par ville (strategie-pieces §4.3) : pas de hasard, pas de fausse urgence.
+  const NOMS_COLLECTIONS = { base: 'De base', kinshasa: 'Kinshasa', lubumbashi: 'Lubumbashi', abidjan: 'Abidjan', dakar: 'Dakar', douala: 'Douala', brazzaville: 'Brazzaville' };
+  async function ouvrirBoutique() {
+    if (!MODE_SERVEUR) return toast('La boutique arrive avec le jeu en ligne.');
+    let B;
+    try { if (!compteLocal()) { const ps = lirePseudo(); if (!ps) return; await compteServeur(ps); } B = await apiJoueur('/boutique'); } catch (e) { toast(e.message); return; }
+    soldeServeur(B.solde);
+    for (const o of B.objets) { OBJETS_SERVEUR[o.id] = o; if (!R.OBJETS[o.id]) R.OBJETS[o.id] = { type: o.type, nom: o.nom, d: o.prix ? `${o.prix} pièces` : 'Parcours de saison' }; }
+    const possedes = new Set(B.possedes.concat(['av-laiton', 'dos-laiton']));
+    const z = el('div', 'boutique');
+    const solde = el('div', 'boutique-solde'); solde.append(pieceEl(), formatPieces(B.solde));
+    z.append(solde, el('small', 'muted', 'Des apparences seulement : rien n\'aide à gagner. Les pièces se gagnent en jouant.'));
+    const groupes = {};
+    for (const o of B.objets) if (o.prix != null) (groupes[o.collection] || (groupes[o.collection] = [])).push(o);
+    const ordre = { avatar: 0, cadre: 1, dos: 2 };
+    for (const [col, objets] of Object.entries(groupes)) {
+      z.append(el('h3', null, NOMS_COLLECTIONS[col] || col));
+      const g = el('div', 'collection');
+      for (const o of objets.sort((a, b) => ordre[a.type] - ordre[b.type])) {
+        const a = possedes.has(o.id), cher = !a && o.prix > B.solde;
+        const bt = el('button', 'objet' + (cher ? ' trop-cher' : ''));
+        bt.setAttribute('aria-pressed', String(B.equipes[o.type] === o.id));
+        const bas = a ? el('small', 'muted', B.equipes[o.type] === o.id ? 'Équipé' : 'À toi') : el('span', 'prix');
+        if (!a) bas.append(formatPieces(o.prix), pieceEl());
+        bt.append(apercuObjet(o.id), el('span', null, o.nom), el('small', 'muted', o.type === 'avatar' ? 'Avatar' : o.type === 'dos' ? 'Dos de cartes' : 'Cadre'), bas);
+        bt.onclick = () => (a ? equiperDepuisBoutique(o.id) : confirmerAchat(o, B.solde));
+        g.append(bt);
+      }
+      z.append(g);
+    }
+    const fermer = el('button', 'btn principal large', 'Fermer'); fermer.onclick = fermerFenetre;
+    ouvrirFenetre([el('h2', null, 'Boutique'), z, fermer], 'boutique');
+  }
+  async function equiperDepuisBoutique(id) {
+    const q = lireProfil(); R.donnerObjet(q, id);
+    if (R.equiper(q, id)) { ecrireProfil(q); appliquerCollection(q); }
+    await apiJoueur('/collection/equiper', 'POST', { objet: id }).catch(() => {});
+    ouvrirBoutique();
+  }
+  function confirmerAchat(o, solde) {
+    const nomType = o.type === 'avatar' ? 'l\'avatar' : o.type === 'dos' ? 'le dos de cartes' : 'le cadre';
+    const corps = el('div', 'bonus-jour');
+    corps.append(el('h2', null, o.nom), apercuObjet(o.id));
+    if (o.prix > solde) {
+      corps.append(el('p', null, `Il te manque ${formatPieces(o.prix - solde)} pièces pour ${nomType} ${o.nom}. Missions, bonus du jour et parties en ligne en rapportent.`));
+      const ok = el('button', 'btn principal large', 'Retour'); ok.onclick = ouvrirBoutique;
+      return ouvrirFenetre([corps, ok], 'boutique');
+    }
+    corps.append(el('p', null, `Acheter ${nomType} ${o.nom} pour ${formatPieces(o.prix)} pièces ? Il te restera ${formatPieces(solde - o.prix)} pièces.`));
+    const oui = el('button', 'btn principal large', 'Acheter'), non = el('button', 'btn large', 'Retour');
+    non.onclick = ouvrirBoutique;
+    oui.onclick = async () => {
+      oui.disabled = true;
+      try {
+        const r = await apiJoueur('/boutique/acheter', 'POST', { objet: o.id });
+        soldeServeur(r.solde);
+        const q = lireProfil(); R.donnerObjet(q, o.id); R.equiper(q, o.id); ecrireProfil(q); appliquerCollection(q);
+        await apiJoueur('/collection/equiper', 'POST', { objet: o.id }).catch(() => {});
+        vibrer(40); toast(`${o.nom} est à toi (équipé)`);
+        ouvrirBoutique();
+      } catch (e) { toast(e.message); oui.disabled = false; }
+    };
+    ouvrirFenetre([corps, oui, non], 'boutique');
+  }
+  window.ouvrirBoutique = ouvrirBoutique;
+
   // Chat en partie : messages choisis dans le tableau de bord (/api/config), sinon la liste de départ.
   const messagesChat = () => (configServeur && Array.isArray(configServeur.messages) && configServeur.messages.length ? configServeur.messages : REACTIONS);
   const estPhrase = (t) => /\p{L}/u.test(t);
@@ -3212,7 +3285,8 @@ body.dos-fondateurs { --dos-motif: radial-gradient(circle, #e2b04a 18%, transpar
     }
     z.append(col);
     const ok = el('button', 'btn principal large', 'Fermer'); ok.onclick = fermerFenetre;
-    ouvrirFenetre([el('h2', null, 'Missions'), z, ok], 'missions');
+    if (MODE_SERVEUR) { const bq = el('button', 'btn large', 'Plus d\'apparences : la Boutique'); bq.onclick = ouvrirBoutique; ouvrirFenetre([el('h2', null, 'Missions'), z, bq, ok], 'missions'); }
+    else ouvrirFenetre([el('h2', null, 'Missions'), z, ok], 'missions');
   }
 
   // ------------------------------------------------------------------ parcours de bienvenue (7 jours de jeu)
@@ -3369,7 +3443,8 @@ body.dos-fondateurs { --dos-motif: radial-gradient(circle, #e2b04a 18%, transpar
     if (!MODE_SERVEUR) corps.append(el('div', 'note-essai', 'Pièces d\'essai, remises à zéro au lancement officiel.'));
     const ok = el('button', 'btn principal large', b ? 'Récupérer' : 'OK');
     ok.onclick = () => { fermerFenetre(); majSolde(); if (b) { pop($('btnBourse'), 1.2); suiteAccueil(); } };
-    ouvrirFenetre([corps, ok]);
+    if (!b && MODE_SERVEUR) { const bq = el('button', 'btn large', 'Boutique'); bq.onclick = ouvrirBoutique; ouvrirFenetre([corps, ok, bq]); }
+    else ouvrirFenetre([corps, ok]);
   }
   function bonusDuJour() {
     if (MODE_SERVEUR) return bonusDuJourServeur();
