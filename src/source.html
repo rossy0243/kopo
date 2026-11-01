@@ -369,8 +369,11 @@ body.accueil .app { max-width: none; min-height: 100vh; min-height: 100dvh; padd
 .choix-niveau-robots button { flex: 1; padding: 10px 6px; font-size: 15px; }
 .choix-robots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .choix-robots .btn { font-size: 20px; padding: 12px 0; }
-ul.regles { margin: 0; padding-left: 18px; display: grid; gap: 8px; color: var(--ink); }
-@media (max-height: 500px) { ul.regles { gap: 4px; font-size: 14px; } }
+ul.regles, ol.regles { margin: 0; padding-left: 20px; display: grid; gap: 6px; color: var(--ink); }
+.fenetre .regles-titre { margin: 4px 0 -4px; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; color: var(--brass); font-weight: 700; }
+.fenetre .regles-note { margin: 0; font-size: 14px; color: var(--muted); }
+.regles b { color: var(--brass); font-weight: 700; }
+@media (max-height: 500px) { ul.regles, ol.regles { gap: 3px; font-size: 14px; } }
 @media (orientation: landscape) {
   .modes { display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 10px 4px; margin: 0 -4px; justify-content: safe center; align-items: center; }
   .mode { flex: none; height: min(168px, 44vh); width: auto; scroll-snap-align: center; }
@@ -618,6 +621,7 @@ body.en-jeu #filChat { display: flex; }
 .tuto-main { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
 .tuto-main .carte { width: 58px; height: 84px; cursor: pointer; }
 .tuto-main .carte.interdite { opacity: .45; }
+.tuto-main .carte.recue { box-shadow: 0 0 0 3px var(--good), 0 6px 14px rgba(0,0,0,.45); }
 .tuto-texte { margin: 0; }
 .tuto-retour { min-height: 1.4em; margin: 0; font-weight: 600; }
 .tuto-retour.ok { color: var(--brass); } .tuto-retour.ko { color: #ff8a80; }
@@ -841,13 +845,29 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       </div>
     </div>
     <template id="modeleRegles">
+      <p class="regles-titre">Le but</p>
       <ul class="regles">
-        <li>Suis la couleur, ou ramasse la plus forte carte de la table (permis même pour bluffer).</li>
-        <li>Si tout le monde suit, la plus forte carte relance, dans une autre couleur.</li>
-        <li>Plus qu'une couleur en main ? Tu peux tout poser d'un coup pour sortir.</li>
-        <li>4 cartes d'une même couleur à la distribution : annonce <b>Katapss</b> avant d'agir.</li>
-        <li>Le dernier joueur qui garde des cartes est éliminé, jusqu'à la finale à deux.</li>
+        <li>Chacun reçoit 4 cartes. Débarrasse-toi de toutes tes cartes : tu es <b>qualifié</b>.</li>
+        <li>Le dernier joueur qui garde des cartes est <b>éliminé</b>. On rejoue une manche sans lui, jusqu'à la finale à deux. Le gagnant de la finale gagne la partie.</li>
       </ul>
+      <p class="regles-titre">Un tour de table</p>
+      <ol class="regles">
+        <li>Un joueur <b>ouvre</b> : il pose la carte de son choix. Sa couleur devient la <b>couleur du tour</b>.</li>
+        <li>Les autres, chacun à son tour, <b>suivent</b> : ils jouent une carte de cette couleur.</li>
+        <li>Tu n'as pas la couleur ? Tu dois <b>ramasser</b> la plus forte carte de la table. Elle va dans ta main et le tour s'arrête net. Tu peux aussi ramasser exprès en ayant la couleur, pour bluffer.</li>
+      </ol>
+      <p class="regles-titre">Après le tour</p>
+      <ul class="regles">
+        <li>Les cartes jouées <b>quittent la partie</b> : c'est comme ça qu'on se débarrasse de ses cartes.</li>
+        <li>Celui qui a posé la plus forte carte <b>relance</b> (même si elle a été ramassée) : il ouvre le tour suivant, mais <b>dans une autre couleur</b>.</li>
+      </ul>
+      <p class="regles-titre">Sortir plus vite</p>
+      <ul class="regles">
+        <li>Il ne te reste que des cartes de la couleur du tour (ou une seule couleur quand tu ouvres) ? Touche <b>Tout poser</b> : tu les poses toutes d'un coup et tu es qualifié.</li>
+        <li>Les cartes avec lesquelles on sort ne comptent pas : personne ne peut les ramasser.</li>
+        <li><b>Katapss</b> : tu reçois 4 cartes de la même couleur ? Annonce-le avant de jouer ou de ramasser : qualifié tout de suite.</li>
+      </ul>
+      <p class="regles-note">36 cartes, du 2 au 10 dans les 4 couleurs. Le 10 est la plus forte. On tourne dans le sens des aiguilles d'une montre.</p>
     </template>
   </section>
 
@@ -1944,7 +1964,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
     if (pause || m.phase === 'terminee') {}
     else if (!v.restants.includes(v.moi) || !jeJoue) cons.append(ico('oeil'), ' Tu regardes la partie.');
     else if (monTour) { if (v.chrono) cons.append(el('span', 'secondes', ''), ' '); cons.append(el('em', null, 'À toi !')); }
-    if (v.robots === 'gentils' && v.restants.includes(v.moi)) {
+    if (v.robots === 'gentils') {
       const aide = aideGuidee(v);
       if (aide) { const b = el('div', 'aide-guidee'); aide.forEach((t, i) => b.append(i % 2 ? el('b', null, t) : t)); cons.append(b); }
     }
@@ -3245,17 +3265,17 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   const C = (c) => carteEl(c, 'button');
   function ouvrirTutoriel() {
     const ETAPES = [
-      { titre: 'Le but', texte: 'Chaque joueur reçoit 4 cartes. Débarrasse-toi des tiennes pour te qualifier. À chaque manche, le dernier qui a encore des cartes est éliminé. Le dernier survivant gagne la partie.',
+      { titre: 'Le but', texte: 'Chaque joueur reçoit 4 cartes. Débarrasse-toi des tiennes pour te qualifier : chaque carte que tu joues quitte la partie. À chaque manche, le dernier qui a encore des cartes est éliminé, jusqu\'à la finale à deux.',
         main: ['3C', '9P', '5K', '9C'], libre: true },
-      { titre: 'Suivre la couleur', texte: 'Kevin a ouvert avec le 7♥ : la couleur du tour est cœur. À toi : joue un cœur.',
+      { titre: 'Suivre la couleur', texte: 'Kevin a ouvert le tour : il a posé le 7♥, donc la couleur du tour est cœur. Chacun doit suivre cette couleur. À toi : joue un cœur.',
         table: [['7C', 'Kevin']], main: ['3C', '9P', '5K', '9C'],
-        carte: (c) => K.couleur(c) === 'C' ? [true, 'Bien joué : tu as suivi la couleur.'] : [false, 'Il faut jouer un cœur ♥.'] },
-      { titre: 'Ramasser', texte: "Kevin a joué le 8♣. Tu n'as aucun trèfle : tu dois ramasser la plus forte carte de la table. Ramasser arrête la séquence.",
-        table: [['8T', 'Kevin']], main: ['2C', '6P', '4K'], bouton: 'Ramasser le 8♣', ok: 'La carte rejoint ta main. Astuce : tu peux aussi ramasser exprès pour bluffer, même si tu as la couleur.',
+        carte: (c) => K.couleur(c) === 'C' ? [true, 'Bien joué : tu as suivi la couleur. Une carte de moins dans ta main !'] : [false, 'Il faut jouer un cœur ♥.'] },
+      { titre: 'Ramasser', texte: "Kevin a ouvert avec le 8♣. Tu n'as aucun trèfle : tu dois ramasser la plus forte carte de la table. Ramasser arrête le tour aussitôt.",
+        table: [['8T', 'Kevin']], main: ['2C', '6P', '4K'], bouton: 'Ramasser le 8♣', ramasse: true, ok: 'Le 8♣ va dans ta main : une carte de plus pour toi. Kevin, qui l\'avait posé, relance. Astuce : on peut aussi ramasser exprès en ayant la couleur, pour bluffer.',
         carte: () => [false, "Tu n'as pas de trèfle : ramasse."] },
-      { titre: 'Qui relance ?', texte: 'Tout le monde a suivi à pique. La plus forte carte gagne la séquence, et son joueur relance. Qui relance ?',
-        table: [['4P', 'Toi'], ['10P', 'Kevin'], ['7P', 'Nadia']], choix: [['Toi', false], ['Kevin', true], ['Nadia', false]], ok: "Oui : le 10♠ est la plus forte. Kevin relance, mais il doit changer de couleur : pas de pique." },
-      { titre: 'Relancer', texte: 'Tu as gagné la séquence précédente, jouée à carreau. Tu relances : joue une carte, mais pas de carreau.',
+      { titre: 'Qui relance ?', texte: 'Tout le monde a suivi à pique, personne n\'a ramassé. Celui qui a posé la plus forte carte relance. Qui relance ?',
+        table: [['4P', 'Toi'], ['10P', 'Kevin'], ['7P', 'Nadia']], choix: [['Toi', false], ['Kevin', true], ['Nadia', false]], ok: "Oui : le 10♠ est la plus forte, Kevin relance. Les 3 cartes quittent la partie. Kevin doit changer de couleur : pas de pique." },
+      { titre: 'Relancer', texte: 'Au tour précédent, joué à carreau, ta carte était la plus forte. Tu relances : joue une carte, mais pas de carreau.',
         main: ['5K', '8K', '3T', '9C'], interdite: 'K',
         carte: (c) => K.couleur(c) !== 'K' ? [true, 'Parfait : on change toujours de couleur en relançant.'] : [false, 'Pas de carreau : c\'était la couleur du tour précédent.'] },
       { titre: 'Sortir', texte: 'Nadia a ouvert à trèfle et il ne te reste que des trèfles. Tu peux tout poser d\'un coup et te qualifier.',
@@ -3279,7 +3299,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       if (e.table) {
         const t = el('div', 'tuto-table');
         const forte = e.table.reduce((m, x) => (K.valeur(x[0]) > K.valeur(m[0]) ? x : m), e.table[0]);
-        for (const [c, qui] of e.table) { const f = el('figure', c === forte[0] && e.choix ? 'forte' : null); f.append(carteEl(c), el('figcaption', null, qui)); t.append(f); }
+        for (const [c, qui] of e.table) { const f = el('figure'); f.dataset.carte = c; if (c === forte[0]) f.dataset.forte = '1'; f.append(carteEl(c), el('figcaption', null, qui)); t.append(f); }
         scene.append(t);
       }
       if (e.main) {
@@ -3295,12 +3315,17 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       }
       if (e.bouton) {
         const b = el('button', 'btn large' + (e.katapss ? ' katapss' : ' principal'), e.bouton);
-        b.onclick = () => { b.disabled = true; if (e.katapss) { tampon('KATAPSS !', 'Qualifié'); Sons.jouer('katapss'); } scene.querySelectorAll('.tuto-main .carte').forEach((x) => (x.style.visibility = 'hidden')); reussi(e.ok); };
+        b.onclick = () => { b.disabled = true; if (e.katapss) { tampon('KATAPSS !', 'Qualifié'); Sons.jouer('katapss'); } if (e.ramasse) {
+            const [c] = e.table[0], f = scene.querySelector(`figure[data-carte="${c}"]`);
+            if (f) f.style.visibility = 'hidden';
+            const n = carteEl(c); n.classList.add('recue'); scene.querySelector('.tuto-main').append(n);
+          } else scene.querySelectorAll('.tuto-main .carte').forEach((x) => (x.style.visibility = 'hidden'));
+          reussi(e.ok); };
         scene.append(b);
       }
       if (e.choix) {
         const ch = el('div', 'tuto-choix');
-        for (const [t, bon] of e.choix) { const b = el('button', 'btn', t); b.onclick = () => (bon ? reussi(e.ok) : rate('Non : regarde quelle carte est la plus forte.', b)); ch.append(b); }
+        for (const [t, bon] of e.choix) { const b = el('button', 'btn', t); b.onclick = () => { if (!bon) return rate('Non : regarde quelle carte est la plus forte (le 10 bat tout).', b); scene.querySelector('figure[data-forte]').classList.add('forte'); reussi(e.ok); }; ch.append(b); }
         scene.append(ch);
       }
       suivant.onclick = () => { if (i < ETAPES.length - 1) { i++; dessiner(); } else fin(); };
@@ -3371,19 +3396,29 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
     const m = v.manche, a = m.actions, sym = (c) => K.SYMBOLES[c];
     const jouables = a.filter((x) => x.type === 'jouer');
     const tout = a.some((x) => x.type === 'toutPoser');
+    if (!v.restants.includes(v.moi)) return ['Éliminé : tu avais encore des cartes quand les autres étaient sortis. Regarde la fin, puis ', 'rejoue', ' !'];
     if (m.pause && m.pause.type === 'depart') return v.numeroManche === 1 ? ['Voici tes 4 cartes. Le but : ', 'te débarrasser de toutes', ' avant les autres.'] : ['Nouvelle manche : le dernier qui garde des cartes est ', 'éliminé', '.'];
+    // Fin d'un tour : on explique ce qui vient de se passer et qui reprend la main.
+    const an = m.pause && m.pause.annonce;
+    if (an) {
+      const moi = (id) => id === v.moi;
+      const relance = (verbe, fin) => (an.meneur ? [moi(an.meneur) ? 'Tu ' + verbe + 's' : nom(v, an.meneur) + ' ' + verbe, fin] : []);
+      if (an.type === 'ramasse') return [(moi(an.joueur) ? 'Tu as' : nom(v, an.joueur) + ' a') + ` ramassé le ${K.afficher(an.carte)} : le tour s'arrête. `, ...relance('relance', ', dans une autre couleur.')];
+      if (an.type === 'suivi') return [`Tout le monde a suivi : le ${K.afficher(an.carte)} est la plus forte. Les cartes quittent la partie. `, ...relance('relance', ', dans une autre couleur.')];
+      if (an.type === 'sortie') return [(moi(an.joueur) ? 'Tu as' : nom(v, an.joueur) + ' a') + ' tout posé : qualifié ! ', ...relance('ouvre', moi(an.meneur) ? ', avec la couleur de ton choix.' : ', avec la couleur de son choix.')];
+    }
     if (m.pause || m.phase === 'terminee') return null;
     if (a.some((x) => x.type === 'katapss')) return ['4 cartes de la même couleur : touche ', 'KATAPSS', ' pour te qualifier tout de suite !'];
-    if (!m.enJeu.includes(v.moi)) return v.restants.includes(v.moi) ? ['Qualifié ! Le dernier qui garde des cartes sera ', 'éliminé', '.'] : null;
+    if (!m.enJeu.includes(v.moi)) return ['Qualifié ! Le dernier qui garde des cartes sera ', 'éliminé', '.'];
     if (m.joueurCourant !== v.moi) return null;
     if (m.phase === 'ouverture') {
       if (tout && !jouables.length) return ['Il ne te reste qu\'une couleur : ', 'tout poser', ' te fait sortir.'];
       if (tout) return ['Une seule couleur en main : tu peux ', 'tout poser', ' d\'un coup et sortir.'];
-      return m.couleurInterdite ? ['Tu relances : joue une carte, mais ', 'pas de ' + sym(m.couleurInterdite), '.'] : ['Tu ouvres : pose une carte. Les autres devront ', 'suivre sa couleur', '.'];
+      return m.couleurInterdite ? ['Tu relances : joue une carte, mais ', 'pas de ' + sym(m.couleurInterdite), ' (la couleur du tour d\'avant).'] : ['Tu ouvres : pose une carte. Les autres devront ', 'suivre sa couleur', '.'];
     }
     if (tout) return ['Tu n\'as plus que des ' + sym(m.couleurTour) + ' : ', 'tout poser', ' te fait sortir.'];
-    if (jouables.length) return ['Suis la couleur : joue un ', sym(m.couleurTour), '. Tu peux aussi ramasser pour bluffer.'];
-    return ['Pas de ' + sym(m.couleurTour) + ' en main : ', 'ramasse', ' la plus forte carte de la table.'];
+    if (jouables.length) return ['Suis la couleur : joue un ', sym(m.couleurTour), '. Une carte de moins pour toi.'];
+    return ['Pas de ' + sym(m.couleurTour) + ' en main : tu dois ', 'ramasser', ' la plus forte carte de la table.'];
   }
 
   // ------------------------------------------------------------------ missions, défi, collection
