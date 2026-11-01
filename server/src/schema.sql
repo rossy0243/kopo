@@ -242,3 +242,46 @@ CREATE TABLE IF NOT EXISTS parcours_parties (
 
 -- ===== Bascule vers les pièces du serveur (décision du 01/11) =====
 ALTER TABLE comptes ADD COLUMN IF NOT EXISTS joker_semaine text;               -- semaine où le joker de série a servi (2026-W45)
+
+-- ===== Parrainage (retention.md §3.7) =====
+ALTER TABLE comptes ADD COLUMN IF NOT EXISTS code_parrain text;                -- code du lien d'invitation (?parrain=ABC234)
+ALTER TABLE comptes ADD COLUMN IF NOT EXISTS identite_connue boolean NOT NULL DEFAULT false; -- une de ses identités Google/e-mail servait déjà à un autre compte
+CREATE UNIQUE INDEX IF NOT EXISTS comptes_code_parrain ON comptes (code_parrain) WHERE code_parrain IS NOT NULL;
+
+-- Empreinte de chaque compte Google (ou téléphone) vu par le serveur : HMAC de l'identifiant Google
+-- et de l'adresse, jamais l'identifiant lui-même. Gardée après la suppression du compte : un même
+-- compte Google ne peut pas se faire parrainer deux fois en supprimant son compte et en revenant.
+CREATE TABLE IF NOT EXISTS empreintes (
+  empreinte text PRIMARY KEY,
+  compte_id text NOT NULL REFERENCES comptes(id), -- le premier compte Kopo de cette identité
+  cree_le   timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS empreintes_compte ON empreintes (compte_id);
+
+-- Un filleul n'a qu'un parrain, une seule fois.
+CREATE TABLE IF NOT EXISTS parrainages (
+  filleul_id     text PRIMARY KEY REFERENCES comptes(id),
+  parrain_id     text NOT NULL REFERENCES comptes(id),
+  statut         text NOT NULL DEFAULT 'en_cours' CHECK (statut IN ('en_cours', 'valide', 'expire')),
+  parties        integer NOT NULL DEFAULT 0,      -- parties qui comptent, jouées par le filleul
+  pieces_parrain integer NOT NULL DEFAULT 0,
+  pieces_filleul integer NOT NULL DEFAULT 0,
+  note           text,                            -- pourquoi le parrain n'a rien reçu (plafond…)
+  cree_le        timestamptz NOT NULL DEFAULT now(),
+  expire_le      timestamptz NOT NULL,
+  valide_le      timestamptz
+);
+CREATE INDEX IF NOT EXISTS parrainages_parrain ON parrainages (parrain_id, valide_le);
+
+ALTER TABLE comptes ADD COLUMN IF NOT EXISTS parrain_createur boolean NOT NULL DEFAULT false; -- créateur vérifié par l'admin : pas de plafond par mois
+
+-- Paliers du parrainage déjà donnés (une fois chacun) : 3, 10, 25, 50, 100, 250, 500, 1 000 amis.
+CREATE TABLE IF NOT EXISTS parrainage_paliers (
+  compte_id text NOT NULL REFERENCES comptes(id),
+  palier    integer NOT NULL,
+  cree_le   timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (compte_id, palier)
+);
+
+ALTER TABLE notifications DROP CONSTRAINT IF EXISTS notifications_type_check;
+ALTER TABLE notifications ADD CONSTRAINT notifications_type_check CHECK (type IN ('rivalite', 'invitation', 'ami', 'parrainage'));

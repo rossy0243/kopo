@@ -3,7 +3,7 @@
 const express = require('express');
 const { enveloppe, publicCompte } = require('./api');
 
-function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, salles, demarrage }) {
+function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainage, salles, demarrage }) {
   const r = express.Router();
   r.use(express.json({ limit: '50kb' }));
 
@@ -103,7 +103,7 @@ function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, salles, d
     if (!c) return res.status(404).json({ erreur: 'Joueur introuvable.' });
     const q = async (sql) => n((await base.query(sql, [c.id])).rows);
     res.json({
-      compte: { ...c, auth_id: c.auth_id ? 'lié' : null },
+      compte: { ...c, auth_id: c.auth_id ? 'lié' : null, parrain_createur: !!((await base.query('SELECT parrain_createur FROM comptes WHERE id = $1', [c.id])).rows[0] || {}).parrain_createur },
       stats: (await q(`SELECT count(*)::int AS parties, count(*) FILTER (WHERE place = 1)::int AS victoires, count(*) FILTER (WHERE abandon)::int AS abandons FROM participations WHERE compte_id = $1`))[0],
       parties: await q(`SELECT x.id, x.code, x.debut, x.nb_joueurs, x.avec_robots, p.place, p.abandon FROM participations p JOIN parties x ON x.id = p.partie_id WHERE p.compte_id = $1 ORDER BY x.debut DESC LIMIT 30`),
       pieces: await comptes.historique(c.id, 100),
@@ -114,6 +114,7 @@ function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, salles, d
       titres: await q(`SELECT saison, titre, rang, pieces FROM recompenses_saison WHERE compte_id = $1 ORDER BY saison DESC`),
       inventaire: await q(`SELECT objet, source, cree_le FROM inventaire WHERE compte_id = $1 ORDER BY cree_le DESC`),
       parcours: (await q(`SELECT p.xp, cardinality(p.gratuits)::int AS gratuits, cardinality(p.plus)::int AS plus FROM parcours p JOIN saisons s ON s.numero = p.saison AND s.statut = 'en_cours' WHERE p.compte_id = $1`))[0] || null,
+      parrainages: parrainage ? n(await parrainage.resumeAdmin(c.id)) : [],
       partenaires: await q(`SELECT c2.id, c2.pseudo, c2.numero, count(*)::int AS ensemble FROM participations a JOIN participations b ON b.partie_id = a.partie_id AND b.compte_id <> a.compte_id JOIN comptes c2 ON c2.id = b.compte_id WHERE a.compte_id = $1 GROUP BY c2.id, c2.pseudo, c2.numero ORDER BY ensemble DESC LIMIT 5`),
     });
   }));
@@ -155,6 +156,12 @@ function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, salles, d
     if (!r2.rows.length) return res.status(404).json({ erreur: 'Joueur introuvable.' });
     await journal('kopo-plus', req.params.id, { jours });
     res.json({ ok: true, jusqu });
+  }));
+  // Parrainage : un créateur vérifié (influenceur) n'a pas de plafond de parrainages par mois.
+  r.post('/joueurs/:id/createur', enveloppe(async (req, res) => {
+    if (!parrainage || !(await parrainage.createur(req.params.id, !!req.body.actif))) return res.status(404).json({ erreur: 'Joueur introuvable.' });
+    await journal('createur', req.params.id, { actif: !!req.body.actif });
+    res.json({ ok: true });
   }));
   // Offrir une apparence (remerciement, correction…).
   r.post('/joueurs/:id/objet', enveloppe(async (req, res) => {

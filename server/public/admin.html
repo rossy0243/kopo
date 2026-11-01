@@ -88,7 +88,7 @@ const $ = (s) => document.querySelector(s);
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const nb = (x) => (x ?? 0).toLocaleString('fr-FR');
 const date = (d) => d ? new Date(d).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : '—';
-const MOTIFS = { bienvenue: 'Bienvenue', bonus_jour: 'Bonus du jour', manche: 'Manches survécues', katapss: 'Katapss', victoire: 'Victoires', deuxieme: '2e places', remise_a_flot: 'Remise à flot', admin: 'Corrections admin', cadeau: 'Cadeaux', mise: 'Mises', pot: 'Pots', saison: 'Récompenses de saison', parcours: 'Parcours de saison', boutique: 'Boutique', mission: 'Missions du jour', defi: 'Défis de la semaine', bienvenue7: 'Bienvenue 7 jours' };
+const MOTIFS = { bienvenue: 'Bienvenue', bonus_jour: 'Bonus du jour', manche: 'Manches survécues', katapss: 'Katapss', victoire: 'Victoires', deuxieme: '2e places', remise_a_flot: 'Remise à flot', admin: 'Corrections admin', cadeau: 'Cadeaux', mise: 'Mises', pot: 'Pots', saison: 'Récompenses de saison', parcours: 'Parcours de saison', boutique: 'Boutique', parrainage: 'Parrainage (parrains)', parrainage_filleul: 'Parrainage (filleuls)', mission: 'Missions du jour', defi: 'Défis de la semaine', bienvenue7: 'Bienvenue 7 jours' };
 const DIV = { bois: 'Bois', bronze: 'Bronze', argent: 'Argent', or: 'Or', diamant: 'Diamant', legende: 'Légende' };
 let jeton = sessionStorage.getItem('kopo-admin');
 let page = 'direct', minuteur = null;
@@ -265,9 +265,12 @@ const afficher = {
         <div class="ligne"><span>${c.kopo_plus_jusqu && new Date(c.kopo_plus_jusqu) > new Date() ? 'Kopo+ jusqu\'au ' + date(c.kopo_plus_jusqu) : 'Pas de Kopo+'}</span><input id="kpJours" type="number" min="0" max="366" value="30" style="width:80px"> <span class="muted">jours</span><button class="btn" id="btnKopoPlus">Offrir Kopo+ (0 = retirer)</button></div>
         <div class="ligne"><input id="objOffert" placeholder="Identifiant, ex. dos-kinshasa" style="min-width:220px"><button class="btn" id="btnObjet">Offrir l'apparence</button></div>
         <p class="muted">${f.parcours ? `Parcours : ${nb(f.parcours.xp)} XP, ${f.parcours.gratuits} paliers gratuits et ${f.parcours.plus} Kopo+ récupérés · ` : ''}${f.inventaire.length ? 'Possède : ' + f.inventaire.map((o) => esc(o.objet)).join(', ') : 'Aucune apparence gagnée ou achetée.'}</p>
+        <h3>Parrainage</h3>
+        <div class="ligne"><span>${c.parrain_createur ? '<b>Créateur vérifié</b> : pas de plafond de parrainages par mois' : 'Plafond de parrainages par mois normal'}</span><button class="btn" id="btnCreateur">${c.parrain_createur ? 'Retirer le statut créateur' : 'Marquer comme créateur (influenceur)'}</button></div>
         <h3>Corriger le solde</h3>
         <div class="ligne"><input id="pMontant" type="number" placeholder="+100 ou -50" style="width:130px"><input id="pMotif" placeholder="Motif (obligatoire)" style="flex:1;min-width:200px"><button class="btn" id="btnPieces">Corriger</button></div>
       </div>
+      ${f.parrainages && f.parrainages.length ? `<h3>Parrainage</h3><div class="carte"><table>${f.parrainages.map((p) => `<tr><td>${date(p.cree_le)}</td><td>${p.filleul_id === c.id ? 'Parrainé par' : 'A parrainé'} <button class="lien" data-joueur="${esc(p.filleul_id === c.id ? p.parrain_id : p.filleul_id)}">${esc(p.filleul_id === c.id ? p.parrain + '#' + p.parrain_numero : p.filleul + '#' + p.filleul_numero)}</button></td><td>${esc(p.statut)}</td><td class="n">${p.parties} parties</td><td class="n">${p.filleul_id === c.id ? nb(p.pieces_filleul) : nb(p.pieces_parrain)} pièces</td><td class="muted">${esc(p.note || '')}</td></tr>`).join('')}</table></div>` : ''}
       ${f.partenaires.length ? `<h3>Joue souvent avec</h3><p class="muted">Utile pour repérer la complicité aux tables à mise.</p><div class="carte"><table>${f.partenaires.map((p) => `<tr><td><button class="lien" data-joueur="${esc(p.id)}">${esc(p.pseudo)}#${p.numero}</button></td><td class="n">${p.ensemble} parties ensemble</td></tr>`).join('')}</table></div>` : ''}
       <h3>Signalements reçus (${f.signalementsRecus.length})</h3>
       <div class="carte"><table>${f.signalementsRecus.map((s) => `<tr><td>${date(s.cree_le)}</td><td>${esc(s.motif)}</td><td>${esc(s.details || '')}</td><td class="muted">par ${esc(s.auteur)}</td><td>${esc(s.statut)}</td></tr>`).join('') || '<tr><td class="muted">Aucun.</td></tr>'}</table></div>
@@ -285,6 +288,7 @@ const afficher = {
       try { await api(`/joueurs/${encodeURIComponent(id)}/sanction`, { methode: 'POST', corps: { type, motif: $('#sMotif').value, jours: Number($('#sJours').value) } }); message('Sanction appliquée.'); aller('fiche', id); } catch (e) { message(e.message); }
     };
     $('#btnKopoPlus').onclick = async () => { try { await api(`/joueurs/${encodeURIComponent(id)}/kopo-plus`, { methode: 'POST', corps: { jours: Number($('#kpJours').value) } }); message('Kopo+ mis à jour.'); aller('fiche', id); } catch (e) { message(e.message); } };
+    $('#btnCreateur').onclick = async () => { try { await api(`/joueurs/${encodeURIComponent(id)}/createur`, { methode: 'POST', corps: { actif: !c.parrain_createur } }); message('Statut créateur mis à jour.'); aller('fiche', id); } catch (e) { message(e.message); } };
     $('#btnObjet').onclick = async () => { try { await api(`/joueurs/${encodeURIComponent(id)}/objet`, { methode: 'POST', corps: { objet: $('#objOffert').value.trim() } }); message('Apparence offerte.'); aller('fiche', id); } catch (e) { message(e.message); } };
     $('#btnPieces').onclick = async () => {
       try { await api(`/joueurs/${encodeURIComponent(id)}/pieces`, { methode: 'POST', corps: { montant: Number($('#pMontant').value), motif: $('#pMotif').value } }); message('Solde corrigé.'); aller('fiche', id); } catch (e) { message(e.message); }
@@ -309,7 +313,7 @@ const afficher = {
 
   async pilotage() {
     const r = await api('/reglages');
-    const champs = (cle, libelles) => Object.entries(libelles).map(([k, t]) => `<label class="ligne"><span style="min-width:230px">${t}</span><input type="number" data-cle="${cle}" data-champ="${k}" value="${r[cle][k]}" style="width:110px"></label>`).join('');
+    const champs = (cle, libelles) => Object.entries(libelles).map(([k, t]) => `<label class="ligne"><span style="min-width:230px">${t}</span><input type="number" data-cle="${cle}" data-champ="${k}" value="${+r[cle][k]}" style="width:110px"></label>`).join('');
     $('#contenu').innerHTML = `<h2>Pilotage</h2>
       <p class="muted">Ces réglages s'appliquent tout de suite, sans mise à jour du jeu. Chaque changement est noté dans le Journal.</p>
       <div class="carte"><h3 style="margin-top:0">Annonce à tous les joueurs</h3>
@@ -324,6 +328,7 @@ const afficher = {
       <div class="carte"><h3 style="margin-top:0">Gains (tables gratuites)</h3>${champs('gains', { bienvenue: 'Cadeau de bienvenue', manche: 'Par manche survécue', katapss: 'Katapss', victoire: 'Victoire', deuxieme: '2e place' })}<button class="btn principal" data-enregistrer="gains">Enregistrer les gains</button>
         <h3>Bonus du jour</h3>${champs('bonusJour', { depart: 'Premier jour', pas: 'En plus chaque jour', plafond: 'Plafond' })}<button class="btn principal" data-enregistrer="bonusJour">Enregistrer le bonus</button>
         <h3>Parcours de saison (XP)</h3>${champs('parcours', { xpPartie: 'Par partie entre joueurs', xpManche: 'Par manche survécue', xpVictoire: 'Victoire', xpPalier: 'XP par palier', paliers: 'Nombre de paliers (10 à 30)' })}<button class="btn principal" data-enregistrer="parcours">Enregistrer le parcours</button>
+        <h3>Parrainage</h3><p class="muted">L'ami invité doit avoir un compte Google neuf. Les parties avec robots, abandonnées, ou jouées seul avec son parrain ne comptent pas. Mettre « Actif » à 0 met le parrainage en pause.</p>${champs('parrainage', { actif: 'Actif (1 = oui, 0 = non)', parties: 'Parties à jouer par l\'ami', piecesParrain: 'Pièces pour le parrain', piecesFilleul: 'Pièces pour l\'ami', parMois: 'Récompensés par mois (sauf créateurs)', total: 'Récompensés au total (0 = sans limite)', joursCompte: 'Compte de l\'ami créé depuis moins de (jours)', joursPourJouer: 'Délai pour jouer (jours)' })}<p class="muted">Paliers fixes pour les gros parrains : 3 amis (cadre), 10 (1 000 pièces, avatar, titre Ambassadeur), 25, 50, 100, 250, 500 et 1 000 amis (jusqu'à 50 000 pièces et le titre « Légende du Kopo »).</p><button class="btn principal" data-enregistrer="parrainage">Enregistrer le parrainage</button>
         <h3>Remise à flot</h3>${champs('remiseAFlot', { seuil: 'Si le solde passe sous', niveau: 'Remonter à' })}<button class="btn principal" data-enregistrer="remiseAFlot">Enregistrer</button></div>
       <div class="carte"><h3 style="margin-top:0">Tables à mise</h3>${champs('tables', { bronze: 'Bronze', argent: 'Argent', or: 'Or', diamant: 'Diamant' })}<button class="btn principal" data-enregistrer="tables">Enregistrer les mises</button>
         <h3>Partage du pot (en %, total 100)</h3>${champs('pot', { vainqueur: 'Vainqueur', deuxieme: '2e', troisieme: '3e', maison: 'Maison (pièces détruites)' })}<button class="btn principal" data-enregistrer="pot">Enregistrer le partage</button></div>

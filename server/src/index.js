@@ -15,6 +15,7 @@ const { SalleKopo, salles } = require('./salle-kopo');
 const { creerLigue } = require('./ligue');
 const { creerSocial } = require('./social');
 const { creerParcours } = require('./parcours');
+const { creerParrainage } = require('./parrainage');
 
 async function demarrer({ port = Number(process.env.PORT || 2567), env = process.env } = {}) {
   const base = await ouvrirBase(env.DATABASE_URL);
@@ -30,7 +31,8 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
   minuteurSaison.unref();
   const social = creerSocial(base);
   const parcours = creerParcours(base, reglages, comptes, ligue);
-  SalleKopo.services = { base, auth, comptes, reglages, ligue, social, parcours };
+  const parrainage = creerParrainage(base, reglages, comptes, social, env);
+  SalleKopo.services = { base, auth, comptes, reglages, ligue, social, parcours, parrainage };
 
   const app = express();
   app.set('trust proxy', 1);
@@ -45,8 +47,8 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
     next();
   });
   app.get('/sante', (req, res) => res.json({ ok: true, salles: salles.size }));
-  app.use('/api', routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours }));
-  app.use('/admin/api', routesAdmin({ base, auth, comptes, reglages, ligue, parcours, salles, demarrage: Date.now() }));
+  app.use('/api', routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours, parrainage }));
+  app.use('/admin/api', routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainage, salles, demarrage: Date.now() }));
   app.get('/admin', (req, res) => { res.set('Cache-Control', 'no-store'); res.set('X-Frame-Options', 'DENY'); res.sendFile(path.join(__dirname, '..', 'public', 'admin.html')); });
 
   // Compteur en ligne et salles ouvertes (lu par l'accueil).
@@ -64,7 +66,7 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
   console.log(`Kopo : serveur prêt sur le port ${adresse.port} (base : ${base.genre}).`);
 
   return {
-    port: adresse.port, base, comptes, reglages, auth, ligue, social, parcours,
+    port: adresse.port, base, comptes, reglages, auth, ligue, social, parcours, parrainage,
     async arreter() { clearInterval(minuteurSaison); await jeu.gracefullyShutdown(false).catch(() => {}); serveurHttp.close(); await base.fermer(); },
   };
 }

@@ -686,6 +686,133 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.deepStrictEqual(reg, [{ montant: -500, ref: 'av-nuit' }]);
   });
 
+  // ----- Parrainage
+  const jetonG = (sub, { providerId, email } = {}) => new jose.SignJWT({ email, app_metadata: { provider: 'google' }, user_metadata: { provider_id: providerId, email } })
+    .setProtectedHeader({ alg: 'HS256' }).setSubject(sub).setAudience('authenticated').setExpirationTime('1h').sign(new TextEncoder().encode('s'.repeat(40)));
+  const connexionG = async (sub, opts = {}, corps = {}) => (await api('/api/connexion', { methode: 'POST', corps: { jetonSupabase: await jetonG(sub, opts), ...corps } })).json;
+  // Partie terminée écrite directement en base (plus rapide qu'une vraie partie).
+  const partieFictive = async (ids, { robots = false, abandon = null } = {}) => {
+    const id = 'p_test' + Math.random().toString(36).slice(2);
+    await srv.base.query("INSERT INTO parties (id, code, nb_joueurs, avec_robots, debut, fin) VALUES ($1, 'TEST', $2, $3, now(), now())", [id, ids.length, robots]);
+    for (let i = 0; i < ids.length; i++) await srv.base.query('INSERT INTO participations (partie_id, compte_id, place, abandon) VALUES ($1,$2,$3,$4)', [id, ids[i], ids[i] === abandon ? null : i + 1, ids[i] === abandon]);
+    return srv.parrainage.apresPartie(ids);
+  };
+  const solde = async (id) => (await srv.comptes.lire(id)).solde;
+  let parrain, filleul, codeParrain;
+  await test('parrainage : lien réservé aux comptes Google, code stable', async () => {
+    const inv = await invite('SansGoogle' + Date.now() % 1000);
+    const e0 = (await api('/api/parrainage', { jeton: inv.jeton })).json;
+    assert.deepStrictEqual([e0.lie, e0.code], [false, null]);
+    parrain = await connexionG('sb-parrain', { providerId: 'g-parrain', email: 'parrain@gmail.com' });
+    const e1 = (await api('/api/parrainage', { jeton: parrain.jeton })).json;
+    assert.match(e1.code, /^[A-Z0-9]{6}$/);
+    assert.strictEqual((await api('/api/parrainage', { jeton: parrain.jeton })).json.code, e1.code);
+    assert.strictEqual(e1.regles.parties, 5);
+    codeParrain = e1.code;
+  });
+  await test('parrainage : pas d\'auto-parrainage, pas pour un invité ni un ancien compte', async () => {
+    const soi = await connexionG('sb-parrain', { providerId: 'g-parrain', email: 'parrain@gmail.com' }, { parrain: codeParrain });
+    assert.match(soi.parrainage.erreur, /toi-même/);
+    const inv = await invite('Invite' + Date.now() % 1000);
+    const r = await api('/api/parrainage', { methode: 'POST', jeton: inv.jeton, corps: { code: codeParrain } });
+    assert.strictEqual(r.statut, 400); assert.match(r.json.erreur, /Google/);
+    // Un vieux compte invité qui se connecte à Google pour la première fois n'est pas un nouveau joueur.
+    const vieux = await invite('Vieux' + Date.now() % 1000);
+    await srv.base.query("UPDATE comptes SET cree_le = now() - interval '10 days' WHERE id = $1", [vieux.compte.id]);
+    const v = await connexionG('sb-vieux', { providerId: 'g-vieux' }, { jeton: vieux.jeton, parrain: codeParrain });
+    assert.strictEqual(v.parrainage.ok, false); assert.match(v.parrainage.erreur, /nouveaux joueurs/);
+    assert.match((await connexionG('sb-x', { providerId: 'g-x' }, { parrain: 'ZZZZZZ' })).parrainage.erreur, /inconnu/);
+  });
+  await test('parrainage : 5 parties entre humains, les parties seul avec son parrain ou avec robots ne comptent pas', async () => {
+    const inv = await invite('Filleul' + Date.now() % 1000);
+    filleul = await connexionG('sb-filleul', { providerId: 'g-filleul', email: 'Jean.Dupont+kopo@gmail.com' }, { jeton: inv.jeton, parrain: codeParrain });
+    assert.strictEqual(filleul.parrainage.ok, true);
+    assert.strictEqual(filleul.compte.id, inv.compte.id);
+    // Deuxième parrain refusé.
+    assert.strictEqual((await api('/api/parrainage', { methode: 'POST', jeton: filleul.jeton, corps: { code: codeParrain } })).statut, 400);
+    const autre = await invite('Tiers' + Date.now() % 1000);
+    const P = parrain.compte.id, F = filleul.compte.id, X = autre.compte.id;
+    const [sp, sf] = [await solde(P), await solde(F)];
+    await partieFictive([F, P]);                     // à deux avec son parrain
+    await partieFictive([F, X], { robots: true });   // avec robots
+    await partieFictive([X, F], { abandon: F });     // abandon
+    for (let i = 0; i < 4; i++) assert.deepStrictEqual(await partieFictive([F, P, X]), []);
+    let e = (await api('/api/parrainage', { jeton: parrain.jeton })).json;
+    assert.deepStrictEqual([e.filleuls.length, e.filleuls[0].parties, e.filleuls[0].statut], [1, 4, 'en_cours']);
+    const v = await partieFictive([X, F]);
+    assert.strictEqual(v.length, 1);
+    assert.deepStrictEqual([await solde(P) - sp, await solde(F) - sf], [300, 200]);
+    // Une seule fois.
+    await partieFictive([X, F]);
+    assert.deepStrictEqual([await solde(P) - sp, await solde(F) - sf], [300, 200]);
+    e = (await api('/api/parrainage', { jeton: parrain.jeton })).json;
+    assert.deepStrictEqual([e.filleuls[0].statut, e.recompenses.total], ['valide', 1]);
+    assert.strictEqual((await api('/api/parrainage', { jeton: filleul.jeton })).json.parrain.statut, 'valide');
+    const notifs = (await api('/api/notifications', { jeton: parrain.jeton })).json.liste;
+    assert.ok(notifs.some((n) => n.type === 'parrainage' && /300 pièces/.test(n.texte)));
+    const reg = (await srv.base.query("SELECT motif, montant FROM registre_pieces WHERE motif LIKE 'parrainage%' AND compte_id = ANY($1) ORDER BY motif", [[P, F]])).rows;
+    assert.deepStrictEqual(reg, [{ motif: 'parrainage', montant: 300 }, { motif: 'parrainage_filleul', montant: 200 }]);
+  });
+  await test('parrainage : supprimer son compte et revenir avec le même Google ne redonne rien', async () => {
+    assert.strictEqual((await api('/api/moi', { methode: 'DELETE', jeton: filleul.jeton })).statut, 200);
+    // Supabase recrée l'utilisateur (nouvel identifiant), mais l'identifiant Google reste le même.
+    const re = await connexionG('sb-filleul-bis', { providerId: 'g-filleul', email: 'jean.dupont@gmail.com' }, { parrain: codeParrain });
+    assert.notStrictEqual(re.compte.id, filleul.compte.id);
+    assert.strictEqual(re.parrainage.ok, false); assert.match(re.parrainage.erreur, /déjà été utilisé/);
+    // Même adresse Gmail écrite autrement, autre identifiant : refusé aussi.
+    const re2 = await connexionG('sb-filleul-ter', { providerId: 'g-autre', email: 'jeandupont+x@googlemail.com' }, { parrain: codeParrain });
+    assert.strictEqual(re2.parrainage.ok, false);
+    // Les empreintes ne contiennent ni l'identifiant ni l'adresse en clair.
+    const emp = (await srv.base.query('SELECT empreinte FROM empreintes')).rows.map((r) => r.empreinte).join(' ');
+    assert.ok(!/g-filleul|dupont/i.test(emp));
+  });
+  await test('parrainage : plafond du mois (levé pour un créateur), paliers pour les gros parrains', async () => {
+    const reg = srv.reglages.get('parrainage');
+    assert.strictEqual(reg.total, 0, 'pas de plafond à vie');
+    const P = parrain.compte.id;
+    const nouveauFilleul = async (n) => {
+      const f = await connexionG('sb-f' + n, { providerId: 'g-f' + n }, { parrain: codeParrain });
+      assert.strictEqual(f.parrainage.ok, true, f.parrainage.erreur);
+      return f.compte.id;
+    };
+    const X = (await invite('Tiers2' + Date.now() % 1000)).compte.id;
+    await srv.reglages.ecrire('parrainage', { ...reg, parties: 1, parMois: 2 });
+    await partieFictive([X, await nouveauFilleul(2)]); // 2e récompensé : plafond du mois atteint
+    let sp = await solde(P);
+    const f3 = await nouveauFilleul(3), sf = await solde(f3);
+    await partieFictive([X, f3]);                      // au-delà du plafond : le parrain n'a pas les 300…
+    assert.deepStrictEqual([await solde(P) - sp, await solde(f3) - sf], [0, 200]);
+    assert.strictEqual((await srv.base.query('SELECT note FROM parrainages WHERE filleul_id = $1', [f3])).rows[0].note, 'plafond du mois');
+    // … mais le 3e ami compte pour les paliers : cadre Ambassadeur.
+    assert.ok((await api('/api/collection', { jeton: parrain.jeton })).json.possedes.includes('cadre-ambassadeur'));
+    // Créateur vérifié par l'admin : plus de plafond par mois.
+    await srv.parrainage.createur(P, true);
+    sp = await solde(P);
+    await partieFictive([X, await nouveauFilleul(4)]);
+    assert.strictEqual(await solde(P) - sp, 300);
+    // Palier de 10 amis : 1 000 pièces, avatar et titre « Ambassadeur » (une seule fois).
+    for (let i = 5; i <= 9; i++) await partieFictive([X, await nouveauFilleul(i)]);
+    sp = await solde(P);
+    await partieFictive([X, await nouveauFilleul(10)]);
+    assert.strictEqual(await solde(P) - sp, 300 + 1000);
+    const e = (await api('/api/parrainage', { jeton: parrain.jeton })).json;
+    assert.deepStrictEqual([e.amis, e.titre, e.createur, e.regles.parMois], [10, 'Ambassadeur', true, null]);
+    assert.ok(e.paliers.find((x) => x.n === 10).atteint && !e.paliers.find((x) => x.n === 25).atteint);
+    assert.ok((await api('/api/collection', { jeton: parrain.jeton })).json.possedes.includes('av-ambassadeur'));
+    const paliers = (await srv.base.query("SELECT ref FROM registre_pieces WHERE compte_id = $1 AND motif = 'parrainage_palier'", [P])).rows;
+    assert.deepStrictEqual(paliers, [{ ref: 'palier:10' }]);
+    await srv.parrainage.createur(P, false);
+    await srv.reglages.ecrire('parrainage', reg);
+  });
+  await test('parrainage : expiré après le délai, réglages vérifiés', async () => {
+    const f = await connexionG('sb-lent', { providerId: 'g-lent' }, { parrain: codeParrain });
+    await srv.base.query("UPDATE parrainages SET expire_le = now() - interval '1 minute' WHERE filleul_id = $1", [f.compte.id]);
+    const X = (await invite('Tiers3' + Date.now() % 1000)).compte.id;
+    for (let i = 0; i < 5; i++) await partieFictive([X, f.compte.id]);
+    assert.strictEqual((await api('/api/parrainage', { jeton: f.jeton })).json.parrain.statut, 'expire');
+    await assert.rejects(srv.reglages.ecrire('parrainage', { ...srv.reglages.get('parrainage'), parties: 0 }));
+  });
+
   await test('trop d\'essais de connexion admin : bloqué', async () => {
     for (let i = 0; i < 5; i++) await api('/admin/api/connexion', { methode: 'POST', corps: { motDePasse: 'x', code: '1' } });
     const r = await api('/admin/api/connexion', { methode: 'POST', corps: { motDePasse: 'motdepasse-admin', code: codeTotp(TOTP) } });
