@@ -9,7 +9,7 @@ const publicCompte = (c) => c && { id: c.id, pseudo: c.pseudo, numero: c.numero,
 // Pays déduit du réseau (en-tête posé par Cloudflare quand il existe), sinon choisi par le joueur.
 const paysReseau = (req) => { const p = String(req.get('cf-ipcountry') || '').toUpperCase(); return /^[A-Z]{2}$/.test(p) && p !== 'XX' ? p : null; };
 
-function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours }) {
+function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours, parrainage }) {
   const r = express.Router();
   r.use(express.json({ limit: '20kb' }));
 
@@ -65,7 +65,13 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours 
     });
     if (c.statut === 'banni') return res.status(403).json({ erreur: 'Ce compte est banni.' });
     await comptes.presence(c.id);
-    res.json({ jeton: await auth.jetonJoueur(c.id), compte: publicCompte(c) });
+    // Empreinte du compte Google (anti-abus du parrainage), puis le code du lien d'invitation s'il y en a un.
+    let parrain = null;
+    if (parrainage) {
+      await parrainage.noterConnexion(c.id, s);
+      if (req.body.parrain) parrain = await parrainage.lier(c.id, req.body.parrain).catch((e) => ({ ok: false, erreur: e.statut ? e.message : 'Parrainage impossible.' }));
+    }
+    res.json({ jeton: await auth.jetonJoueur(c.id), compte: publicCompte(c), parrainage: parrain });
   }));
 
   r.get('/moi', joueur, enveloppe(async (req, res) => {
@@ -139,6 +145,14 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours 
   r.post('/amis/:id/inviter', joueur, enveloppe(async (req, res) => res.json(await social.inviter(req.compte, req.params.id, req.body.code))));
 
   // --- Rivalités et notifications
+  // --- Parrainage : mon lien, mes filleuls ; saisir le code d'un parrain (compte Google neuf)
+  r.get('/parrainage', joueur, enveloppe(async (req, res) => res.json(await parrainage.etat(req.compte))));
+  r.post('/parrainage', joueur, enveloppe(async (req, res) => {
+    const x = await parrainage.lier(req.compte.id, req.body.code);
+    if (!x.ok) return res.status(400).json({ erreur: x.erreur });
+    res.json(x);
+  }));
+
   r.get('/rivaux', joueur, enveloppe(async (req, res) => res.json(await social.rivaux(req.compte.id))));
   r.get('/notifications', joueur, enveloppe(async (req, res) => res.json(await social.liste(req.compte.id))));
   r.post('/notifications/lues', joueur, enveloppe(async (req, res) => { await social.marquerLues(req.compte.id, req.body.ids); res.json({ ok: true }); }));

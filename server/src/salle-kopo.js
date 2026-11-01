@@ -124,7 +124,7 @@ class SalleKopo extends Room {
 
   // Fin de partie : historique, places, gains (rien si la table avait des robots).
   async enregistrerPartie() {
-    const { base, comptes, reglages, ligue, social, parcours } = SalleKopo.services;
+    const { base, comptes, reglages, ligue, social, parcours, parrainage } = SalleKopo.services;
     const s = this.salle, p = this.partie;
     const humains = s.joueurs.filter((j) => !j.robot || j.remplace).map((j) => j.id).filter((id) => this.comptes.has(id));
     const avecRobots = s.joueurs.some((j) => j.robot && !j.remplace);
@@ -165,6 +165,8 @@ class SalleKopo extends Room {
         return { id, place: pl, abandon: p.abandons.has(id), manchesSurvecues: !pl ? 0 : pl === 1 ? s.numeroManche : s.elimines.indexOf(id) };
       })).catch((e) => { console.error('Parcours :', e.message); return new Map(); });
     }
+    // Parrainage : le filleul avance ; à sa dernière partie, son parrain et lui reçoivent leur cadeau.
+    if (parrainage && !avecRobots && humains.length >= 2) await parrainage.apresPartie(humains).catch((e) => console.error('Parrainage :', e.message));
     // Face-à-face et notifications de rivalité (« Kevin t'a rattrapé : 7 – 7 ! »).
     if (social) await social.apresPartie(humains.map((id) => ({ id, place: place(id), abandon: p.abandons.has(id) }))).catch((e) => console.error('Rivalités :', e.message));
     for (const [id, c] of this.clientsParId) {

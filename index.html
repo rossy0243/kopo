@@ -656,6 +656,18 @@ body.dos-fondateurs { --dos-motif: radial-gradient(circle, #e2b04a 18%, transpar
 .mini-dos.dos-fondateurs { background: radial-gradient(circle, #e2b04a 18%, transparent 19%) 0 0 / 8px 8px, #1d1606 !important; }
 .mini-dos.dos-kinshasa { background: linear-gradient(135deg, transparent 38%, #f7d038 38% 44%, #ce1021 44% 56%, #f7d038 56% 62%, transparent 62%), #3b8fd6 !important; }
 .mini-dos { display: inline-block; width: 26px; height: 38px; border-radius: 4px; border: 2px solid #f3e3bd; background: repeating-linear-gradient(45deg, var(--brass) 0 4px, #9c7524 4px 8px); }
+/* Parrainage : apparences des paliers et écran d'invitation. */
+.avatar.av-ambassadeur { background: radial-gradient(circle at 50% 30%, #fff3c8, #e2b04a 45%, #1f4d3a 46%, #123326); color: #1d1606; }
+.avatar.cadre-ambassadeur { box-shadow: 0 0 0 3px #1f8a5b, 0 0 0 5px #e2b04a; }
+.avatar.cadre-ambassadeur-or { box-shadow: 0 0 0 3px #e2b04a, 0 0 0 5px #fff3c8, 0 0 0 7px #e2b04a, 0 0 14px 4px rgba(226,176,74,.55); }
+body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0 16%, transparent 17%), repeating-linear-gradient(90deg, #1f8a5b 0 6px, #155f3f 6px 12px); --dos-motif-petit: radial-gradient(circle, #e2b04a 0 22%, transparent 23%), #1f8a5b; }
+.mini-dos.dos-ambassadeur { background: radial-gradient(circle, #e2b04a 0 22%, transparent 23%), #1f8a5b !important; }
+.parrainage { display: grid; gap: 10px; justify-items: stretch; }
+.parrainage > .ico { justify-self: center; font-size: 40px; color: var(--brass); }
+.paliers-parrain li { display: grid; grid-template-columns: 70px 1fr 20px; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); }
+.paliers-parrain li.atteint { color: inherit; }
+.paliers-parrain li.atteint b { color: var(--brass); }
+.titre-parrain { font: 400 26px/1 var(--display); color: var(--brass); }
 /* Parcours de saison */
 .parcours { display: grid; gap: 10px; }
 .parcours-tete { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; }
@@ -4585,6 +4597,13 @@ var qrcode = function() {
     try { sessionStorage.setItem('kopo-google-erreur', new URLSearchParams(location.hash.slice(1)).get('error_description')); } catch (e) {}
     history.replaceState(null, '', location.pathname + location.search);
   }
+  // Lien de parrainage (?parrain=ABC234) : le code est gardé sur le téléphone jusqu'à la connexion Google.
+  const parrainLien = (new URLSearchParams(location.search).get('parrain') || '').toUpperCase();
+  if (/^[A-Z0-9]{6}$/.test(parrainLien)) {
+    if (!stock.lire('kopo-parrain')) stock.ecrire('kopo-parrain', { code: parrainLien, le: Date.now() });
+    const q = new URLSearchParams(location.search); q.delete('parrain');
+    history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + location.hash);
+  }
   function enregistrerPrefs() { stock.ecrire('kopo-prefs', prefs); appliquerPrefs(); }
   function appliquerPrefs() {
     document.body.classList.toggle('quatre-couleurs', !!prefs.quatreCouleurs);
@@ -6350,6 +6369,13 @@ var qrcode = function() {
       const couper = el('button', 'btn', 'Ne plus recevoir les rivalités');
       couper.onclick = async () => { try { await apiJoueur('/moi', 'PATCH', { notifs: { rivalite: false } }); toast('Notifications de rivalité coupées.'); } catch (e) { toast(e.message); } fermerFenetre(); };
       boutons.push(fermer('À moi de jouer !'), couper);
+    } else if (a.type === 'parrainage') {
+      z.append(icone('i-cadeau'), el('h2', null, 'Parrainage'), el('p', null, a.texte));
+      if (d.titre) z.append(el('b', 'titre-parrain', '« ' + d.titre + ' »'));
+      apiJoueur('/moi').then((m) => soldeServeur(m.compte.solde)).catch(() => {});
+      const voir = el('button', 'btn principal large', 'Inviter d\'autres amis');
+      voir.onclick = () => ouvrirParrainage();
+      boutons.push(voir, fermer());
     } else if (a.type === 'ami') {
       z.append(icone('i-creer'), el('h2', null, a.texte));
       const aj = el('button', 'btn principal large', 'L\'ajouter aussi');
@@ -6679,9 +6705,82 @@ var qrcode = function() {
     const inviter = el('button', 'btn large', 'Inviter sur WhatsApp');
     inviter.onclick = () => { const t = `Viens jouer au Kopo avec moi ! Ajoute-moi : ${c.compte.pseudo}#${c.compte.numero}\n${location.origin + location.pathname}`; window.open('https://wa.me/?text=' + encodeURIComponent(t), '_blank', 'noopener'); };
     const f = el('button', 'btn large', 'Fermer'); f.onclick = () => ouvrirParametres();
-    ouvrirFenetre([el('h2', null, 'Mes amis'), moi, ligne, liste, inviter, f]);
+    const parrainer = el('button', 'btn principal large', 'Inviter et gagner des pièces');
+    parrainer.onclick = () => ouvrirParrainage(ouvrirAmis);
+    ouvrirFenetre([el('h2', null, 'Mes amis'), moi, ligne, liste, parrainer, inviter, f]);
     dessiner();
   }
+
+  // ------------------------------------------------------------------ parrainage (serveur)
+  // Mon lien d'invitation, mes amis venus jouer, mes paliers. Tout est vérifié par le serveur.
+  const lienParrain = (code) => location.origin + location.pathname + '?parrain=' + code;
+  async function ouvrirParrainage(retour) {
+    const zone = el('div', 'parrainage');
+    const f = el('button', 'btn large', 'Fermer'); f.onclick = () => (retour ? retour() : fermerFenetre());
+    ouvrirFenetre([el('h2', null, 'Inviter des amis'), zone, f]);
+    zone.append(el('p', null, 'Chargement…'));
+    let P;
+    try { P = await apiJoueur('/parrainage'); } catch (e) { zone.replaceChildren(el('p', null, e.message)); return; }
+    const R = P.regles;
+    zone.replaceChildren();
+    if (!P.actif) zone.append(el('p', 'muted', 'Le parrainage est en pause pour le moment.'));
+    const regle = el('p', null);
+    regle.append('Quand un ami crée son compte avec Google et joue ', el('b', null, R.parties + ' parties'), ' contre d\'autres joueurs, tu gagnes ', el('b', null, R.piecesParrain + ' pièces'), ' et lui ', el('b', null, R.piecesFilleul + ' pièces'), '.');
+    zone.append(icone('i-cadeau'), regle);
+    if (!P.lie) {
+      zone.append(el('p', 'muted', 'Connecte-toi avec Google pour avoir ton lien d\'invitation.'));
+      const cfg = await lireConfig();
+      if (cfg && cfg.google) { const g = el('button', 'btn principal large', 'Se connecter avec Google'); g.onclick = () => connexionGoogle(cfg.google); zone.append(g); }
+    } else {
+      const lien = lienParrain(P.code);
+      const champ = el('input', 'texte'); champ.readOnly = true; champ.value = lien; champ.setAttribute('aria-label', 'Ton lien d\'invitation');
+      const copier = el('button', 'btn', 'Copier');
+      copier.onclick = async () => { try { await navigator.clipboard.writeText(lien); toast('Lien copié.'); } catch (e) { champ.select(); toast('Sélectionne le lien et copie-le.'); } };
+      const ligne = el('div', 'lien'); ligne.append(champ, copier);
+      const wa = el('button', 'btn large btn-whatsapp', 'Inviter sur WhatsApp');
+      wa.prepend(icone('i-partager'));
+      wa.onclick = () => ouvrirWhatsApp(`Viens jouer au Kopo avec moi ! Crée ton compte avec ce lien, on gagne des pièces tous les deux :\n${lien}`);
+      zone.append(ligne, wa);
+      // Progression et paliers (les gros parrains sont récompensés).
+      const prochain = P.paliers.find((x) => !x.atteint);
+      const prog = el('p', null);
+      prog.append(el('b', null, P.amis + (P.amis > 1 ? ' amis venus jouer' : ' ami venu jouer')));
+      if (P.titre) prog.append(' · titre ', el('b', null, '« ' + P.titre + ' »'));
+      if (prochain) {
+        const quoi = [prochain.pieces ? prochain.pieces.toLocaleString('fr-FR') + ' pièces' : null, prochain.objet ? 'une apparence exclusive' : null, prochain.titre ? 'le titre « ' + prochain.titre + ' »' : null].filter(Boolean).join(', ');
+        prog.append(el('br'), el('small', 'muted', `Prochain palier à ${prochain.n} amis : ${quoi}.`));
+      }
+      zone.append(prog);
+      const paliers = el('ul', 'liste-k paliers-parrain');
+      for (const x of P.paliers) {
+        const li = el('li', x.atteint ? 'atteint' : null);
+        li.append(el('b', null, x.n + ' amis'), el('span', null, [x.pieces ? x.pieces.toLocaleString('fr-FR') + ' pièces' : null, x.objet ? 'apparence' : null, x.titre ? '« ' + x.titre + ' »' : null].filter(Boolean).join(' · ')), el('span', null, x.atteint ? '✓' : ''));
+        paliers.append(li);
+      }
+      zone.append(paliers);
+      if (P.regles.parMois) zone.append(el('small', 'muted', `Au plus ${P.regles.parMois} amis récompensés en pièces par mois (ils comptent tous pour les paliers).`));
+      if (P.filleuls.length) {
+        const l = el('ul', 'liste-k');
+        const etat = (x) => x.statut === 'valide' ? (x.pieces_parrain ? '✓ +' + x.pieces_parrain : '✓') : x.statut === 'expire' ? 'délai passé' : `${x.parties} / ${R.parties} parties`;
+        for (const x of P.filleuls) { const li = el('li'); li.append(el('span', null, x.pseudo + '#' + x.numero), el('small', null, etat(x))); l.append(li); }
+        zone.append(el('h3', null, 'Mes invités'), l);
+      }
+    }
+    // Côté invité : mon parrain, ou saisir son code (compte Google tout neuf seulement).
+    if (P.parrain) {
+      const m = P.parrain;
+      zone.append(el('p', 'muted', m.statut === 'valide' ? `Invité par ${m.pseudo} : cadeau reçu.` : m.statut === 'expire' ? `Invité par ${m.pseudo} : le délai est passé.` : `Invité par ${m.pseudo} : ${m.parties} / ${R.parties} parties jouées.`));
+    } else if (P.peutEtreParraine && !P.filleuls.length) {
+      const champ = el('input', 'texte'); champ.placeholder = 'Code de ton ami'; champ.maxLength = 6; champ.setAttribute('aria-label', 'Code de parrainage');
+      const ok = el('button', 'btn', 'Valider');
+      ok.onclick = async () => { try { const r = await apiJoueur('/parrainage', 'POST', { code: champ.value.trim() }); toast(`${r.parrain} t'a invité : joue tes premières parties pour gagner ton cadeau !`); ouvrirParrainage(retour); } catch (e) { toast(e.message); } };
+      const ligne = el('div', 'lien'); ligne.append(champ, ok);
+      zone.append(el('h3', null, 'Un ami t\'a invité ?'), ligne);
+    }
+    zone.append(el('small', 'muted', 'Les parties contre des robots, abandonnées ou jouées seul avec ton parrain ne comptent pas. Un compte Google ne peut être invité qu\'une fois, même après une suppression.'));
+  }
+  window.ouvrirParrainage = ouvrirParrainage;
+  if (/^[A-Z0-9]{6}$/.test(parrainLien) && MODE_SERVEUR) setTimeout(() => toast('Un ami t\'invite : connecte-toi avec Google dans Paramètres et joue tes premières parties pour gagner des pièces !'), 2500);
 
   async function ouvrirBloques() {
     const liste = el('ul', 'liste-k');
@@ -6731,7 +6830,7 @@ var qrcode = function() {
     try {
       const invite = compteLocal();
       const pseudo = stock.lire('kopo-pseudo') || undefined;
-      const r = await fetch(SERVEUR + '/api/connexion', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jetonSupabase: jeton, jeton: invite && invite.jeton, pseudo }) });
+      const r = await fetch(SERVEUR + '/api/connexion', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jetonSupabase: jeton, jeton: invite && invite.jeton, pseudo, parrain: (stock.lire('kopo-parrain') || {}).code }) });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.erreur || 'Connexion refusée.');
       stock.ecrire('kopo-compte-serveur', { serveur: SERVEUR, jeton: j.jeton, compte: j.compte });
@@ -6739,6 +6838,10 @@ var qrcode = function() {
       if (j.compte && j.compte.pseudo) { stock.ecrire('kopo-pseudo', j.compte.pseudo); if ($('pseudo')) $('pseudo').value = j.compte.pseudo; }
       toast('Connecté avec Google : ' + j.compte.pseudo + '#' + j.compte.numero);
       majBloques();
+      if (j.parrainage) {
+        stock.effacer('kopo-parrain');
+        setTimeout(() => toast(j.parrainage.ok ? `${j.parrainage.parrain} t'a invité : joue tes premières parties pour gagner ton cadeau !` : j.parrainage.erreur), 3800);
+      }
     } catch (e) { toast(e.message); }
   })();
 
@@ -7222,7 +7325,8 @@ var qrcode = function() {
   $('btnParametresAccueil').onclick = () => window.ouvrirParametres && window.ouvrirParametres();
   setTimeout(() => ($('btnParametresAccueil').hidden = typeof window.ouvrirParametres !== 'function'), 0);
   $('btnPartager').onclick = async () => {
-    const url = location.origin + location.pathname;
+    let url = location.origin + location.pathname;
+    if (MODE_SERVEUR && compteLocal()) { try { const P = await apiJoueur('/parrainage'); if (P.code) url = lienParrain(P.code); } catch (e) {} }
     try { if (navigator.share) { await navigator.share({ title: 'Kopo', text: 'Viens jouer au Kopo avec moi !', url }); return; } } catch (e) { return; }
     try { await navigator.clipboard.writeText(url); toast('Lien du jeu copié.'); } catch (e) { toast(url); }
   };

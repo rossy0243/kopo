@@ -31,6 +31,11 @@ const OBJETS = {
   'cadre-brazzaville': { type: 'cadre', nom: 'Brazzaville', collection: 'brazzaville', prix: 1500 },
   'cadre-fondateurs': { type: 'cadre', nom: 'Les Fondateurs', collection: 'saison-1', prix: null },
   'cadre-legende': { type: 'cadre', nom: 'Légende', collection: 'saison-1', prix: null },
+  // Paliers du parrainage (amis venus jouer) : ne s'achètent pas.
+  'cadre-ambassadeur': { type: 'cadre', nom: 'Ambassadeur', collection: 'parrainage', prix: null },
+  'av-ambassadeur': { type: 'avatar', nom: 'Ambassadeur', collection: 'parrainage', prix: null },
+  'dos-ambassadeur': { type: 'dos', nom: 'Ambassadeur', collection: 'parrainage', prix: null },
+  'cadre-ambassadeur-or': { type: 'cadre', nom: "Ambassadeur d'or", collection: 'parrainage', prix: null },
 };
 const DE_BASE = ['av-laiton', 'dos-laiton'];
 

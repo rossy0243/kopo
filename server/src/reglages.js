@@ -25,6 +25,9 @@ const DEFAUTS = {
   parcours: { xpPartie: 30, xpManche: 5, xpVictoire: 15, xpPalier: 100, paliers: 30 },
   // Cadeau de fondateur (dos « Les Fondateurs ») pour ceux qui avaient des pièces d'essai (décision du 01/11).
   cadeauFondateur: { actif: true },
+  // Parrainage : quand l'ami invité (compte Google neuf) a joué `parties` parties entre humains.
+  // parMois : plafond anti-faux comptes, levé pour les créateurs vérifiés ; total : 0 = sans limite.
+  parrainage: { actif: true, parties: 5, piecesParrain: 300, piecesFilleul: 200, parMois: 30, total: 0, joursCompte: 7, joursPourJouer: 30 },
   // Nom et thème de la prochaine saison (sinon : une ville, thème validé le 31/10).
   prochaineSaison: { nom: '', theme: '' },
   messagesRapides: ['👏', '😂', '😮', '🔥', '😡', '👍', '😭', '🙏', 'Bien joué !', 'Bravo !', 'Joli coup !', 'Belle carte !', 'Bien vu !', 'Trop fort !', 'Merci !', 'Désolé !', 'Oups !', 'Aïe !', 'Pas de chance !', 'Je ramasse…', 'Je t’ai eu !', 'Katapss !', 'Vite !', 'Prends ton temps', 'À toi !', 'Encore une !', 'Bonne chance !', 'Bonne partie !', 'GG !', 'Revanche ?', 'On en refait une ?', 'Je reviens', 'Salut tout le monde !', 'À la prochaine !'],
@@ -103,6 +106,17 @@ function creerReglages(base) {
         }
         if (v.xpPalier < 10) throw Object.assign(new Error('Il faut au moins 10 XP par palier.'), { statut: 400 });
         if (v.paliers < 10 || v.paliers > 30) throw Object.assign(new Error('Le parcours a entre 10 et 30 paliers.'), { statut: 400 });
+        valeur = v;
+      }
+      if (cle === 'parrainage') {
+        const v = { actif: valeur.actif !== false && valeur.actif !== 0 };
+        for (const k of Object.keys(DEFAUTS.parrainage)) {
+          if (k === 'actif') continue;
+          v[k] = entier(valeur[k]);
+          if (!(v[k] >= 0) || v[k] > 100000) throw Object.assign(new Error('Valeur invalide : ' + k + '.'), { statut: 400 });
+        }
+        if (v.parties < 1) throw Object.assign(new Error('Il faut au moins 1 partie pour valider un parrainage.'), { statut: 400 });
+        if (v.joursPourJouer < 1 || v.joursCompte < 1) throw Object.assign(new Error('Les délais font au moins 1 jour.'), { statut: 400 });
         valeur = v;
       }
       if (cle === 'prochaineSaison') valeur = { nom: String(valeur.nom || '').replace(/[<>]/g, '').trim().slice(0, 40), theme: String(valeur.theme || '').replace(/[<>]/g, '').trim().slice(0, 40) };
