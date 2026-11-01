@@ -1391,6 +1391,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
     room.onMessage('classee', (d) => window.dispatchEvent(new CustomEvent('kopo-classee', { detail: d })));
     room.onMessage('ligue', (d) => window.dispatchEvent(new CustomEvent('kopo-ligue', { detail: d })));
     room.onMessage('parcours', (d) => window.dispatchEvent(new CustomEvent('kopo-parcours', { detail: d })));
+    room.onMessage('faceAFace', (d) => window.dispatchEvent(new CustomEvent('kopo-face-a-face', { detail: d })));
     room.onMessage('reaction', (e) => window.dispatchEvent(new CustomEvent('kopo-reaction', { detail: e })));
     room.onMessage('exclu', (raison) => { quitter(); toast(raison || 'Tu as été exclu de la partie.'); });
     room.onLeave((code) => {
@@ -2418,6 +2419,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       if (r.faceAFace) {
         const f = r.faceAFace;
         const ff = el('div', 'face-a-face');
+        if (f.id) ff.dataset.rival = f.id;
         const moiB = el('b', null, String(f.gagnes)), luiB = el('b', null, String(f.perdus));
         const score = el('span', 'score'); score.append(moiB, ' – ', luiB);
         ff.append(el('span', null, 'Toi'), score, el('span', null, f.nom));
@@ -2704,6 +2706,25 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   };
   let derniereLigue = null; // { recu, detail } : points de la dernière partie classée
   window.addEventListener('kopo-classee', (e) => { if (e.detail && e.detail.classee) toast('Partie classée : tes points de ligue sont en jeu.'); });
+  // Fin de partie en ligne : le serveur donne le face-à-face qu'il tient pour toute la table. C'est lui qui fait foi
+  // (chaque téléphone ne compte que les parties qu'il a vues) : on le recopie dans le profil et dans le récap affiché.
+  window.addEventListener('kopo-face-a-face', (e) => {
+    const duels = Array.isArray(e.detail) ? e.detail : [];
+    if (!duels.length) return;
+    const p = lireProfil(), rv = p.rivaux || (p.rivaux = {});
+    for (const x of duels) {
+      const r = rv[x.id] || (rv[x.id] = { pseudo: x.pseudo, gagnes: 0, perdus: 0, vuLe: jourLocal() });
+      r.pseudo = x.pseudo; r.gagnes = x.moi; r.perdus = x.lui;
+      const f = suivi && suivi.recap && suivi.recap.faceAFace;
+      if (f && f.id === x.id) { f.gagnes = x.moi; f.perdus = x.lui; }
+      for (const ff of document.querySelectorAll('.face-a-face[data-rival="' + CSS.escape(x.id) + '"]')) {
+        const bs = ff.querySelectorAll('.score b');
+        if (bs.length === 2) { bs[0].textContent = String(x.moi); bs[1].textContent = String(x.lui); }
+      }
+    }
+    ecrireProfil(p); sauvegarderProfil();
+  });
+
   window.addEventListener('kopo-ligue', (e) => {
     derniereLigue = { recu: Date.now(), detail: e.detail };
     const x = document.getElementById('recapExtra');
@@ -3585,7 +3606,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       for (const [id, r] of Object.entries(p.rivaux || {})) rv[id] = Object.assign({}, r);
       for (const x of srv.rivaux || []) {
         const r = rv[x.id] || (rv[x.id] = { pseudo: x.pseudo, gagnes: 0, perdus: 0 });
-        r.pseudo = x.pseudo; r.gagnes = Math.max(r.gagnes || 0, x.moi || 0); r.perdus = Math.max(r.perdus || 0, x.lui || 0);
+        r.pseudo = x.pseudo; r.gagnes = x.moi || 0; r.perdus = x.lui || 0; // le serveur fait foi : même score pour les deux joueurs
       }
       dessinerStats(plus(s, srv.stats), plus(en, srv.entrainement || {}), Object.values(rv));
     }).catch(() => {});

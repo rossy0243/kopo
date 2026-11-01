@@ -4472,7 +4472,7 @@ var qrcode = function() {
       // On montre l'adversaire avec qui l'histoire est la plus longue (à égalité : celui qui t'a battu).
       const choisi = e.adversaires.slice().sort((a, b) => (rv[b.id].gagnes + rv[b.id].perdus) - (rv[a.id].gagnes + rv[a.id].perdus) || (b.devant - a.devant))[0];
       const r = rv[choisi.id];
-      faceAFace = { nom: r.pseudo, gagnes: r.gagnes, perdus: r.perdus, gagne: !choisi.devant };
+      faceAFace = { id: choisi.id, nom: r.pseudo, gagnes: r.gagnes, perdus: r.perdus, gagne: !choisi.devant };
       // Les 200 plus récents seulement.
       const ids = Object.keys(rv);
       if (ids.length > 200) ids.sort((a, b) => (rv[a].vuLe < rv[b].vuLe ? -1 : 1)).slice(0, ids.length - 200).forEach((id) => delete rv[id]);
@@ -4882,7 +4882,7 @@ var qrcode = function() {
   // ------------------------------------------------------------------ paramètres
   // Réglages du joueur, gardés sur le téléphone (plus tard : rattachés au compte).
   const VERSION = '1.0-essai';
-  const BUILD = '2287f0939b14'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = 'a9e447870002'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
@@ -5231,6 +5231,7 @@ var qrcode = function() {
     room.onMessage('classee', (d) => window.dispatchEvent(new CustomEvent('kopo-classee', { detail: d })));
     room.onMessage('ligue', (d) => window.dispatchEvent(new CustomEvent('kopo-ligue', { detail: d })));
     room.onMessage('parcours', (d) => window.dispatchEvent(new CustomEvent('kopo-parcours', { detail: d })));
+    room.onMessage('faceAFace', (d) => window.dispatchEvent(new CustomEvent('kopo-face-a-face', { detail: d })));
     room.onMessage('reaction', (e) => window.dispatchEvent(new CustomEvent('kopo-reaction', { detail: e })));
     room.onMessage('exclu', (raison) => { quitter(); toast(raison || 'Tu as été exclu de la partie.'); });
     room.onLeave((code) => {
@@ -6258,6 +6259,7 @@ var qrcode = function() {
       if (r.faceAFace) {
         const f = r.faceAFace;
         const ff = el('div', 'face-a-face');
+        if (f.id) ff.dataset.rival = f.id;
         const moiB = el('b', null, String(f.gagnes)), luiB = el('b', null, String(f.perdus));
         const score = el('span', 'score'); score.append(moiB, ' – ', luiB);
         ff.append(el('span', null, 'Toi'), score, el('span', null, f.nom));
@@ -6544,6 +6546,25 @@ var qrcode = function() {
   };
   let derniereLigue = null; // { recu, detail } : points de la dernière partie classée
   window.addEventListener('kopo-classee', (e) => { if (e.detail && e.detail.classee) toast('Partie classée : tes points de ligue sont en jeu.'); });
+  // Fin de partie en ligne : le serveur donne le face-à-face qu'il tient pour toute la table. C'est lui qui fait foi
+  // (chaque téléphone ne compte que les parties qu'il a vues) : on le recopie dans le profil et dans le récap affiché.
+  window.addEventListener('kopo-face-a-face', (e) => {
+    const duels = Array.isArray(e.detail) ? e.detail : [];
+    if (!duels.length) return;
+    const p = lireProfil(), rv = p.rivaux || (p.rivaux = {});
+    for (const x of duels) {
+      const r = rv[x.id] || (rv[x.id] = { pseudo: x.pseudo, gagnes: 0, perdus: 0, vuLe: jourLocal() });
+      r.pseudo = x.pseudo; r.gagnes = x.moi; r.perdus = x.lui;
+      const f = suivi && suivi.recap && suivi.recap.faceAFace;
+      if (f && f.id === x.id) { f.gagnes = x.moi; f.perdus = x.lui; }
+      for (const ff of document.querySelectorAll('.face-a-face[data-rival="' + CSS.escape(x.id) + '"]')) {
+        const bs = ff.querySelectorAll('.score b');
+        if (bs.length === 2) { bs[0].textContent = String(x.moi); bs[1].textContent = String(x.lui); }
+      }
+    }
+    ecrireProfil(p); sauvegarderProfil();
+  });
+
   window.addEventListener('kopo-ligue', (e) => {
     derniereLigue = { recu: Date.now(), detail: e.detail };
     const x = document.getElementById('recapExtra');
@@ -7425,7 +7446,7 @@ var qrcode = function() {
       for (const [id, r] of Object.entries(p.rivaux || {})) rv[id] = Object.assign({}, r);
       for (const x of srv.rivaux || []) {
         const r = rv[x.id] || (rv[x.id] = { pseudo: x.pseudo, gagnes: 0, perdus: 0 });
-        r.pseudo = x.pseudo; r.gagnes = Math.max(r.gagnes || 0, x.moi || 0); r.perdus = Math.max(r.perdus || 0, x.lui || 0);
+        r.pseudo = x.pseudo; r.gagnes = x.moi || 0; r.perdus = x.lui || 0; // le serveur fait foi : même score pour les deux joueurs
       }
       dessinerStats(plus(s, srv.stats), plus(en, srv.entrainement || {}), Object.values(rv));
     }).catch(() => {});

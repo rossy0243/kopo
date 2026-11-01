@@ -472,6 +472,13 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.deepStrictEqual(st.json.stats, { parties: 1, victoires: 1, finales: 1, eliminePremier: 0 });
     assert.deepStrictEqual(st.json.entrainement, { parties: 0, victoires: 0 });
     assert.strictEqual(st.json.rivaux.length, 2);
+    // Même duel, vu des deux côtés : les scores sont le miroir l'un de l'autre.
+    const autre = js.find((j) => j.compte.id !== v.compte.id);
+    const [d1] = await srv.social.duels(v.compte.id, [autre.compte.id]);
+    const [d2] = await srv.social.duels(autre.compte.id, [v.compte.id]);
+    assert.deepStrictEqual([d1.moi, d1.lui], [1, 0]);
+    assert.deepStrictEqual([d2.moi, d2.lui], [0, 1]);
+    assert.deepStrictEqual(await srv.social.duels(v.compte.id, []), []);
     const premier = js.find((j) => j.compte.id === fin.elimines[0]);
     assert.strictEqual((await api('/api/statistiques', { jeton: premier.jeton })).json.stats.eliminePremier, 1);
     // Copie du profil du téléphone.

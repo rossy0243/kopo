@@ -267,7 +267,7 @@
       // On montre l'adversaire avec qui l'histoire est la plus longue (à égalité : celui qui t'a battu).
       const choisi = e.adversaires.slice().sort((a, b) => (rv[b.id].gagnes + rv[b.id].perdus) - (rv[a.id].gagnes + rv[a.id].perdus) || (b.devant - a.devant))[0];
       const r = rv[choisi.id];
-      faceAFace = { nom: r.pseudo, gagnes: r.gagnes, perdus: r.perdus, gagne: !choisi.devant };
+      faceAFace = { id: choisi.id, nom: r.pseudo, gagnes: r.gagnes, perdus: r.perdus, gagne: !choisi.devant };
       // Les 200 plus récents seulement.
       const ids = Object.keys(rv);
       if (ids.length > 200) ids.sort((a, b) => (rv[a].vuLe < rv[b].vuLe ? -1 : 1)).slice(0, ids.length - 200).forEach((id) => delete rv[id]);

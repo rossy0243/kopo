@@ -56,9 +56,9 @@ console.log('\nFace-à-face');
 test('Toi 1 – 0, puis 1 – 1 ; rien contre des robots', () => {
   const p = profil();
   let r = R.enregistrerPartie(p, partie({ adversaires: [{ id: 'k', nom: 'Kevin', devant: false }] }), '2026-10-31');
-  assert.deepStrictEqual(r.faceAFace, { nom: 'Kevin', gagnes: 1, perdus: 0, gagne: true });
+  assert.deepStrictEqual(r.faceAFace, { id: 'k', nom: 'Kevin', gagnes: 1, perdus: 0, gagne: true });
   r = R.enregistrerPartie(p, partie({ adversaires: [{ id: 'k', nom: 'Kevin', devant: true }] }), '2026-10-31');
-  assert.deepStrictEqual(r.faceAFace, { nom: 'Kevin', gagnes: 1, perdus: 1, gagne: false });
+  assert.deepStrictEqual(r.faceAFace, { id: 'k', nom: 'Kevin', gagnes: 1, perdus: 1, gagne: false });
   r = R.enregistrerPartie(p, partie({ avecRobots: true, adversaires: [{ id: 'k', nom: 'Kevin', devant: true }] }), '2026-10-31');
   assert.strictEqual(r.faceAFace, null);
   assert.strictEqual(p.rivaux.k.perdus, 1);

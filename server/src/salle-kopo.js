@@ -171,6 +171,11 @@ class SalleKopo extends Room {
     if (social) await social.apresPartie(humains.map((id) => ({ id, place: place(id), abandon: p.abandons.has(id) }))).catch((e) => console.error('Rivalités :', e.message));
     for (const [id, c] of this.clientsParId) {
       const compte = await comptes.lire(id);
+      // Face-à-face tenus par le serveur : les deux joueurs voient le même score (le téléphone ne compte que ce qu'il a vu).
+      if (social && !avecRobots && humains.includes(id)) {
+        const duels = await social.duels(id, humains.filter((x) => x !== id)).catch(() => []);
+        if (duels.length) c.send('faceAFace', duels);
+      }
       if (compte) c.send('solde', { solde: compte.solde });
       if (resultats.has(id)) c.send('ligue', resultats.get(id));
       if (xps.has(id)) c.send('parcours', xps.get(id));
