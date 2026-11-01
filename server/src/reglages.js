@@ -21,6 +21,8 @@ const DEFAUTS = {
     recompenses: { bois: 100, bronze: 200, argent: 400, or: 700, diamant: 1000, legende: 1500 }, // pièces selon la division atteinte
     descente: { bois: 0, bronze: 1, argent: 1, or: 1, diamant: 2, legende: 2 }, // divisions perdues au début de la saison suivante
   },
+  // Parcours de saison (retention.md §3.5) : environ 50 XP par partie, 100 XP par palier, 30 paliers.
+  parcours: { xpPartie: 30, xpManche: 5, xpVictoire: 15, xpPalier: 100, paliers: 30 },
   // Nom et thème de la prochaine saison (sinon : une ville, thème validé le 31/10).
   prochaineSaison: { nom: '', theme: '' },
   messagesRapides: ['👏', '😂', '😮', '🔥', '😡', '👍', '😭', '🙏', 'Bien joué !', 'Bravo !', 'Joli coup !', 'Belle carte !', 'Bien vu !', 'Trop fort !', 'Merci !', 'Désolé !', 'Oups !', 'Aïe !', 'Pas de chance !', 'Je ramasse…', 'Je t’ai eu !', 'Katapss !', 'Vite !', 'Prends ton temps', 'À toi !', 'Encore une !', 'Bonne chance !', 'Bonne partie !', 'GG !', 'Revanche ?', 'On en refait une ?', 'Je reviens', 'Salut tout le monde !', 'À la prochaine !'],
@@ -91,6 +93,16 @@ function creerReglages(base) {
         valeur = v.liste;
       }
       if (cle === 'ligue') valeur = verifierLigue(valeur);
+      if (cle === 'parcours') {
+        const v = {};
+        for (const k of Object.keys(DEFAUTS.parcours)) {
+          v[k] = entier(valeur[k]);
+          if (!(v[k] >= 0)) throw Object.assign(new Error('Valeur invalide : ' + k + '.'), { statut: 400 });
+        }
+        if (v.xpPalier < 10) throw Object.assign(new Error('Il faut au moins 10 XP par palier.'), { statut: 400 });
+        if (v.paliers < 10 || v.paliers > 30) throw Object.assign(new Error('Le parcours a entre 10 et 30 paliers.'), { statut: 400 });
+        valeur = v;
+      }
       if (cle === 'prochaineSaison') valeur = { nom: String(valeur.nom || '').replace(/[<>]/g, '').trim().slice(0, 40), theme: String(valeur.theme || '').replace(/[<>]/g, '').trim().slice(0, 40) };
       if (cle === 'pot') {
         const t = ['vainqueur', 'deuxieme', 'troisieme', 'maison'].reduce((s, k) => s + Number(valeur[k] || 0), 0);
