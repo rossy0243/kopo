@@ -46,7 +46,8 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
     if (req.method === 'OPTIONS') return res.sendStatus(204);
     next();
   });
-  app.get('/sante', (req, res) => res.json({ ok: true, salles: salles.size }));
+  // version = commit déployé (Render le donne dans RENDER_GIT_COMMIT) : pour vérifier qu'une mise à jour est en ligne.
+  app.get('/sante', (req, res) => res.json({ ok: true, salles: salles.size, version: (env.RENDER_GIT_COMMIT || '').slice(0, 7) || null }));
   app.use('/api', routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours, parrainage }));
   app.use('/admin/api', routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainage, salles, demarrage: Date.now() }));
   app.get('/admin', (req, res) => { res.set('Cache-Control', 'no-store'); res.set('X-Frame-Options', 'DENY'); res.sendFile(path.join(__dirname, '..', 'public', 'admin.html')); });

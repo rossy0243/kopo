@@ -504,6 +504,20 @@ body.dos-kinshasa { --dos-motif: linear-gradient(135deg, transparent 38%, #f7d03
 .carte-mission .barre-xp span { background: var(--good); }
 .carte-mission .droite { display: flex; align-items: center; gap: 8px; }
 .fenetre[data-type="missions"] { width: min(600px, 100%); }
+.fenetre[data-type="profil"] { width: min(560px, 100%); }
+.profil-fiche { display: grid; gap: 10px; }
+.profil-tete { display: flex; align-items: center; gap: 12px; }
+.profil-tete .avatar { width: 56px; height: 56px; flex: none; }
+.profil-tete b.nom { font-size: 19px; display: block; }
+.profil-tete small { color: var(--muted); }
+.profil-fiche h3 { margin: 6px 0 0; font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--brass); }
+.stats-grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+.stat-case { background: rgba(255,255,255,.05); border-radius: 10px; padding: 8px 10px; display: grid; gap: 2px; }
+.stat-case b { font-family: var(--display); font-size: 22px; color: var(--brass); line-height: 1.1; }
+.stat-case small { color: var(--muted); font-size: 12px; }
+.rival-ligne { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,.06); }
+.rival-ligne small { color: var(--muted); }
+.profil-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .fenetre[data-type="ligue"] { width: min(520px, 100%); }
 .carte-mission { padding: 7px 11px; }
 .carte-mission .recompense { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; color: var(--brass); font-size: 14px; }
@@ -4845,22 +4859,18 @@ var qrcode = function() {
   const MODE_SERVEUR = !!SERVEUR && !LOCAL && typeof Colyseus !== 'undefined';
 
   // Compte invité : créé une fois avec le pseudo, puis gardé sur l'appareil.
-  // Le pseudo changé sur l'appareil est envoyé au serveur avant de jouer (il doit être libre).
   async function compteServeur(pseudo) {
     let c = stock.lire('kopo-compte-serveur');
     if (!(c && c.serveur === SERVEUR && c.jeton)) {
-      const r = await fetch(SERVEUR + '/api/invite', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pseudo }) });
+      const r = await fetch(SERVEUR + '/api/invite', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pseudo }) }).catch(() => { throw new Error(erreurServeur(0)); });
       const j = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(j.erreur || 'Le serveur ne répond pas.');
+      if (!r.ok) throw new Error(j.erreur || erreurServeur(r.status));
       c = { serveur: SERVEUR, jeton: j.jeton, compte: j.compte };
       stock.ecrire('kopo-compte-serveur', c);
-    } else if (pseudo && c.compte && c.compte.pseudo !== pseudo) {
-      const r = await fetch(SERVEUR + '/api/moi', { method: 'PATCH', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + c.jeton }, body: JSON.stringify({ pseudo }) });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(j.erreur || 'Le serveur ne répond pas.');
-      c.compte = j.compte; stock.ecrire('kopo-compte-serveur', c);
-    }
-    adopterPseudo(c.compte && c.compte.pseudo);
+      adopterPseudo(c.compte && c.compte.pseudo, true);
+    } else adopterPseudo(c.compte && c.compte.pseudo, false);
+    // Le pseudo du compte en ligne fait foi : il ne change que dans les Paramètres (2 fois par an),
+    // qui l'envoient au serveur. On ne pousse plus ici un pseudo modifié sur le téléphone.
     return c;
   }
   // Pseudo en un seul mot : les espaces deviennent « _ » (même règle que le serveur).
@@ -4869,12 +4879,21 @@ var qrcode = function() {
     return (enCours ? t : t.trim()).replace(/\s+/g, '_').replace(/[^\p{L}\p{N}_.-]/gu, '');
   }
   // Le serveur a pu donner une variante (pseudo déjà pris) : on l'affiche partout.
-  function adopterPseudo(p) {
-    if (!p || p === stock.lire('kopo-pseudo')) return;
+  function adopterPseudo(p, aLaCreation) {
+    if (!p || p === stock.lire('kopo-pseudo')) return figerPseudo();
     const avant = stock.lire('kopo-pseudo');
     stock.ecrire('kopo-pseudo', p);
     if ($('pseudo')) { $('pseudo').value = p; majAvatar(); }
-    if (avant && avant.toLowerCase() !== p.toLowerCase()) toast('« ' + avant + ' » était déjà pris : ton pseudo est ' + p + '.');
+    figerPseudo();
+    if (avant && avant.toLowerCase() !== p.toLowerCase()) toast(aLaCreation ? '« ' + avant + ' » était déjà pris : ton pseudo est ' + p + '.' : 'Ton pseudo en ligne est ' + p + '.');
+  }
+  // Le pseudo se choisit une fois : ensuite le champ de l'accueil est figé (toucher ouvre le profil)
+  // et il ne se change plus que dans les Paramètres, 2 fois par an.
+  function figerPseudo() {
+    if (!$('pseudo')) return;
+    const fige = !!stock.lire('kopo-pseudo');
+    $('pseudo').readOnly = fige; $('profil').classList.toggle('fige', fige);
+    $('profil').title = fige ? 'Mon profil' : 'Ton pseudo';
   }
 
   // facon : { creer: true } | { code } | { taille } (salle publique) | { reconnexion: jeton de reconnexion }
@@ -5126,8 +5145,7 @@ var qrcode = function() {
     montrerEcran('ecranAccueil');
     $('info').textContent = '';
     $('pseudo').value = nettoyerPseudo(stock.lire('kopo-pseudo') || '');
-    // Le pseudo se choisit une fois : ensuite il se change seulement dans les Paramètres (2 fois par an).
-    $('pseudo').readOnly = !!$('pseudo').value; $('profil').classList.toggle('fige', $('pseudo').readOnly);
+    figerPseudo();
     afficherEnLigne();
     const h = location.hash.slice(1).toUpperCase();
     majAvatar(); majSolde(); appliquerCollection();
@@ -6183,9 +6201,9 @@ var qrcode = function() {
   async function apiJoueur(chemin, methode = 'GET', corps) {
     const c = compteLocal();
     if (!c) throw new Error('Il faut un compte en ligne.');
-    const r = await fetch(c.serveur + '/api' + chemin, { method: methode, headers: { 'content-type': 'application/json', authorization: 'Bearer ' + c.jeton }, body: corps ? JSON.stringify(corps) : undefined });
+    const r = await fetch(c.serveur + '/api' + chemin, { method: methode, headers: { 'content-type': 'application/json', authorization: 'Bearer ' + c.jeton }, body: corps ? JSON.stringify(corps) : undefined }).catch(() => { throw new Error(erreurServeur(0)); });
     const j = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(j.erreur || 'Le serveur ne répond pas.');
+    if (!r.ok) throw new Error(j.erreur || erreurServeur(r.status));
     return j;
   }
   let bloques = new Set(stock.lire('kopo-bloques') || []);
@@ -6835,7 +6853,7 @@ var qrcode = function() {
       if (!r.ok) throw new Error(j.erreur || 'Connexion refusée.');
       stock.ecrire('kopo-compte-serveur', { serveur: SERVEUR, jeton: j.jeton, compte: j.compte });
       stock.ecrire('kopo-entree', 'google'); $('bienvenue').hidden = true;
-      if (j.compte && j.compte.pseudo) { stock.ecrire('kopo-pseudo', j.compte.pseudo); if ($('pseudo')) $('pseudo').value = j.compte.pseudo; }
+      if (j.compte && j.compte.pseudo) { stock.ecrire('kopo-pseudo', j.compte.pseudo); if ($('pseudo')) { $('pseudo').value = j.compte.pseudo; majAvatar(); } figerPseudo(); }
       toast('Connecté avec Google : ' + j.compte.pseudo + '#' + j.compte.numero);
       majBloques();
       if (j.parrainage) {
@@ -7012,6 +7030,59 @@ var qrcode = function() {
     return a;
   }
   function recompenseEl(n) { const r = el('span', 'recompense'); r.append('+' + n, pieceEl()); return r; }
+  // Mon profil : niveau, statistiques (parties entre humains), entraînement (robots), rivaux, ligue.
+  // Les stats sont tenues sur le téléphone (kopo-profil) à la fin de chaque partie.
+  function ouvrirProfil() {
+    const p = lireProfil(), s = Object.assign({ parties: 0, victoires: 0, finales: 0, manchesSurvecues: 0, katapss: 0, eliminePremier: 0 }, p.stats || {});
+    const en = p.entrainement || { parties: 0, victoires: 0 };
+    const c = compteLocal();
+    const z = el('div', 'profil-fiche');
+    const tete = el('div', 'profil-tete');
+    const av = el('span', $('avatar').className || 'avatar');
+    const pseudo = stock.lire('kopo-pseudo') || $('pseudo').value || 'Joueur';
+    av.append(el('b', null, pseudo[0].toUpperCase()));
+    const id = el('div');
+    id.append(el('b', 'nom', c && c.compte && c.compte.numero ? pseudo + '#' + c.compte.numero : pseudo), el('small', null, R.titre(p) || 'Petit nouveau'));
+    tete.append(av, id);
+    z.append(tete);
+    const n = R.niveauDe(p.xp || 0);
+    const lv = el('div', 'recap-xp');
+    const barre = el('div', 'barre-xp'), sp = el('span'); barre.append(sp);
+    lv.append(el('div', 'recap-niveau', String(n.niveau)), barre, el('small', 'muted', `${n.dansNiveau}/${n.pourSuivant} XP`));
+    remplir(sp, 0, n.dansNiveau / n.pourSuivant, 150);
+    z.append(lv);
+    const grille = (cases) => { const g = el('div', 'stats-grille'); for (const [v, t] of cases) { const k = el('div', 'stat-case'); k.append(el('b', null, String(v)), el('small', null, t)); g.append(k); } return g; };
+    const taux = (v, n2) => (n2 ? Math.round(100 * v / n2) : 0) + ' %';
+    // Ligue (en ligne seulement) : remplie quand le serveur répond.
+    const ligueZ = el('div');
+    z.append(ligueZ);
+    if (MODE_SERVEUR && c) apiJoueur('/ligue').then((L) => {
+      const m = L && L.moi; if (!m) return;
+      ligueZ.append(el('h3', null, 'Ligue' + (L.saison ? ' · ' + L.saison.nom : '')), grille([[NOMS_DIVISIONS[m.division] || m.division, 'Division'], [m.points, 'Points'], [m.rangMondial ? '#' + m.rangMondial : '–', 'Rang mondial'], [m.parties, 'Parties classées']]));
+    }).catch(() => {});
+    z.append(el('h3', null, 'Statistiques'));
+    if (!s.parties) z.append(el('p', 'muted', 'Joue une partie avec d\'autres joueurs pour voir tes statistiques ici.'));
+    else z.append(grille([[s.parties, 'Parties jouées'], [s.victoires, 'Victoires'], [taux(s.victoires, s.parties), 'Taux de victoire'], [s.finales, 'Finales atteintes'], [s.manchesSurvecues, 'Manches survécues'], [s.katapss, 'Katapss'], [s.eliminePremier, 'Éliminé en premier']]));
+    z.append(el('h3', null, 'Entraînement (robots)'));
+    z.append(en.parties ? grille([[en.parties, 'Parties'], [en.victoires, 'Victoires'], [taux(en.victoires, en.parties), 'Taux de victoire']]) : el('p', 'muted', 'Aucune partie contre les robots pour l\'instant.'));
+    const rivaux = Object.values(p.rivaux || {});
+    if (rivaux.length) {
+      z.append(el('h3', null, 'Rivaux'));
+      const victime = rivaux.filter((r) => r.gagnes).sort((a, b) => b.gagnes - a.gagnes)[0];
+      const bete = rivaux.filter((r) => r.perdus).sort((a, b) => b.perdus - a.perdus)[0];
+      const ligneR = (a, b) => { const l = el('div', 'rival-ligne'); l.append(el('span', null, a), el('small', null, b)); z.append(l); };
+      if (victime) ligneR('Ta victime : ' + victime.pseudo, 'battu ' + victime.gagnes + ' fois');
+      if (bete) ligneR('Ta bête noire : ' + bete.pseudo, 't\'a battu ' + bete.perdus + ' fois');
+      for (const r of rivaux.sort((a, b) => (b.gagnes + b.perdus) - (a.gagnes + a.perdus)).slice(0, 5)) ligneR(r.pseudo, 'Toi ' + r.gagnes + ' – ' + r.perdus);
+    }
+    const actions = el('div', 'profil-actions');
+    const reg = el('button', 'btn', 'Changer de pseudo'); reg.onclick = ouvrirParametres;
+    const mis = el('button', 'btn', 'Missions'); mis.onclick = ouvrirMissions;
+    actions.append(reg, mis);
+    const fermer = el('button', 'btn principal large', 'Fermer'); fermer.onclick = () => { fermerFenetre(); if (vueActuelle) afficher(vueActuelle); };
+    ouvrirFenetre([el('h2', null, 'Mon profil'), z, actions, fermer], 'profil');
+  }
+  window.ouvrirProfil = ouvrirProfil;
   function ouvrirMissions() {
     const p = lireProfil(), jour = jourLocal();
     const ms = R.missionsDuJour(p, jour), d = R.defiSemaine(p, jour), b = R.bienvenue(p, jour);
@@ -7123,9 +7194,12 @@ var qrcode = function() {
   // Petit clic discret sur les boutons (les interrupteurs jouent leur propre son).
   document.addEventListener('click', (e) => { const b = e.target.closest && e.target.closest('button'); if (b && !b.disabled && !b.classList.contains('bascule')) Sons.jouer('clic'); });
   function lirePseudo() {
+    // Déjà choisi : c'est lui qui compte, quoi qu'il y ait dans le champ.
+    const deja = nettoyerPseudo(stock.lire('kopo-pseudo') || '');
+    if (deja) { if ($('pseudo').value !== deja) { $('pseudo').value = deja; majAvatar(); } figerPseudo(); return deja; }
     const p = nettoyerPseudo($('pseudo').value); $('pseudo').value = p;
-    if (!p) { $('voileRejoindre').hidden = $('voileRobots').hidden = true; toast("Choisis d'abord ton pseudo, en haut."); $('pseudo').focus(); return null; }
-    stock.ecrire('kopo-pseudo', p);
+    if (p.length < 3) { $('voileRejoindre').hidden = $('voileRobots').hidden = true; toast(p ? 'Le pseudo fait au moins 3 caractères, en un seul mot.' : "Choisis d'abord ton pseudo, en haut."); $('pseudo').focus(); return null; }
+    stock.ecrire('kopo-pseudo', p); figerPseudo();
     return p;
   }
   $('btnCreer').onclick = () => { const p = lirePseudo(); if (!p) return; if (MODE_SERVEUR) entrerServeur(p, { creer: true }); else demarrerHote(nouveauCode(), p, false); };
@@ -7167,11 +7241,18 @@ var qrcode = function() {
     $('solde').textContent = formatPieces(soldeAffiche());
     if (MODE_SERVEUR) { $('btnBourse').title = 'Tes pièces'; $('btnBourse').querySelector('small').textContent = 'pièces'; }
   }
+  // Message clair selon la réponse : sans réseau, serveur qui redémarre, ou serveur pas encore à jour (route inconnue).
+  function erreurServeur(statut) {
+    if (!statut) return 'Pas de connexion au serveur. Vérifie ton réseau et réessaie.';
+    if (statut === 404) return 'Le serveur n\'est pas encore à jour. Réessaie dans quelques minutes.';
+    if (statut >= 502) return 'Le serveur redémarre. Réessaie dans une minute.';
+    return 'Le serveur ne répond pas (' + statut + ').';
+  }
   async function appelEnLigne(chemin, methode = 'GET', corps) {
     const c = compteEnLigne(); if (!c) throw new Error('Il faut un compte en ligne.');
-    const r = await fetch(SERVEUR + '/api' + chemin, { method: methode, headers: { 'content-type': 'application/json', authorization: 'Bearer ' + c.jeton }, body: corps ? JSON.stringify(corps) : undefined });
+    const r = await fetch(SERVEUR + '/api' + chemin, { method: methode, headers: { 'content-type': 'application/json', authorization: 'Bearer ' + c.jeton }, body: corps ? JSON.stringify(corps) : undefined }).catch(() => { throw new Error(erreurServeur(0)); });
     const j = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(j.erreur || 'Le serveur ne répond pas.');
+    if (!r.ok) throw new Error(j.erreur || erreurServeur(r.status));
     return j;
   }
   // Récompense gagnée sur le téléphone (mission, défi, bienvenue) : créditée par le serveur, qui plafonne.
@@ -7189,7 +7270,7 @@ var qrcode = function() {
       try {
         if (!compteEnLigne()) { if (!pseudo) return null; await compteServeur(pseudo); }
         const j = await appelEnLigne('/moi');
-        const c = compteEnLigne(); if (c) { c.compte = j.compte; stock.ecrire('kopo-compte-serveur', c); }
+        const c = compteEnLigne(); if (c) { c.compte = j.compte; stock.ecrire('kopo-compte-serveur', c); adopterPseudo(j.compte && j.compte.pseudo, false); }
         majSolde();
         return compteEnLigne();
       } catch (e) { return compteEnLigne(); } finally { setTimeout(() => { compteEnCours = null; }, 0); }
@@ -7286,7 +7367,7 @@ var qrcode = function() {
   $('btnBourse').onclick = () => fenetrePieces(null);
   function majAvatar() { const p = $('pseudo').value.trim(); $('avatarLettre').textContent = p ? p[0].toUpperCase() : '?'; }
   $('pseudo').addEventListener('input', () => { const v = nettoyerPseudo($('pseudo').value, true); if (v !== $('pseudo').value) $('pseudo').value = v; majAvatar(); });
-  $('profil').addEventListener('click', (e) => { if ($('pseudo').readOnly) { e.preventDefault(); ouvrirParametres(); } });
+  $('profil').addEventListener('click', (e) => { if ($('pseudo').readOnly) { e.preventDefault(); ouvrirProfil(); } });
   $('btnInconnus').onclick = () => { if (!lirePseudo()) return; dessinerSalles(); afficherEnLigne(); $('voileSalles').hidden = false; };
   $('btnFermerSalles').onclick = () => ($('voileSalles').hidden = true);
   $('btnModeRejoindre').onclick = () => { $('voileRejoindre').hidden = false; setTimeout(() => $('codeRejoindre').focus(), 50); };
