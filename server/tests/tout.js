@@ -419,6 +419,57 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.strictEqual(am.json.liste[2].points, 0);
   });
 
+  console.log('Rivalités, notifications, invitations');
+  await test('face-à-face : une partie à 3 crée les 3 duels', async () => {
+    const js = [await invite('Fa1' + Date.now() % 1000), await invite('Fa2' + Date.now() % 1000), await invite('Fa3' + Date.now() % 1000)];
+    const fin = await jouerPartie(js);
+    const ordre = [fin.vainqueur, ...fin.elimines.slice().reverse()];
+    const r = await api('/api/rivaux', { jeton: js.find((j) => j.compte.id === ordre[0]).jeton });
+    assert.strictEqual(r.json.length, 2);
+    assert.ok(r.json.every((x) => x.moi === 1 && x.lui === 0), JSON.stringify(r.json));
+  });
+  await test('rivalité entre amis : « t\'a rattrapé », une seule par jour, et 1 – 0 ne compte pas', async () => {
+    const [x, y] = [await invite('Riv' + Date.now() % 1000), await invite('Ral' + Date.now() % 1000)];
+    await api('/api/amis', { methode: 'POST', jeton: x.jeton, corps: { cible: y.compte.pseudo + '#' + y.compte.numero } });
+    const S = srv.social;
+    assert.deepStrictEqual(await S.apresPartie([{ id: x.compte.id, place: 1 }, { id: y.compte.id, place: 2 }]), []);
+    const e = await S.apresPartie([{ id: y.compte.id, place: 1 }, { id: x.compte.id, place: 2 }]);
+    assert.deepStrictEqual(e, [{ a: x.compte.id, texte: `${y.compte.pseudo} t'a rattrapé : 1 – 1 !` }]);
+    assert.deepStrictEqual(await S.apresPartie([{ id: y.compte.id, place: 1 }, { id: x.compte.id, place: 2 }]), [], 'pas deux le même jour');
+    const n = await api('/api/notifications', { jeton: x.jeton });
+    assert.strictEqual(n.json.liste[0].type, 'rivalite');
+    assert.deepStrictEqual([n.json.liste[0].donnees.toi, n.json.liste[0].donnees.lui], [1, 1]);
+    // y a reçu « x t'a ajouté en ami ».
+    const ny = await api('/api/notifications', { jeton: y.jeton });
+    assert.strictEqual(ny.json.liste[0].type, 'ami');
+    assert.strictEqual(ny.json.nonLues, 1);
+    await api('/api/notifications/lues', { methode: 'POST', jeton: y.jeton, corps: {} });
+    assert.strictEqual((await api('/api/notifications', { jeton: y.jeton })).json.nonLues, 0);
+  });
+  await test('rivalité entre inconnus : à partir de 3 – 3 ; coupée dans le profil, plus rien', async () => {
+    const [x, y, z] = [await invite('Inc' + Date.now() % 1000), await invite('Inb' + Date.now() % 1000), await invite('Ind' + Date.now() % 1000)];
+    const [a, b] = x.compte.id < y.compte.id ? [x, y] : [y, x];
+    await srv.base.query('INSERT INTO face_a_face (a, b, victoires_a, victoires_b) VALUES ($1,$2,3,2)', [a.compte.id, b.compte.id]);
+    const e = await srv.social.apresPartie([{ id: b.compte.id, place: 1 }, { id: a.compte.id, place: 3, abandon: false }]);
+    assert.deepStrictEqual(e.map((v) => v.texte), [`${b.compte.pseudo} t'a rattrapé : 3 – 3 !`]);
+    // z coupe les notifications de rivalité.
+    const ch = await api('/api/moi', { methode: 'PATCH', jeton: z.jeton, corps: { notifs: { rivalite: false } } });
+    assert.strictEqual(ch.json.compte.notifs.rivalite, false);
+    await api('/api/amis', { methode: 'POST', jeton: x.jeton, corps: { cible: z.compte.pseudo + '#' + z.compte.numero } });
+    await srv.social.apresPartie([{ id: z.compte.id, place: 1 }, { id: x.compte.id, place: 2 }]);
+    assert.deepStrictEqual(await srv.social.apresPartie([{ id: x.compte.id, place: 1 }, { id: z.compte.id, place: 2 }]), []);
+  });
+  await test('inviter un ami dans sa salle : ami seulement, code valide, pas de rafale', async () => {
+    const [x, y, z] = [await invite('Hot' + Date.now() % 1000), await invite('Inv' + Date.now() % 1000), await invite('Aut' + Date.now() % 1000)];
+    await api('/api/amis', { methode: 'POST', jeton: x.jeton, corps: { cible: y.compte.pseudo + '#' + y.compte.numero } });
+    assert.strictEqual((await api('/api/amis/' + z.compte.id + '/inviter', { methode: 'POST', jeton: x.jeton, corps: { code: 'ABCD' } })).statut, 404);
+    assert.strictEqual((await api('/api/amis/' + y.compte.id + '/inviter', { methode: 'POST', jeton: x.jeton, corps: { code: 'ab' } })).statut, 400);
+    assert.strictEqual((await api('/api/amis/' + y.compte.id + '/inviter', { methode: 'POST', jeton: x.jeton, corps: { code: 'ABCD' } })).json.envoyee, true);
+    assert.strictEqual((await api('/api/amis/' + y.compte.id + '/inviter', { methode: 'POST', jeton: x.jeton, corps: { code: 'ABCD' } })).statut, 429);
+    const n = (await api('/api/notifications', { jeton: y.jeton })).json.liste.find((v) => v.type === 'invitation');
+    assert.deepStrictEqual([n.donnees.code, n.donnees.pseudo, n.texte], ['ABCD', x.compte.pseudo, `${x.compte.pseudo} t'invite à sa table`]);
+  });
+
   console.log('Tableau de bord admin');
   await test('code à deux facteurs (TOTP) : bon code accepté, mauvais refusé', () => {
     assert.ok(verifierTotp(TOTP, codeTotp(TOTP)));

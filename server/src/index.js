@@ -13,6 +13,7 @@ const { routesJoueurs } = require('./api');
 const { routesAdmin } = require('./admin');
 const { SalleKopo, salles } = require('./salle-kopo');
 const { creerLigue } = require('./ligue');
+const { creerSocial } = require('./social');
 
 async function demarrer({ port = Number(process.env.PORT || 2567), env = process.env } = {}) {
   const base = await ouvrirBase(env.DATABASE_URL);
@@ -26,7 +27,8 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
   // Chaque minute : la saison finie est clôturée (récompenses) et la suivante s'ouvre.
   const minuteurSaison = setInterval(() => ligue.assurerSaison().then((r) => r.cloturee && console.log(`Saison ${r.cloturee} clôturée, saison ${r.ouverte} ouverte.`)).catch((e) => console.error('Saison :', e.message)), 60e3);
   minuteurSaison.unref();
-  SalleKopo.services = { base, auth, comptes, reglages, ligue };
+  const social = creerSocial(base);
+  SalleKopo.services = { base, auth, comptes, reglages, ligue, social };
 
   const app = express();
   app.set('trust proxy', 1);
@@ -41,7 +43,7 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
     next();
   });
   app.get('/sante', (req, res) => res.json({ ok: true, salles: salles.size }));
-  app.use('/api', routesJoueurs({ base, auth, comptes, reglages, ligue }));
+  app.use('/api', routesJoueurs({ base, auth, comptes, reglages, ligue, social }));
   app.use('/admin/api', routesAdmin({ base, auth, comptes, reglages, ligue, salles, demarrage: Date.now() }));
   app.get('/admin', (req, res) => { res.set('Cache-Control', 'no-store'); res.set('X-Frame-Options', 'DENY'); res.sendFile(path.join(__dirname, '..', 'public', 'admin.html')); });
 
@@ -60,7 +62,7 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
   console.log(`Kopo : serveur prêt sur le port ${adresse.port} (base : ${base.genre}).`);
 
   return {
-    port: adresse.port, base, comptes, reglages, auth, ligue,
+    port: adresse.port, base, comptes, reglages, auth, ligue, social,
     async arreter() { clearInterval(minuteurSaison); await jeu.gracefullyShutdown(false).catch(() => {}); serveurHttp.close(); await base.fermer(); },
   };
 }

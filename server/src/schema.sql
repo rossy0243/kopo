@@ -182,3 +182,30 @@ CREATE TABLE IF NOT EXISTS recompenses_saison (
   cree_le   timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (saison, compte_id)
 );
+
+-- ===== Amis, rivalités et notifications (retention.md §3.7) =====
+ALTER TABLE comptes ADD COLUMN IF NOT EXISTS notifs jsonb NOT NULL DEFAULT '{}'; -- types coupés par le joueur : { "rivalite": false }
+
+-- Face-à-face entre deux joueurs (a < b) : qui finit devant l'autre dans les parties jouées ensemble.
+CREATE TABLE IF NOT EXISTS face_a_face (
+  a          text NOT NULL REFERENCES comptes(id),
+  b          text NOT NULL REFERENCES comptes(id),
+  victoires_a integer NOT NULL DEFAULT 0,
+  victoires_b integer NOT NULL DEFAULT 0,
+  maj_le     timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (a, b),
+  CHECK (a < b)
+);
+CREATE INDEX IF NOT EXISTS face_a_face_b ON face_a_face (b);
+
+-- Notifications dans le jeu (rivalité, invitation d'un ami, nouvel ami).
+CREATE TABLE IF NOT EXISTS notifications (
+  id        bigserial PRIMARY KEY,
+  compte_id text NOT NULL REFERENCES comptes(id),
+  type      text NOT NULL CHECK (type IN ('rivalite', 'invitation', 'ami')),
+  texte     text NOT NULL,
+  donnees   jsonb,
+  lue       boolean NOT NULL DEFAULT false,
+  cree_le   timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS notifications_compte ON notifications (compte_id, lue, cree_le);

@@ -90,7 +90,7 @@ function creerComptes(base, reglages) {
     },
 
     async lire(id, q = base) {
-      const r = await q.query('SELECT id, auth_id, pseudo, numero, avatar, solde, statut, suspendu_jusqu, micro_coupe, pays, serie_bonus, dernier_bonus, cree_le, vu_le FROM comptes WHERE id = $1', [id]);
+      const r = await q.query('SELECT id, auth_id, pseudo, numero, avatar, solde, statut, suspendu_jusqu, micro_coupe, pays, serie_bonus, dernier_bonus, notifs, cree_le, vu_le FROM comptes WHERE id = $1', [id]);
       return r.rows[0] || null;
     },
     async parAuth(authId) {
@@ -108,7 +108,14 @@ function creerComptes(base, reglages) {
       return r.rows.length ? api.lire(id) : null;
     },
 
-    async changerProfil(id, { pseudo, avatar, pays }) {
+    async changerProfil(id, { pseudo, avatar, pays, notifs }) {
+      // Types de notifications coupés : { rivalite: false, invitation: true, ami: true }.
+      if (notifs !== undefined) {
+        if (!notifs || typeof notifs !== 'object') throw Object.assign(new Error('Réglage invalide.'), { statut: 400 });
+        const v = {};
+        for (const t of ['rivalite', 'invitation', 'ami']) if (typeof notifs[t] === 'boolean') v[t] = notifs[t];
+        await base.query('UPDATE comptes SET notifs = notifs || $2::jsonb WHERE id = $1', [id, JSON.stringify(v)]);
+      }
       // Pays du classement : code à 2 lettres (CD, CI, SN…), ou null pour ne pas l'afficher.
       if (pays !== undefined) {
         const p = pays === null || pays === '' ? null : String(pays).toUpperCase();

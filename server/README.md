@@ -9,7 +9,7 @@ La logique de jeu n'est pas dupliquée : le serveur utilise `src/kopo-salle.js` 
 cd server
 npm install
 npm start              # sans DATABASE_URL : base Postgres en mémoire (rien n'est gardé)
-npm test               # 41 tests
+npm test               # 45 tests
 npm run charge -- 1500 30   # test de charge : 1 500 joueurs simulés pendant 30 s
 ```
 Tableau de bord en local : http://localhost:2567/admin (définir `ADMIN_MOT_DE_PASSE` et `ADMIN_TOTP`).
@@ -44,6 +44,9 @@ Les tables sont créées toutes seules au premier démarrage (`src/schema.sql`).
 | `POST /api/bonus-du-jour`, `POST /api/remise-a-flot`, `GET /api/pieces` | Pièces |
 | `POST /api/signaler`, `GET/POST/DELETE /api/bloques`, `GET/POST/DELETE /api/amis` | Entre joueurs |
 | `GET /api/en-ligne` | Joueurs connectés et salles publiques ouvertes (`classee` : la salle compte pour la ligue) |
+| `GET /api/rivaux` | Mes face-à-face (qui finit devant l'autre dans les parties jouées ensemble) |
+| `GET /api/notifications`, `POST /api/notifications/lues` | Notifications dans le jeu : rivalité, invitation d'un ami, nouvel ami. Chaque type se coupe avec `PATCH /api/moi { notifs: { rivalite: false } }` |
+| `POST /api/amis/:id/inviter` | Inviter un ami à sa table (`{ code }`) : 1 fois par ami toutes les 2 min, 15 par heure |
 | `GET /api/ligue` | Saison en cours, divisions, mes points, ma division, mon rang (mondial, pays), mes 10 dernières parties classées, récompense de saison pas encore vue, mes titres |
 | `POST /api/ligue/vu` | L'écran de fin de saison a été vu |
 | `GET /api/classement?type=mondial\|pays\|amis` | Classement de la saison (`&pays=CD` pour un autre pays). Le pays se choisit avec `PATCH /api/moi { pays: 'CD' }` |
