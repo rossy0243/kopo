@@ -11,6 +11,7 @@ const rempl = {
   QRCODE: lire('vendor/qrcode.js'),
   MOTEUR: lire('moteur/kopo-moteur.js'),
   SALLE: lire('src/kopo-salle.js'),
+  RETENTION: lire('src/kopo-retention.js'),
 };
 for (const [k, v] of Object.entries(rempl)) html = html.replace(`/*${k}*/`, () => v);
 fs.writeFileSync(ici('index.html'), html);
