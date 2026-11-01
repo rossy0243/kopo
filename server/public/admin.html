@@ -59,6 +59,7 @@ input, select, textarea { background: #0b1a2c; border: 1px solid var(--ligne); c
   <symbol id="d-joueurs" viewBox="0 0 32 32"><rect x="8" y="4" width="16" height="24" rx="2.5"/><circle cx="16" cy="13" r="3.5"/><path d="M11 23a5 5 0 0 1 10 0"/></symbol>
   <symbol id="d-signal" viewBox="0 0 32 32"><rect x="8" y="4" width="16" height="24" rx="2.5"/><path d="M16 10v8"/><circle cx="16" cy="22.5" r="1.6" class="acc"/></symbol>
   <symbol id="d-pilotage" viewBox="0 0 32 32"><rect x="8" y="4" width="16" height="24" rx="2.5"/><path d="M12 10h8M12 16h8M12 22h8"/><circle cx="14" cy="22" r="1.8" class="acc"/></symbol>
+  <symbol id="d-ligue" viewBox="0 0 32 32"><rect x="8" y="4" width="16" height="24" rx="2.5"/><path d="M12 10h8v3a4 4 0 0 1-8 0zM16 17v4M13 22h6"/><circle cx="16" cy="11.5" r="1.4" class="acc"/></symbol>
   <symbol id="d-journal" viewBox="0 0 32 32"><rect x="8" y="4" width="16" height="24" rx="2.5"/><path d="M12 10h8M12 14h8M12 18h5"/></symbol>
 </svg>
 
@@ -87,7 +88,8 @@ const $ = (s) => document.querySelector(s);
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const nb = (x) => (x ?? 0).toLocaleString('fr-FR');
 const date = (d) => d ? new Date(d).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : '—';
-const MOTIFS = { bienvenue: 'Bienvenue', bonus_jour: 'Bonus du jour', manche: 'Manches survécues', katapss: 'Katapss', victoire: 'Victoires', deuxieme: '2e places', remise_a_flot: 'Remise à flot', admin: 'Corrections admin', cadeau: 'Cadeaux', mise: 'Mises', pot: 'Pots' };
+const MOTIFS = { bienvenue: 'Bienvenue', bonus_jour: 'Bonus du jour', manche: 'Manches survécues', katapss: 'Katapss', victoire: 'Victoires', deuxieme: '2e places', remise_a_flot: 'Remise à flot', admin: 'Corrections admin', cadeau: 'Cadeaux', mise: 'Mises', pot: 'Pots', saison: 'Récompenses de saison' };
+const DIV = { bois: 'Bois', bronze: 'Bronze', argent: 'Argent', or: 'Or', diamant: 'Diamant', legende: 'Légende' };
 let jeton = sessionStorage.getItem('kopo-admin');
 let page = 'direct', minuteur = null;
 
@@ -120,7 +122,7 @@ $('#btnDeconnexion').onclick = deconnexion;
 // --- Navigation
 const PAGES = [
   ['direct', 'En direct', 'd-direct'], ['audience', 'Audience', 'd-audience'], ['economie', 'Pièces', 'd-pieces'],
-  ['joueurs', 'Joueurs', 'd-joueurs'], ['signalements', 'Signalements', 'd-signal'], ['pilotage', 'Pilotage', 'd-pilotage'], ['journal', 'Journal', 'd-journal'],
+  ['ligue', 'Ligue', 'd-ligue'], ['joueurs', 'Joueurs', 'd-joueurs'], ['signalements', 'Signalements', 'd-signal'], ['pilotage', 'Pilotage', 'd-pilotage'], ['journal', 'Journal', 'd-journal'],
 ];
 function nav() {
   $('#nav').innerHTML = PAGES.map(([id, t, ico]) => `<button data-page="${id}" ${id === page ? 'aria-current="page"' : ''}><svg class="ico-k"><use href="#${ico}"/></svg>${t}${id === 'signalements' ? ' <span class="badge" id="nbSignal" hidden></span>' : ''}</button>`).join('');
@@ -186,6 +188,55 @@ const afficher = {
       <div class="carte"><table><tr><th>Motif</th><th class="n">Total</th><th class="n">Opérations</th></tr>${e.parMotif.map((m) => `<tr><td>${esc(MOTIFS[m.motif] || m.motif)}</td><td class="n ${m.total < 0 ? 'ko' : ''}">${nb(m.total)}</td><td class="n">${nb(m.operations)}</td></tr>`).join('') || '<tr><td colspan="3" class="muted">Rien pour l\'instant.</td></tr>'}</table></div>`;
   },
 
+  async ligue() {
+    const L = await api('/ligue');
+    const s = L.saison, c = L.reglages;
+    const reste = s ? Math.max(0, new Date(s.fin) - Date.now()) : 0;
+    const jours = Math.floor(reste / 864e5), heures = Math.floor((reste % 864e5) / 36e5);
+    const champs = (groupe, libelles) => Object.entries(libelles).map(([k, t]) => `<label class="ligne"><span style="min-width:230px">${t}</span><input type="number" data-ligue="${groupe || ''}" data-champ="${k}" value="${groupe ? c[groupe][k] : c[k]}" style="width:110px"></label>`).join('');
+    const max = Math.max(1, ...L.parDivision.map((d) => d.joueurs));
+    const finLocale = s ? new Date(new Date(s.fin).getTime() - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 16) : '';
+    $('#contenu').innerHTML = `<h2>Ligue et saisons</h2>
+      ${s ? `<div class="tuiles">${tuile(`<span style="font-size:20px">${esc(s.titre)}</span>`, 'saison en cours', 'du ' + date(s.debut) + ' au ' + date(s.fin))}${tuile(jours + ' j ' + heures + ' h', 'avant la fin')}${tuile(nb(L.joueurs), 'joueurs classés')}${tuile(nb(L.activite.parties_7j), 'parties classées', 'sur 7 jours')}${tuile(nb(L.activite.joueurs_7j), 'joueurs en ligue', 'sur 7 jours')}</div>` : '<p class="ko">Aucune saison en cours.</p>'}
+      <h3>Répartition par division</h3>
+      <div class="carte"><table>${L.parDivision.map((d) => `<tr><td style="width:110px">${esc(d.nom)}</td><td><div style="background:var(--laiton);height:10px;border-radius:5px;width:${Math.round((100 * d.joueurs) / max)}%;min-width:${d.joueurs ? 3 : 0}px"></div></td><td class="n" style="width:80px">${nb(d.joueurs)}</td><td class="n muted" style="width:120px">dès ${nb(c.seuils[d.division])} pts</td></tr>`).join('')}</table></div>
+      <h3>Classement mondial (20 premiers)</h3>
+      <div class="carte"><table><tr><th class="n">Rang</th><th>Joueur</th><th>Division</th><th class="n">Points</th><th class="n">Parties</th></tr>${L.top.map((j) => `<tr><td class="n">${j.rang}</td><td><button class="lien" data-joueur="${esc(j.id)}">${esc(j.pseudo)}#${j.numero}</button></td><td>${esc(DIV[j.division] || j.division)}</td><td class="n">${nb(j.points)}</td><td class="n">${nb(j.parties)}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">Personne n\'a encore joué de partie classée cette saison.</td></tr>'}</table></div>
+      ${s ? `<div class="carte"><h3 style="margin-top:0">Saison en cours</h3>
+        <div class="ligne"><span style="min-width:120px">Nom</span><input id="sNom" value="${esc(s.nom)}" maxlength="40" style="min-width:220px"><span>Thème</span><input id="sTheme" value="${esc(s.theme || '')}" maxlength="40"></div>
+        <div class="ligne"><span style="min-width:120px">Fin</span><input id="sFin" type="datetime-local" value="${finLocale}"><button class="btn principal" id="btnSaison">Enregistrer</button></div>
+        <h3>Prochaine saison</h3>
+        <p class="muted">Laisse vide pour un nom de ville choisi automatiquement (Kinshasa, Lubumbashi, Abidjan…).</p>
+        <div class="ligne"><span style="min-width:120px">Nom</span><input id="pNom" value="${esc(L.prochaine.nom)}" maxlength="40" placeholder="Ex. Fête de l'indépendance" style="min-width:220px"><span>Thème</span><input id="pTheme" value="${esc(L.prochaine.theme)}" maxlength="40"><button class="btn" id="btnProchaine">Enregistrer</button></div>
+        <h3>Clôturer maintenant</h3>
+        <p class="muted">Verse tout de suite les récompenses, fait redescendre chacun et ouvre la saison suivante. Irréversible : à réserver aux cas exceptionnels.</p>
+        <button class="btn danger" id="btnCloturer">Clôturer la saison ${s.numero}</button></div>` : ''}
+      <div class="carte"><h3 style="margin-top:0">Points de ligue par partie</h3>
+        ${champs('points', { premier: '1re place', deuxieme: '2e place', troisieme: '3e place (5 joueurs et plus)', avantDernier: 'Avant-dernier (6 joueurs et plus)', dernier: 'Dernier (4 joueurs et plus)', abandon: 'Abandon volontaire' })}
+        <p class="muted">Moins de 5 joueurs : les gains sont réduits en proportion. Coupure réseau sans retour : ni gain ni perte.</p>
+        <h3>Seuils des divisions (points)</h3>${champs('seuils', DIV)}
+        <h3>Pièces de fin de saison (division atteinte)</h3>${champs('recompenses', DIV)}
+        <h3>Divisions perdues au début de la saison suivante</h3>${champs('descente', DIV)}
+        <h3>Règles</h3>${champs(null, { protection: 'Parties protégées après une montée', joueursMin: 'Joueurs humains minimum', dureeJours: 'Durée d\'une saison (jours)' })}
+        <button class="btn principal" id="btnReglesLigue">Enregistrer les règles de la ligue</button></div>
+      <h3>Saisons passées</h3>
+      <div class="carte"><table><tr><th>Saison</th><th>Dates</th><th>Champion</th><th class="n">Joueurs récompensés</th><th class="n">Pièces versées</th></tr>${L.passees.map((p) => `<tr><td>Saison ${p.numero} : ${esc(p.nom)}</td><td>${date(p.debut)} → ${date(p.fin)}</td><td>${esc(p.champion || '—')}</td><td class="n">${nb(p.joueurs)}</td><td class="n">${nb(p.pieces)}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">Aucune pour l\'instant.</td></tr>'}</table></div>`;
+    lierJoueurs();
+    if (s) {
+      $('#btnSaison').onclick = async () => { try { await api('/ligue/saison', { methode: 'PUT', corps: { nom: $('#sNom').value, theme: $('#sTheme').value, fin: new Date($('#sFin').value).toISOString() } }); message('Saison enregistrée.'); aller('ligue'); } catch (e) { message(e.message); } };
+      $('#btnProchaine').onclick = async () => { try { await api('/reglages/prochaineSaison', { methode: 'PUT', corps: { valeur: { nom: $('#pNom').value, theme: $('#pTheme').value } } }); message('Enregistré.'); } catch (e) { message(e.message); } };
+      $('#btnCloturer').onclick = async () => {
+        if (prompt(`Clôturer la saison ${s.numero} maintenant ? Les récompenses seront versées. Écris CLOTURER pour confirmer.`) !== 'CLOTURER') return;
+        try { const r = await api('/ligue/cloturer', { methode: 'POST', corps: { confirmation: 'CLOTURER' } }); message(`Saison ${r.cloturee} clôturée, saison ${r.ouverte} ouverte.`); aller('ligue'); } catch (e) { message(e.message); }
+      };
+    }
+    $('#btnReglesLigue').onclick = async () => {
+      const v = JSON.parse(JSON.stringify(c));
+      $('#contenu').querySelectorAll('[data-ligue]').forEach((i) => { if (i.dataset.ligue) v[i.dataset.ligue][i.dataset.champ] = Number(i.value); else v[i.dataset.champ] = Number(i.value); });
+      try { await api('/reglages/ligue', { methode: 'PUT', corps: { valeur: v } }); message('Règles de la ligue enregistrées.'); aller('ligue'); } catch (e) { message(e.message); }
+    };
+  },
+
   async joueurs(q = '') {
     $('#contenu').innerHTML = `<h2>Joueurs</h2><div class="ligne"><input id="recherche" placeholder="Pseudo, Pseudo#1234 ou identifiant" value="${esc(q)}" style="min-width:300px"><button class="btn principal" id="btnRecherche">Chercher</button></div><div id="resultats"></div>`;
     const go = async () => {
@@ -205,6 +256,7 @@ const afficher = {
       <h2>${esc(c.pseudo)}#${c.numero}</h2>
       <div class="tuiles">${tuile(nb(c.solde), 'pièces')}${tuile(nb(f.stats.parties), 'parties')}${tuile(nb(f.stats.victoires), 'victoires')}${tuile(nb(f.stats.abandons), 'abandons')}${tuile(`<span class="statut-${c.statut}">${esc(c.statut)}</span>`, c.suspendu_jusqu ? "jusqu'au " + date(c.suspendu_jusqu) : (c.micro_coupe ? 'micro coupé' : 'statut'))}</div>
       <p class="muted">Identifiant ${esc(c.id)} · inscrit le ${date(c.cree_le)} · vu le ${date(c.vu_le)} · ${c.auth_id ? 'compte Google/téléphone' : 'invité'}${c.pays ? ' · ' + esc(c.pays) : ''}</p>
+      ${f.ligue || f.titres.length ? `<p>Ligue : ${f.ligue ? `<b>${esc(DIV[f.ligue.division] || f.ligue.division)}</b>, ${nb(f.ligue.points)} points, ${nb(f.ligue.parties)} parties classées cette saison` : 'pas encore classé cette saison'}${f.titres.length ? ' · titres : ' + f.titres.map((t) => esc(t.titre) + (t.rang ? ' (' + t.rang + 'e)' : '')).join(', ') : ''}</p>` : ''}
       <div class="carte"><h3 style="margin-top:0">Sanction</h3>
         <div class="ligne"><select id="sType"><option value="avertissement">Avertir</option><option value="micro">Couper le micro</option><option value="suspension">Suspendre</option><option value="bannissement">Bannir</option><option value="levee">Lever les sanctions</option></select>
         <input id="sJours" type="number" min="1" value="3" style="width:80px" title="Jours de suspension"> <span class="muted">jours</span>

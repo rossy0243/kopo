@@ -6,6 +6,8 @@ const { Client } = require('colyseus.js');
 const { demarrer } = require('../src/index');
 const { codeTotp, nouveauSecretTotp, verifierTotp } = require('../src/auth');
 const { verifierPseudo, migrerPseudos } = require('../src/comptes');
+const { calculerPoints, finDeSaison } = require('../src/ligue');
+const { DEFAUTS } = require('../src/reglages');
 const jose = require('jose');
 
 const TOTP = nouveauSecretTotp();
@@ -47,6 +49,38 @@ async function jouerPartie(joueurs, { robots = 0 } = {}) {
   await attendre(400); // enregistrement en base
   for (const s of salles) await s.leave();
   return fin;
+}
+
+
+// Partie publique (inconnus) : tous entrent par le matchmaking, la salle démarre pleine.
+async function jouerPublique(joueurs, { parCode = false } = {}) {
+  const client = new Client(URL_.replace('http', 'ws'));
+  const taille = joueurs.length;
+  const salles = [], ligue = new Map(), classee = new Map();
+  let fin = null, code = null;
+  for (const j of joueurs) {
+    const salle = parCode && salles.length
+      ? await client.join('kopo', { jeton: j.jeton, code })
+      : await client.joinOrCreate('kopo', { jeton: j.jeton, publique: true, taille, rapide: true });
+    salle.onMessage('erreur', () => {}); salle.onMessage('solde', () => {});
+    salle.onMessage('ligue', (m) => ligue.set(j.compte.id, m));
+    salle.onMessage('classee', (m) => classee.set(j.compte.id, m.classee));
+    salle.onMessage('vue', (v) => {
+      code = v.code;
+      if (v.etat === 'finPartie') fin = fin || v;
+      const a = v.manche && v.manche.actions[0];
+      if (v.etat === 'manche' && a) setTimeout(() => salle.send('action', { action: a }), 5);
+    });
+    salles.push(salle);
+    await attendre(80);
+  }
+  assert.ok(salles.every((x) => x.roomId === salles[0].roomId), 'même salle');
+  for (let t = 0; t < 400 && !fin; t++) await attendre(50);
+  assert.ok(fin, 'la partie doit se terminer');
+  for (let t = 0; t < 40 && ligue.size < joueurs.length && classee.get(joueurs[0].compte.id); t++) await attendre(50);
+  await attendre(200);
+  for (const s of salles) await s.leave();
+  return { fin, ligue, classee, ordre: [fin.vainqueur, ...fin.elimines.slice().reverse()] };
 }
 
 (async () => {
@@ -264,6 +298,127 @@ async function jouerPartie(joueurs, { robots = 0 } = {}) {
     await a.leave(); await b.leave();
   });
 
+  console.log('Ligue classée et saisons');
+  const P = DEFAUTS.ligue.points;
+  const ligneLigue = async (id) => (await srv.base.query("SELECT l.* FROM ligue l JOIN saisons s ON s.numero = l.saison AND s.statut = 'en_cours' WHERE l.compte_id = $1", [id])).rows[0];
+  await test('points selon la place : 9 joueurs, 4 joueurs, 3 joueurs, abandon, coupure', () => {
+    const t = (n) => Array.from({ length: n }, (_, i) => calculerPoints({ place: i + 1, n }, P));
+    assert.deepStrictEqual(t(9), [30, 15, 5, 0, 0, 0, 0, -5, -10]);
+    assert.deepStrictEqual(t(5), [30, 15, 5, 0, -10]);
+    assert.deepStrictEqual(t(4), [24, 12, 0, -10]);
+    assert.deepStrictEqual(t(3), [18, 9, 0]);
+    assert.strictEqual(calculerPoints({ place: 1, n: 9, abandon: true }, P), -15);
+    assert.strictEqual(calculerPoints({ place: 9, n: 9, coupure: true }, P), 0);
+  });
+  await test('fin de saison : un dimanche à 19 h UTC, 4 semaines pile ensuite', () => {
+    for (const d of ['2026-11-01T10:00:00Z', '2026-11-04T23:00:00Z', '2026-11-06T08:00:00Z']) {
+      const f = finDeSaison(new Date(d), 28);
+      const jours = (f - new Date(d)) / 864e5;
+      assert.ok(f.getUTCDay() === 0 && f.getUTCHours() === 19, f.toISOString());
+      assert.ok(jours >= 24 && jours <= 32, d + ' → ' + jours);
+    }
+    const f1 = finDeSaison(new Date('2026-11-29T19:00:00Z'), 28);
+    assert.strictEqual(f1.toISOString(), '2026-12-27T19:00:00.000Z');
+  });
+  await test('saison 1 « Les Fondateurs » ouverte au démarrage, écran Ligue d\'un nouveau joueur', async () => {
+    const j = await invite('Ligueur');
+    const l = await api('/api/ligue', { jeton: j.jeton });
+    assert.strictEqual(l.statut, 200);
+    assert.strictEqual(l.json.saison.numero, 1);
+    assert.strictEqual(l.json.saison.titre, 'Saison 1 : Les Fondateurs');
+    assert.ok(new Date(l.json.saison.fin) > new Date());
+    assert.deepStrictEqual(l.json.divisions.map((d) => d.nom), ['Bois', 'Bronze', 'Argent', 'Or', 'Diamant', 'Légende']);
+    assert.deepStrictEqual([l.json.moi.points, l.json.moi.division, l.json.moi.rangMondial, l.json.moi.prochaine.manque], [0, 'bois', null, 100]);
+    assert.strictEqual(l.json.recompense, null);
+    assert.strictEqual((await api('/api/ligue')).statut, 401);
+  });
+  const classes = [];
+  await test('partie publique à 4 : classée, points selon la place, message « ligue » à chacun', async () => {
+    const js = [];
+    for (let i = 0; i < 4; i++) js.push(await invite('Lg' + i + Date.now() % 1000));
+    classes.push(...js);
+    const r = await jouerPublique(js);
+    assert.ok([...r.classee.values()].every(Boolean), 'annoncée classée au départ');
+    assert.strictEqual(r.ligue.size, 4);
+    const attendus = [24, 12, 0, 0]; // le dernier perd 10, mais pas sous 0
+    r.ordre.forEach((id, i) => {
+      const m = r.ligue.get(id);
+      assert.strictEqual(m.points, attendus[i], 'place ' + (i + 1) + ' ' + JSON.stringify(m));
+      assert.strictEqual(m.division, 'bois');
+      assert.strictEqual(m.saison.numero, 1);
+    });
+    const l = await ligneLigue(r.ordre[0]);
+    assert.deepStrictEqual([l.points, l.parties, l.victoires], [24, 1, 1]);
+    const p = (await srv.base.query('SELECT classee FROM parties ORDER BY fin DESC LIMIT 1')).rows[0];
+    assert.strictEqual(p.classee, true);
+  });
+  await test('partie entre amis (code) : pas classée', async () => {
+    const js = [await invite('Pv1' + Date.now() % 1000), await invite('Pv2' + Date.now() % 1000), await invite('Pv3' + Date.now() % 1000)];
+    await jouerPartie(js);
+    for (const j of js) assert.strictEqual(await ligneLigue(j.compte.id), undefined);
+  });
+  await test('salle publique rejointe avec le code par un ami : plus classée', async () => {
+    const js = [await invite('Cd1' + Date.now() % 1000), await invite('Cd2' + Date.now() % 1000), await invite('Cd3' + Date.now() % 1000)];
+    const r = await jouerPublique(js, { parCode: true });
+    assert.strictEqual(r.classee.get(js[0].compte.id), false);
+    assert.strictEqual(r.ligue.size, 0);
+    for (const j of js) assert.strictEqual(await ligneLigue(j.compte.id), undefined);
+  });
+  await test('montée de division, palier de protection, descente', async () => {
+    const [a, b, c] = classes;
+    const saison = 1;
+    await srv.base.query('UPDATE ligue SET points = 95, division = $3, protection = 0 WHERE saison = $1 AND compte_id = $2', [saison, a.compte.id, 'bois']);
+    let r = await srv.ligue.enregistrerPartie({ partieId: 'p_test1', n: 9, joueurs: [{ id: a.compte.id, place: 1 }] });
+    let m = r.get(a.compte.id);
+    assert.deepStrictEqual([m.points, m.division, m.divisionAvant, m.promu, m.protection], [125, 'bronze', 'bois', true, 3]);
+    // Protégé : une défaite ne le fait pas redescendre sous 100.
+    await srv.base.query('UPDATE ligue SET points = 104 WHERE saison = $1 AND compte_id = $2', [saison, a.compte.id]);
+    r = await srv.ligue.enregistrerPartie({ partieId: 'p_test2', n: 9, joueurs: [{ id: a.compte.id, place: 9 }] });
+    m = r.get(a.compte.id);
+    assert.deepStrictEqual([m.points, m.division, m.relegue, m.protection], [100, 'bronze', false, 2]);
+    // Sans protection : il redescend.
+    await srv.base.query('UPDATE ligue SET protection = 0 WHERE saison = $1 AND compte_id = $2', [saison, a.compte.id]);
+    r = await srv.ligue.enregistrerPartie({ partieId: 'p_test3', n: 9, joueurs: [{ id: a.compte.id, place: 9 }] });
+    m = r.get(a.compte.id);
+    assert.deepStrictEqual([m.points, m.division, m.relegue, m.delta], [90, 'bois', true, -10]);
+    // Une même partie n'est jamais comptée deux fois.
+    r = await srv.ligue.enregistrerPartie({ partieId: 'p_test3', n: 9, joueurs: [{ id: a.compte.id, place: 1 }] });
+    assert.strictEqual(r.size, 0);
+    assert.strictEqual((await ligneLigue(a.compte.id)).points, 90);
+    // Coupure réseau : rien de perdu.
+    r = await srv.ligue.enregistrerPartie({ partieId: 'p_test4', n: 9, joueurs: [{ id: b.compte.id, place: 9, coupure: true }, { id: c.compte.id, place: 1 }] });
+    assert.strictEqual(r.get(b.compte.id).delta, 0);
+    // Meilleure division atteinte gardée (Bronze), même après la descente.
+    assert.strictEqual((await ligneLigue(a.compte.id)).meilleure, 'bronze');
+  });
+  await test('classements : mondial, pays, amis', async () => {
+    const [a, b, c, d] = classes;
+    await srv.base.query('UPDATE ligue SET points = 500, division = $2, meilleure = $2 WHERE compte_id = $1', [d.compte.id, 'or']);
+    const m = await api('/api/classement?type=mondial', { jeton: b.jeton });
+    assert.strictEqual(m.json.liste[0].id, d.compte.id);
+    assert.strictEqual(m.json.liste[0].rang, 1);
+    assert.ok(m.json.moi && m.json.moi.id === b.compte.id && m.json.moi.rang > 1);
+    assert.ok(m.json.total >= 4);
+    // Pays : choisi dans le profil.
+    assert.strictEqual((await api('/api/moi', { methode: 'PATCH', jeton: b.jeton, corps: { pays: 'cd' } })).json.compte.pays, 'CD');
+    assert.strictEqual((await api('/api/moi', { methode: 'PATCH', jeton: b.jeton, corps: { pays: 'Congo' } })).statut, 400);
+    await api('/api/moi', { methode: 'PATCH', jeton: c.jeton, corps: { pays: 'CD' } });
+    await api('/api/moi', { methode: 'PATCH', jeton: d.jeton, corps: { pays: 'CI' } });
+    const p = await api('/api/classement?type=pays', { jeton: b.jeton });
+    assert.strictEqual(p.json.pays, 'CD');
+    assert.deepStrictEqual(p.json.liste.map((x) => x.id).sort(), [b.compte.id, c.compte.id].sort());
+    assert.strictEqual((await api('/api/classement?type=pays&pays=CI', { jeton: b.jeton })).json.liste[0].id, d.compte.id);
+    const l = await api('/api/ligue', { jeton: b.jeton });
+    assert.ok(l.json.moi.rangPays >= 1 && l.json.moi.rangMondial >= 2, JSON.stringify(l.json.moi));
+    // Amis : moi + mes amis, même un ami qui n'a pas encore joué.
+    const nouveau = await invite('PasJoue' + Date.now() % 1000);
+    await api('/api/amis', { methode: 'POST', jeton: b.jeton, corps: { cible: d.compte.pseudo + '#' + d.compte.numero } });
+    await api('/api/amis', { methode: 'POST', jeton: b.jeton, corps: { cible: nouveau.compte.pseudo + '#' + nouveau.compte.numero } });
+    const am = await api('/api/classement?type=amis', { jeton: b.jeton });
+    assert.deepStrictEqual(am.json.liste.map((x) => x.id), [d.compte.id, b.compte.id, nouveau.compte.id]);
+    assert.strictEqual(am.json.liste[2].points, 0);
+  });
+
   console.log('Tableau de bord admin');
   await test('code à deux facteurs (TOTP) : bon code accepté, mauvais refusé', () => {
     assert.ok(verifierTotp(TOTP, codeTotp(TOTP)));
@@ -341,6 +496,51 @@ async function jouerPartie(joueurs, { robots = 0 } = {}) {
     assert.strictEqual(erreurs.length, 1);
     await a.leave(); await b.leave();
   });
+  await test('ligue dans le tableau de bord : résumé, saison renommée, fin dans le passé refusée', async () => {
+    const r = await api('/admin/api/ligue', { jeton: adminJeton });
+    assert.strictEqual(r.json.saison.numero, 1);
+    assert.ok(r.json.joueurs >= 4);
+    assert.strictEqual(r.json.parDivision.length, 6);
+    assert.ok(r.json.top.length >= 4);
+    const m = await api('/admin/api/ligue/saison', { methode: 'PUT', jeton: adminJeton, corps: { nom: 'Les Pionniers' } });
+    assert.strictEqual(m.json.saison.titre, 'Saison 1 : Les Pionniers');
+    assert.strictEqual((await api('/admin/api/ligue/saison', { methode: 'PUT', jeton: adminJeton, corps: { fin: '2020-01-01' } })).statut, 400);
+    const mauvais = { ...DEFAUTS.ligue, seuils: { ...DEFAUTS.ligue.seuils, argent: 50 } };
+    assert.strictEqual((await api('/admin/api/reglages/ligue', { methode: 'PUT', jeton: adminJeton, corps: { valeur: mauvais } })).statut, 400);
+    assert.strictEqual((await api('/admin/api/ligue/cloturer', { methode: 'POST', jeton: adminJeton, corps: {} })).statut, 400);
+  });
+  await test('fin de saison : récompense selon la division atteinte, titre, descente, saison suivante', async () => {
+    const [a, b, , d] = classes;
+    const soldeA = (await srv.comptes.lire(a.compte.id)).solde, soldeD = (await srv.comptes.lire(d.compte.id)).solde;
+    await api('/admin/api/reglages/prochaineSaison', { methode: 'PUT', jeton: adminJeton, corps: { valeur: { nom: 'Kinshasa la belle', theme: 'ville' } } });
+    const r = await api('/admin/api/ligue/cloturer', { methode: 'POST', jeton: adminJeton, corps: { confirmation: 'CLOTURER' } });
+    assert.deepStrictEqual([r.json.cloturee, r.json.ouverte], [1, 2]);
+    // a a atteint Bronze (redescendu en Bois) : récompense Bronze. d a fini en Or.
+    assert.strictEqual((await srv.comptes.lire(a.compte.id)).solde, soldeA + DEFAUTS.ligue.recompenses.bronze);
+    assert.strictEqual((await srv.comptes.lire(d.compte.id)).solde, soldeD + DEFAUTS.ligue.recompenses.or);
+    const l = await api('/api/ligue', { jeton: d.jeton });
+    assert.strictEqual(l.json.saison.titre, 'Saison 2 : Kinshasa la belle');
+    assert.deepStrictEqual([l.json.recompense.titre, l.json.recompense.rang, l.json.recompense.pieces], ['Or S1', 1, DEFAUTS.ligue.recompenses.or]);
+    assert.deepStrictEqual(l.json.titres.map((t) => t.titre), ['Or S1']);
+    // Or → Argent (une division de moins), avec la protection de début de saison.
+    assert.deepStrictEqual([l.json.moi.division, l.json.moi.points, l.json.moi.protection], ['argent', 250, DEFAUTS.ligue.protection]);
+    // Bois et Bronze repartent de zéro.
+    assert.strictEqual((await api('/api/ligue', { jeton: a.jeton })).json.moi.points, 0);
+    await api('/api/ligue/vu', { methode: 'POST', jeton: d.jeton });
+    assert.strictEqual((await api('/api/ligue', { jeton: d.jeton })).json.recompense, null);
+    // Le registre garde la trace, et le nom prévu a servi une fois.
+    const reg = (await srv.base.query("SELECT montant FROM registre_pieces WHERE compte_id = $1 AND motif = 'saison'", [d.compte.id])).rows;
+    assert.deepStrictEqual(reg.map((x) => x.montant), [DEFAUTS.ligue.recompenses.or]);
+    assert.deepStrictEqual(srv.reglages.get('prochaineSaison'), { nom: '', theme: '' });
+    // Rien ne se passe tant que la nouvelle saison n'est pas finie ; pas de double récompense.
+    assert.deepStrictEqual(await srv.ligue.assurerSaison(), {});
+    const resume = await api('/admin/api/ligue', { jeton: adminJeton });
+    assert.strictEqual(resume.json.passees[0].champion, d.compte.pseudo + '#' + d.compte.numero);
+    // b n'a pas encore classé de partie en saison 2 : absent du mondial, présent chez ses amis.
+    const am = await api('/api/classement?type=amis', { jeton: b.jeton });
+    assert.strictEqual(am.json.liste[0].id, d.compte.id);
+  });
+
   await test('trop d\'essais de connexion admin : bloqué', async () => {
     for (let i = 0; i < 5; i++) await api('/admin/api/connexion', { methode: 'POST', corps: { motDePasse: 'x', code: '1' } });
     const r = await api('/admin/api/connexion', { methode: 'POST', corps: { motDePasse: 'motdepasse-admin', code: codeTotp(TOTP) } });

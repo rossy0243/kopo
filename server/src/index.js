@@ -12,6 +12,7 @@ const { creerComptes, migrerPseudos } = require('./comptes');
 const { routesJoueurs } = require('./api');
 const { routesAdmin } = require('./admin');
 const { SalleKopo, salles } = require('./salle-kopo');
+const { creerLigue } = require('./ligue');
 
 async function demarrer({ port = Number(process.env.PORT || 2567), env = process.env } = {}) {
   const base = await ouvrirBase(env.DATABASE_URL);
@@ -20,7 +21,12 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
   const reglages = creerReglages(base);
   await reglages.charger();
   const comptes = creerComptes(base, reglages);
-  SalleKopo.services = { base, auth, comptes, reglages };
+  const ligue = creerLigue(base, reglages, comptes);
+  await ligue.assurerSaison(); // ouvre la saison 1 au premier démarrage
+  // Chaque minute : la saison finie est clôturée (récompenses) et la suivante s'ouvre.
+  const minuteurSaison = setInterval(() => ligue.assurerSaison().then((r) => r.cloturee && console.log(`Saison ${r.cloturee} clôturée, saison ${r.ouverte} ouverte.`)).catch((e) => console.error('Saison :', e.message)), 60e3);
+  minuteurSaison.unref();
+  SalleKopo.services = { base, auth, comptes, reglages, ligue };
 
   const app = express();
   app.set('trust proxy', 1);
@@ -35,15 +41,15 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
     next();
   });
   app.get('/sante', (req, res) => res.json({ ok: true, salles: salles.size }));
-  app.use('/api', routesJoueurs({ base, auth, comptes, reglages }));
-  app.use('/admin/api', routesAdmin({ base, auth, comptes, reglages, salles, demarrage: Date.now() }));
+  app.use('/api', routesJoueurs({ base, auth, comptes, reglages, ligue }));
+  app.use('/admin/api', routesAdmin({ base, auth, comptes, reglages, ligue, salles, demarrage: Date.now() }));
   app.get('/admin', (req, res) => { res.set('Cache-Control', 'no-store'); res.set('X-Frame-Options', 'DENY'); res.sendFile(path.join(__dirname, '..', 'public', 'admin.html')); });
 
   // Compteur en ligne et salles ouvertes (lu par l'accueil).
   app.get('/api/en-ligne', async (req, res) => {
     let joueurs = 0; for (const s of salles) joueurs += s.clientsParId.size;
     const ouvertes = (await matchMaker.query({ name: 'kopo' })).filter((r) => r.metadata && r.metadata.publique && r.metadata.etat === 'salon' && !r.locked);
-    res.json({ joueurs, sallesOuvertes: ouvertes.map((r) => ({ id: r.roomId, code: r.metadata.code, taille: r.metadata.taille, joueurs: r.clients })) });
+    res.json({ joueurs, sallesOuvertes: ouvertes.map((r) => ({ id: r.roomId, code: r.metadata.code, taille: r.metadata.taille, joueurs: r.clients, classee: !!r.metadata.classee })) });
   });
 
   const serveurHttp = http.createServer(app);
@@ -54,8 +60,8 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
   console.log(`Kopo : serveur prêt sur le port ${adresse.port} (base : ${base.genre}).`);
 
   return {
-    port: adresse.port, base, comptes, reglages, auth,
-    async arreter() { await jeu.gracefullyShutdown(false).catch(() => {}); serveurHttp.close(); await base.fermer(); },
+    port: adresse.port, base, comptes, reglages, auth, ligue,
+    async arreter() { clearInterval(minuteurSaison); await jeu.gracefullyShutdown(false).catch(() => {}); serveurHttp.close(); await base.fermer(); },
   };
 }
 

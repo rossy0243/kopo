@@ -9,7 +9,7 @@ La logique de jeu n'est pas dupliquée : le serveur utilise `src/kopo-salle.js` 
 cd server
 npm install
 npm start              # sans DATABASE_URL : base Postgres en mémoire (rien n'est gardé)
-npm test               # 22 tests
+npm test               # 41 tests
 npm run charge -- 1500 30   # test de charge : 1 500 joueurs simulés pendant 30 s
 ```
 Tableau de bord en local : http://localhost:2567/admin (définir `ADMIN_MOT_DE_PASSE` et `ADMIN_TOTP`).
@@ -43,8 +43,19 @@ Les tables sont créées toutes seules au premier démarrage (`src/schema.sql`).
 | `GET/PATCH/DELETE /api/moi` | Profil, changer pseudo/avatar, supprimer son compte |
 | `POST /api/bonus-du-jour`, `POST /api/remise-a-flot`, `GET /api/pieces` | Pièces |
 | `POST /api/signaler`, `GET/POST/DELETE /api/bloques`, `GET/POST/DELETE /api/amis` | Entre joueurs |
-| `GET /api/en-ligne` | Joueurs connectés et salles publiques ouvertes |
-| WebSocket, salle `kopo` | La partie. Options : `{ jeton, code?, publique? }`. Messages : les mêmes que `kopo-salle.js`. Le serveur envoie `vue`, `erreur`, `solde`, `exclu`. |
+| `GET /api/en-ligne` | Joueurs connectés et salles publiques ouvertes (`classee` : la salle compte pour la ligue) |
+| `GET /api/ligue` | Saison en cours, divisions, mes points, ma division, mon rang (mondial, pays), mes 10 dernières parties classées, récompense de saison pas encore vue, mes titres |
+| `POST /api/ligue/vu` | L'écran de fin de saison a été vu |
+| `GET /api/classement?type=mondial\|pays\|amis` | Classement de la saison (`&pays=CD` pour un autre pays). Le pays se choisit avec `PATCH /api/moi { pays: 'CD' }` |
+| WebSocket, salle `kopo` | La partie. Options : `{ jeton, code?, publique? }`. Messages : les mêmes que `kopo-salle.js`. Le serveur envoie `vue`, `erreur`, `solde`, `exclu`, `classee` (au début : `{ classee }`) et `ligue` (fin de partie classée : `{ delta, points, division, divisionAvant, promu, relegue, protection, prochaine, saison }`). |
+
+## Ligue classée et saisons
+- **Saison de 4 semaines**, qui se termine un dimanche à 19 h UTC (20 h à Kinshasa). La saison 1 s'ouvre toute seule au premier démarrage (« Les Fondateurs ») ; les suivantes portent un nom de ville, sauf si l'admin en choisit un.
+- **Partie classée** : salle publique uniquement, sans robot au départ, au moins 3 joueurs, et personne n'est entré avec le code (pas de complicité entre amis).
+- **Points** : 1er +30, 2e +15, 3e +5 (dès 5 joueurs), avant-dernier −5 (dès 6), dernier −10 (dès 4), abandon −15. Moins de 5 joueurs : gains réduits en proportion. Coupure réseau sans retour : ni gain ni perte.
+- **Divisions** : Bois 0, Bronze 100, Argent 250, Or 450, Diamant 700, Légende 1 000. Après une montée, 3 parties protégées (on ne redescend pas).
+- **Fin de saison** (automatique, vérifiée chaque minute) : pièces et titre selon la meilleure division atteinte (« Diamant S1 »), rang final, puis chacun redescend (1 division, 2 depuis Diamant et Légende) pour la saison suivante.
+- Tout se règle dans le tableau de bord, onglet **Ligue**, sans mise à jour.
 
 ## Mesures (test de charge, 31/10/2026)
 Joueurs simulés qui jouent bien plus vite que des humains (un coup toutes les 0,3 à 1,5 s), sur un vrai Postgres :

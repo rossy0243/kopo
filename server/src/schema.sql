@@ -122,3 +122,63 @@ CREATE TABLE IF NOT EXISTS journal_admin (
   details jsonb,
   cree_le timestamptz NOT NULL DEFAULT now()
 );
+
+-- ===== Ligue classée et saisons (retention.md §3.4) =====
+ALTER TABLE parties ADD COLUMN IF NOT EXISTS classee boolean NOT NULL DEFAULT false;
+
+-- Une saison dure 4 semaines. Une seule est en cours à la fois.
+CREATE TABLE IF NOT EXISTS saisons (
+  numero      integer PRIMARY KEY,                -- Saison 1, 2, 3…
+  nom         text NOT NULL,                      -- « Les Fondateurs », « Kinshasa »…
+  theme       text,
+  debut       timestamptz NOT NULL,
+  fin         timestamptz NOT NULL,
+  statut      text NOT NULL DEFAULT 'en_cours' CHECK (statut IN ('en_cours', 'terminee')),
+  cloturee_le timestamptz
+);
+CREATE UNIQUE INDEX IF NOT EXISTS saisons_une_en_cours ON saisons (statut) WHERE statut = 'en_cours';
+
+-- Place de chaque joueur dans la ligue, par saison.
+CREATE TABLE IF NOT EXISTS ligue (
+  saison     integer NOT NULL REFERENCES saisons(numero),
+  compte_id  text NOT NULL REFERENCES comptes(id),
+  points     integer NOT NULL DEFAULT 0 CHECK (points >= 0),
+  division   text NOT NULL DEFAULT 'bois',
+  meilleure  text NOT NULL DEFAULT 'bois',        -- meilleure division atteinte (récompense de fin de saison)
+  parties    integer NOT NULL DEFAULT 0,
+  victoires  integer NOT NULL DEFAULT 0,
+  protection integer NOT NULL DEFAULT 0,          -- parties restantes sans pouvoir descendre de division
+  maj_le     timestamptz NOT NULL DEFAULT now(),  -- à points égaux, le premier arrivé passe devant
+  PRIMARY KEY (saison, compte_id)
+);
+CREATE INDEX IF NOT EXISTS ligue_classement ON ligue (saison, points DESC, maj_le);
+
+-- Chaque partie classée, joueur par joueur (une seule fois par partie : pas de double comptage).
+CREATE TABLE IF NOT EXISTS ligue_parties (
+  partie_id      text NOT NULL,
+  compte_id      text NOT NULL REFERENCES comptes(id),
+  saison         integer NOT NULL,
+  place          integer,
+  nb_joueurs     integer NOT NULL,
+  delta          integer NOT NULL,
+  points_apres   integer NOT NULL,
+  division_apres text NOT NULL,
+  cree_le        timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (partie_id, compte_id)
+);
+CREATE INDEX IF NOT EXISTS ligue_parties_compte ON ligue_parties (compte_id, cree_le);
+CREATE INDEX IF NOT EXISTS ligue_parties_date ON ligue_parties (cree_le);
+
+-- Récompenses de fin de saison (titre « Diamant S1 », pièces, rang final).
+CREATE TABLE IF NOT EXISTS recompenses_saison (
+  saison    integer NOT NULL REFERENCES saisons(numero),
+  compte_id text NOT NULL REFERENCES comptes(id),
+  division  text NOT NULL,                        -- division à la fin
+  meilleure text NOT NULL,                        -- division atteinte : c'est elle qui est récompensée
+  titre     text NOT NULL,
+  pieces    integer NOT NULL DEFAULT 0,
+  rang      integer,
+  vue       boolean NOT NULL DEFAULT false,       -- le joueur a vu l'écran de fin de saison
+  cree_le   timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (saison, compte_id)
+);
