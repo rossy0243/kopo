@@ -206,6 +206,10 @@ details.rappel summary { cursor: pointer; font-weight: 600; }
 @media (orientation: portrait) {
   body.en-jeu .tourner { display: flex; align-items: center; gap: 8px; flex: none; font-size: 13px; color: var(--brass); background: rgba(226,176,74,.1); border: 1px solid rgba(226,176,74,.35); border-radius: 10px; padding: 6px 10px; }
   body.en-jeu .tourner .btn { margin-left: auto; padding: 4px 10px; font-size: 13px; }
+  body.en-jeu .tourner .fermer-tourner { margin-left: auto; flex: none; background: none; border: 0; color: inherit; font-size: 15px; line-height: 1; padding: 4px 6px; cursor: pointer; opacity: .8; }
+  body.en-jeu .tourner .btn:not([hidden]) + .fermer-tourner { margin-left: 0; }
+  /* Masqué pour de bon (✕), ou quand une fenêtre (fin de manche, fin de partie…) couvre la table. */
+  body.en-jeu.sans-tourner .tourner, body.en-jeu:has(#voile:not([hidden])) .tourner, body.en-jeu:has(#voileTourner:not([hidden])) .tourner { display: none; }
 }
 /* Invitation à tourner le téléphone (au début d'une partie tenue droite, sur téléphone). */
 .voile-tourner { z-index: 12; }
@@ -912,7 +916,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   <!-- Partie -->
   <section id="ecranPartie" hidden>
     <div class="tapis" aria-hidden="true"></div>
-    <div class="tourner" id="tourner"><svg class="tel-mini" viewBox="0 0 24 24" aria-hidden="true"><g class="tel"><rect x="7" y="2" width="10" height="20" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><line x1="10.5" y1="18.5" x2="13.5" y2="18.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></g></svg><span>Tourne ton téléphone pour voir la table en grand.</span><button class="btn" id="btnPleinEcran" hidden>Plein écran</button></div>
+    <div class="tourner" id="tourner"><svg class="tel-mini" viewBox="0 0 24 24" aria-hidden="true"><g class="tel"><rect x="7" y="2" width="10" height="20" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><line x1="10.5" y1="18.5" x2="13.5" y2="18.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></g></svg><span>Mets ton téléphone à l'horizontale pour voir la table en grand.</span><button class="btn" id="btnPleinEcran" hidden>Plein écran</button><button class="fermer-tourner" id="btnFermerTourner" aria-label="Masquer ce conseil">✕</button></div>
     <div class="sieges" id="sieges" aria-label="Joueurs, dans l'ordre de jeu"></div>
     <section class="table" aria-label="Table">
       <div class="table-entete" id="entete"></div>
@@ -950,8 +954,8 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
         <rect x="46" y="46" width="12" height="17" rx="2" fill="#f7efe0"/><rect x="62" y="46" width="12" height="17" rx="2" fill="#f7efe0"/>
       </g>
     </svg>
-    <h2 id="titreTourner">Tourne ton téléphone</h2>
-    <p>Kopo se joue mieux en paysage : la table en grand, les joueurs autour de toi et ta main en éventail.</p>
+    <h2 id="titreTourner">Passe en paysage</h2>
+    <p>Mets ton téléphone à l'horizontale : Kopo se joue mieux comme ça, avec la table en grand, les joueurs autour de toi et ta main en éventail.</p>
     <button class="btn principal large" id="btnTournerPleinEcran" hidden>Plein écran en paysage</button>
     <button class="btn large" id="btnTournerPortrait">Continuer en portrait</button>
   </div>
@@ -1354,8 +1358,10 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       stock.ecrire(cleSession, session);
       majHash(code);
     };
-    room.onMessage('vue', (v) => { cacherBandeau(); memoriser(v.code); afficher(v); });
-    room.onMessage('erreur', (t) => toast(t));
+    // Une salle quittée (partie suivante, Quitter) peut encore envoyer une vue avant de fermer : on l'ignore,
+    // sinon le bilan de l'ancienne partie se rouvrait (et rejouait son animation) par-dessus la nouvelle recherche.
+    room.onMessage('vue', (v) => { if (moi !== client) return; cacherBandeau(); memoriser(v.code); afficher(v); });
+    room.onMessage('erreur', (t) => { if (moi === client) toast(t); });
     room.onMessage('solde', (d) => soldeServeur(d && d.solde));
     room.onMessage('classee', (d) => window.dispatchEvent(new CustomEvent('kopo-classee', { detail: d })));
     room.onMessage('ligue', (d) => window.dispatchEvent(new CustomEvent('kopo-ligue', { detail: d })));
@@ -1565,6 +1571,9 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   $('btnTournerPleinEcran').onclick = () => { fermerInvitationPaysage(); pleinEcran(); };
   $('voileTourner').onclick = (e) => { if (e.target === e.currentTarget) fermerInvitationPaysage(); };
   mqPortrait.addEventListener('change', () => { if (!mqPortrait.matches) fermerInvitationPaysage(); });
+  // Le petit bandeau en haut de la table : le ✕ le masque pour de bon sur cet appareil.
+  document.body.classList.toggle('sans-tourner', !!stock.lire('kopo-sans-bandeau-paysage'));
+  $('btnFermerTourner').onclick = () => { stock.ecrire('kopo-sans-bandeau-paysage', true); document.body.classList.add('sans-tourner'); };
   // Icône Kopo du sprite (#i-nom) : trait doré, voir docs/icones-kopo.md.
   function ico(nom, cls) { const t = document.createElement('template'); t.innerHTML = '<svg class="ico' + (cls ? ' ' + cls : '') + '" aria-hidden="true"><use href="#i-' + nom + '"/></svg>'; return t.content.firstChild; }
   // Texte précédé d'une icône (dans un bouton, un nom…).
@@ -1875,7 +1884,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       try { const q = qrcode(0, 'M'); q.addData(lien); q.make(); $('qr').innerHTML = q.createSvgTag({ cellSize: 4, margin: 0, scalable: true }); qrPour = lien; } catch (e) {}
     }
     const jeSuisHote = v.hote === v.moi;
-    $('noteHote').hidden = !jeSuisHote;
+    $('noteHote').hidden = !jeSuisHote || MODE_SERVEUR; // avec le serveur Kopo, la partie ne tourne pas sur le téléphone de l'hôte
     const rg = $('reglage'); rg.replaceChildren(el('span', null, 'Temps pour jouer :'));
     for (const d of S.DELAIS) {
       const libelle = d ? d + ' s' : 'sans';
@@ -2317,9 +2326,17 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   }
 
   let recapOuvert = null; // { cle, maj(v) } : la fenêtre n'est construite qu'une fois, puis mise à jour
+  const recapsAnimes = new Set(); // bilans déjà montrés : s'ils se rouvrent, plus de « NIVEAU » ni d'animation
   function afficherFinPartie(v) {
     const cle = v.code + '|' + v.vainqueur + '|' + v.elimines.join(',');
     if (recapOuvert && recapOuvert.cle === cle && $('fenetre').dataset.type === 'recap' && !$('voile').hidden) return recapOuvert.maj(v);
+    const dejaVu = recapsAnimes.has(cle);
+    recapsAnimes.add(cle);
+    const animAvant = sansAnim;
+    if (dejaVu) sansAnim = true; // le bilan s'affiche directement dans son état final
+    try { construireFinPartie(v, cle, dejaVu); } finally { sansAnim = animAvant; }
+  }
+  function construireFinPartie(v, cle, dejaVu) {
     const r = suivi && suivi.fini ? suivi.recap : null;
     const e = r && r.bilan;
     const gagne = v.vainqueur === v.moi;
@@ -2353,8 +2370,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
         plus(() => {
           rond.textContent = r.niveauApres.niveau; pop(rond, 1.6, 600);
           remplir(rempli, 0, fB, 0, 600);
-          tampon('NIVEAU ' + r.niveauApres.niveau);
-          vibrer(60);
+          if (!dejaVu) { tampon('NIVEAU ' + r.niveauApres.niveau); vibrer(60); }
         }, 950);
       } else remplir(rempli, fA, fB, 300);
       setTimeout(() => { if (rempli.isConnected) { gain.textContent = '+' + (r.xpPartie + r.xpMissions) + ' XP'; } }, sansAnim ? 0 : 1100);
