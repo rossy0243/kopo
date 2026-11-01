@@ -988,6 +988,32 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   // à l'adresse du site. Quand NOUVELLE_ADRESSE est remplie, l'ancienne adresse envoie ses données kopo-*
   // à la nouvelle dans le # (rien ne passe par un serveur), et la nouvelle les reprend si elle est encore vide.
   const NOUVELLE_ADRESSE = 'https://kopo-d655.onrender.com/'; // avec le / final
+  const ANCIENNE_ADRESSE = 'https://rossy0243.github.io/kopo/'; // ses données kopo-* y sont restées sur le téléphone
+  // Données arrivées de l'ancienne adresse. Nouvelle adresse encore vide : on recopie tout.
+  // Sinon (le joueur a d'abord ouvert la nouvelle adresse, par exemple par le lien d'un ami, et un profil neuf
+  // y a été créé) : on réunit les deux profils au lieu de jeter l'ancien, et on reprend l'ancien compte
+  // (pièces, ligue, amis). Le compte neuf est gardé de côté dans kopo-compte-serveur-remplace.
+  function reprendreDonnees(d) {
+    const kopo = Object.entries(d).filter(([k, v]) => k.startsWith('kopo-') && typeof v === 'string');
+    const vide = !Object.keys(localStorage).some((k) => k.startsWith('kopo-'));
+    if (vide) for (const [k, v] of kopo) localStorage.setItem(k, v);
+    stock.ecrire('kopo-demenagement', new Date().toISOString()); // l'ancienne adresse est passée par ici
+    if (vide) return;
+    const json = (t) => { try { return JSON.parse(t); } catch (e) { return null; } };
+    const local = stock.lire('kopo-profil');
+    const p = local && typeof local === 'object' ? local : { version: 1 };
+    if (!R.fusionnerProfils(p, json(d['kopo-profil']), 'somme')) return; // déjà réunis (ou rien à reprendre)
+    stock.ecrire('kopo-profil', p);
+    const ancienC = json(d['kopo-compte-serveur']), neufC = stock.lire('kopo-compte-serveur');
+    if (ancienC && ancienC.jeton && !(neufC && neufC.compte && ancienC.compte && neufC.compte.id === ancienC.compte.id)) {
+      if (neufC) stock.ecrire('kopo-compte-serveur-remplace', neufC);
+      localStorage.setItem('kopo-compte-serveur', d['kopo-compte-serveur']);
+      if (d['kopo-pseudo']) localStorage.setItem('kopo-pseudo', d['kopo-pseudo']);
+      if (d['kopo-pseudo-changements']) localStorage.setItem('kopo-pseudo-changements', d['kopo-pseudo-changements']);
+    }
+    for (const [k, v] of kopo) if (localStorage.getItem(k) === null) localStorage.setItem(k, v); // réglages, etc.
+    try { sessionStorage.setItem('kopo-donnees-reprises', '1'); } catch (e) {}
+  }
   (function demenagement() {
     const h = location.hash;
     if (h.startsWith('#demenagement=')) {
@@ -995,8 +1021,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       try {
         const d = JSON.parse(decodeURIComponent(escape(atob(h.slice(14)))));
         suite = typeof d._hash === 'string' ? d._hash : '';
-        const vide = !Object.keys(localStorage).some((k) => k.startsWith('kopo-'));
-        if (vide && d && typeof d === 'object') for (const [k, v] of Object.entries(d)) if (k.startsWith('kopo-') && typeof v === 'string') localStorage.setItem(k, v);
+        if (d && typeof d === 'object') reprendreDonnees(d);
       } catch (e) {}
       history.replaceState(null, '', location.pathname + location.search + suite);
       return;
@@ -2277,7 +2302,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
         const e = R.bilanPartie(v, suivi);
         suivi.recap = R.enregistrerPartie(p, e, jourLocal());
         if (suivi.recap) {
-          suivi.recap.bilan = e; ecrireProfil(p);
+          suivi.recap.bilan = e; ecrireProfil(p); sauvegarderProfil();
           // En ligne, les pièces des missions et du défi sont créditées par le serveur (plafonnées, sans doublon).
           const jour = jourLocal();
           for (const m of suivi.recap.missions || []) if (m.finie && m.avant < m.cible) crediterEnLigne('mission', m.pieces, m.texte.slice(0, 60) + ':' + jour);
@@ -3236,6 +3261,9 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
     zone.append(el('small', 'muted', 'Les parties contre des robots, abandonnées ou jouées seul avec ton parrain ne comptent pas. Un compte Google ne peut être invité qu\'une fois, même après une suppression.'));
   }
   window.ouvrirParrainage = ouvrirParrainage;
+  // Données reprises de l'ancienne adresse du site (réunies avec le profil créé ici).
+  try { if (sessionStorage.getItem('kopo-donnees-reprises')) { sessionStorage.removeItem('kopo-donnees-reprises'); setTimeout(() => toast('Tes statistiques de l\'ancienne adresse ont été récupérées.'), 1200); } } catch (e) {}
+  setTimeout(restaurerProfil, 1500);
   if (/^[A-Z0-9]{6}$/.test(parrainLien) && MODE_SERVEUR) setTimeout(() => toast('Un ami t\'invite : connecte-toi avec Google dans Paramètres et joue tes premières parties pour gagner des pièces !'), 2500);
 
   async function ouvrirBloques() {
@@ -3293,7 +3321,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       stock.ecrire('kopo-entree', 'google'); $('bienvenue').hidden = true;
       if (j.compte && j.compte.pseudo) { stock.ecrire('kopo-pseudo', j.compte.pseudo); if ($('pseudo')) { $('pseudo').value = j.compte.pseudo; majAvatar(); } figerPseudo(); }
       toast('Connecté avec Google : ' + j.compte.pseudo + '#' + j.compte.numero);
-      majBloques();
+      majBloques(); setTimeout(restaurerProfil, 3000);
       if (j.parrainage) {
         stock.effacer('kopo-parrain');
         setTimeout(() => toast(j.parrainage.ok ? `${j.parrainage.parrain} t'a invité : joue tes premières parties pour gagner ton cadeau !` : j.parrainage.erreur), 3800);
@@ -3513,20 +3541,44 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       const m = L && L.moi; if (!m) return;
       ligueZ.append(el('h3', null, 'Ligue' + (L.saison ? ' · ' + L.saison.nom : '')), grille([[NOMS_DIVISIONS[m.division] || m.division, 'Division'], [m.points, 'Points'], [m.rangMondial ? '#' + m.rangMondial : '–', 'Rang mondial'], [m.parties, 'Parties classées']]));
     }).catch(() => {});
-    z.append(el('h3', null, 'Statistiques'));
-    if (!s.parties) z.append(el('p', 'muted', 'Joue une partie avec d\'autres joueurs pour voir tes statistiques ici.'));
-    else z.append(grille([[s.parties, 'Parties jouées'], [s.victoires, 'Victoires'], [taux(s.victoires, s.parties), 'Taux de victoire'], [s.finales, 'Finales atteintes'], [s.manchesSurvecues, 'Manches survécues'], [s.katapss, 'Katapss'], [s.eliminePremier, 'Éliminé en premier']]));
-    z.append(el('h3', null, 'Entraînement (robots)'));
-    z.append(en.parties ? grille([[en.parties, 'Parties'], [en.victoires, 'Victoires'], [taux(en.victoires, en.parties), 'Taux de victoire']]) : el('p', 'muted', 'Aucune partie contre les robots pour l\'instant.'));
-    const rivaux = Object.values(p.rivaux || {});
-    if (rivaux.length) {
-      z.append(el('h3', null, 'Rivaux'));
+    // Statistiques du téléphone, complétées par celles du serveur (compte en ligne) : si le téléphone a perdu
+    // son profil (nouvelle adresse du site, navigateur nettoyé), le serveur, lui, a gardé les parties.
+    const statsZ = el('div');
+    z.append(statsZ);
+    const dessinerStats = (s, en, rivaux) => {
+      statsZ.replaceChildren();
+      statsZ.append(el('h3', null, 'Statistiques'));
+      if (!s.parties) statsZ.append(el('p', 'muted', 'Joue une partie avec d\'autres joueurs pour voir tes statistiques ici.'));
+      else statsZ.append(grille([[s.parties, 'Parties jouées'], [s.victoires, 'Victoires'], [taux(s.victoires, s.parties), 'Taux de victoire'], [s.finales, 'Finales atteintes'], [s.manchesSurvecues, 'Manches survécues'], [s.katapss, 'Katapss'], [s.eliminePremier, 'Éliminé en premier']]));
+      statsZ.append(el('h3', null, 'Entraînement (robots)'));
+      statsZ.append(en.parties ? grille([[en.parties, 'Parties'], [en.victoires, 'Victoires'], [taux(en.victoires, en.parties), 'Taux de victoire']]) : el('p', 'muted', 'Aucune partie contre les robots pour l\'instant.'));
+      if (!rivaux.length) return;
+      statsZ.append(el('h3', null, 'Rivaux'));
       const victime = rivaux.filter((r) => r.gagnes).sort((a, b) => b.gagnes - a.gagnes)[0];
       const bete = rivaux.filter((r) => r.perdus).sort((a, b) => b.perdus - a.perdus)[0];
-      const ligneR = (a, b) => { const l = el('div', 'rival-ligne'); l.append(el('span', null, a), el('small', null, b)); z.append(l); };
+      const ligneR = (a, b) => { const l = el('div', 'rival-ligne'); l.append(el('span', null, a), el('small', null, b)); statsZ.append(l); };
       if (victime) ligneR('Ta victime : ' + victime.pseudo, 'battu ' + victime.gagnes + ' fois');
       if (bete) ligneR('Ta bête noire : ' + bete.pseudo, 't\'a battu ' + bete.perdus + ' fois');
-      for (const r of rivaux.sort((a, b) => (b.gagnes + b.perdus) - (a.gagnes + a.perdus)).slice(0, 5)) ligneR(r.pseudo, 'Toi ' + r.gagnes + ' – ' + r.perdus);
+      for (const r of rivaux.slice().sort((a, b) => (b.gagnes + b.perdus) - (a.gagnes + a.perdus)).slice(0, 5)) ligneR(r.pseudo, 'Toi ' + r.gagnes + ' – ' + r.perdus);
+    };
+    dessinerStats(s, en, Object.values(p.rivaux || {}));
+    if (MODE_SERVEUR && c) apiJoueur('/statistiques').then((srv) => {
+      if (!srv || !srv.stats) return;
+      const plus = (a, b) => Object.fromEntries(Object.keys(a).map((k) => [k, Math.max(a[k] || 0, b[k] || 0)]));
+      const rv = {};
+      for (const [id, r] of Object.entries(p.rivaux || {})) rv[id] = Object.assign({}, r);
+      for (const x of srv.rivaux || []) {
+        const r = rv[x.id] || (rv[x.id] = { pseudo: x.pseudo, gagnes: 0, perdus: 0 });
+        r.pseudo = x.pseudo; r.gagnes = Math.max(r.gagnes || 0, x.moi || 0); r.perdus = Math.max(r.perdus || 0, x.lui || 0);
+      }
+      dessinerStats(plus(s, srv.stats), plus(en, srv.entrainement || {}), Object.values(rv));
+    }).catch(() => {});
+    // Changement d'adresse du site : un profil neuf a pu être créé ici avant que les anciennes données arrivent.
+    // Passer une fois par l'ancienne adresse les ramène (elles sont réunies avec celles d'ici).
+    if (NOUVELLE_ADRESSE && location.origin === new URL(NOUVELLE_ADRESSE).origin && !stock.lire('kopo-demenagement')) {
+      const rec = el('button', 'btn', 'Statistiques disparues depuis le changement d\'adresse ? Les récupérer');
+      rec.onclick = () => { location.href = ANCIENNE_ADRESSE; };
+      z.append(rec);
     }
     const actions = el('div', 'profil-actions');
     const reg = el('button', 'btn', 'Changer de pseudo'); reg.onclick = ouvrirParametres;
@@ -3669,6 +3721,35 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   const jourLocal = (d) => R.jourDe(d || new Date());
   function lireProfil() { const p = stock.lire('kopo-profil'); return p && typeof p === 'object' ? p : { version: 1 }; }
   function ecrireProfil(p) { stock.ecrire('kopo-profil', p); }
+  // Copie du profil sur le serveur (compte en ligne) : il revient sur un autre téléphone, une autre adresse
+  // du site ou après un nettoyage du navigateur. Les rivaux les plus anciens ne sont pas copiés au-delà de 150.
+  let minuteurSauvegarde = null;
+  function sauvegarderProfil() {
+    if (!MODE_SERVEUR || !compteLocal()) return;
+    clearTimeout(minuteurSauvegarde);
+    minuteurSauvegarde = setTimeout(() => {
+      const p = lireProfil();
+      if (!p.xp && !p.premierePartie) return; // rien encore à garder
+      const copie = Object.assign({}, p);
+      const ids = Object.keys(p.rivaux || {});
+      if (ids.length > 150) { copie.rivaux = {}; ids.sort((a, b) => (p.rivaux[a].vuLe < p.rivaux[b].vuLe ? 1 : -1)).slice(0, 150).forEach((id) => (copie.rivaux[id] = p.rivaux[id])); }
+      apiJoueur('/profil', 'PUT', { profil: copie }).catch(() => {});
+    }, 1500);
+  }
+  // Au démarrage (et après la connexion Google) : la copie du serveur complète le profil du téléphone.
+  // On garde la plus grande valeur de chaque statistique : rien n'est compté deux fois.
+  async function restaurerProfil() {
+    if (!MODE_SERVEUR || !compteLocal()) return;
+    try {
+      const r = await apiJoueur('/profil');
+      const p = lireProfil();
+      if (r && r.profil && R.fusionnerProfils(p, r.profil, 'max')) {
+        ecrireProfil(p); appliquerCollection(p);
+        toast('Ton niveau et tes statistiques ont été récupérés.');
+      }
+    } catch (e) {}
+    sauvegarderProfil();
+  }
   function lirePieces() {
     const p = lireProfil(), neuf = !p.pieces;
     const pc = R.pieces(p);

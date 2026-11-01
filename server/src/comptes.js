@@ -248,7 +248,7 @@ function creerComptes(base, reglages) {
     async supprimer(id) {
       const avant = await api.lire(id);
       await base.transaction(async (q) => {
-        await q.query("UPDATE comptes SET statut = 'supprime', auth_id = NULL, pseudo = 'Joueur supprimé', pays = NULL WHERE id = $1", [id]);
+        await q.query("UPDATE comptes SET statut = 'supprime', auth_id = NULL, pseudo = 'Joueur supprimé', pays = NULL, profil = NULL WHERE id = $1", [id]);
         await q.query('DELETE FROM amis WHERE compte_id = $1 OR ami_id = $1', [id]);
         await q.query('DELETE FROM blocages WHERE compte_id = $1', [id]);
       });

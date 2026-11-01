@@ -285,3 +285,9 @@ CREATE TABLE IF NOT EXISTS parrainage_paliers (
 
 ALTER TABLE notifications DROP CONSTRAINT IF EXISTS notifications_type_check;
 ALTER TABLE notifications ADD CONSTRAINT notifications_type_check CHECK (type IN ('rivalite', 'invitation', 'ami', 'parrainage'));
+
+-- ===== Sauvegarde du profil du téléphone (niveau, statistiques, face-à-face, collection) =====
+-- Le profil est calculé sur le téléphone ; sa copie ici le fait revenir sur un autre téléphone,
+-- une autre adresse du site ou après un nettoyage du navigateur.
+ALTER TABLE comptes ADD COLUMN IF NOT EXISTS profil jsonb;
+ALTER TABLE comptes ADD COLUMN IF NOT EXISTS profil_maj timestamptz;

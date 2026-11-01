@@ -222,5 +222,62 @@ test('Place, manches survécues, adversaires humains devant ou derrière', () =>
   assert.strictEqual(g.manches, 3);
 });
 
+console.log('\nRéunir deux profils (changement d\'adresse, sauvegarde du serveur)');
+// Ancien profil : 30 parties, 10 contre Yvn. Profil neuf : 4 parties contre Yvn, le jour du déménagement.
+const ancienProfil = () => {
+  const p = profil();
+  for (let i = 0; i < 30; i++) R.enregistrerPartie(p, partie({ place: i % 3 ? 2 : 1, nbJoueurs: 3, victoire: !(i % 3), finale: true, adversaires: i < 10 ? [{ id: 'yvn', nom: 'Yvn', devant: false }] : [] }), '2026-10-0' + (1 + (i % 9)));
+  R.donnerObjet(p, 'cadre-dakar');
+  return p;
+};
+const neufProfil = () => {
+  const p = profil();
+  for (let i = 0; i < 4; i++) R.enregistrerPartie(p, partie({ place: 2, nbJoueurs: 3, finale: true, adversaires: [{ id: 'yvn', nom: 'Yvn', devant: true }] }), '2026-11-01');
+  return p;
+};
+test('déménagement : les deux profils sont additionnés, rien n\'est perdu', () => {
+  const a = ancienProfil(), n = neufProfil();
+  const xp = a.xp + n.xp;
+  assert.strictEqual(R.fusionnerProfils(n, a, 'somme'), true);
+  assert.strictEqual(n.stats.parties, 34);
+  assert.strictEqual(n.stats.victoires, 10);
+  assert.strictEqual(n.xp, xp);
+  assert.deepStrictEqual([n.rivaux.yvn.gagnes, n.rivaux.yvn.perdus], [10, 4]);
+  assert.strictEqual(n.premierePartie, a.premierePartie);
+  assert.ok(n.collection.possedes.includes('cadre-dakar'));
+  assert.strictEqual(n.collection.equipes.cadre, 'cadre-dakar');
+});
+test('déménagement : une deuxième visite de l\'ancienne adresse ne compte pas deux fois', () => {
+  const a = ancienProfil(), n = neufProfil();
+  R.fusionnerProfils(n, a, 'somme');
+  assert.strictEqual(R.fusionnerProfils(n, a, 'somme'), false);
+  R.enregistrerPartie(n, partie(), '2026-11-02'); // il a rejoué entre-temps
+  const parties = n.stats.parties;
+  assert.strictEqual(R.fusionnerProfils(n, a, 'somme'), false);
+  assert.strictEqual(n.stats.parties, parties);
+});
+test('profil recopié tel quel puis joué : c\'est la suite de l\'ancien, rien à ajouter', () => {
+  const a = ancienProfil();
+  const n = JSON.parse(JSON.stringify(a));
+  R.enregistrerPartie(n, partie(), '2026-11-01');
+  assert.strictEqual(R.fusionnerProfils(n, a, 'somme'), false);
+  assert.strictEqual(n.stats.parties, 31);
+});
+test('sauvegarde du serveur : on garde le plus grand, sans additionner', () => {
+  const a = ancienProfil(), n = neufProfil();
+  assert.strictEqual(R.fusionnerProfils(n, a, 'max'), true);
+  assert.strictEqual(n.stats.parties, 30);
+  assert.strictEqual(n.xp, a.xp);
+  assert.deepStrictEqual([n.rivaux.yvn.gagnes, n.rivaux.yvn.perdus], [10, 4]);
+  // La même sauvegarde relue : rien ne bouge.
+  assert.strictEqual(R.fusionnerProfils(n, a, 'max'), false);
+});
+test('rien à reprendre : profil vide ou absent', () => {
+  const n = neufProfil();
+  assert.strictEqual(R.fusionnerProfils(n, null), false);
+  assert.strictEqual(R.fusionnerProfils(n, { version: 1 }), false);
+  assert.strictEqual(n.stats.parties, 4);
+});
+
 console.log(`\n${ok} tests réussis, ${ko} en échec.`);
 process.exit(ko ? 1 : 0);

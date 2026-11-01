@@ -11,7 +11,7 @@ const paysReseau = (req) => { const p = String(req.get('cf-ipcountry') || '').to
 
 function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours, parrainage }) {
   const r = express.Router();
-  r.use(express.json({ limit: '20kb' }));
+  r.use(express.json({ limit: '64kb' })); // la copie du profil (PUT /profil) peut faire quelques dizaines de ko
 
   // Qui appelle ? (jeton Kopo dans l'en-tête Authorization: Bearer …)
   async function joueur(req, res, next) {
@@ -151,6 +151,37 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours,
     const x = await parrainage.lier(req.compte.id, req.body.code);
     if (!x.ok) return res.status(400).json({ erreur: x.erreur });
     res.json(x);
+  }));
+
+  // --- Statistiques et sauvegarde du profil
+  // Statistiques tenues par le serveur (toutes les parties finies sur ce compte) : le téléphone les compare
+  // aux siennes, pour qu'un profil perdu sur le téléphone ne remette pas tout à zéro.
+  r.get('/statistiques', joueur, enveloppe(async (req, res) => {
+    const s = (await base.query(`SELECT
+        count(*) FILTER (WHERE NOT p.avec_robots)::int AS parties,
+        count(*) FILTER (WHERE NOT p.avec_robots AND pa.place = 1)::int AS victoires,
+        count(*) FILTER (WHERE NOT p.avec_robots AND pa.place <= 2 AND p.nb_joueurs >= 2)::int AS finales,
+        count(*) FILTER (WHERE NOT p.avec_robots AND pa.place = p.nb_joueurs AND p.nb_joueurs >= 2)::int AS elimine_premier,
+        count(*) FILTER (WHERE p.avec_robots)::int AS entrainement_parties,
+        count(*) FILTER (WHERE p.avec_robots AND pa.place = 1)::int AS entrainement_victoires
+      FROM participations pa JOIN parties p ON p.id = pa.partie_id
+      WHERE pa.compte_id = $1 AND pa.place IS NOT NULL AND NOT pa.abandon`, [req.compte.id])).rows[0];
+    res.json({
+      stats: { parties: s.parties, victoires: s.victoires, finales: s.finales, eliminePremier: s.elimine_premier },
+      entrainement: { parties: s.entrainement_parties, victoires: s.entrainement_victoires },
+      rivaux: await social.rivaux(req.compte.id, 50),
+    });
+  }));
+  // Copie du profil du téléphone (kopo-profil), envoyée après chaque partie.
+  r.get('/profil', joueur, enveloppe(async (req, res) => {
+    const c = (await base.query('SELECT profil, profil_maj FROM comptes WHERE id = $1', [req.compte.id])).rows[0];
+    res.json({ profil: (c && c.profil) || null, maj: (c && c.profil_maj) || null });
+  }));
+  r.put('/profil', joueur, enveloppe(async (req, res) => {
+    const p = req.body && req.body.profil;
+    if (!p || typeof p !== 'object' || Array.isArray(p)) return res.status(400).json({ erreur: 'Profil invalide.' });
+    await base.query('UPDATE comptes SET profil = $2, profil_maj = now() WHERE id = $1', [req.compte.id, JSON.stringify(p)]);
+    res.json({ ok: true });
   }));
 
   r.get('/rivaux', joueur, enveloppe(async (req, res) => res.json(await social.rivaux(req.compte.id))));

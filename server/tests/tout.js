@@ -463,6 +463,25 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.strictEqual(r.json.length, 2);
     assert.ok(r.json.every((x) => x.moi === 1 && x.lui === 0), JSON.stringify(r.json));
   });
+  await test('statistiques du compte et copie du profil : gardées par le serveur', async () => {
+    const js = [await invite('Sta' + Date.now() % 1000), await invite('Stb' + Date.now() % 1000), await invite('Stc' + Date.now() % 1000)];
+    const fin = await jouerPartie(js);
+    const v = js.find((j) => j.compte.id === fin.vainqueur);
+    const st = await api('/api/statistiques', { jeton: v.jeton });
+    assert.strictEqual(st.statut, 200);
+    assert.deepStrictEqual(st.json.stats, { parties: 1, victoires: 1, finales: 1, eliminePremier: 0 });
+    assert.deepStrictEqual(st.json.entrainement, { parties: 0, victoires: 0 });
+    assert.strictEqual(st.json.rivaux.length, 2);
+    const premier = js.find((j) => j.compte.id === fin.elimines[0]);
+    assert.strictEqual((await api('/api/statistiques', { jeton: premier.jeton })).json.stats.eliminePremier, 1);
+    // Copie du profil du téléphone.
+    assert.strictEqual((await api('/api/profil', { jeton: v.jeton })).json.profil, null);
+    assert.strictEqual((await api('/api/profil', { methode: 'PUT', jeton: v.jeton, corps: { profil: [] } })).statut, 400);
+    const p = { version: 1, xp: 420, premierePartie: '2026-10-01', stats: { parties: 12 } };
+    assert.strictEqual((await api('/api/profil', { methode: 'PUT', jeton: v.jeton, corps: { profil: p } })).statut, 200);
+    assert.deepStrictEqual((await api('/api/profil', { jeton: v.jeton })).json.profil, p);
+    assert.strictEqual((await api('/api/profil', { jeton: premier.jeton })).json.profil, null, 'chacun la sienne');
+  });
   await test('rivalité entre amis : « t\'a rattrapé », une seule par jour, et 1 – 0 ne compte pas', async () => {
     const [x, y] = [await invite('Riv' + Date.now() % 1000), await invite('Ral' + Date.now() % 1000)];
     await api('/api/amis', { methode: 'POST', jeton: x.jeton, corps: { cible: y.compte.pseudo + '#' + y.compte.numero } });
