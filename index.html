@@ -622,6 +622,10 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
 .ligue-recap .monte { color: var(--brass); font-weight: 700; }
 .ligue-fin { text-align: center; display: grid; gap: 8px; justify-items: center; }
 .ligue-fin .titre { font: 400 34px/1 var(--display); letter-spacing: 2px; color: var(--div, var(--brass)); }
+.notif-carte { display: grid; gap: 10px; justify-items: center; text-align: center; }
+.notif-carte .ico { font-size: 44px; color: var(--brass); }
+.liste-amis-inviter li { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.liste-amis-inviter .en-ligne { color: var(--good); font-size: 12px; }
 </style>
 </head>
 <body>
@@ -765,6 +769,7 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
     <div class="qr" id="qr"></div>
     <div class="lien"><input class="texte" id="lienSalon" readonly><button class="btn" id="btnCopier">Copier</button></div>
     <button class="btn large btn-whatsapp" id="btnWhatsappSalon"><svg class="ico"><use href="#i-partager"/></svg> Inviter sur WhatsApp</button>
+    <button class="btn large" id="btnInviterAmi" hidden>Inviter un ami du Kopo</button>
     <div class="bandeau info-hote" id="noteHote" hidden>Tu es l'hôte : c'est ton téléphone qui fait tourner la partie. Garde cette page ouverte jusqu'à la fin.</div>
     </div>
     <div class="colonne">
@@ -5088,6 +5093,7 @@ var qrcode = function() {
     $('info').textContent = (v.publique ? 'Salle publique · ' : 'Salon · ') + v.code;
     $('titreSalon').textContent = v.publique ? `Salle de ${v.taille}` : 'Salon';
     $('attentePublique').hidden = !v.publique;
+    $('btnInviterAmi').hidden = !(MODE_SERVEUR && compteLocal() && !v.publique); // une salle publique rejointe par code n'est plus classée
     if (v.publique) $('attentePublique').replaceChildren('En attente de joueurs : ', el('strong', null, `${v.joueurs.length}/${v.taille}`), `. La partie démarre dès que la salle est pleine. ${lobby.enLigne()} en ligne.`);
     $('texteCode').textContent = v.publique ? 'Tes amis peuvent aussi rejoindre avec ce code :' : 'Code de la partie :';
     $('codeSalon').textContent = v.code;
@@ -5996,6 +6002,68 @@ var qrcode = function() {
   setTimeout(majOngletLigue, 1500);
   window.ouvrirLigue = ouvrirLigue;
 
+  // ------------------------------------------------------------------ notifications et invitations (serveur)
+  // Rivalité (« Kevin t'a rattrapé : 7 – 7 ! »), invitation d'un ami, nouvel ami : montrées sur l'accueil, une à la fois.
+  const notifsVues = new Set();
+  async function lireNotifications() {
+    if (!MODE_SERVEUR || !compteLocal() || $('ecranAccueil').hidden || !$('voile').hidden) return;
+    let n;
+    try { n = await apiJoueur('/notifications'); } catch (e) { return; }
+    const nonLues = n.liste.filter((x) => !x.lue && !notifsVues.has(x.id)).reverse(); // de la plus ancienne à la plus récente
+    const a = nonLues.find((x) => x.type === 'invitation' && Date.now() - new Date(x.cree_le) < 10 * 60e3) || nonLues[0]; // une invitation passe devant
+    if (!a || $('ecranAccueil').hidden || !$('voile').hidden) return;
+    notifsVues.add(a.id);
+    apiJoueur('/notifications/lues', 'POST', { ids: [a.id] }).catch(() => {});
+    const d = a.donnees || {};
+    const z = el('div', 'notif-carte');
+    const boutons = [];
+    const fermer = (t = 'OK') => { const b = el('button', 'btn large', t); b.onclick = () => { fermerFenetre(); setTimeout(lireNotifications, 400); }; return b; };
+    if (a.type === 'invitation') {
+      if (Date.now() - new Date(a.cree_le) > 10 * 60e3) return lireNotifications(); // trop ancienne : la table est sans doute partie
+      z.append(icone('i-rejoindre'), el('h2', null, a.texte), el('div', 'code-geant', d.code));
+      const go = el('button', 'btn principal large', 'Rejoindre');
+      go.onclick = () => { const p = lirePseudo(); if (!p) return; fermerFenetre(); entrerServeur(p, { code: d.code }); };
+      boutons.push(go, fermer('Pas maintenant'));
+    } else if (a.type === 'rivalite') {
+      z.append(icone('i-revanche'), el('h2', null, 'Rivalité'));
+      const ff = el('div', 'face-a-face');
+      const score = el('span', 'score'); score.append(el('b', null, String(d.toi)), ' – ', el('b', null, String(d.lui)));
+      ff.append(el('span', null, 'Toi'), score, el('span', null, d.pseudo || '?'));
+      z.append(ff, el('p', null, a.texte), el('small', 'muted', 'Retrouve-le en ligne pour reprendre l\'avantage !'));
+      const couper = el('button', 'btn', 'Ne plus recevoir les rivalités');
+      couper.onclick = async () => { try { await apiJoueur('/moi', 'PATCH', { notifs: { rivalite: false } }); toast('Notifications de rivalité coupées.'); } catch (e) { toast(e.message); } fermerFenetre(); };
+      boutons.push(fermer('À moi de jouer !'), couper);
+    } else if (a.type === 'ami') {
+      z.append(icone('i-creer'), el('h2', null, a.texte));
+      const aj = el('button', 'btn principal large', 'L\'ajouter aussi');
+      aj.onclick = async () => { try { await apiJoueur('/amis', 'POST', { cible: d.pseudo + '#' + d.numero }); toast('Ami ajouté.'); } catch (e) { toast(e.message); } fermerFenetre(); setTimeout(lireNotifications, 400); };
+      boutons.push(aj, fermer('Plus tard'));
+    } else return;
+    ouvrirFenetre([z, ...boutons]);
+  }
+  setInterval(lireNotifications, 15000); // invitations : il faut les voir vite
+  setTimeout(lireNotifications, 6000); // après le bonus du jour et les fenêtres d'accueil
+
+  // Salon entre amis : inviter un ami du Kopo (il reçoit le code sur son accueil).
+  $('btnInviterAmi').onclick = async () => {
+    const v = vueActuelle; if (!v) return;
+    const liste = el('ul', 'liste-k liste-amis-inviter');
+    const f = el('button', 'btn large', 'Fermer'); f.onclick = fermerFenetre;
+    ouvrirFenetre([el('h2', null, 'Inviter un ami'), liste, f]);
+    try {
+      const amis = await apiJoueur('/amis');
+      if (!amis.length) liste.append(el('li', null, 'Pas encore d\'amis. Ajoute-les dans Paramètres → Mes amis.'));
+      amis.sort((x, y) => Number(y.en_ligne) - Number(x.en_ligne));
+      for (const a of amis) {
+        const li = el('li'), t = el('span', null, a.pseudo + ' ');
+        if (a.en_ligne) t.append(el('span', 'en-ligne', '● en ligne'));
+        const b = el('button', 'btn', 'Inviter');
+        b.onclick = async () => { try { await apiJoueur('/amis/' + encodeURIComponent(a.id) + '/inviter', 'POST', { code: v.code }); b.textContent = 'Invité'; b.disabled = true; } catch (e) { toast(e.message); } };
+        li.append(t, b); liste.append(li);
+      }
+    } catch (e) { liste.append(el('li', null, e.message)); }
+  };
+
   // Chat en partie : messages choisis dans le tableau de bord (/api/config), sinon la liste de départ.
   const messagesChat = () => (configServeur && Array.isArray(configServeur.messages) && configServeur.messages.length ? configServeur.messages : REACTIONS);
   const estPhrase = (t) => /\p{L}/u.test(t);
@@ -6107,12 +6175,14 @@ var qrcode = function() {
     const dessiner = async () => {
       liste.replaceChildren(el('li', null, 'Chargement…'));
       try {
-        const amis = await apiJoueur('/amis');
+        const [amis, rivaux] = await Promise.all([apiJoueur('/amis'), apiJoueur('/rivaux').catch(() => [])]);
         liste.replaceChildren();
         if (!amis.length) liste.append(el('li', null, 'Pas encore d\'amis. Ajoute-les avec leur pseudo#numéro.'));
         for (const a of amis) {
           const li = el('li');
           const t = el('span', null, a.pseudo + '#' + a.numero + ' ');
+          const rv = rivaux.find((r) => r.id === a.id);
+          if (rv) t.append(el('b', null, `${rv.moi} – ${rv.lui} `));
           t.append(el('small', null, a.en_ligne ? '· en ligne' : ''));
           const x = el('button', 'btn', 'Retirer');
           x.onclick = async () => { try { await apiJoueur('/amis/' + encodeURIComponent(a.id), 'DELETE'); dessiner(); } catch (e) { toast(e.message); } };

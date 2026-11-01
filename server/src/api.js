@@ -4,12 +4,12 @@ const express = require('express');
 
 const MOTIFS = ['pseudo', 'insultes', 'triche', 'abandon', 'autre'];
 const enveloppe = (fn) => (req, res) => fn(req, res).catch((e) => res.status(e.statut || 500).json({ erreur: e.statut ? e.message : 'Erreur du serveur.' }) && (e.statut || console.error(e)));
-const publicCompte = (c) => c && { id: c.id, pseudo: c.pseudo, numero: c.numero, avatar: c.avatar, solde: c.solde, statut: c.statut, serieBonus: c.serie_bonus, dernierBonus: c.dernier_bonus, pays: c.pays || null };
+const publicCompte = (c) => c && { id: c.id, pseudo: c.pseudo, numero: c.numero, avatar: c.avatar, solde: c.solde, statut: c.statut, serieBonus: c.serie_bonus, dernierBonus: c.dernier_bonus, pays: c.pays || null, notifs: { rivalite: true, invitation: true, ami: true, ...(c.notifs || {}) } };
 
 // Pays déduit du réseau (en-tête posé par Cloudflare quand il existe), sinon choisi par le joueur.
 const paysReseau = (req) => { const p = String(req.get('cf-ipcountry') || '').toUpperCase(); return /^[A-Z]{2}$/.test(p) && p !== 'XX' ? p : null; };
 
-function routesJoueurs({ base, auth, comptes, reglages, ligue }) {
+function routesJoueurs({ base, auth, comptes, reglages, ligue, social }) {
   const r = express.Router();
   r.use(express.json({ limit: '20kb' }));
 
@@ -121,9 +121,18 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue }) {
     if (!c || c.id === req.compte.id) return res.status(404).json({ erreur: 'Joueur introuvable. Écris son pseudo#numéro, par exemple Kevin#1290.' });
     const bloque = await base.query('SELECT 1 FROM blocages WHERE compte_id = $1 AND bloque_id = $2', [c.id, req.compte.id]);
     if (bloque.rows.length) return res.status(404).json({ erreur: 'Joueur introuvable.' });
-    await base.query('INSERT INTO amis (compte_id, ami_id) VALUES ($1,$2) ON CONFLICT DO NOTHING', [req.compte.id, c.id]);
+    const nouveau = await base.query('INSERT INTO amis (compte_id, ami_id) VALUES ($1,$2) ON CONFLICT DO NOTHING RETURNING 1', [req.compte.id, c.id]);
+    if (nouveau.rows.length) await social.notifier(c.id, 'ami', `${req.compte.pseudo} t'a ajouté en ami`, { de: req.compte.id, pseudo: req.compte.pseudo, numero: req.compte.numero });
     res.json({ ok: true, ami: c });
   }));
+  // Inviter un ami dans ma salle (il reçoit une notification avec le code).
+  r.post('/amis/:id/inviter', joueur, enveloppe(async (req, res) => res.json(await social.inviter(req.compte, req.params.id, req.body.code))));
+
+  // --- Rivalités et notifications
+  r.get('/rivaux', joueur, enveloppe(async (req, res) => res.json(await social.rivaux(req.compte.id))));
+  r.get('/notifications', joueur, enveloppe(async (req, res) => res.json(await social.liste(req.compte.id))));
+  r.post('/notifications/lues', joueur, enveloppe(async (req, res) => { await social.marquerLues(req.compte.id, req.body.ids); res.json({ ok: true }); }));
+
   r.delete('/amis/:id', joueur, enveloppe(async (req, res) => { await base.query('DELETE FROM amis WHERE compte_id = $1 AND ami_id = $2', [req.compte.id, req.params.id]); res.json({ ok: true }); }));
 
   return r;
