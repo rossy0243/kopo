@@ -712,5 +712,52 @@ test('Distribution équitable : chaque valeur sort aussi souvent (20 000 donnes)
   for (let v = 2; v <= 10; v++) assert.ok(Math.abs(compte[v] / 80000 - 1 / 9) < 0.01, `valeur ${v} : ${compte[v]}`);
 });
 
+// Duel : qui commence alterne d'une partie à l'autre.
+test('Duel : la revanche est ouverte par l’autre joueur, à tour de rôle', () => {
+  for (let g = 1; g <= 20; g++) {
+    const s = finie(2, g);
+    const ouvreurs = [s.dernierDuel.ouvreur];
+    for (let k = 0; k < 5; k++) {
+      S.recevoir(s, 'p1', { type: 'revanche' });
+      S.recevoir(s, 'p2', { type: 'revanche' });
+      assert.strictEqual(s.etat, 'manche');
+      ouvreurs.push(s.manche.joueurCourant);
+      jouerPartieParLesVues(s, K.hasard(g * 10 + k));
+    }
+    for (let k = 1; k < ouvreurs.length; k++) assert.notStrictEqual(ouvreurs[k], ouvreurs[k - 1]);
+  }
+});
+test('Duel : alternance aussi après « Rejouer » et après une reprise de la salle', () => {
+  const s = finie(2, 5);
+  const avant = s.dernierDuel.ouvreur;
+  assert.ok(S.recevoir(s, 'p1', { type: 'rejouer' }).ok);
+  const r = S.importer(S.exporter(s), K.hasard(9));
+  r.joueurs.forEach((j) => (j.connecte = true));
+  assert.ok(S.recevoir(r, 'p1', { type: 'lancer' }).ok);
+  assert.notStrictEqual(r.manche.joueurCourant, avant);
+});
+test('Duel contre un nouvel adversaire : de nouveau au hasard', () => {
+  const vus = new Set();
+  for (let g = 1; g <= 30; g++) {
+    const s = salleAvec(3, g);
+    s.dernierDuel = { paire: 'p1|p2', ouvreur: 'p1' };
+    S.recevoir(s, 'p2', { type: 'quitter' });
+    s.joueurs = s.joueurs.filter((j) => j.id !== 'p2');
+    S.recevoir(s, 'p1', { type: 'lancer' });
+    vus.add(s.manche.joueurCourant);
+  }
+  assert.deepStrictEqual([...vus].sort(), ['p1', 'p3']);
+});
+test('Plus de 2 joueurs : l’ouvreur reste tiré au hasard', () => {
+  const vus = new Set();
+  for (let g = 1; g <= 40; g++) {
+    const s = salleAvec(3, g);
+    s.dernierDuel = { paire: 'p1|p2', ouvreur: 'p1' };
+    S.recevoir(s, 'p1', { type: 'lancer' });
+    vus.add(s.manche.joueurCourant);
+  }
+  assert.strictEqual(vus.size, 3);
+});
+
 console.log(`\n${ok} tests réussis, ${ko} en échec.`);
 process.exit(ko ? 1 : 0);
