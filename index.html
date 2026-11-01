@@ -4775,7 +4775,7 @@ var qrcode = function() {
   // Passage de GitHub Pages à Render : les données du téléphone (compte invité, profil, réglages) sont liées
   // à l'adresse du site. Quand NOUVELLE_ADRESSE est remplie, l'ancienne adresse envoie ses données kopo-*
   // à la nouvelle dans le # (rien ne passe par un serveur), et la nouvelle les reprend si elle est encore vide.
-  const NOUVELLE_ADRESSE = ''; // ex. 'https://kopo.onrender.com/' (avec le / final)
+  const NOUVELLE_ADRESSE = 'https://kopo-d655.onrender.com/'; // avec le / final
   (function demenagement() {
     const h = location.hash;
     if (h.startsWith('#demenagement=')) {
@@ -4789,7 +4789,7 @@ var qrcode = function() {
       history.replaceState(null, '', location.pathname + location.search + suite);
       return;
     }
-    if (!NOUVELLE_ADRESSE || LOCAL) return;
+    if (!NOUVELLE_ADRESSE || LOCAL || !location.hostname.endsWith('.github.io')) return; // seule l'ancienne adresse redirige (pas l'appli ni un test local)
     let cible; try { cible = new URL(NOUVELLE_ADRESSE); } catch (e) { return; }
     if (cible.origin === location.origin) return;
     if (h.startsWith('#access_token') || h.startsWith('#error')) return; // retour de Google : on le traite ici
@@ -4801,7 +4801,7 @@ var qrcode = function() {
   // ------------------------------------------------------------------ paramètres
   // Réglages du joueur, gardés sur le téléphone (plus tard : rattachés au compte).
   const VERSION = '1.0-essai';
-  const BUILD = '3aaf74f6e5c3'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = '282ebcc6caab'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
