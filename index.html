@@ -365,6 +365,8 @@ body.accueil .app { max-width: none; min-height: 100vh; min-height: 100dvh; padd
 .choix-salles .btn.attente small { color: var(--good); }
 .en-ligne-fenetre { color: var(--good) !important; font-weight: 600; }
 .point-en-ligne { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--good); margin: 0 4px 1px 2px; box-shadow: 0 0 6px var(--good); }
+.choix-niveau-robots { width: 100%; }
+.choix-niveau-robots button { flex: 1; padding: 10px 6px; font-size: 15px; }
 .choix-robots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .choix-robots .btn { font-size: 20px; padding: 12px 0; }
 ul.regles { margin: 0; padding-left: 18px; display: grid; gap: 8px; color: var(--ink); }
@@ -825,6 +827,13 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
     <div class="voile" id="voileRobots" hidden>
       <div class="fenetre">
         <h2>Contre les robots</h2>
+        <p>Quel niveau ?</p>
+        <div class="choix choix-niveau-robots" id="niveauRobots" role="group" aria-label="Niveau des robots">
+          <button type="button" data-v="faciles">Facile</button>
+          <button type="button" data-v="normaux">Normal</button>
+          <button type="button" data-v="forts">Fort</button>
+        </div>
+        <small class="muted" id="niveauRobotsAide"></small>
         <p>Combien de robots autour de la table ?</p>
         <div class="choix-robots" id="choixRobots"></div>
         <button class="btn principal large" id="btnGuidee" hidden>Première partie guidée (2 robots gentils)</button>
@@ -3314,6 +3323,8 @@ var qrcode = function() {
       qualifies: [], // { joueur, raison }
       elimine: null,
       journal: [],
+      // Ce que toute la table a vu : cartes sorties du jeu, et cartes ramassées (on sait qui les a).
+      vu: { sorties: [], ramassees: {} },
     };
     for (const j of sieges) {
       m.mains[j] = mains[j].slice();
@@ -3390,6 +3401,46 @@ var qrcode = function() {
     nouvelleOuverture(m, forte.joueur, m.couleurTour);
   }
 
+  // Mémoire publique de la manche : uniquement ce qu'un joueur attentif a pu voir.
+  function memoriser(m, action) {
+    if (!m.vu) m.vu = { sorties: [], ramassees: {} };
+    const v = m.vu, j = action.joueur;
+    const oublier = (c) => { if (v.ramassees[j]) v.ramassees[j] = v.ramassees[j].filter((x) => x !== c); };
+    const sortir = (c) => { oublier(c); if (!v.sorties.includes(c)) v.sorties.push(c); };
+    if (action.type === 'katapss' || action.type === 'toutPoser') m.mains[j].forEach(sortir);
+    else if (action.type === 'jouer') sortir(action.carte);
+    else if (action.type === 'ramasser') {
+      const forte = plusForte(m);
+      for (const p of m.table) for (const c of p.cartes) if (c !== forte.carte && !v.sorties.includes(c)) v.sorties.push(c);
+      v.sorties = v.sorties.filter((c) => c !== forte.carte);
+      (v.ramassees[j] = v.ramassees[j] || []).push(forte.carte);
+    }
+  }
+
+  // Ce qu'un joueur a le droit de connaître : sa main, la table, le nombre de cartes de chacun,
+  // et ce qui a été montré pendant la manche. Jamais les mains des autres.
+  function vuePublique(m, joueur) {
+    const vu = m.vu || { sorties: [], ramassees: {} };
+    const ramassees = {};
+    for (const [k, l] of Object.entries(vu.ramassees)) if (k !== joueur && m.enJeu.includes(k) && l.length) ramassees[k] = l.slice();
+    return {
+      moi: joueur,
+      main: (m.mains[joueur] || []).slice(),
+      nbCartes: Object.fromEntries(m.sieges.map((k) => [k, m.mains[k].length])),
+      sieges: m.sieges.slice(),
+      enJeu: m.enJeu.slice(),
+      table: m.table.map((p) => ({ joueur: p.joueur, cartes: p.cartes.slice(), compte: p.compte })),
+      couleurTour: m.couleurTour,
+      couleurInterdite: m.couleurInterdite,
+      phase: m.phase,
+      joueurCourant: m.joueurCourant,
+      meneur: m.meneur,
+      attente: m.attente.slice(),
+      sorties: vu.sorties.slice(),
+      ramassees,
+    };
+  }
+
   // Actions possibles pour un joueur, dans l'état actuel.
   function actionsPossibles(m, joueur) {
     const actions = [];
@@ -3423,6 +3474,7 @@ var qrcode = function() {
     }
     const j = action.joueur;
     const main = m.mains[j];
+    memoriser(m, action);
 
     if (action.type === 'katapss') {
       noter(m, `${j} annonce KATAPSS ! (${main.map(afficher).join(' ')})`);
@@ -3547,7 +3599,7 @@ var qrcode = function() {
   const Kopo = {
     COULEURS, NOMS_COULEURS, SYMBOLES,
     valeur, couleur, afficher, nouveauPaquet, hasard, melanger,
-    nouvelleManche, actionsPossibles, jouer, jouerPartie,
+    nouvelleManche, actionsPossibles, jouer, jouerPartie, vuePublique,
     strategieSimple, strategieHasard,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = Kopo;
@@ -3597,7 +3649,8 @@ var qrcode = function() {
       suiteA: null, // instant (ms) où la manche suivante se lance seule
       publique: false, // partie ouverte aux inconnus (recherche de joueurs)
       taille: null, // partie publique : nombre de joueurs attendus (2 à 9), elle démarre quand la table est pleine
-      robots: 'normaux', // 'gentils' pour la première partie guidée
+      robots: 'normaux', // 'faciles' | 'normaux' | 'forts', ou 'gentils' pour la première partie guidée
+      niveauJoueur: 1, // niveau (XP) de l'hôte : les robots se renforcent avec lui
       revanche: null, // fin de partie : { oui: [ids], non: [ids], jusqua } ; la partie repart si au moins 2 joueurs acceptent
       revancheRatee: false,
       horloge: Date.now,
@@ -3607,43 +3660,102 @@ var qrcode = function() {
 
   const estRobot = (s, id) => !!(s.joueurs.find((j) => j.id === id) || {}).robot;
 
-  // Robot : annonce Katapss, pose tout dès qu'il peut, ouvre dans sa couleur la plus longue
-  // avec sa plus petite carte, suit avec sa plus petite carte, bluffe rarement.
+  // Niveaux des robots. Chaque robot ne voit que ce qu'un joueur voit (K.vuePublique) :
+  // sa main, la table, le nombre de cartes de chacun et les cartes déjà montrées.
+  // 'gentils' : première partie guidée. 'faciles', 'normaux', 'forts' : choisis par le joueur.
+  const NIVEAUX_ROBOTS = ['faciles', 'normaux', 'forts'];
+  // Force de 0 (gentil) à 2 (fort). Dans chaque niveau, elle monte avec le niveau du joueur
+  // (niveau 1 : bas de la plage, niveau 20 et plus : haut de la plage).
+  const PLAGES_FORCE = { faciles: [0, 0.7], normaux: [1, 1.5], forts: [1.6, 2] };
+  function forceRobots(s) {
+    if (s.robots === 'gentils') return 0;
+    const plage = PLAGES_FORCE[s.robots] || PLAGES_FORCE.normaux;
+    const n = s.niveauJoueur > 1 ? s.niveauJoueur : 1;
+    const t = Math.min(1, (n - 1) / 19);
+    return plage[0] + (plage[1] - plage[0]) * t;
+  }
+
+  // À chaque coup, le robot joue comme le niveau du dessous ou du dessus de sa force :
+  // force 1,3 = coup normal 7 fois sur 10, coup fort 3 fois sur 10.
   function choixRobot(s, j) {
-    if (s.robots === 'gentils') return choixRobotGentil(s, j);
-    const m = s.manche;
-    const actions = K.actionsPossibles(m, j);
+    const v = K.vuePublique(s.manche, j);
+    const actions = K.actionsPossibles(s.manche, j);
+    const f = forceRobots(s);
+    const cerveau = f < 1 ? (s.rng() < f ? robotNormal : robotGentil) : (s.rng() < f - 1 ? robotFort : robotNormal);
+    return cerveau(v, actions, s.rng);
+  }
+
+  // Robot normal : annonce Katapss, pose tout dès qu'il peut, ouvre dans sa couleur la plus longue
+  // avec sa plus petite carte, suit avec sa plus petite carte, bluffe rarement.
+  function robotNormal(v, actions, rng) {
     const k = actions.find((a) => a.type === 'katapss');
     if (k) return k;
-    if (j !== m.joueurCourant) return null;
+    if (v.moi !== v.joueurCourant) return null;
     const tout = actions.find((a) => a.type === 'toutPoser');
     if (tout) return tout;
     const cartes = actions.filter((a) => a.type === 'jouer');
     if (!cartes.length) return actions.find((a) => a.type === 'ramasser') || null;
-    if (m.phase === 'ouverture') {
-      const main = m.mains[j];
-      const nb = (c) => main.filter((x) => K.couleur(x) === c).length;
+    if (v.phase === 'ouverture') {
+      const nb = (c) => v.main.filter((x) => K.couleur(x) === c).length;
       cartes.sort((a, b) => nb(K.couleur(b.carte)) - nb(K.couleur(a.carte)) || K.valeur(a.carte) - K.valeur(b.carte));
       return cartes[0];
     }
-    if (s.rng() < 0.05) return actions.find((a) => a.type === 'ramasser');
+    if (rng() < 0.05) return actions.find((a) => a.type === 'ramasser');
     cartes.sort((a, b) => K.valeur(a.carte) - K.valeur(b.carte));
     return cartes[0];
   }
 
-  // Robot gentil (première partie guidée) : il oublie souvent le Katapss, ne sort pas toujours
-  // quand il pourrait, gaspille ses fortes cartes et ramasse plus souvent. Il respecte les règles.
-  function choixRobotGentil(s, j) {
-    const m = s.manche;
-    const actions = K.actionsPossibles(m, j);
+  // Robot fort : il compte les cartes déjà sorties (comme un bon joueur), sans jamais voir les mains des autres.
+  // En ouverture, il cherche à garder la main (carte que personne ne peut battre), à se retrouver
+  // avec une seule couleur pour sortir d'un coup, et à se débarrasser de ses petites cartes.
+  // En suite, s'il est le dernier à jouer, il prend la main avec la plus petite carte qui suffit.
+  // Il ne ramasse jamais exprès.
+  function robotFort(v, actions) {
     const k = actions.find((a) => a.type === 'katapss');
-    if (k && (j !== m.joueurCourant || s.rng() < 0.3)) return s.rng() < 0.3 ? k : null;
-    if (j !== m.joueurCourant) return null;
+    if (k) return k;
+    if (v.moi !== v.joueurCourant) return null;
+    const tout = actions.find((a) => a.type === 'toutPoser');
+    if (tout) return tout;
+    const cartes = actions.filter((a) => a.type === 'jouer');
+    if (!cartes.length) return actions.find((a) => a.type === 'ramasser') || null;
+    const V = K.valeur, C = K.couleur;
+    const vues = new Set(v.main.concat(v.sorties));
+    const inconnues = K.nouveauPaquet().filter((c) => !vues.has(c)); // chez les autres, ou pas distribuées
+    const plusHautes = (c) => inconnues.filter((x) => C(x) === C(c) && V(x) > V(c)).length;
+    const uneCouleur = (l) => l.length > 0 && l.every((x) => C(x) === C(l[0]));
+    if (v.phase === 'ouverture') {
+      let choix = null, meilleur = -Infinity;
+      for (const a of cartes) {
+        const c = a.carte, reste = v.main.filter((x) => x !== c), h = plusHautes(c);
+        const restantes = inconnues.filter((x) => C(x) === C(c)).length;
+        let score = 2 * (10 - V(c)) - h + 20 * (9 - restantes) / 9;
+        if (h === 0) score += 50; // personne ne peut la battre : il garde la main
+        if (uneCouleur(reste)) score += h === 0 ? 120 : 20; // une seule couleur ensuite : il pourra tout poser
+        if (score > meilleur) { meilleur = score; choix = a; }
+      }
+      return choix;
+    }
+    let forte = null;
+    for (const p of v.table) if (p.compte) for (const c of p.cartes) if (!forte || V(c) > V(forte)) forte = c;
+    cartes.sort((a, b) => V(a.carte) - V(b.carte));
+    if (v.attente.length <= 1) {
+      const gagnante = cartes.find((a) => V(a.carte) > V(forte));
+      if (gagnante) return gagnante;
+    }
+    return cartes[0];
+  }
+
+  // Robot gentil (première partie guidée, et robots faciles) : il oublie souvent le Katapss, ne sort pas toujours
+  // quand il pourrait, gaspille ses fortes cartes et ramasse plus souvent. Il respecte les règles.
+  function robotGentil(v, actions, rng) {
+    const k = actions.find((a) => a.type === 'katapss');
+    if (k && (v.moi !== v.joueurCourant || rng() < 0.3)) return rng() < 0.3 ? k : null;
+    if (v.moi !== v.joueurCourant) return null;
     const cartes = actions.filter((a) => a.type === 'jouer').sort((a, b) => K.valeur(b.carte) - K.valeur(a.carte));
     const tout = actions.find((a) => a.type === 'toutPoser');
-    if (tout && (!cartes.length || s.rng() < 0.35)) return tout;
+    if (tout && (!cartes.length || rng() < 0.35)) return tout;
     const ramasser = actions.find((a) => a.type === 'ramasser');
-    if (ramasser && (!cartes.length || s.rng() < 0.3)) return ramasser;
+    if (ramasser && (!cartes.length || rng() < 0.3)) return ramasser;
     return cartes[0] || tout || ramasser || null;
   }
 
@@ -3905,9 +4017,13 @@ var qrcode = function() {
       }
       case 'reglages': {
         if (id !== s.hote || s.etat !== 'salon') return { ok: false, erreur: 'Impossible.' };
-        if (msg.robots !== undefined) { // première partie guidée : robots gentils
-          if (s.publique || !['normaux', 'gentils'].includes(msg.robots)) return { ok: false, erreur: 'Impossible.' };
+        if (msg.robots !== undefined) { // niveau des robots, ou robots gentils pour la première partie guidée
+          if (s.publique || !NIVEAUX_ROBOTS.concat('gentils').includes(msg.robots)) return { ok: false, erreur: 'Impossible.' };
           s.robots = msg.robots;
+          if (msg.niveau !== undefined) {
+            if (!Number.isInteger(msg.niveau) || msg.niveau < 1 || msg.niveau > 1000) return { ok: false, erreur: 'Impossible.' };
+            s.niveauJoueur = msg.niveau;
+          }
         }
         if (msg.delai !== undefined || msg.robots === undefined) {
           if (!DELAIS.includes(msg.delai)) return { ok: false, erreur: 'Impossible.' };
@@ -4048,7 +4164,7 @@ var qrcode = function() {
     return s;
   }
 
-  const KopoSalle = { MIN, MAX, DELAIS, PAUSE_ROBOT, DUREES, creerSalle, rendrePublique, choixRobot, reconnecter, DELAI_ABSENT, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
+  const KopoSalle = { MIN, MAX, DELAIS, PAUSE_ROBOT, DUREES, creerSalle, rendrePublique, choixRobot, NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, robotGentil, robotNormal, robotFort, reconnecter, DELAI_ABSENT, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
   if (typeof module !== 'undefined' && module.exports) module.exports = KopoSalle;
   else root.KopoSalle = KopoSalle;
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -7421,9 +7537,20 @@ var qrcode = function() {
   $('btnFermerSalles').onclick = () => ($('voileSalles').hidden = true);
   $('btnModeRejoindre').onclick = () => { $('voileRejoindre').hidden = false; setTimeout(() => $('codeRejoindre').focus(), 50); };
   $('btnFermerRejoindre').onclick = () => ($('voileRejoindre').hidden = true);
+  // Niveau des robots : choisi ici (gardé sur le téléphone), et renforcé peu à peu avec le niveau du joueur.
+  const AIDES_NIVEAU_ROBOTS = { faciles: 'Ils font des erreurs.', normaux: 'Ils jouent simplement.', forts: 'Ils comptent les cartes déjà sorties, comme un bon joueur. Ils ne voient jamais ta main.' };
+  const niveauRobots = () => (S.NIVEAUX_ROBOTS.includes(stock.lire('kopo-niveau-robots')) ? stock.lire('kopo-niveau-robots') : 'normaux');
+  const monNiveau = () => R.niveauDe(lireProfil().xp || 0).niveau;
+  function majNiveauRobots() {
+    const n = niveauRobots();
+    $('niveauRobots').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === n)));
+    $('niveauRobotsAide').textContent = AIDES_NIVEAU_ROBOTS[n] + ' Ils deviennent un peu plus forts à chaque niveau que tu gagnes (tu es niveau ' + monNiveau() + ').';
+  }
+  $('niveauRobots').querySelectorAll('button').forEach((b) => (b.onclick = () => { stock.ecrire('kopo-niveau-robots', b.dataset.v); majNiveauRobots(); }));
   $('btnModeRobots').onclick = () => {
     if (!lirePseudo()) return;
     $('btnGuidee').hidden = !!lireProfil().premierePartie;
+    majNiveauRobots();
     $('voileRobots').hidden = false;
   };
   $('btnFermerRobots').onclick = () => ($('voileRobots').hidden = true);
@@ -7436,6 +7563,7 @@ var qrcode = function() {
       $('voileRobots').hidden = true;
       // Partie avec des robots : on crée la salle, on ajoute les robots et on lance tout de suite.
       demarrerHote(nouveauCode(), p, false);
+      envoyer({ type: 'reglages', robots: niveauRobots(), niveau: monNiveau() });
       for (let i = 0; i < n; i++) envoyer({ type: 'ajouterRobot' });
       envoyer({ type: 'lancer' });
     };
