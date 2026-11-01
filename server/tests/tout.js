@@ -592,6 +592,65 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.strictEqual(am.json.liste[0].id, d.compte.id);
   });
 
+  console.log('Parcours de saison, collection, boutique');
+  await test('XP de saison : base, manches survécues, victoire ; une partie entre humains en donne', async () => {
+    assert.strictEqual(srv.parcours.xpPartie({ place: 1, manchesSurvecues: 3 }), 30 + 15 + 15);
+    assert.strictEqual(srv.parcours.xpPartie({ place: 4, manchesSurvecues: 1 }), 35);
+    assert.strictEqual(srv.parcours.xpPartie({ place: 2, abandon: true }), 0);
+    const js = [await invite('Xp1' + Date.now() % 1000), await invite('Xp2' + Date.now() % 1000)];
+    await jouerPartie(js);
+    const e = await api('/api/parcours', { jeton: js[0].jeton });
+    assert.ok(e.json.xp >= 30, JSON.stringify({ xp: e.json.xp }));
+    assert.strictEqual(e.json.paliers.length, 30);
+    assert.strictEqual(e.json.paliers[29].gratuit.objet, 'dos-fondateurs');
+    assert.strictEqual(e.json.kopoPlus, false);
+  });
+  const pj = await invite('Passe' + Date.now() % 1000);
+  await test('récupérer les paliers : pièces, objet, pas deux fois, pas avant de l\'avoir atteint, Kopo+ réservé', async () => {
+    const s = (await srv.ligue.saisonCourante()).numero;
+    await srv.base.query('INSERT INTO parcours (saison, compte_id, xp) VALUES ($1,$2,1050)', [s, pj.compte.id]);
+    const solde = (await srv.comptes.lire(pj.compte.id)).solde;
+    const r1 = await api('/api/parcours/recuperer', { methode: 'POST', jeton: pj.jeton, corps: { palier: 1 } });
+    assert.deepStrictEqual([r1.json.pieces, r1.json.solde], [60, solde + 60]);
+    const r3 = await api('/api/parcours/recuperer', { methode: 'POST', jeton: pj.jeton, corps: { palier: 3 } });
+    assert.strictEqual(r3.json.objet.id, 'av-lubumbashi');
+    assert.strictEqual((await api('/api/parcours/recuperer', { methode: 'POST', jeton: pj.jeton, corps: { palier: 3 } })).statut, 409);
+    assert.strictEqual((await api('/api/parcours/recuperer', { methode: 'POST', jeton: pj.jeton, corps: { palier: 11 } })).statut, 400);
+    assert.strictEqual((await api('/api/parcours/recuperer', { methode: 'POST', jeton: pj.jeton, corps: { palier: 1, voie: 'plus' } })).statut, 403);
+    await api(`/admin/api/joueurs/${pj.compte.id}/kopo-plus`, { methode: 'POST', jeton: adminJeton, corps: { jours: 30 } });
+    assert.strictEqual((await api('/api/moi', { jeton: pj.jeton })).json.compte.kopoPlus, true);
+    const rp = await api('/api/parcours/recuperer', { methode: 'POST', jeton: pj.jeton, corps: { palier: 1, voie: 'plus' } });
+    assert.strictEqual(rp.json.objet.id, 'av-fondateur');
+    const e = await api('/api/parcours', { jeton: pj.jeton });
+    assert.deepStrictEqual([e.json.palier, e.json.paliers[0].gratuit.recupere, e.json.paliers[0].plus.recupere, e.json.paliers[1].gratuit.recupere], [10, true, true, false]);
+  });
+  await test('collection : équiper ce qu\'on possède, retirer un cadre', async () => {
+    const e = await api('/api/collection/equiper', { methode: 'POST', jeton: pj.jeton, corps: { objet: 'av-lubumbashi' } });
+    assert.strictEqual(e.json.equipes.avatar, 'av-lubumbashi');
+    assert.ok(e.json.possedes.includes('av-fondateur') && e.json.possedes.includes('av-laiton'));
+    assert.strictEqual((await api('/api/collection/equiper', { methode: 'POST', jeton: pj.jeton, corps: { objet: 'av-goma' } })).statut, 403);
+    await srv.parcours.donner(pj.compte.id, 'cadre-dakar', 'admin');
+    assert.strictEqual((await api('/api/collection/equiper', { methode: 'POST', jeton: pj.jeton, corps: { objet: 'cadre-dakar' } })).json.equipes.cadre, 'cadre-dakar');
+    assert.strictEqual((await api('/api/collection/equiper', { methode: 'POST', jeton: pj.jeton, corps: { objet: 'cadre-dakar' } })).json.equipes.cadre, null);
+    assert.strictEqual((await api('/api/collection', { jeton: pj.jeton })).json.equipes.avatar, 'av-lubumbashi');
+  });
+  await test('boutique : prix affiché, pas deux fois, objets de saison pas en vente, solde insuffisant refusé', async () => {
+    await srv.comptes.crediter(pj.compte.id, 1000, 'admin', 'test boutique', true);
+    const b = await api('/api/boutique', { jeton: pj.jeton });
+    assert.ok(b.json.objets.find((o) => o.id === 'av-nuit').prix === 500);
+    const avant = b.json.solde;
+    const a = await api('/api/boutique/acheter', { methode: 'POST', jeton: pj.jeton, corps: { objet: 'av-nuit' } });
+    assert.strictEqual(a.json.solde, avant - 500);
+    assert.strictEqual((await api('/api/boutique/acheter', { methode: 'POST', jeton: pj.jeton, corps: { objet: 'av-nuit' } })).statut, 409);
+    assert.strictEqual((await api('/api/boutique/acheter', { methode: 'POST', jeton: pj.jeton, corps: { objet: 'dos-fondateurs' } })).statut, 400);
+    const pauvre = await invite('Pauvre' + Date.now() % 1000);
+    const r = await api('/api/boutique/acheter', { methode: 'POST', jeton: pauvre.jeton, corps: { objet: 'dos-kinshasa' } });
+    assert.strictEqual(r.statut, 400);
+    assert.match(r.json.erreur, /insuffisant/);
+    const reg = (await srv.base.query("SELECT montant, ref FROM registre_pieces WHERE compte_id = $1 AND motif = 'boutique'", [pj.compte.id])).rows;
+    assert.deepStrictEqual(reg, [{ montant: -500, ref: 'av-nuit' }]);
+  });
+
   await test('trop d\'essais de connexion admin : bloqué', async () => {
     for (let i = 0; i < 5; i++) await api('/admin/api/connexion', { methode: 'POST', corps: { motDePasse: 'x', code: '1' } });
     const r = await api('/admin/api/connexion', { methode: 'POST', corps: { motDePasse: 'motdepasse-admin', code: codeTotp(TOTP) } });

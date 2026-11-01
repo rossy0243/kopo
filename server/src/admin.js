@@ -3,7 +3,7 @@
 const express = require('express');
 const { enveloppe, publicCompte } = require('./api');
 
-function routesAdmin({ base, auth, comptes, reglages, ligue, salles, demarrage }) {
+function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, salles, demarrage }) {
   const r = express.Router();
   r.use(express.json({ limit: '50kb' }));
 
@@ -112,6 +112,8 @@ function routesAdmin({ base, auth, comptes, reglages, ligue, salles, demarrage }
       // Joueurs souvent à la même table : aide à repérer la complicité (strategie-pieces §6.3).
       ligue: (await q(`SELECT l.saison, l.points, l.division, l.meilleure, l.parties, l.victoires FROM ligue l JOIN saisons s ON s.numero = l.saison WHERE l.compte_id = $1 AND s.statut = 'en_cours'`))[0] || null,
       titres: await q(`SELECT saison, titre, rang, pieces FROM recompenses_saison WHERE compte_id = $1 ORDER BY saison DESC`),
+      inventaire: await q(`SELECT objet, source, cree_le FROM inventaire WHERE compte_id = $1 ORDER BY cree_le DESC`),
+      parcours: (await q(`SELECT p.xp, cardinality(p.gratuits)::int AS gratuits, cardinality(p.plus)::int AS plus FROM parcours p JOIN saisons s ON s.numero = p.saison AND s.statut = 'en_cours' WHERE p.compte_id = $1`))[0] || null,
       partenaires: await q(`SELECT c2.id, c2.pseudo, c2.numero, count(*)::int AS ensemble FROM participations a JOIN participations b ON b.partie_id = a.partie_id AND b.compte_id <> a.compte_id JOIN comptes c2 ON c2.id = b.compte_id WHERE a.compte_id = $1 GROUP BY c2.id, c2.pseudo, c2.numero ORDER BY ensemble DESC LIMIT 5`),
     });
   }));
@@ -142,6 +144,24 @@ function routesAdmin({ base, auth, comptes, reglages, ligue, salles, demarrage }
     const solde = await comptes.crediter(req.params.id, montant, 'admin', String(req.body.motif).slice(0, 200), true);
     await journal('pieces', req.params.id, { montant, motif: req.body.motif });
     res.json({ ok: true, solde });
+  }));
+
+  // Kopo+ (en attendant les paiements, phase 2) : jours offerts, 0 pour retirer.
+  r.post('/joueurs/:id/kopo-plus', enveloppe(async (req, res) => {
+    const jours = Math.trunc(Number(req.body.jours));
+    if (!(jours >= 0 && jours <= 366)) return res.status(400).json({ erreur: 'Entre 0 et 366 jours.' });
+    const jusqu = jours ? new Date(Date.now() + jours * 864e5) : null;
+    const r2 = await base.query('UPDATE comptes SET kopo_plus_jusqu = $2 WHERE id = $1 RETURNING id', [req.params.id, jusqu]);
+    if (!r2.rows.length) return res.status(404).json({ erreur: 'Joueur introuvable.' });
+    await journal('kopo-plus', req.params.id, { jours });
+    res.json({ ok: true, jusqu });
+  }));
+  // Offrir une apparence (remerciement, correction…).
+  r.post('/joueurs/:id/objet', enveloppe(async (req, res) => {
+    if (!(await comptes.lire(req.params.id))) return res.status(404).json({ erreur: 'Joueur introuvable.' });
+    const ok = await parcours.donner(req.params.id, String(req.body.objet || ''), 'admin');
+    await journal('objet', req.params.id, { objet: req.body.objet });
+    res.json({ ok: true, nouveau: ok });
   }));
 
   // Cadeau à tous les joueurs actifs (ex. excuses après une panne).

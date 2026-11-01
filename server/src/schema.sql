@@ -209,3 +209,33 @@ CREATE TABLE IF NOT EXISTS notifications (
   cree_le   timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS notifications_compte ON notifications (compte_id, lue, cree_le);
+
+-- ===== Collection, parcours de saison, Kopo+ (retention.md §3.5, §3.6) =====
+ALTER TABLE comptes ADD COLUMN IF NOT EXISTS equipes jsonb NOT NULL DEFAULT '{}';     -- { avatar, dos, cadre }
+ALTER TABLE comptes ADD COLUMN IF NOT EXISTS kopo_plus_jusqu timestamptz;             -- abonnement Kopo+ (cosmétique seulement)
+
+-- Objets possédés (apparences uniquement : rien n'aide à gagner).
+CREATE TABLE IF NOT EXISTS inventaire (
+  compte_id text NOT NULL REFERENCES comptes(id),
+  objet     text NOT NULL,
+  source    text NOT NULL,                        -- parcours:1, boutique, admin, saison:1…
+  cree_le   timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (compte_id, objet)
+);
+
+-- Parcours de saison : XP de saison et paliers récupérés (voie gratuite et voie Kopo+).
+CREATE TABLE IF NOT EXISTS parcours (
+  saison     integer NOT NULL REFERENCES saisons(numero),
+  compte_id  text NOT NULL REFERENCES comptes(id),
+  xp         integer NOT NULL DEFAULT 0,
+  gratuits   integer[] NOT NULL DEFAULT '{}',     -- paliers récupérés, voie gratuite
+  plus       integer[] NOT NULL DEFAULT '{}',     -- paliers récupérés, voie Kopo+
+  maj_le     timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (saison, compte_id)
+);
+CREATE TABLE IF NOT EXISTS parcours_parties (
+  partie_id text NOT NULL,
+  compte_id text NOT NULL REFERENCES comptes(id),
+  xp        integer NOT NULL,
+  PRIMARY KEY (partie_id, compte_id)
+);

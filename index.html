@@ -626,6 +626,49 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
 .notif-carte .ico { font-size: 44px; color: var(--brass); }
 .liste-amis-inviter li { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .liste-amis-inviter .en-ligne { color: var(--good); font-size: 12px; }
+/* Apparences des villes (catalogue du serveur). */
+.avatar.av-lubumbashi { background: linear-gradient(160deg, #e39b5b, #b87333 55%, #5a2e0e); color: #fff; }
+.avatar.av-abidjan { background: linear-gradient(90deg, #f77f00 0 33%, #fff 33% 66%, #009e60 66%); color: #1d1606; }
+.avatar.av-dakar { background: linear-gradient(90deg, #00853f 0 33%, #fdef42 33% 66%, #e31b23 66%); color: #1d1606; }
+.avatar.av-douala { background: linear-gradient(90deg, #007a5e 0 33%, #ce1126 33% 66%, #fcd116 66%); color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.6); }
+.avatar.av-brazzaville { background: linear-gradient(135deg, #009543 0 40%, #fbde4a 40% 60%, #dc241f 60%); color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.6); }
+.avatar.av-goma { background: radial-gradient(circle at 50% 110%, #ff7a2f, #a3200f 45%, #1b0b07 80%); color: #ffd7a8; }
+.avatar.av-fondateur { background: radial-gradient(circle at 30% 25%, #f6dc9a, #e2b04a 55%, #8a6420); color: #1d1606; box-shadow: inset 0 0 0 2px #1d1606; }
+.avatar.cadre-fondateurs { box-shadow: 0 0 0 3px #e2b04a, 0 0 0 5px #1d1606, 0 0 0 7px #e2b04a; }
+.avatar.cadre-legende { box-shadow: 0 0 0 3px #e0564c, 0 0 0 6px #e2b04a, 0 0 14px 4px rgba(224,86,76,.6); }
+body.dos-lubumbashi { --dos-motif: repeating-linear-gradient(45deg, #b87333 0 5px, #5a2e0e 5px 10px); --dos-motif-petit: repeating-linear-gradient(45deg, #b87333 0 3px, #5a2e0e 3px 6px); }
+body.dos-abidjan { --dos-motif: linear-gradient(90deg, #f77f00 0 33%, #fff 33% 66%, #009e60 66%); --dos-motif-petit: linear-gradient(90deg, #f77f00 0 33%, #fff 33% 66%, #009e60 66%); }
+body.dos-dakar { --dos-motif: linear-gradient(90deg, #00853f 0 33%, #fdef42 33% 66%, #e31b23 66%); --dos-motif-petit: linear-gradient(90deg, #00853f 0 33%, #fdef42 33% 66%, #e31b23 66%); }
+body.dos-douala { --dos-motif: linear-gradient(90deg, #007a5e 0 33%, #ce1126 33% 66%, #fcd116 66%); --dos-motif-petit: linear-gradient(90deg, #007a5e 0 33%, #ce1126 33% 66%, #fcd116 66%); }
+body.dos-fondateurs { --dos-motif: radial-gradient(circle, #e2b04a 18%, transparent 19%) 0 0 / 12px 12px, #1d1606; --dos-motif-petit: radial-gradient(circle, #e2b04a 25%, transparent 26%) 0 0 / 6px 6px, #1d1606; }
+.mini-dos.dos-lubumbashi { background: repeating-linear-gradient(45deg, #b87333 0 4px, #5a2e0e 4px 8px) !important; }
+.mini-dos.dos-abidjan { background: linear-gradient(90deg, #f77f00 0 33%, #fff 33% 66%, #009e60 66%) !important; }
+.mini-dos.dos-dakar { background: linear-gradient(90deg, #00853f 0 33%, #fdef42 33% 66%, #e31b23 66%) !important; }
+.mini-dos.dos-douala { background: linear-gradient(90deg, #007a5e 0 33%, #ce1126 33% 66%, #fcd116 66%) !important; }
+.mini-dos.dos-fondateurs { background: radial-gradient(circle, #e2b04a 18%, transparent 19%) 0 0 / 8px 8px, #1d1606 !important; }
+.mini-dos.dos-kinshasa { background: linear-gradient(135deg, transparent 38%, #f7d038 38% 44%, #ce1021 44% 56%, #f7d038 56% 62%, transparent 62%), #3b8fd6 !important; }
+.mini-dos { display: inline-block; width: 26px; height: 38px; border-radius: 4px; border: 2px solid #f3e3bd; background: repeating-linear-gradient(45deg, var(--brass) 0 4px, #9c7524 4px 8px); }
+/* Parcours de saison */
+.parcours { display: grid; gap: 10px; }
+.parcours-tete { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; }
+.parcours-tete .num { font: 400 34px/1 var(--display); color: var(--brass); }
+.parcours-voies { display: grid; grid-template-columns: 34px minmax(0,1fr) minmax(0,1fr); gap: 6px; font-size: 12px; color: var(--muted); text-align: center; }
+.parcours-liste { display: grid; gap: 6px; max-height: 46vh; overflow: auto; padding-right: 2px; }
+.palier { display: grid; grid-template-columns: 34px minmax(0,1fr) minmax(0,1fr); gap: 6px; align-items: stretch; }
+.palier .n { display: grid; place-items: center; font: 400 20px/1 var(--display); color: var(--muted); border-radius: 8px; }
+.palier.atteint .n { color: #1d1606; background: var(--brass); }
+.palier .case { min-width: 0; display: flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; min-height: 52px; font-size: 13px; background: rgba(255,255,255,.03); }
+.palier .case.plus { border-color: rgba(224,86,76,.4); background: rgba(224,86,76,.06); }
+.palier .case.fait { opacity: .55; }
+.palier .case > span:not(.avatar):not(.piece):not(.mini-dos) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.palier .case .qte { flex: none; font-weight: 600; }
+.palier .case .btn { margin-left: auto; flex: none; padding: 4px 9px; font-size: 12px; }
+.palier .case .avatar { width: 34px; height: 34px; font-size: 15px; flex: none; }
+.palier .case .mini-dos { width: 22px; height: 32px; flex: none; }
+.palier .case .piece { width: 22px; height: 22px; font-size: 12px; flex: none; }
+.palier .case .ico-k.gris { width: 18px; height: 18px; margin-left: auto; }
+.parcours-recap { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; align-items: center; font-size: 13px; margin-top: 6px; }
+.parcours-recap b { color: var(--brass); }
 </style>
 </head>
 <body>
@@ -4631,6 +4674,7 @@ var qrcode = function() {
     room.onMessage('solde', () => {});
     room.onMessage('classee', (d) => window.dispatchEvent(new CustomEvent('kopo-classee', { detail: d })));
     room.onMessage('ligue', (d) => window.dispatchEvent(new CustomEvent('kopo-ligue', { detail: d })));
+    room.onMessage('parcours', (d) => window.dispatchEvent(new CustomEvent('kopo-parcours', { detail: d })));
     room.onMessage('reaction', (e) => window.dispatchEvent(new CustomEvent('kopo-reaction', { detail: e })));
     room.onMessage('exclu', (raison) => { quitter(); toast(raison || 'Tu as été exclu de la partie.'); });
     room.onLeave((code) => {
@@ -5614,6 +5658,7 @@ var qrcode = function() {
     const extra = el('div'); extra.id = 'recapExtra'; // points de ligue (serveur)
     gauche.append(extra);
     remplirRecapLigue(extra);
+    remplirRecapParcours(extra);
     // Boutons : revanche, partie suivante, partager, quitter
     const boutons = el('div', 'recap-boutons');
     const btnRev = el('button', 'btn principal large btn-revanche');
@@ -5891,9 +5936,10 @@ var qrcode = function() {
     if (d.promu) t.append(el('div', 'monte', `Montée en ${NOMS_DIVISIONS[d.division]} !`));
     else if (d.relegue) t.append(el('small', 'muted', `Retour en ${NOMS_DIVISIONS[d.division]}.`));
     else if (d.prochaine) t.append(el('small', 'muted', `Encore ${d.prochaine.manque} pts pour ${NOMS_DIVISIONS[d.prochaine.division]}`));
-    if (d.protection > 0 && d.promu) t.append(el('small', 'muted', ` · ${d.protection} parties protégées`));
+    if (d.protection > 0 && d.promu) t.append(el('small', 'muted', `${d.protection} parties protégées : pas de descente`));
     b.append(t);
-    x.replaceChildren(b);
+    x.querySelector('.ligue-recap')?.remove();
+    x.prepend(b);
     if (!sansAnim) b.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 400, easing: 'ease-out' });
   }
 
@@ -5983,7 +6029,9 @@ var qrcode = function() {
     const regle = el('small', 'muted', `Parties classées : seulement « En ligne », avec des inconnus. 1er +${L.points.premier}, 2e +${L.points.deuxieme}, 3e +${L.points.troisieme}, dernier ${L.points.dernier}. Fin de saison : un titre et des pièces selon la division atteinte.`);
     const fermer = el('button', 'btn principal large', 'Fermer');
     fermer.onclick = fermerFenetre;
-    ouvrirFenetre([el('h2', null, 'Ligue'), z, regle, fermer], 'ligue');
+    const pass = el('button', 'btn large', 'Parcours de saison');
+    pass.onclick = ouvrirParcours;
+    ouvrirFenetre([el('h2', null, 'Ligue'), z, pass, regle, fermer], 'ligue');
     charger('amis');
   }
   // Accueil : l'onglet Ligue existe avec le serveur ; un point s'allume si une saison s'est terminée.
@@ -6063,6 +6111,101 @@ var qrcode = function() {
       }
     } catch (e) { liste.append(el('li', null, e.message)); }
   };
+
+  // ------------------------------------------------------------------ parcours de saison et collection (serveur)
+  // XP de saison en jouant avec des humains ; 30 paliers ; voie gratuite et voie Kopo+ (apparences seulement).
+  const OBJETS_SERVEUR = {};
+  async function chargerCatalogue() {
+    if (Object.keys(OBJETS_SERVEUR).length) return;
+    try { const b = await apiJoueur('/boutique'); for (const o of b.objets) { OBJETS_SERVEUR[o.id] = o; if (!R.OBJETS[o.id]) R.OBJETS[o.id] = { type: o.type, nom: o.nom, d: o.prix ? `${o.prix} pièces` : 'Parcours de saison' }; } } catch (e) {}
+  }
+  // Les apparences gagnées en ligne rejoignent la collection du téléphone (celle des missions).
+  async function synchroCollection() {
+    if (!MODE_SERVEUR || !compteLocal()) return;
+    try {
+      await chargerCatalogue();
+      const c = await apiJoueur('/collection');
+      const p = lireProfil(), col = R.collection(p);
+      let change = false;
+      for (const id of c.possedes) if (R.OBJETS[id] && !col.possedes.includes(id)) { col.possedes.push(id); change = true; }
+      if (change) { ecrireProfil(p); appliquerCollection(p); }
+    } catch (e) {}
+  }
+  function synchroEquiper(id) { if (MODE_SERVEUR && compteLocal()) apiJoueur('/collection/equiper', 'POST', { objet: id }).catch(() => {}); }
+  setTimeout(synchroCollection, 2500);
+
+  let dernierParcours = null;
+  window.addEventListener('kopo-parcours', (e) => {
+    dernierParcours = { recu: Date.now(), detail: e.detail };
+    const x = document.getElementById('recapExtra');
+    if (x) remplirRecapParcours(x);
+  });
+  function remplirRecapParcours(x) {
+    if (!dernierParcours || Date.now() - dernierParcours.recu > 60000) return;
+    const d = dernierParcours.detail;
+    x.querySelector('.parcours-recap')?.remove();
+    const z = el('div', 'parcours-recap');
+    const barre = el('div', 'barre-xp'), sp = el('span'); barre.append(sp);
+    z.append(el('b', null, `+${d.xp} XP`), el('span', null, d.nouveaux ? `Parcours de saison : palier ${d.palier} atteint !` : `Parcours de saison · palier ${d.palier}/${d.paliers}`), el('span'), barre);
+    x.append(z);
+    const dans = d.palier >= d.paliers ? 1 : (d.total % d.xpPalier) / d.xpPalier;
+    remplir(sp, Math.max(0, dans - d.xp / d.xpPalier), dans, 300);
+  }
+
+  function apercuRecompense(r) {
+    if (r.pieces) return pieceEl();
+    const o = R.OBJETS[r.objet] || { type: r.type };
+    if (o.type === 'dos') return el('span', 'mini-dos ' + r.objet);
+    const a = el('span', 'avatar ' + (o.type === 'cadre' ? 'av-laiton ' : '') + r.objet);
+    a.append(el('b', null, ($('pseudo').value.trim()[0] || '?').toUpperCase()));
+    return a;
+  }
+  async function ouvrirParcours() {
+    let P;
+    try { await chargerCatalogue(); P = await apiJoueur('/parcours'); } catch (e) { toast(e.message); return; }
+    const z = el('div', 'parcours');
+    const tete = el('div', 'parcours-tete');
+    const barre = el('div', 'barre-xp'), sp = el('span'); barre.append(sp);
+    const fini = P.palier >= P.paliersMax;
+    tete.append(el('div', 'num', String(P.palier)), barre, el('small', 'muted', fini ? 'Terminé !' : `${P.xp % P.xpPalier}/${P.xpPalier} XP`));
+    remplir(sp, 0, fini ? 1 : (P.xp % P.xpPalier) / P.xpPalier, 150);
+    z.append(el('small', 'muted', (P.saison ? P.saison.titre + ' · ' + resteSaison(P.saison.fin) : '') + ' · XP en jouant avec d\'autres joueurs (pas contre les robots).'), tete);
+    const voies = el('div', 'parcours-voies');
+    voies.append(el('span'), el('span', null, 'Gratuit'), el('span', null, P.kopoPlus ? 'Kopo+ ✓' : 'Kopo+'));
+    const liste = el('div', 'parcours-liste');
+    const recuperer = async (n, voie, bouton) => {
+      bouton.disabled = true;
+      try {
+        const r = await apiJoueur('/parcours/recuperer', 'POST', { palier: n, voie });
+        if (r.objet) { const q = lireProfil(); if (!R.OBJETS[r.objet.id]) R.OBJETS[r.objet.id] = { type: r.objet.type, nom: r.objet.nom, d: 'Parcours de saison' }; R.donnerObjet(q, r.objet.id); ecrireProfil(q); appliquerCollection(q); synchroEquiper(r.objet.id); toast(`Nouveau : ${r.objet.nom} (équipé)`); }
+        else toast(`+${r.pieces} pièces`);
+        ouvrirParcours();
+      } catch (e) { toast(e.message); bouton.disabled = false; }
+    };
+    const caseRec = (r, n, voie, atteint) => {
+      const c = el('div', 'case' + (voie === 'plus' ? ' plus' : '') + (r && r.recupere ? ' fait' : ''));
+      if (!r) return c;
+      c.append(apercuRecompense(r), r.pieces ? el('b', 'qte', String(r.pieces)) : el('span', null, r.nom));
+      if (r.recupere) c.append(el('small', 'muted', '✓'));
+      else if (voie === 'plus' && !P.kopoPlus) c.append(iconeCadenas());
+      else if (atteint) { const b = el('button', 'btn principal', 'Prendre'); b.onclick = () => recuperer(n, voie, b); c.append(b); }
+      return c;
+    };
+    let premierAPrendre = null;
+    for (const x of P.paliers) {
+      const l = el('div', 'palier' + (x.atteint ? ' atteint' : ''));
+      l.append(el('div', 'n', String(x.n)), caseRec(x.gratuit, x.n, 'gratuit', x.atteint), caseRec(x.plus, x.n, 'plus', x.atteint));
+      if (!premierAPrendre && (x.atteint ? !x.gratuit.recupere : true)) premierAPrendre = l;
+      liste.append(l);
+    }
+    z.append(voies, liste);
+    if (!P.kopoPlus) z.append(el('small', 'muted', 'Kopo+ (bientôt) : des apparences en plus sur le parcours. Jamais rien qui aide à gagner.'));
+    const fermer = el('button', 'btn principal large', 'Fermer');
+    fermer.onclick = fermerFenetre;
+    ouvrirFenetre([el('h2', null, 'Parcours de saison'), z, fermer], 'ligue');
+    if (premierAPrendre) setTimeout(() => premierAPrendre.scrollIntoView({ block: 'center' }), 50);
+  }
+  window.ouvrirParcours = ouvrirParcours;
 
   // Chat en partie : messages choisis dans le tableau de bord (/api/config), sinon la liste de départ.
   const messagesChat = () => (configServeur && Array.isArray(configServeur.messages) && configServeur.messages.length ? configServeur.messages : REACTIONS);
@@ -6412,7 +6555,8 @@ var qrcode = function() {
     p = p || lireProfil();
     const c = R.collection(p);
     $('avatar').className = 'avatar ' + c.equipes.avatar + (c.equipes.cadre ? ' ' + c.equipes.cadre : '');
-    document.body.classList.toggle('dos-kinshasa', c.equipes.dos === 'dos-kinshasa');
+    for (const k of [...document.body.classList]) if (k.startsWith('dos-')) document.body.classList.remove(k);
+    if (c.equipes.dos && c.equipes.dos !== 'dos-laiton') document.body.classList.add(c.equipes.dos);
     const n = R.niveauDe(p.xp || 0);
     $('niveauPastille').hidden = $('xpMini').hidden = !p.xp;
     $('niveauPastille').textContent = n.niveau;
@@ -6479,7 +6623,7 @@ var qrcode = function() {
       bt.setAttribute('aria-pressed', String(c.equipes[o.type] === id));
       bt.disabled = !a;
       bt.append(apercuObjet(id), el('span', null, o.nom), el('small', 'muted', a ? (o.type === 'avatar' ? 'Avatar' : o.type === 'dos' ? 'Dos de cartes' : 'Cadre') : o.d));
-      bt.onclick = () => { const q = lireProfil(); if (R.equiper(q, id)) { ecrireProfil(q); appliquerCollection(q); ouvrirMissions(); } };
+      bt.onclick = () => { const q = lireProfil(); if (R.equiper(q, id)) { ecrireProfil(q); appliquerCollection(q); synchroEquiper(id); ouvrirMissions(); } };
       col.append(bt);
     }
     z.append(col);
