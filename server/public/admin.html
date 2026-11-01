@@ -88,7 +88,7 @@ const $ = (s) => document.querySelector(s);
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const nb = (x) => (x ?? 0).toLocaleString('fr-FR');
 const date = (d) => d ? new Date(d).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : '—';
-const MOTIFS = { bienvenue: 'Bienvenue', bonus_jour: 'Bonus du jour', manche: 'Manches survécues', katapss: 'Katapss', victoire: 'Victoires', deuxieme: '2e places', remise_a_flot: 'Remise à flot', admin: 'Corrections admin', cadeau: 'Cadeaux', mise: 'Mises', pot: 'Pots', saison: 'Récompenses de saison' };
+const MOTIFS = { bienvenue: 'Bienvenue', bonus_jour: 'Bonus du jour', manche: 'Manches survécues', katapss: 'Katapss', victoire: 'Victoires', deuxieme: '2e places', remise_a_flot: 'Remise à flot', admin: 'Corrections admin', cadeau: 'Cadeaux', mise: 'Mises', pot: 'Pots', saison: 'Récompenses de saison', parcours: 'Parcours de saison', boutique: 'Boutique' };
 const DIV = { bois: 'Bois', bronze: 'Bronze', argent: 'Argent', or: 'Or', diamant: 'Diamant', legende: 'Légende' };
 let jeton = sessionStorage.getItem('kopo-admin');
 let page = 'direct', minuteur = null;
@@ -261,6 +261,10 @@ const afficher = {
         <div class="ligne"><select id="sType"><option value="avertissement">Avertir</option><option value="micro">Couper le micro</option><option value="suspension">Suspendre</option><option value="bannissement">Bannir</option><option value="levee">Lever les sanctions</option></select>
         <input id="sJours" type="number" min="1" value="3" style="width:80px" title="Jours de suspension"> <span class="muted">jours</span>
         <input id="sMotif" placeholder="Motif (obligatoire)" style="flex:1;min-width:200px"><button class="btn danger" id="btnSanction">Appliquer</button></div>
+        <h3>Kopo+ et apparences</h3>
+        <div class="ligne"><span>${c.kopo_plus_jusqu && new Date(c.kopo_plus_jusqu) > new Date() ? 'Kopo+ jusqu\'au ' + date(c.kopo_plus_jusqu) : 'Pas de Kopo+'}</span><input id="kpJours" type="number" min="0" max="366" value="30" style="width:80px"> <span class="muted">jours</span><button class="btn" id="btnKopoPlus">Offrir Kopo+ (0 = retirer)</button></div>
+        <div class="ligne"><input id="objOffert" placeholder="Identifiant, ex. dos-kinshasa" style="min-width:220px"><button class="btn" id="btnObjet">Offrir l'apparence</button></div>
+        <p class="muted">${f.parcours ? `Parcours : ${nb(f.parcours.xp)} XP, ${f.parcours.gratuits} paliers gratuits et ${f.parcours.plus} Kopo+ récupérés · ` : ''}${f.inventaire.length ? 'Possède : ' + f.inventaire.map((o) => esc(o.objet)).join(', ') : 'Aucune apparence gagnée ou achetée.'}</p>
         <h3>Corriger le solde</h3>
         <div class="ligne"><input id="pMontant" type="number" placeholder="+100 ou -50" style="width:130px"><input id="pMotif" placeholder="Motif (obligatoire)" style="flex:1;min-width:200px"><button class="btn" id="btnPieces">Corriger</button></div>
       </div>
@@ -280,6 +284,8 @@ const afficher = {
       if ((type === 'bannissement' || type === 'suspension') && !confirm(`Confirmer : ${type} de ${c.pseudo}#${c.numero} ?`)) return;
       try { await api(`/joueurs/${encodeURIComponent(id)}/sanction`, { methode: 'POST', corps: { type, motif: $('#sMotif').value, jours: Number($('#sJours').value) } }); message('Sanction appliquée.'); aller('fiche', id); } catch (e) { message(e.message); }
     };
+    $('#btnKopoPlus').onclick = async () => { try { await api(`/joueurs/${encodeURIComponent(id)}/kopo-plus`, { methode: 'POST', corps: { jours: Number($('#kpJours').value) } }); message('Kopo+ mis à jour.'); aller('fiche', id); } catch (e) { message(e.message); } };
+    $('#btnObjet').onclick = async () => { try { await api(`/joueurs/${encodeURIComponent(id)}/objet`, { methode: 'POST', corps: { objet: $('#objOffert').value.trim() } }); message('Apparence offerte.'); aller('fiche', id); } catch (e) { message(e.message); } };
     $('#btnPieces').onclick = async () => {
       try { await api(`/joueurs/${encodeURIComponent(id)}/pieces`, { methode: 'POST', corps: { montant: Number($('#pMontant').value), motif: $('#pMotif').value } }); message('Solde corrigé.'); aller('fiche', id); } catch (e) { message(e.message); }
     };
@@ -315,6 +321,7 @@ const afficher = {
       </div>
       <div class="carte"><h3 style="margin-top:0">Gains (tables gratuites)</h3>${champs('gains', { bienvenue: 'Cadeau de bienvenue', manche: 'Par manche survécue', katapss: 'Katapss', victoire: 'Victoire', deuxieme: '2e place' })}<button class="btn principal" data-enregistrer="gains">Enregistrer les gains</button>
         <h3>Bonus du jour</h3>${champs('bonusJour', { depart: 'Premier jour', pas: 'En plus chaque jour', plafond: 'Plafond' })}<button class="btn principal" data-enregistrer="bonusJour">Enregistrer le bonus</button>
+        <h3>Parcours de saison (XP)</h3>${champs('parcours', { xpPartie: 'Par partie entre joueurs', xpManche: 'Par manche survécue', xpVictoire: 'Victoire', xpPalier: 'XP par palier', paliers: 'Nombre de paliers (10 à 30)' })}<button class="btn principal" data-enregistrer="parcours">Enregistrer le parcours</button>
         <h3>Remise à flot</h3>${champs('remiseAFlot', { seuil: 'Si le solde passe sous', niveau: 'Remonter à' })}<button class="btn principal" data-enregistrer="remiseAFlot">Enregistrer</button></div>
       <div class="carte"><h3 style="margin-top:0">Tables à mise</h3>${champs('tables', { bronze: 'Bronze', argent: 'Argent', or: 'Or', diamant: 'Diamant' })}<button class="btn principal" data-enregistrer="tables">Enregistrer les mises</button>
         <h3>Partage du pot (en %, total 100)</h3>${champs('pot', { vainqueur: 'Vainqueur', deuxieme: '2e', troisieme: '3e', maison: 'Maison (pièces détruites)' })}<button class="btn principal" data-enregistrer="pot">Enregistrer le partage</button></div>

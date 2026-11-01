@@ -419,6 +419,57 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.strictEqual(am.json.liste[2].points, 0);
   });
 
+  console.log('Rivalités, notifications, invitations');
+  await test('face-à-face : une partie à 3 crée les 3 duels', async () => {
+    const js = [await invite('Fa1' + Date.now() % 1000), await invite('Fa2' + Date.now() % 1000), await invite('Fa3' + Date.now() % 1000)];
+    const fin = await jouerPartie(js);
+    const ordre = [fin.vainqueur, ...fin.elimines.slice().reverse()];
+    const r = await api('/api/rivaux', { jeton: js.find((j) => j.compte.id === ordre[0]).jeton });
+    assert.strictEqual(r.json.length, 2);
+    assert.ok(r.json.every((x) => x.moi === 1 && x.lui === 0), JSON.stringify(r.json));
+  });
+  await test('rivalité entre amis : « t\'a rattrapé », une seule par jour, et 1 – 0 ne compte pas', async () => {
+    const [x, y] = [await invite('Riv' + Date.now() % 1000), await invite('Ral' + Date.now() % 1000)];
+    await api('/api/amis', { methode: 'POST', jeton: x.jeton, corps: { cible: y.compte.pseudo + '#' + y.compte.numero } });
+    const S = srv.social;
+    assert.deepStrictEqual(await S.apresPartie([{ id: x.compte.id, place: 1 }, { id: y.compte.id, place: 2 }]), []);
+    const e = await S.apresPartie([{ id: y.compte.id, place: 1 }, { id: x.compte.id, place: 2 }]);
+    assert.deepStrictEqual(e, [{ a: x.compte.id, texte: `${y.compte.pseudo} t'a rattrapé : 1 – 1 !` }]);
+    assert.deepStrictEqual(await S.apresPartie([{ id: y.compte.id, place: 1 }, { id: x.compte.id, place: 2 }]), [], 'pas deux le même jour');
+    const n = await api('/api/notifications', { jeton: x.jeton });
+    assert.strictEqual(n.json.liste[0].type, 'rivalite');
+    assert.deepStrictEqual([n.json.liste[0].donnees.toi, n.json.liste[0].donnees.lui], [1, 1]);
+    // y a reçu « x t'a ajouté en ami ».
+    const ny = await api('/api/notifications', { jeton: y.jeton });
+    assert.strictEqual(ny.json.liste[0].type, 'ami');
+    assert.strictEqual(ny.json.nonLues, 1);
+    await api('/api/notifications/lues', { methode: 'POST', jeton: y.jeton, corps: {} });
+    assert.strictEqual((await api('/api/notifications', { jeton: y.jeton })).json.nonLues, 0);
+  });
+  await test('rivalité entre inconnus : à partir de 3 – 3 ; coupée dans le profil, plus rien', async () => {
+    const [x, y, z] = [await invite('Inc' + Date.now() % 1000), await invite('Inb' + Date.now() % 1000), await invite('Ind' + Date.now() % 1000)];
+    const [a, b] = x.compte.id < y.compte.id ? [x, y] : [y, x];
+    await srv.base.query('INSERT INTO face_a_face (a, b, victoires_a, victoires_b) VALUES ($1,$2,3,2)', [a.compte.id, b.compte.id]);
+    const e = await srv.social.apresPartie([{ id: b.compte.id, place: 1 }, { id: a.compte.id, place: 3, abandon: false }]);
+    assert.deepStrictEqual(e.map((v) => v.texte), [`${b.compte.pseudo} t'a rattrapé : 3 – 3 !`]);
+    // z coupe les notifications de rivalité.
+    const ch = await api('/api/moi', { methode: 'PATCH', jeton: z.jeton, corps: { notifs: { rivalite: false } } });
+    assert.strictEqual(ch.json.compte.notifs.rivalite, false);
+    await api('/api/amis', { methode: 'POST', jeton: x.jeton, corps: { cible: z.compte.pseudo + '#' + z.compte.numero } });
+    await srv.social.apresPartie([{ id: z.compte.id, place: 1 }, { id: x.compte.id, place: 2 }]);
+    assert.deepStrictEqual(await srv.social.apresPartie([{ id: x.compte.id, place: 1 }, { id: z.compte.id, place: 2 }]), []);
+  });
+  await test('inviter un ami dans sa salle : ami seulement, code valide, pas de rafale', async () => {
+    const [x, y, z] = [await invite('Hot' + Date.now() % 1000), await invite('Inv' + Date.now() % 1000), await invite('Aut' + Date.now() % 1000)];
+    await api('/api/amis', { methode: 'POST', jeton: x.jeton, corps: { cible: y.compte.pseudo + '#' + y.compte.numero } });
+    assert.strictEqual((await api('/api/amis/' + z.compte.id + '/inviter', { methode: 'POST', jeton: x.jeton, corps: { code: 'ABCD' } })).statut, 404);
+    assert.strictEqual((await api('/api/amis/' + y.compte.id + '/inviter', { methode: 'POST', jeton: x.jeton, corps: { code: 'ab' } })).statut, 400);
+    assert.strictEqual((await api('/api/amis/' + y.compte.id + '/inviter', { methode: 'POST', jeton: x.jeton, corps: { code: 'ABCD' } })).json.envoyee, true);
+    assert.strictEqual((await api('/api/amis/' + y.compte.id + '/inviter', { methode: 'POST', jeton: x.jeton, corps: { code: 'ABCD' } })).statut, 429);
+    const n = (await api('/api/notifications', { jeton: y.jeton })).json.liste.find((v) => v.type === 'invitation');
+    assert.deepStrictEqual([n.donnees.code, n.donnees.pseudo, n.texte], ['ABCD', x.compte.pseudo, `${x.compte.pseudo} t'invite à sa table`]);
+  });
+
   console.log('Tableau de bord admin');
   await test('code à deux facteurs (TOTP) : bon code accepté, mauvais refusé', () => {
     assert.ok(verifierTotp(TOTP, codeTotp(TOTP)));
@@ -539,6 +590,65 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     // b n'a pas encore classé de partie en saison 2 : absent du mondial, présent chez ses amis.
     const am = await api('/api/classement?type=amis', { jeton: b.jeton });
     assert.strictEqual(am.json.liste[0].id, d.compte.id);
+  });
+
+  console.log('Parcours de saison, collection, boutique');
+  await test('XP de saison : base, manches survécues, victoire ; une partie entre humains en donne', async () => {
+    assert.strictEqual(srv.parcours.xpPartie({ place: 1, manchesSurvecues: 3 }), 30 + 15 + 15);
+    assert.strictEqual(srv.parcours.xpPartie({ place: 4, manchesSurvecues: 1 }), 35);
+    assert.strictEqual(srv.parcours.xpPartie({ place: 2, abandon: true }), 0);
+    const js = [await invite('Xp1' + Date.now() % 1000), await invite('Xp2' + Date.now() % 1000)];
+    await jouerPartie(js);
+    const e = await api('/api/parcours', { jeton: js[0].jeton });
+    assert.ok(e.json.xp >= 30, JSON.stringify({ xp: e.json.xp }));
+    assert.strictEqual(e.json.paliers.length, 30);
+    assert.strictEqual(e.json.paliers[29].gratuit.objet, 'dos-fondateurs');
+    assert.strictEqual(e.json.kopoPlus, false);
+  });
+  const pj = await invite('Passe' + Date.now() % 1000);
+  await test('récupérer les paliers : pièces, objet, pas deux fois, pas avant de l\'avoir atteint, Kopo+ réservé', async () => {
+    const s = (await srv.ligue.saisonCourante()).numero;
+    await srv.base.query('INSERT INTO parcours (saison, compte_id, xp) VALUES ($1,$2,1050)', [s, pj.compte.id]);
+    const solde = (await srv.comptes.lire(pj.compte.id)).solde;
+    const r1 = await api('/api/parcours/recuperer', { methode: 'POST', jeton: pj.jeton, corps: { palier: 1 } });
+    assert.deepStrictEqual([r1.json.pieces, r1.json.solde], [60, solde + 60]);
+    const r3 = await api('/api/parcours/recuperer', { methode: 'POST', jeton: pj.jeton, corps: { palier: 3 } });
+    assert.strictEqual(r3.json.objet.id, 'av-lubumbashi');
+    assert.strictEqual((await api('/api/parcours/recuperer', { methode: 'POST', jeton: pj.jeton, corps: { palier: 3 } })).statut, 409);
+    assert.strictEqual((await api('/api/parcours/recuperer', { methode: 'POST', jeton: pj.jeton, corps: { palier: 11 } })).statut, 400);
+    assert.strictEqual((await api('/api/parcours/recuperer', { methode: 'POST', jeton: pj.jeton, corps: { palier: 1, voie: 'plus' } })).statut, 403);
+    await api(`/admin/api/joueurs/${pj.compte.id}/kopo-plus`, { methode: 'POST', jeton: adminJeton, corps: { jours: 30 } });
+    assert.strictEqual((await api('/api/moi', { jeton: pj.jeton })).json.compte.kopoPlus, true);
+    const rp = await api('/api/parcours/recuperer', { methode: 'POST', jeton: pj.jeton, corps: { palier: 1, voie: 'plus' } });
+    assert.strictEqual(rp.json.objet.id, 'av-fondateur');
+    const e = await api('/api/parcours', { jeton: pj.jeton });
+    assert.deepStrictEqual([e.json.palier, e.json.paliers[0].gratuit.recupere, e.json.paliers[0].plus.recupere, e.json.paliers[1].gratuit.recupere], [10, true, true, false]);
+  });
+  await test('collection : équiper ce qu\'on possède, retirer un cadre', async () => {
+    const e = await api('/api/collection/equiper', { methode: 'POST', jeton: pj.jeton, corps: { objet: 'av-lubumbashi' } });
+    assert.strictEqual(e.json.equipes.avatar, 'av-lubumbashi');
+    assert.ok(e.json.possedes.includes('av-fondateur') && e.json.possedes.includes('av-laiton'));
+    assert.strictEqual((await api('/api/collection/equiper', { methode: 'POST', jeton: pj.jeton, corps: { objet: 'av-goma' } })).statut, 403);
+    await srv.parcours.donner(pj.compte.id, 'cadre-dakar', 'admin');
+    assert.strictEqual((await api('/api/collection/equiper', { methode: 'POST', jeton: pj.jeton, corps: { objet: 'cadre-dakar' } })).json.equipes.cadre, 'cadre-dakar');
+    assert.strictEqual((await api('/api/collection/equiper', { methode: 'POST', jeton: pj.jeton, corps: { objet: 'cadre-dakar' } })).json.equipes.cadre, null);
+    assert.strictEqual((await api('/api/collection', { jeton: pj.jeton })).json.equipes.avatar, 'av-lubumbashi');
+  });
+  await test('boutique : prix affiché, pas deux fois, objets de saison pas en vente, solde insuffisant refusé', async () => {
+    await srv.comptes.crediter(pj.compte.id, 1000, 'admin', 'test boutique', true);
+    const b = await api('/api/boutique', { jeton: pj.jeton });
+    assert.ok(b.json.objets.find((o) => o.id === 'av-nuit').prix === 500);
+    const avant = b.json.solde;
+    const a = await api('/api/boutique/acheter', { methode: 'POST', jeton: pj.jeton, corps: { objet: 'av-nuit' } });
+    assert.strictEqual(a.json.solde, avant - 500);
+    assert.strictEqual((await api('/api/boutique/acheter', { methode: 'POST', jeton: pj.jeton, corps: { objet: 'av-nuit' } })).statut, 409);
+    assert.strictEqual((await api('/api/boutique/acheter', { methode: 'POST', jeton: pj.jeton, corps: { objet: 'dos-fondateurs' } })).statut, 400);
+    const pauvre = await invite('Pauvre' + Date.now() % 1000);
+    const r = await api('/api/boutique/acheter', { methode: 'POST', jeton: pauvre.jeton, corps: { objet: 'dos-kinshasa' } });
+    assert.strictEqual(r.statut, 400);
+    assert.match(r.json.erreur, /insuffisant/);
+    const reg = (await srv.base.query("SELECT montant, ref FROM registre_pieces WHERE compte_id = $1 AND motif = 'boutique'", [pj.compte.id])).rows;
+    assert.deepStrictEqual(reg, [{ montant: -500, ref: 'av-nuit' }]);
   });
 
   await test('trop d\'essais de connexion admin : bloqué', async () => {
