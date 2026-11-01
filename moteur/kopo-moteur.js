@@ -64,6 +64,8 @@
       qualifies: [], // { joueur, raison }
       elimine: null,
       journal: [],
+      // Ce que toute la table a vu : cartes sorties du jeu, et cartes ramassées (on sait qui les a).
+      vu: { sorties: [], ramassees: {} },
     };
     for (const j of sieges) {
       m.mains[j] = mains[j].slice();
@@ -140,6 +142,46 @@
     nouvelleOuverture(m, forte.joueur, m.couleurTour);
   }
 
+  // Mémoire publique de la manche : uniquement ce qu'un joueur attentif a pu voir.
+  function memoriser(m, action) {
+    if (!m.vu) m.vu = { sorties: [], ramassees: {} };
+    const v = m.vu, j = action.joueur;
+    const oublier = (c) => { if (v.ramassees[j]) v.ramassees[j] = v.ramassees[j].filter((x) => x !== c); };
+    const sortir = (c) => { oublier(c); if (!v.sorties.includes(c)) v.sorties.push(c); };
+    if (action.type === 'katapss' || action.type === 'toutPoser') m.mains[j].forEach(sortir);
+    else if (action.type === 'jouer') sortir(action.carte);
+    else if (action.type === 'ramasser') {
+      const forte = plusForte(m);
+      for (const p of m.table) for (const c of p.cartes) if (c !== forte.carte && !v.sorties.includes(c)) v.sorties.push(c);
+      v.sorties = v.sorties.filter((c) => c !== forte.carte);
+      (v.ramassees[j] = v.ramassees[j] || []).push(forte.carte);
+    }
+  }
+
+  // Ce qu'un joueur a le droit de connaître : sa main, la table, le nombre de cartes de chacun,
+  // et ce qui a été montré pendant la manche. Jamais les mains des autres.
+  function vuePublique(m, joueur) {
+    const vu = m.vu || { sorties: [], ramassees: {} };
+    const ramassees = {};
+    for (const [k, l] of Object.entries(vu.ramassees)) if (k !== joueur && m.enJeu.includes(k) && l.length) ramassees[k] = l.slice();
+    return {
+      moi: joueur,
+      main: (m.mains[joueur] || []).slice(),
+      nbCartes: Object.fromEntries(m.sieges.map((k) => [k, m.mains[k].length])),
+      sieges: m.sieges.slice(),
+      enJeu: m.enJeu.slice(),
+      table: m.table.map((p) => ({ joueur: p.joueur, cartes: p.cartes.slice(), compte: p.compte })),
+      couleurTour: m.couleurTour,
+      couleurInterdite: m.couleurInterdite,
+      phase: m.phase,
+      joueurCourant: m.joueurCourant,
+      meneur: m.meneur,
+      attente: m.attente.slice(),
+      sorties: vu.sorties.slice(),
+      ramassees,
+    };
+  }
+
   // Actions possibles pour un joueur, dans l'état actuel.
   function actionsPossibles(m, joueur) {
     const actions = [];
@@ -173,6 +215,7 @@
     }
     const j = action.joueur;
     const main = m.mains[j];
+    memoriser(m, action);
 
     if (action.type === 'katapss') {
       noter(m, `${j} annonce KATAPSS ! (${main.map(afficher).join(' ')})`);
@@ -297,7 +340,7 @@
   const Kopo = {
     COULEURS, NOMS_COULEURS, SYMBOLES,
     valeur, couleur, afficher, nouveauPaquet, hasard, melanger,
-    nouvelleManche, actionsPossibles, jouer, jouerPartie,
+    nouvelleManche, actionsPossibles, jouer, jouerPartie, vuePublique,
     strategieSimple, strategieHasard,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = Kopo;

@@ -352,6 +352,8 @@ body.accueil .app { max-width: none; min-height: 100vh; min-height: 100dvh; padd
 .choix-salles .btn.attente small { color: var(--good); }
 .en-ligne-fenetre { color: var(--good) !important; font-weight: 600; }
 .point-en-ligne { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--good); margin: 0 4px 1px 2px; box-shadow: 0 0 6px var(--good); }
+.choix-niveau-robots { width: 100%; }
+.choix-niveau-robots button { flex: 1; padding: 10px 6px; font-size: 15px; }
 .choix-robots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .choix-robots .btn { font-size: 20px; padding: 12px 0; }
 ul.regles { margin: 0; padding-left: 18px; display: grid; gap: 8px; color: var(--ink); }
@@ -798,6 +800,13 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
     <div class="voile" id="voileRobots" hidden>
       <div class="fenetre">
         <h2>Contre les robots</h2>
+        <p>Quel niveau ?</p>
+        <div class="choix choix-niveau-robots" id="niveauRobots" role="group" aria-label="Niveau des robots">
+          <button type="button" data-v="faciles">Facile</button>
+          <button type="button" data-v="normaux">Normal</button>
+          <button type="button" data-v="forts">Fort</button>
+        </div>
+        <small class="muted" id="niveauRobotsAide"></small>
         <p>Combien de robots autour de la table ?</p>
         <div class="choix-robots" id="choixRobots"></div>
         <button class="btn principal large" id="btnGuidee" hidden>Première partie guidée (2 robots gentils)</button>
@@ -3610,9 +3619,20 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   $('btnFermerSalles').onclick = () => ($('voileSalles').hidden = true);
   $('btnModeRejoindre').onclick = () => { $('voileRejoindre').hidden = false; setTimeout(() => $('codeRejoindre').focus(), 50); };
   $('btnFermerRejoindre').onclick = () => ($('voileRejoindre').hidden = true);
+  // Niveau des robots : choisi ici (gardé sur le téléphone), et renforcé peu à peu avec le niveau du joueur.
+  const AIDES_NIVEAU_ROBOTS = { faciles: 'Ils font des erreurs.', normaux: 'Ils jouent simplement.', forts: 'Ils comptent les cartes déjà sorties, comme un bon joueur. Ils ne voient jamais ta main.' };
+  const niveauRobots = () => (S.NIVEAUX_ROBOTS.includes(stock.lire('kopo-niveau-robots')) ? stock.lire('kopo-niveau-robots') : 'normaux');
+  const monNiveau = () => R.niveauDe(lireProfil().xp || 0).niveau;
+  function majNiveauRobots() {
+    const n = niveauRobots();
+    $('niveauRobots').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === n)));
+    $('niveauRobotsAide').textContent = AIDES_NIVEAU_ROBOTS[n] + ' Ils deviennent un peu plus forts à chaque niveau que tu gagnes (tu es niveau ' + monNiveau() + ').';
+  }
+  $('niveauRobots').querySelectorAll('button').forEach((b) => (b.onclick = () => { stock.ecrire('kopo-niveau-robots', b.dataset.v); majNiveauRobots(); }));
   $('btnModeRobots').onclick = () => {
     if (!lirePseudo()) return;
     $('btnGuidee').hidden = !!lireProfil().premierePartie;
+    majNiveauRobots();
     $('voileRobots').hidden = false;
   };
   $('btnFermerRobots').onclick = () => ($('voileRobots').hidden = true);
@@ -3625,6 +3645,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       $('voileRobots').hidden = true;
       // Partie avec des robots : on crée la salle, on ajoute les robots et on lance tout de suite.
       demarrerHote(nouveauCode(), p, false);
+      envoyer({ type: 'reglages', robots: niveauRobots(), niveau: monNiveau() });
       for (let i = 0; i < n; i++) envoyer({ type: 'ajouterRobot' });
       envoyer({ type: 'lancer' });
     };

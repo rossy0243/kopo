@@ -615,6 +615,92 @@ test('Une réaction est relayée à toute la table, une par seconde au plus', ()
   assert.ok(!S.recevoir(s, 'intrus', { type: 'reaction', emoji: '👍' }).ok);
 });
 
+console.log('\nNiveaux des robots');
+test("Niveau des robots : facile, normal ou fort, avec le niveau du joueur, seulement en partie privée", () => {
+  const s = salleAvec(1);
+  for (const n of ['faciles', 'normaux', 'forts']) assert.ok(S.recevoir(s, 'p1', { type: 'reglages', robots: n, niveau: 7 }).ok);
+  assert.strictEqual(s.robots, 'forts');
+  assert.strictEqual(s.niveauJoueur, 7);
+  assert.strictEqual(s.delai, 5); // le chrono ne change pas
+  assert.strictEqual(S.recevoir(s, 'p1', { type: 'reglages', robots: 'forts', niveau: 0 }).ok, false);
+  assert.strictEqual(S.recevoir(s, 'p1', { type: 'reglages', robots: 'forts', niveau: 'x' }).ok, false);
+  const p = S.creerSalle('PUBL'); S.rendrePublique(p, 2); S.recevoir(p, 'a', { type: 'rejoindre', nom: 'A' });
+  assert.strictEqual(S.recevoir(p, 'a', { type: 'reglages', robots: 'forts' }).ok, false);
+});
+test('La force des robots monte avec le niveau du joueur, sans que les niveaux se chevauchent', () => {
+  const f = (robots, niveauJoueur) => S.forceRobots({ robots, niveauJoueur });
+  assert.strictEqual(f('normaux', 1), 1); // comme avant : robot normal
+  assert.strictEqual(f('gentils', 30), 0);
+  for (const r of ['faciles', 'normaux', 'forts']) {
+    assert.ok(f(r, 10) > f(r, 1), r);
+    assert.ok(f(r, 20) > f(r, 10), r);
+    assert.strictEqual(f(r, 50), f(r, 20), r); // plafond au niveau 20
+  }
+  assert.ok(f('faciles', 50) < f('normaux', 1));
+  assert.ok(f('normaux', 50) < f('forts', 1));
+});
+test('Le robot fort ne voit pas les mains des autres : même décision quelles que soient leurs cartes', () => {
+  for (let k = 0; k < 300; k++) {
+    const rng = K.hasard(k);
+    const paquet = K.melanger(K.nouveauPaquet(), rng);
+    const sieges = ['a', 'b', 'c', 'd'];
+    const mains = {}; sieges.forEach((j, i) => (mains[j] = paquet.slice(i * 4, i * 4 + 4)));
+    const m = K.nouvelleManche(sieges, mains, 'a');
+    // Quelques coups au hasard pour arriver au milieu d'une manche.
+    for (let n = Math.floor(rng() * 8); n > 0 && m.phase !== 'terminee'; n--) {
+      const acts = K.actionsPossibles(m, m.joueurCourant).filter((x) => x.type !== 'katapss');
+      K.jouer(m, acts[Math.floor(rng() * acts.length)]);
+    }
+    if (m.phase === 'terminee') continue;
+    const j = m.joueurCourant;
+    const v = K.vuePublique(m, j);
+    assert.ok(!('mains' in v));
+    const avant = S.robotFort(v, K.actionsPossibles(m, j));
+    // On échange les cartes cachées des autres avec celles qui ne sont pas distribuées : rien de public ne change.
+    const connues = new Set(v.main.concat(v.sorties, ...Object.values(v.ramassees)));
+    const cachees = K.nouveauPaquet().filter((c) => !connues.has(c));
+    const melangees = K.melanger(cachees, rng);
+    const m2 = JSON.parse(JSON.stringify(m));
+    for (const autre of m2.enJeu) if (autre !== j) m2.mains[autre] = m2.mains[autre].map((c) => (cachees.includes(c) ? melangees[cachees.indexOf(c)] : c));
+    const apres = S.robotFort(K.vuePublique(m2, j), K.actionsPossibles(m2, j));
+    assert.deepStrictEqual(apres, avant);
+  }
+});
+test('Le robot fort gagne nettement plus souvent que le robot normal (3 000 parties à 5)', () => {
+  const vict = (cerveau) => {
+    const rng = K.hasard(42);
+    let v = 0;
+    for (let k = 0; k < 3000; k++) {
+      const r = K.jouerPartie(['x', 'b', 'c', 'd', 'e'], (m, j, a) => (j === 'x' ? cerveau : S.robotNormal)(K.vuePublique(m, j), a, rng), rng);
+      if (r.vainqueur === 'x') v++;
+    }
+    return v / 3000;
+  };
+  const normal = vict(S.robotNormal), fort = vict(S.robotFort);
+  assert.ok(normal < 0.23, 'normal ' + normal);
+  assert.ok(fort > 0.26, 'fort ' + fort);
+});
+test('Robots faciles et forts : partie complète sans coup interdit', () => {
+  for (const genre of ['faciles', 'forts']) for (let k = 0; k < 30; k++) {
+    const s = salleAvec(1, 500 + k);
+    let t = 1000; s.horloge = () => t;
+    S.recevoir(s, 'p1', { type: 'reglages', robots: genre, niveau: 1 + k, delai: 0 });
+    for (let i = 0; i < 4; i++) S.recevoir(s, 'p1', { type: 'ajouterRobot' });
+    S.recevoir(s, 'p1', { type: 'lancer' });
+    for (let i = 0; i < 20000 && s.etat !== 'finPartie'; i++) {
+      if (s.etat === 'finManche') { S.recevoir(s, 'p1', { type: 'mancheSuivante' }); continue; }
+      t += 2000;
+      const v = S.vue(s, 'p1');
+      if (v.manche && v.manche.joueurCourant === 'p1' && v.manche.actions.length) {
+        const a = v.manche.actions.find((x) => x.type !== 'katapss') || v.manche.actions[0];
+        S.recevoir(s, 'p1', { type: 'action', action: a });
+      }
+      S.tic(s);
+    }
+    assert.strictEqual(s.etat, 'finPartie', genre + ' ' + k);
+  }
+});
+
 console.log('\nMélange');
 test('Distribution équitable : chaque valeur sort aussi souvent (20 000 donnes)', () => {
   const compte = {};
