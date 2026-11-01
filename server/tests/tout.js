@@ -174,6 +174,41 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     await srv.base.query("UPDATE comptes SET dernier_bonus = current_date - 3 WHERE id = $1", [r.compte.id]);
     await srv.base.query("UPDATE comptes SET dernier_bonus = current_date - 3 WHERE id = $1", [r.compte.id]);
   });
+  await test('bonus du jour : le joker de série sauve un jour raté par semaine', async () => {
+    const r = await invite('Joker' + Date.now() % 1000);
+    await srv.base.query("UPDATE comptes SET serie_bonus = 4, dernier_bonus = current_date - 2, joker_semaine = NULL WHERE id = $1", [r.compte.id]);
+    const b = (await api('/api/bonus-du-jour', { methode: 'POST', jeton: r.jeton })).json;
+    assert.deepStrictEqual([b.serie, b.joker, b.montant, b.prochain], [5, true, 90, 100]);
+    // Une deuxième fois la même semaine : la série repart.
+    await srv.base.query("UPDATE comptes SET dernier_bonus = current_date - 2 WHERE id = $1", [r.compte.id]);
+    const b2 = (await api('/api/bonus-du-jour', { methode: 'POST', jeton: r.jeton })).json;
+    assert.deepStrictEqual([b2.serie, b2.joker], [1, false]);
+  });
+  await test('récompenses du téléphone (missions, défi, bienvenue) : plafonnées, sans doublon', async () => {
+    const r = await invite('Mission' + Date.now() % 1000);
+    const rec = (corps) => api('/api/recompense', { methode: 'POST', jeton: r.jeton, corps });
+    const solde = (await srv.comptes.lire(r.compte.id)).solde;
+    assert.strictEqual((await rec({ motif: 'mission', montant: 60, ref: 'katapss:2026-11-01' })).json.solde, solde + 60);
+    assert.strictEqual((await rec({ motif: 'mission', montant: 60, ref: 'katapss:2026-11-01' })).json.ok, false, 'doublon');
+    assert.strictEqual((await rec({ motif: 'mission', montant: 5000, ref: 'x' })).statut, 400);
+    assert.strictEqual((await rec({ motif: 'jackpot', montant: 10 })).statut, 400);
+    assert.strictEqual((await rec({ motif: 'defi', montant: 300, ref: 'w45' })).json.ok, true);
+    assert.strictEqual((await rec({ motif: 'defi', montant: 300, ref: 'w45b' })).json.ok, false, 'un défi par semaine');
+    assert.strictEqual((await rec({ motif: 'bienvenue', montant: 100, ref: 'j1' })).json.ok, true);
+    assert.strictEqual((await rec({ motif: 'bienvenue', montant: 150, ref: 'j2' })).json.ok, false, 'un cadeau par jour');
+  });
+  await test('cadeau de fondateur : le dos « Les Fondateurs », une seule fois, coupé par l\'admin', async () => {
+    const r = await invite('Fondateur' + Date.now() % 1000);
+    const c1 = (await api('/api/cadeau-fondateur', { methode: 'POST', jeton: r.jeton })).json;
+    assert.deepStrictEqual([c1.ok, c1.nouveau, c1.objet], [true, true, 'dos-fondateurs']);
+    assert.strictEqual((await api('/api/cadeau-fondateur', { methode: 'POST', jeton: r.jeton })).json.nouveau, false);
+    assert.ok((await api('/api/collection', { jeton: r.jeton })).json.possedes.includes('dos-fondateurs'));
+    await srv.reglages.ecrire('cadeauFondateur', { actif: false });
+    const autre = await invite('Tardif' + Date.now() % 1000);
+    assert.strictEqual((await api('/api/cadeau-fondateur', { methode: 'POST', jeton: autre.jeton })).json.ok, false);
+    await srv.reglages.ecrire('cadeauFondateur', { actif: true });
+  });
+
   await test('le registre et le solde concordent, le solde ne passe jamais sous 0', async () => {
     const r = await invite('Registre');
     await assert.rejects(srv.comptes.crediter(r.compte.id, -501, 'mise'));
@@ -602,7 +637,7 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     const e = await api('/api/parcours', { jeton: js[0].jeton });
     assert.ok(e.json.xp >= 30, JSON.stringify({ xp: e.json.xp }));
     assert.strictEqual(e.json.paliers.length, 30);
-    assert.strictEqual(e.json.paliers[29].gratuit.objet, 'dos-fondateurs');
+    assert.strictEqual(e.json.paliers[29].gratuit.objet, 'dos-goma');
     assert.strictEqual(e.json.kopoPlus, false);
   });
   const pj = await invite('Passe' + Date.now() % 1000);

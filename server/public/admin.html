@@ -88,7 +88,7 @@ const $ = (s) => document.querySelector(s);
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const nb = (x) => (x ?? 0).toLocaleString('fr-FR');
 const date = (d) => d ? new Date(d).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : '—';
-const MOTIFS = { bienvenue: 'Bienvenue', bonus_jour: 'Bonus du jour', manche: 'Manches survécues', katapss: 'Katapss', victoire: 'Victoires', deuxieme: '2e places', remise_a_flot: 'Remise à flot', admin: 'Corrections admin', cadeau: 'Cadeaux', mise: 'Mises', pot: 'Pots', saison: 'Récompenses de saison', parcours: 'Parcours de saison', boutique: 'Boutique' };
+const MOTIFS = { bienvenue: 'Bienvenue', bonus_jour: 'Bonus du jour', manche: 'Manches survécues', katapss: 'Katapss', victoire: 'Victoires', deuxieme: '2e places', remise_a_flot: 'Remise à flot', admin: 'Corrections admin', cadeau: 'Cadeaux', mise: 'Mises', pot: 'Pots', saison: 'Récompenses de saison', parcours: 'Parcours de saison', boutique: 'Boutique', mission: 'Missions du jour', defi: 'Défis de la semaine', bienvenue7: 'Bienvenue 7 jours' };
 const DIV = { bois: 'Bois', bronze: 'Bronze', argent: 'Argent', or: 'Or', diamant: 'Diamant', legende: 'Légende' };
 let jeton = sessionStorage.getItem('kopo-admin');
 let page = 'direct', minuteur = null;
@@ -316,6 +316,8 @@ const afficher = {
         <div class="ligne"><input id="annonce" value="${esc(r.annonce.texte)}" placeholder="Ex. Tournoi samedi à 20 h !" style="flex:1;min-width:260px"><label><input type="checkbox" id="annonceActive" ${r.annonce.active ? 'checked' : ''}> affichée</label><button class="btn principal" id="btnAnnonce">Enregistrer</button></div>
         <h3>Maintenance</h3>
         <div class="ligne"><input id="maint" value="${esc(r.maintenance.message)}" style="flex:1;min-width:260px"><label><input type="checkbox" id="maintActive" ${r.maintenance.active ? 'checked' : ''}> <span class="ko">jeu fermé</span></label><button class="btn" id="btnMaint">Enregistrer</button></div>
+        <h3>Cadeau de fondateur</h3>
+        <div class="ligne"><label><input type="checkbox" id="fondateurActif" ${r.cadeauFondateur && r.cadeauFondateur.active !== false && r.cadeauFondateur.actif ? 'checked' : ''}> distribuer le dos « Les Fondateurs » aux joueurs qui avaient des pièces d'essai</label><button class="btn" id="btnFondateur">Enregistrer</button></div>
         <h3>Version minimale de l'application</h3>
         <div class="ligne"><input id="version" value="${esc(r.versionMin)}" style="width:110px"><button class="btn" id="btnVersion">Enregistrer</button><span class="muted">Les versions plus anciennes devront se mettre à jour.</span></div>
       </div>
@@ -340,6 +342,7 @@ const afficher = {
     $('#btnAnnonce').onclick = () => ecrire('annonce', { texte: $('#annonce').value, active: $('#annonceActive').checked });
     $('#btnMaint').onclick = () => { if (!$('#maintActive').checked || confirm('Fermer le jeu pour maintenance ?')) ecrire('maintenance', { message: $('#maint').value, active: $('#maintActive').checked }); };
     $('#btnMessages').onclick = () => ecrire('messagesRapides', $('#messagesRapides').value.split('\n'));
+    $('#btnFondateur').onclick = () => ecrire('cadeauFondateur', { actif: $('#fondateurActif').checked });
     $('#btnVersion').onclick = () => ecrire('versionMin', $('#version').value.trim());
     $('#btnCadeau').onclick = async () => {
       const montant = Number($('#cadeauMontant').value);

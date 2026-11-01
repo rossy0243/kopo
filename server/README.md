@@ -9,7 +9,7 @@ La logique de jeu n'est pas dupliquée : le serveur utilise `src/kopo-salle.js` 
 cd server
 npm install
 npm start              # sans DATABASE_URL : base Postgres en mémoire (rien n'est gardé)
-npm test               # 49 tests
+npm test               # 52 tests
 npm run charge -- 1500 30   # test de charge : 1 500 joueurs simulés pendant 30 s
 ```
 Tableau de bord en local : http://localhost:2567/admin (définir `ADMIN_MOT_DE_PASSE` et `ADMIN_TOTP`).
@@ -41,7 +41,8 @@ Les tables sont créées toutes seules au premier démarrage (`src/schema.sql`).
 | `POST /api/invite` | Jouer sans compte : renvoie un jeton et le compte (500 pièces) |
 | `POST /api/connexion` | Connexion Google/téléphone (jeton Supabase), rattache le compte invité |
 | `GET/PATCH/DELETE /api/moi` | Profil, changer pseudo/avatar, supprimer son compte |
-| `POST /api/bonus-du-jour`, `POST /api/remise-a-flot`, `GET /api/pieces` | Pièces |
+| `POST /api/bonus-du-jour`, `POST /api/remise-a-flot`, `GET /api/pieces` | Pièces (bonus du jour avec joker de série hebdomadaire) |
+| `POST /api/recompense`, `POST /api/cadeau-fondateur` | Pièces des missions, du défi et de la bienvenue gagnées sur le téléphone (plafonnées, sans doublon) ; dos « Les Fondateurs » (tant que la case est cochée dans Pilotage) |
 | `POST /api/signaler`, `GET/POST/DELETE /api/bloques`, `GET/POST/DELETE /api/amis` | Entre joueurs |
 | `GET /api/en-ligne` | Joueurs connectés et salles publiques ouvertes (`classee` : la salle compte pour la ligue) |
 | `GET /api/rivaux` | Mes face-à-face (qui finit devant l'autre dans les parties jouées ensemble) |

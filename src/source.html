@@ -640,11 +640,13 @@ body.dos-lubumbashi { --dos-motif: repeating-linear-gradient(45deg, #b87333 0 5p
 body.dos-abidjan { --dos-motif: linear-gradient(90deg, #f77f00 0 33%, #fff 33% 66%, #009e60 66%); --dos-motif-petit: linear-gradient(90deg, #f77f00 0 33%, #fff 33% 66%, #009e60 66%); }
 body.dos-dakar { --dos-motif: linear-gradient(90deg, #00853f 0 33%, #fdef42 33% 66%, #e31b23 66%); --dos-motif-petit: linear-gradient(90deg, #00853f 0 33%, #fdef42 33% 66%, #e31b23 66%); }
 body.dos-douala { --dos-motif: linear-gradient(90deg, #007a5e 0 33%, #ce1126 33% 66%, #fcd116 66%); --dos-motif-petit: linear-gradient(90deg, #007a5e 0 33%, #ce1126 33% 66%, #fcd116 66%); }
+body.dos-goma { --dos-motif: linear-gradient(160deg, transparent 55%, #3a3a3a 55% 62%, transparent 62%), radial-gradient(circle at 70% 25%, #e0564c 0 14%, #f39a3c 15% 22%, transparent 23%), #1f4d3a; --dos-motif-petit: radial-gradient(circle at 70% 25%, #e0564c 0 20%, transparent 21%), #1f4d3a; }
 body.dos-fondateurs { --dos-motif: radial-gradient(circle, #e2b04a 18%, transparent 19%) 0 0 / 12px 12px, #1d1606; --dos-motif-petit: radial-gradient(circle, #e2b04a 25%, transparent 26%) 0 0 / 6px 6px, #1d1606; }
 .mini-dos.dos-lubumbashi { background: repeating-linear-gradient(45deg, #b87333 0 4px, #5a2e0e 4px 8px) !important; }
 .mini-dos.dos-abidjan { background: linear-gradient(90deg, #f77f00 0 33%, #fff 33% 66%, #009e60 66%) !important; }
 .mini-dos.dos-dakar { background: linear-gradient(90deg, #00853f 0 33%, #fdef42 33% 66%, #e31b23 66%) !important; }
 .mini-dos.dos-douala { background: linear-gradient(90deg, #007a5e 0 33%, #ce1126 33% 66%, #fcd116 66%) !important; }
+.mini-dos.dos-goma { background: radial-gradient(circle at 70% 25%, #e0564c 0 14%, #f39a3c 15% 22%, transparent 23%), #1f4d3a !important; }
 .mini-dos.dos-fondateurs { background: radial-gradient(circle, #e2b04a 18%, transparent 19%) 0 0 / 8px 8px, #1d1606 !important; }
 .mini-dos.dos-kinshasa { background: linear-gradient(135deg, transparent 38%, #f7d038 38% 44%, #ce1021 44% 56%, #f7d038 56% 62%, transparent 62%), #3b8fd6 !important; }
 .mini-dos { display: inline-block; width: 26px; height: 38px; border-radius: 4px; border: 2px solid #f3e3bd; background: repeating-linear-gradient(45deg, var(--brass) 0 4px, #9c7524 4px 8px); }
@@ -1213,7 +1215,7 @@ body.dos-fondateurs { --dos-motif: radial-gradient(circle, #e2b04a 18%, transpar
     };
     room.onMessage('vue', (v) => { cacherBandeau(); memoriser(v.code); afficher(v); });
     room.onMessage('erreur', (t) => toast(t));
-    room.onMessage('solde', () => {});
+    room.onMessage('solde', (d) => soldeServeur(d && d.solde));
     room.onMessage('classee', (d) => window.dispatchEvent(new CustomEvent('kopo-classee', { detail: d })));
     room.onMessage('ligue', (d) => window.dispatchEvent(new CustomEvent('kopo-ligue', { detail: d })));
     room.onMessage('parcours', (d) => window.dispatchEvent(new CustomEvent('kopo-parcours', { detail: d })));
@@ -1423,6 +1425,7 @@ body.dos-fondateurs { --dos-motif: radial-gradient(circle, #e2b04a 18%, transpar
     afficherEnLigne();
     const h = location.hash.slice(1).toUpperCase();
     majAvatar(); majSolde(); appliquerCollection();
+    assurerCompte();
     if (montrerBienvenue()) return;
     if (/^[A-Z]{4}$/.test(h)) { $('codeRejoindre').value = h; $('voileRejoindre').hidden = false; }
     else setTimeout(() => { if ($('ecranAccueil').hidden || !$('voile').hidden) return; if (!bonusDuJour()) suiteAccueil(); }, 1600);
@@ -2114,7 +2117,14 @@ body.dos-fondateurs { --dos-motif: radial-gradient(circle, #e2b04a 18%, transpar
         const p = lireProfil();
         const e = R.bilanPartie(v, suivi);
         suivi.recap = R.enregistrerPartie(p, e, jourLocal());
-        if (suivi.recap) { suivi.recap.bilan = e; ecrireProfil(p); }
+        if (suivi.recap) {
+          suivi.recap.bilan = e; ecrireProfil(p);
+          // En ligne, les pièces des missions et du défi sont créditées par le serveur (plafonnées, sans doublon).
+          const jour = jourLocal();
+          for (const m of suivi.recap.missions || []) if (m.finie && m.avant < m.cible) crediterEnLigne('mission', m.pieces, m.texte.slice(0, 60) + ':' + jour);
+          const d = suivi.recap.defi;
+          if (d && d.finie && d.avant < d.cible) crediterEnLigne('defi', d.pieces, d.texte.slice(0, 60) + ':' + jour);
+        }
       } catch (err) { console.error(err); }
     }
   }
@@ -2751,6 +2761,7 @@ body.dos-fondateurs { --dos-motif: radial-gradient(circle, #e2b04a 18%, transpar
         const r = await apiJoueur('/parcours/recuperer', 'POST', { palier: n, voie });
         if (r.objet) { const q = lireProfil(); if (!R.OBJETS[r.objet.id]) R.OBJETS[r.objet.id] = { type: r.objet.type, nom: r.objet.nom, d: 'Parcours de saison' }; R.donnerObjet(q, r.objet.id); ecrireProfil(q); appliquerCollection(q); synchroEquiper(r.objet.id); toast(`Nouveau : ${r.objet.nom} (équipé)`); }
         else toast(`+${r.pieces} pièces`);
+        soldeServeur(r.solde);
         ouvrirParcours();
       } catch (e) { toast(e.message); bouton.disabled = false; }
     };
@@ -3232,6 +3243,7 @@ body.dos-fondateurs { --dos-motif: radial-gradient(circle, #e2b04a 18%, transpar
       const c = R.recevoirBienvenue(q, jour);
       if (!c) return fermerFenetre();
       ecrireProfil(q); majSolde(); appliquerCollection(q);
+      if (c.pieces) crediterEnLigne('bienvenue', c.pieces, 'j' + c.jour);
       carte.getAnimations().forEach((a) => a.cancel());
       carte.classList.add('ouvert');
       vibrer(40);
@@ -3279,16 +3291,64 @@ body.dos-fondateurs { --dos-motif: radial-gradient(circle, #e2b04a 18%, transpar
     return pc;
   }
   const formatPieces = (n) => n.toLocaleString('fr-FR');
-  function majSolde() { $('solde').textContent = formatPieces(lirePieces().solde); }
+  // Pièces : en mode serveur, la bourse est celle du compte en ligne (les pièces d'essai du téléphone ne comptent plus).
+  // compteLocal est défini plus bas : on lit le stockage directement.
+  function compteEnLigne() { if (!MODE_SERVEUR) return null; const c = stock.lire('kopo-compte-serveur'); return c && c.jeton && c.serveur === SERVEUR ? c : null; }
+  function soldeServeur(n) {
+    if (typeof n !== 'number') return;
+    const c = compteEnLigne(); if (!c) return;
+    c.compte = Object.assign({}, c.compte, { solde: n }); stock.ecrire('kopo-compte-serveur', c);
+    majSolde();
+  }
+  function soldeAffiche() {
+    if (!MODE_SERVEUR) return lirePieces().solde;
+    const c = compteEnLigne();
+    return c && c.compte && typeof c.compte.solde === 'number' ? c.compte.solde : 0;
+  }
+  function majSolde() {
+    $('solde').textContent = formatPieces(soldeAffiche());
+    if (MODE_SERVEUR) { $('btnBourse').title = 'Tes pièces'; $('btnBourse').querySelector('small').textContent = 'pièces'; }
+  }
+  async function appelEnLigne(chemin, methode = 'GET', corps) {
+    const c = compteEnLigne(); if (!c) throw new Error('Il faut un compte en ligne.');
+    const r = await fetch(SERVEUR + '/api' + chemin, { method: methode, headers: { 'content-type': 'application/json', authorization: 'Bearer ' + c.jeton }, body: corps ? JSON.stringify(corps) : undefined });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.erreur || 'Le serveur ne répond pas.');
+    return j;
+  }
+  // Récompense gagnée sur le téléphone (mission, défi, bienvenue) : créditée par le serveur, qui plafonne.
+  function crediterEnLigne(motif, montant, ref) {
+    if (!compteEnLigne() || !(montant > 0)) return;
+    appelEnLigne('/recompense', 'POST', { motif, montant, ref }).then((r) => { if (r.ok) { soldeServeur(r.solde); pop($('btnBourse'), 1.2); } }).catch(() => {});
+  }
+  // Accueil : rafraîchit le compte en ligne (créé tout de suite si le pseudo est déjà choisi).
+  let compteEnCours = null;
+  function assurerCompte() {
+    if (!MODE_SERVEUR) return Promise.resolve(null);
+    if (compteEnCours) return compteEnCours;
+    const pseudo = stock.lire('kopo-pseudo');
+    compteEnCours = (async () => {
+      try {
+        if (!compteEnLigne()) { if (!pseudo) return null; await compteServeur(pseudo); }
+        const j = await appelEnLigne('/moi');
+        const c = compteEnLigne(); if (c) { c.compte = j.compte; stock.ecrire('kopo-compte-serveur', c); }
+        majSolde();
+        return compteEnLigne();
+      } catch (e) { return compteEnLigne(); } finally { setTimeout(() => { compteEnCours = null; }, 0); }
+    })();
+    return compteEnCours;
+  }
   // b : { gain, serie, joker, prochain } juste après le bonus du jour, ou null pour consulter.
   function fenetrePieces(b) {
     const p = lireProfil(), pc = R.pieces(p), jour = jourLocal();
-    const serie = b ? b.serie : (pc.bonusSerie || 0);
+    const info = MODE_SERVEUR ? (stock.lire('kopo-bonus-serveur') || {}) : null;
+    const serie = b ? b.serie : (info ? (info.serie || 0) : (pc.bonusSerie || 0));
+    const jokerLibre = info ? (b ? b.jokerLibre !== false : info.jokerLibre !== false) : R.jokerLibre(p, jour);
     const barres = el('div', 'serie');
     for (let i = 1; i <= 7; i++) barres.append(el('span', i <= Math.min(serie, 7) ? (b && b.joker && i === Math.min(serie, 7) - 1 ? 'ok joker' : 'ok') : null));
     const corps = el('div', 'bonus-jour');
-    const joker = el('div', 'joker-etat' + (R.jokerLibre(p, jour) ? '' : ' pris'));
-    joker.append(icone('i-joker'), R.jokerLibre(p, jour) ? 'Joker de série libre : un jour raté cette semaine ne casse pas ta série.' : 'Joker de série déjà utilisé cette semaine.');
+    const joker = el('div', 'joker-etat' + (jokerLibre ? '' : ' pris'));
+    joker.append(icone('i-joker'), jokerLibre ? 'Joker de série libre : un jour raté cette semaine ne casse pas ta série.' : 'Joker de série déjà utilisé cette semaine.');
     if (b) {
       if (b.joker) {
         // Le joker vient d'être joué : la carte arrive, puis le bonus.
@@ -3299,19 +3359,65 @@ body.dos-fondateurs { --dos-motif: radial-gradient(circle, #e2b04a 18%, transpar
       } else corps.append(el('h2', null, 'Bonus du jour'));
       const piece = el('span', 'piece', 'K');
       corps.append(piece, el('div', 'gain', '+' + b.gain), el('div', null, 'Jour ' + serie + ' d\'affilée · reviens demain pour +' + b.prochain), barres);
-    } else corps.append(el('h2', null, 'Tes pièces'), el('span', 'piece', 'K'), el('div', 'gain', formatPieces(pc.solde)), el('div', null, 'Bonus du jour déjà pris · série de ' + serie + ' jour' + (serie > 1 ? 's' : '')), barres);
-    corps.append(joker, el('div', 'note-essai', 'Pièces d\'essai, remises à zéro au lancement officiel.'));
+    } else {
+      const sansCompte = MODE_SERVEUR && !compteEnLigne();
+      const ligne = sansCompte ? 'Choisis ton pseudo et joue : ta bourse s\'ouvre avec un cadeau de bienvenue.'
+        : (info && info.jour !== new Date().toISOString().slice(0, 10) ? 'Série de ' : 'Bonus du jour déjà pris · série de ') + serie + ' jour' + (serie > 1 ? 's' : '');
+      corps.append(el('h2', null, 'Tes pièces'), el('span', 'piece', 'K'), el('div', 'gain', formatPieces(soldeAffiche())), el('div', null, ligne), barres);
+    }
+    corps.append(joker);
+    if (!MODE_SERVEUR) corps.append(el('div', 'note-essai', 'Pièces d\'essai, remises à zéro au lancement officiel.'));
     const ok = el('button', 'btn principal large', b ? 'Récupérer' : 'OK');
     ok.onclick = () => { fermerFenetre(); majSolde(); if (b) { pop($('btnBourse'), 1.2); suiteAccueil(); } };
     ouvrirFenetre([corps, ok]);
   }
   function bonusDuJour() {
+    if (MODE_SERVEUR) return bonusDuJourServeur();
     const p = lireProfil();
     const b = R.bonusDuJour(p, jourLocal());
     if (!b) return false;
     ecrireProfil(p);
     fenetrePieces(b);
     return true;
+  }
+  // Bonus du jour en ligne : le serveur tient la série et le joker (jour UTC).
+  function bonusDuJourServeur() {
+    const auj = new Date().toISOString().slice(0, 10), info = stock.lire('kopo-bonus-serveur') || {};
+    if (info.jour === auj || !stock.lire('kopo-pseudo')) return false;
+    const libre = () => !$('ecranAccueil').hidden && $('voile').hidden && $('bienvenue').hidden;
+    (async () => {
+      let b = null;
+      try {
+        if (await assurerCompte()) {
+          await cadeauFondateur();
+          b = await appelEnLigne('/bonus-du-jour', 'POST');
+          stock.ecrire('kopo-bonus-serveur', { jour: auj, serie: b.serie || 0, jokerLibre: b.dejaPris ? info.jokerLibre !== false : b.jokerLibre !== false });
+        }
+      } catch (e) { b = null; }
+      if (!libre()) return;
+      if (b && !b.dejaPris) { soldeServeur(b.solde); fenetrePieces(b); }
+      else suiteAccueil();
+    })();
+    return true;
+  }
+  // Cadeau de fondateur : les pièces d'essai du téléphone disparaissent avec le passage aux vraies pièces ;
+  // en échange, le dos de cartes « Les Fondateurs » (une fois par appareil, si le joueur avait des pièces d'essai).
+  async function cadeauFondateur() {
+    const p = lireProfil();
+    if (p.fondateur) return;
+    const avaitEssai = !!(p.pieces && p.pieces.solde > 0);
+    try {
+      const r = await appelEnLigne('/cadeau-fondateur', 'POST');
+      const q = lireProfil(); q.fondateur = jourLocal();
+      if (!r.ok) { ecrireProfil(q); return; }
+      if (!R.OBJETS['dos-fondateurs']) R.OBJETS['dos-fondateurs'] = { type: 'dos', nom: 'Les Fondateurs', d: 'Cadeau de fondateur' };
+      R.donnerObjet(q, 'dos-fondateurs'); ecrireProfil(q); appliquerCollection(q);
+      const corps = el('div', 'bonus-jour');
+      corps.append(el('h2', null, 'Merci, fondateur !'), apercuObjet('dos-fondateurs'),
+        el('p', null, (avaitEssai ? 'Le Kopo passe aux vraies pièces : tes pièces d\'essai s\'arrêtent ici. Pour te remercier d\'avoir été là dès le début, voici' : 'Le Kopo passe aux vraies pièces. Pour fêter ça avec ceux qui sont là dès le début, voici') + ' le dos de cartes « Les Fondateurs ». Il ne sera plus distribué après le lancement.'));
+      const ok = el('button', 'btn principal large', 'Merci !');
+      await new Promise((fin) => { ok.onclick = () => { fermerFenetre(); fin(); }; ouvrirFenetre([corps, ok]); });
+    } catch (e) {}
   }
   // Après le bonus : le tutoriel la toute première fois, sinon le cadeau de bienvenue du jour.
   function suiteAccueil() {
