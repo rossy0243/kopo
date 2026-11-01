@@ -782,10 +782,11 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
 <script>/*MOTEUR*/</script>
 <script>/*SALLE*/</script>
 <script>/*RETENTION*/</script>
+<script>/*SONS*/</script>
 <script>
 (function () {
   'use strict';
-  const K = window.Kopo, S = window.KopoSalle, R = window.KopoRetention;
+  const K = window.Kopo, S = window.KopoSalle, R = window.KopoRetention, Sons = window.KopoSons;
   const $ = (id) => document.getElementById(id);
   const PREFIXE = 'kopo-mj-v1-';
   const LETTRES = 'ABCDEFGHJKMNPQRSTUVWXYZ';
@@ -801,7 +802,7 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
   // ------------------------------------------------------------------ paramètres
   // Réglages du joueur, gardés sur le téléphone (plus tard : rattachés au compte).
   const VERSION = '1.0-essai';
-  const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false };
+  const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
   // On le met de côté et on nettoie l'adresse avant que le jeu ne lise un code de partie.
@@ -818,6 +819,7 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
   function appliquerPrefs() {
     document.body.classList.toggle('quatre-couleurs', !!prefs.quatreCouleurs);
     sansAnim = animReduiteSysteme || prefs.animations === 'reduites';
+    Sons.regler({ effets: prefs.effetsSonores, musique: prefs.musique });
   }
   function vibrer(ms) { if (prefs.vibrations && navigator.vibrate) try { navigator.vibrate(ms); } catch (e) {} }
   // Identifiant du joueur : par onglet en mode local, par appareil sinon.
@@ -1381,6 +1383,7 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
     const avant = positionsAvant();
     afficherPartie(v);
     try { animer(ancienne, v, avant, finAvant); } catch (e) { console.error(e); }
+    try { sonner(ancienne, v); } catch (e) { console.error(e); }
     if (v.etat === 'finManche' || v.etat === 'finPartie') {
       // On laisse le temps de voir l'élimination avant d'ouvrir le bilan.
       const attente = retardFenetre - Date.now();
@@ -1589,6 +1592,30 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
     }
   }
 
+  // ------------------------------------------------------------------ sons
+  // Comme animer() : on compare la vue à la précédente, mais les sons jouent même
+  // quand les animations sont réduites. Réglages : Paramètres > Son et vibrations.
+  function sonner(A, N) {
+    if (N.etat === 'finPartie' && A && A.etat !== 'finPartie') Sons.jouer(N.vainqueur === N.moi ? 'victoire' : 'defaite', { delai: 1300 });
+    if (!N.manche) return;
+    const m = N.manche, moi = N.moi, a = A && A.manche;
+    const memeManche = a && (A.etat === 'manche' || A.etat === 'finManche') && A.numeroManche === N.numeroManche;
+    if (m.pause && m.pause.type === 'depart' && !(memeManche && a.pause && a.pause.type === 'depart'))
+      Sons.jouer('distribution', { nb: m.sieges.reduce((s, id) => s + (m.nbCartes[id] || 0), 0) });
+    if (!memeManche) return;
+    const cle = (p) => p.joueur + ':' + p.cartes.join(',');
+    const clesA = new Set(a.table.map(cle));
+    m.table.filter((p) => !clesA.has(cle(p))).forEach((p, i) => Sons.jouer('carte', { delai: i * 110 }));
+    const an = m.pause && m.pause.annonce;
+    if (an && an.type === 'ramasse' && !(a.pause && a.pause.annonce)) Sons.jouer('ramasse');
+    m.qualifies.forEach((q) => {
+      if (a.qualifies.some((x) => x.joueur === q.joueur)) return;
+      if (q.raison === 'Katapss') Sons.jouer('katapss');
+      else Sons.jouer('qualifie', { moi: q.joueur === moi, delai: 250 });
+    });
+    if (m.elimine && !a.elimine) Sons.jouer('elimine', { moi: m.elimine === moi, delai: 200 });
+  }
+
   let qrPour = null;
   function afficherSalon(v) {
     montrerEcran('ecranSalon');
@@ -1736,7 +1763,7 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
     }
     $('barreChrono').hidden = !(v.chrono && monTour) && !pause;
     $('barreChrono').classList.toggle('barre-pause', !!pause);
-    if (monTour && !pause && !etaitMonTour) vibrer(120);
+    if (monTour && !pause && !etaitMonTour) { vibrer(120); Sons.jouer('tour'); }
     etaitMonTour = monTour && !pause;
 
     // Main et actions
@@ -1815,7 +1842,7 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
 
   // ------------------------------------------------------------------ chrono (affichage)
   // L'hôte envoie le temps restant ; chaque téléphone le décompte avec sa propre horloge.
-  let finChrono = null, totalChrono = 0;
+  let finChrono = null, totalChrono = 0, dernierTic = null;
   function demarrerChrono(v) {
     const p = v.manche && v.manche.pause;
     const c = p ? { resteMs: p.resteMs, totalMs: p.totalMs } : v.etat === 'finManche' ? v.suite : v.chrono;
@@ -1827,10 +1854,13 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
     const ds = document.querySelector('.decompte-suite');
     if (ds) ds.textContent = Math.max(0, Math.ceil((finChrono - performance.now()) / 1000));
     const d = document.querySelector('.decompte');
-    if (d) { const t = String(Math.max(1, Math.ceil((finChrono - performance.now()) / 1000))); if (d.textContent !== t) { d.textContent = t; pop(d, 1.6, 600); } }
+    if (d) { const t = String(Math.max(1, Math.ceil((finChrono - performance.now()) / 1000))); if (d.textContent !== t) { d.textContent = t; pop(d, 1.6, 600); Sons.jouer('decompte'); } }
     const reste = Math.max(0, finChrono - performance.now());
     const urgent = reste < 2000;
     const sec = Math.ceil(reste / 1000);
+    const v = vueActuelle, m = v && v.manche;
+    if (v && v.chrono && m && !m.pause && m.joueurCourant === v.moi && sec <= 3 && sec > 0 && sec !== dernierTic) Sons.jouer('tic');
+    dernierTic = sec;
     document.querySelectorAll('.secondes').forEach((e) => { e.textContent = sec + ' s'; e.classList.toggle('urgent', urgent); });
     document.querySelectorAll('.chrono').forEach((c) => { if (c.classList.contains('barre-pause')) { c.firstChild.style.width = (100 * reste / (totalChrono || 1)) + '%'; return; } c.firstChild.style.width = (100 * reste / (totalChrono || 1)) + '%'; c.classList.toggle('urgent', urgent); });
   }
@@ -2270,6 +2300,8 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
       maj(); ligne(texte, aide, c);
     };
     titre('Son et vibrations');
+    bascule('effetsSonores', 'Effets sonores', 'Cartes, tour, Katapss, chat', () => Sons.jouer('essai'));
+    bascule('musique', 'Musique d\'ambiance', 'Douce, en fond', null);
     bascule('vibrations', 'Vibrations', 'Quand c\'est à toi de jouer', () => vibrer(60));
     bascule('sonAutresCoupe', 'Couper le micro des autres', 'Au début de chaque partie', null);
     titre('Jeu');
@@ -2399,6 +2431,7 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
     // 1. Le fil de chat
     const m = { code: vueActuelle && vueActuelle.code, nom: vueActuelle ? nom(vueActuelle, d.joueur) : '?', texte, moi: !!vueActuelle && d.joueur === vueActuelle.moi };
     historiqueChat.push(m); if (historiqueChat.length > 30) historiqueChat.shift();
+    if (!m.moi) Sons.jouer('chat');
     const fil = $('filChat'), ligne = ligneChat(m);
     fil.append(ligne);
     while (fil.children.length > 4) fil.firstChild.remove();
@@ -2610,7 +2643,7 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
       }
       if (e.bouton) {
         const b = el('button', 'btn large' + (e.katapss ? ' katapss' : ' principal'), e.bouton);
-        b.onclick = () => { b.disabled = true; if (e.katapss) tampon('KATAPSS !', 'Qualifié'); scene.querySelectorAll('.tuto-main .carte').forEach((x) => (x.style.visibility = 'hidden')); reussi(e.ok); };
+        b.onclick = () => { b.disabled = true; if (e.katapss) { tampon('KATAPSS !', 'Qualifié'); Sons.jouer('katapss'); } scene.querySelectorAll('.tuto-main .carte').forEach((x) => (x.style.visibility = 'hidden')); reussi(e.ok); };
         scene.append(b);
       }
       if (e.choix) {
@@ -2827,6 +2860,8 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
   // ------------------------------------------------------------------ boutons
   $('btnParametres').onclick = ouvrirParametres;
   appliquerPrefs();
+  // Petit clic discret sur les boutons (les interrupteurs jouent leur propre son).
+  document.addEventListener('click', (e) => { const b = e.target.closest && e.target.closest('button'); if (b && !b.disabled && !b.classList.contains('bascule')) Sons.jouer('clic'); });
   function lirePseudo() {
     const p = nettoyerPseudo($('pseudo').value); $('pseudo').value = p;
     if (!p) { $('voileRejoindre').hidden = $('voileRobots').hidden = true; toast("Choisis d'abord ton pseudo, en haut."); $('pseudo').focus(); return null; }
