@@ -42,3 +42,6 @@ node src/kopo-salle-tests.js
 node src/kopo-retention-tests.js
 ```
 Pour tester à plusieurs onglets sur un seul appareil, sans réseau : ouvrir `index.html?local=1` dans plusieurs onglets.
+
+## Licence
+Tous droits réservés. Voir [LICENSE](LICENSE) : le dépôt est public pour la mise en ligne, mais sa réutilisation n'est pas autorisée.

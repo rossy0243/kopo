@@ -1,0 +1,21 @@
+Copyright (c) 2026 Rossy Mundyo Busyo. Tous droits réservés.
+
+Le Kopo (le code, le nom « Kopo », le logo, les illustrations, les icônes et les
+textes de ce dépôt) appartient à Rossy Mundyo Busyo.
+
+Ce dépôt est public pour que le jeu puisse être mis en ligne. Cela ne donne aucun
+droit de copier, modifier, publier, distribuer, vendre ou réutiliser tout ou partie
+de son contenu, sans autorisation écrite de l'auteur.
+
+Les bibliothèques libres du dossier vendor/ (MQTT.js, colyseus.js, PeerJS,
+qrcode-generator) et les dépendances du serveur restent soumises à leur propre
+licence.
+
+Contact : rmundyo51@gmail.com
+
+---
+
+Copyright (c) 2026 Rossy Mundyo Busyo. All rights reserved.
+No permission is granted to copy, modify, publish, distribute or reuse any part of
+this repository without the author's written permission. Third-party libraries in
+vendor/ remain under their own licenses.
