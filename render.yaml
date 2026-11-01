@@ -1,5 +1,5 @@
-# Mise en ligne du serveur Kopo sur Render (offre Starter : toujours allumé, ≈ 7 $/mois).
-# Render lit ce fichier : Dashboard → New → Blueprint → choisir le dépôt kopo.
+# Mise en ligne du Kopo sur Render : le serveur (offre Starter : toujours allumé, ≈ 7 $/mois)
+# et la page du jeu (site statique, gratuit). Render lit ce fichier : Dashboard → New → Blueprint → choisir le dépôt kopo.
 services:
   - type: web
     name: kopo-serveur
@@ -27,7 +27,26 @@ services:
         sync: false
       - key: ADMIN_TOTP            # secret du code à 6 chiffres : node server/src/outils.js totp
         sync: false
-      - key: CONNEXION_GOOGLE      # 1 = bouton « Se connecter avec Google » (une fois Google activé dans Supabase)
-        value: "0"
+      - key: CONNEXION_GOOGLE      # 1 = bouton « Se connecter avec Google » (Google est activé dans Supabase)
+        value: "1"
       - key: ORIGINES              # pages autorisées à appeler le serveur
-        value: https://rossy0243.github.io,capacitor://localhost,https://localhost
+        value: https://rossy0243.github.io,https://kopo.onrender.com,capacitor://localhost,https://localhost
+
+  # Page du jeu (remplace GitHub Pages, pour pouvoir passer le dépôt en privé).
+  # Seuls la page, le manifeste, les icônes et les pages légales sont publiés (pas le code du serveur).
+  - type: web
+    name: kopo
+    runtime: static
+    buildCommand: node build.js && rm -rf _site && mkdir _site && cp -r index.html manifest.webmanifest icons legal _site/
+    staticPublishPath: _site
+    autoDeploy: true
+    envVars:
+      - key: SITE_URL              # adresse publique du site (aperçus des liens partagés)
+        value: https://kopo.onrender.com/
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: no-cache            # le téléphone revérifie la page à chaque ouverture (nouvelle version tout de suite)
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
