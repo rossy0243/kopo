@@ -5,12 +5,12 @@ const { DEBLOCAGE } = require('./salle-kopo');
 
 const MOTIFS = ['pseudo', 'insultes', 'triche', 'abandon', 'autre'];
 const enveloppe = (fn) => (req, res) => fn(req, res).catch((e) => res.status(e.statut || 500).json({ erreur: e.statut ? e.message : 'Erreur du serveur.' }) && (e.statut || console.error(e)));
-const publicCompte = (c) => c && { id: c.id, pseudo: c.pseudo, numero: c.numero, avatar: c.avatar, solde: c.solde, statut: c.statut, serieBonus: c.serie_bonus, dernierBonus: c.dernier_bonus, pays: c.pays || null, notifs: { rivalite: true, invitation: true, ami: true, ...(c.notifs || {}) }, kopoPlus: !!(c.kopo_plus_jusqu && new Date(c.kopo_plus_jusqu) > new Date()) };
+const publicCompte = (c) => c && { id: c.id, pseudo: c.pseudo, numero: c.numero, avatar: c.avatar, solde: c.solde, statut: c.statut, serieBonus: c.serie_bonus, dernierBonus: c.dernier_bonus, pays: c.pays || null, notifs: { rivalite: true, invitation: true, ami: true, bande: true, ...(c.notifs || {}) }, kopoPlus: !!(c.kopo_plus_jusqu && new Date(c.kopo_plus_jusqu) > new Date()), google: !!c.auth_id };
 
 // Pays déduit du réseau (en-tête posé par Cloudflare quand il existe), sinon choisi par le joueur.
 const paysReseau = (req) => { const p = String(req.get('cf-ipcountry') || '').toUpperCase(); return /^[A-Z]{2}$/.test(p) && p !== 'XX' ? p : null; };
 
-function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours, parrainage }) {
+function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours, parrainage, matchJour, bande }) {
   const r = express.Router();
   r.use(express.json({ limit: '64kb' })); // la copie du profil (PUT /profil) peut faire quelques dizaines de ko
 
@@ -97,6 +97,22 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours,
   r.get('/ligue', joueur, enveloppe(async (req, res) => res.json(await ligue.etat(req.compte))));
   r.post('/ligue/vu', joueur, enveloppe(async (req, res) => { await ligue.marquerVu(req.compte.id); res.json({ ok: true }); }));
   r.get('/classement', joueur, enveloppe(async (req, res) => res.json(await ligue.classement(req.compte, String(req.query.type || 'mondial'), { pays: req.query.pays, limite: req.query.limite }))));
+
+  // --- Match du jour et Bande (competition-amis.md)
+  r.get('/match-jour', joueur, enveloppe(async (req, res) => res.json(await matchJour.etat(req.compte))));
+  r.get('/match-jour/classement', joueur, enveloppe(async (req, res) => res.json(await matchJour.classement(req.compte, String(req.query.type || 'mondial'), { limite: req.query.limite }))));
+  r.get('/bandes', joueur, enveloppe(async (req, res) => res.json(await bande.mesBandes(req.compte))));
+  r.post('/bandes', joueur, enveloppe(async (req, res) => res.json(await bande.creer(req.compte, req.body || {}))));
+  r.get('/bandes/ouvertes', joueur, enveloppe(async (req, res) => res.json(await bande.ouvertes(req.compte, req.query.pays))));
+  r.post('/bandes/rejoindre', joueur, enveloppe(async (req, res) => res.json(await bande.rejoindre(req.compte, req.body.code))));
+  r.get('/bandes/:id', joueur, enveloppe(async (req, res) => res.json(await bande.etat(req.compte, req.params.id))));
+  r.patch('/bandes/:id', joueur, enveloppe(async (req, res) => res.json(await bande.modifier(req.compte, req.params.id, req.body || {}))));
+  r.post('/bandes/:id/miser', joueur, enveloppe(async (req, res) => { await bande.inscrire(req.compte, req.params.id); res.json(await bande.etat(await comptes.lire(req.compte.id), req.params.id)); }));
+  r.post('/bandes/:id/auto', joueur, enveloppe(async (req, res) => res.json(await bande.auto(req.compte, req.params.id, !!(req.body && req.body.auto)))));
+  r.post('/bandes/:id/demander', joueur, enveloppe(async (req, res) => res.json(await bande.demander(req.compte, req.params.id))));
+  r.post('/bandes/:id/demandes/:compte', joueur, enveloppe(async (req, res) => res.json(await bande.repondre(req.compte, req.params.id, req.params.compte, !!(req.body && req.body.accepter)))));
+  r.post('/bandes/:id/quitter', joueur, enveloppe(async (req, res) => res.json(await bande.quitter(req.compte, req.params.id))));
+  r.delete('/bandes/:id/membres/:compte', joueur, enveloppe(async (req, res) => res.json(await bande.quitter(req.compte, req.params.id, req.params.compte))));
 
   r.post('/bonus-du-jour', joueur, enveloppe(async (req, res) => res.json(await comptes.bonusDuJour(req.compte.id))));
   r.post('/recompense', joueur, enveloppe(async (req, res) => res.json(await comptes.recompense(req.compte.id, req.body || {}))));

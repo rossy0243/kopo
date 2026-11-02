@@ -284,7 +284,7 @@ CREATE TABLE IF NOT EXISTS parrainage_paliers (
 );
 
 ALTER TABLE notifications DROP CONSTRAINT IF EXISTS notifications_type_check;
-ALTER TABLE notifications ADD CONSTRAINT notifications_type_check CHECK (type IN ('rivalite', 'invitation', 'ami', 'parrainage'));
+ALTER TABLE notifications ADD CONSTRAINT notifications_type_check CHECK (type IN ('rivalite', 'invitation', 'ami', 'parrainage', 'bande')); -- bande : rappel du Match du jour, fin de semaine
 
 -- ===== Sauvegarde du profil du téléphone (niveau, statistiques, face-à-face, collection) =====
 -- Le profil est calculé sur le téléphone ; sa copie ici le fait revenir sur un autre téléphone,
@@ -303,3 +303,65 @@ CREATE TABLE IF NOT EXISTS demandes_ami (
   PRIMARY KEY (de_id, a_id)
 );
 CREATE INDEX IF NOT EXISTS demandes_ami_a ON demandes_ami (a_id, cree_le);
+
+-- ===== Match du jour et Bande (competition-amis.md v1.3, validé le 2/11) =====
+-- Match du jour : un seul essai officiel par joueur et par jour (jour de Kinshasa). Score sur 100.
+CREATE TABLE IF NOT EXISTS match_jour (
+  compte_id text NOT NULL REFERENCES comptes(id),
+  jour      date NOT NULL,
+  score     integer NOT NULL DEFAULT 0,
+  manches   integer NOT NULL DEFAULT 0,               -- manches passées (7 au plus avant la finale)
+  victoire  boolean NOT NULL DEFAULT false,
+  statut    text NOT NULL DEFAULT 'en_cours' CHECK (statut IN ('en_cours', 'fini')),
+  debut     timestamptz NOT NULL DEFAULT now(),
+  fin       timestamptz,
+  PRIMARY KEY (compte_id, jour)
+);
+CREATE INDEX IF NOT EXISTS match_jour_jour ON match_jour (jour, score DESC);
+
+-- Bande : un groupe d'amis (2 à 20 inscrits) qui mise chaque semaine sur ses Matchs du jour.
+CREATE TABLE IF NOT EXISTS bandes (
+  id        text PRIMARY KEY,
+  nom       text NOT NULL,
+  code      text NOT NULL UNIQUE,                     -- lien d'invitation ?bande=CODE
+  createur  text NOT NULL REFERENCES comptes(id),
+  mise      integer NOT NULL,                         -- mise des semaines pas encore commencées
+  ouverte   boolean NOT NULL DEFAULT false,           -- visible des inconnus (sur demande, acceptée par le créateur)
+  pays      text,
+  cree_le   timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS bande_membres (
+  bande_id  text NOT NULL REFERENCES bandes(id) ON DELETE CASCADE,
+  compte_id text NOT NULL REFERENCES comptes(id),
+  auto      boolean NOT NULL DEFAULT false,           -- remiser automatiquement chaque lundi
+  rejoint_le timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (bande_id, compte_id)
+);
+CREATE INDEX IF NOT EXISTS bande_membres_compte ON bande_membres (compte_id);
+CREATE TABLE IF NOT EXISTS bande_demandes (
+  bande_id  text NOT NULL REFERENCES bandes(id) ON DELETE CASCADE,
+  compte_id text NOT NULL REFERENCES comptes(id),
+  cree_le   timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (bande_id, compte_id)
+);
+-- Une semaine (du lundi au dimanche) : la mise est figée à la première inscription.
+CREATE TABLE IF NOT EXISTS bande_semaines (
+  bande_id  text NOT NULL REFERENCES bandes(id) ON DELETE CASCADE,
+  semaine   date NOT NULL,                            -- le lundi
+  mise      integer NOT NULL,
+  statut    text NOT NULL DEFAULT 'ouverte' CHECK (statut IN ('ouverte', 'cloturee', 'annulee')),
+  resultat  jsonb,
+  cloturee_le timestamptz,
+  PRIMARY KEY (bande_id, semaine)
+);
+CREATE INDEX IF NOT EXISTS bande_semaines_statut ON bande_semaines (statut, semaine);
+CREATE TABLE IF NOT EXISTS bande_inscriptions (
+  bande_id  text NOT NULL,
+  semaine   date NOT NULL,
+  compte_id text NOT NULL REFERENCES comptes(id),
+  mise      integer NOT NULL,
+  inscrit_le timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (bande_id, semaine, compte_id),
+  FOREIGN KEY (bande_id, semaine) REFERENCES bande_semaines(bande_id, semaine) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS bande_inscriptions_compte ON bande_inscriptions (compte_id, semaine);

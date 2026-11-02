@@ -28,6 +28,12 @@ const DEFAUTS = {
   // Parrainage : quand l'ami invité (compte Google neuf) a joué `parties` parties entre humains.
   // parMois : plafond anti-faux comptes, levé pour les créateurs vérifiés ; total : 0 = sans limite.
   parrainage: { actif: true, parties: 5, piecesParrain: 300, piecesFilleul: 200, parMois: 30, total: 0, joursCompte: 7, joursPourJouer: 30 },
+  // Match du jour (competition-amis.md) : 8 robots de niveau Fort (décision du 2/11), à pleine force, la même donne pour tous.
+  matchJour: { actif: true, robots: 'forts', niveauRobots: 20 },
+  // La Bande : maison = % des mises détruit ; inscrits de 2 à 20 ; 5 Matchs sur 7 au moins, sinon la mise est détruite ;
+  // jour manqué avant l'inscription = pire note du jour - penaliteRetard ; inscription jusqu'au mercredi 23 h (heure de Kinshasa).
+  // Pour miser : compte Google de joursCompte jours au moins, avec partiesMin parties jouées contre des humains.
+  bande: { actif: true, maison: 15, miseMin: 500, miseMax: 10000, inscritsMin: 2, membresMax: 20, bandesMax: 3, matchsMin: 5, penaliteRetard: 10, joursCompte: 7, partiesMin: 10 },
   // Nom et thème de la prochaine saison (sinon : une ville, thème validé le 31/10).
   prochaineSaison: { nom: '', theme: '' },
   messagesRapides: ['👏', '😂', '😮', '🔥', '😡', '👍', '😭', '🙏', 'Bien joué !', 'Bravo !', 'Joli coup !', 'Belle carte !', 'Bien vu !', 'Trop fort !', 'Merci !', 'Désolé !', 'Oups !', 'Aïe !', 'Pas de chance !', 'Je ramasse…', 'Je t’ai eu !', 'Katapss !', 'Vite !', 'Prends ton temps', 'À toi !', 'Encore une !', 'Bonne chance !', 'Bonne partie !', 'GG !', 'Revanche ?', 'On en refait une ?', 'Je reviens', 'Salut tout le monde !', 'À la prochaine !'],
@@ -78,6 +84,21 @@ function verifierLigue(v) {
   return out;
 }
 
+// Réglages de la Bande : entiers dans des bornes raisonnables, mise minimum sous la mise maximum.
+function verifierBande(v) {
+  const err = (m) => { throw Object.assign(new Error(m), { statut: 400 }); };
+  const bornes = { maison: [0, 50], miseMin: [1, 1e6], miseMax: [1, 1e6], inscritsMin: [2, 20], membresMax: [2, 50], bandesMax: [1, 10], matchsMin: [1, 7], penaliteRetard: [0, 100], joursCompte: [0, 365], partiesMin: [0, 1000] };
+  const out = { actif: v.actif !== false && v.actif !== 0 };
+  for (const [k, [a, b]] of Object.entries(bornes)) {
+    const n = entier(v[k]);
+    if (!(n >= a && n <= b)) err(`Valeur invalide : ${k} (entre ${a} et ${b}).`);
+    out[k] = n;
+  }
+  if (out.miseMin > out.miseMax) err('La mise minimum doit être sous la mise maximum.');
+  if (out.inscritsMin > out.membresMax) err('Il faut plus de membres possibles que d\'inscrits minimum.');
+  return out;
+}
+
 function creerReglages(base) {
   let cache = JSON.parse(JSON.stringify(DEFAUTS));
   return {
@@ -119,6 +140,13 @@ function creerReglages(base) {
         if (v.joursPourJouer < 1 || v.joursCompte < 1) throw Object.assign(new Error('Les délais font au moins 1 jour.'), { statut: 400 });
         valeur = v;
       }
+      if (cle === 'matchJour') {
+        const n = entier(valeur.niveauRobots);
+        if (!['faciles', 'normaux', 'forts'].includes(valeur.robots)) throw Object.assign(new Error('Niveau des robots : faciles, normaux ou forts.'), { statut: 400 });
+        if (!(n >= 1 && n <= 100)) throw Object.assign(new Error('Niveau des robots entre 1 et 100.'), { statut: 400 });
+        valeur = { actif: valeur.actif !== false && valeur.actif !== 0, robots: valeur.robots, niveauRobots: n };
+      }
+      if (cle === 'bande') valeur = verifierBande(valeur);
       if (cle === 'prochaineSaison') valeur = { nom: String(valeur.nom || '').replace(/[<>]/g, '').trim().slice(0, 40), theme: String(valeur.theme || '').replace(/[<>]/g, '').trim().slice(0, 40) };
       if (cle === 'pot') {
         const t = ['vainqueur', 'deuxieme', 'troisieme', 'maison'].reduce((s, k) => s + Number(valeur[k] || 0), 0);
@@ -131,4 +159,4 @@ function creerReglages(base) {
   };
 }
 
-module.exports = { creerReglages, DEFAUTS, verifierMessages, verifierLigue, DIVISIONS, MESSAGE_MAX };
+module.exports = { creerReglages, DEFAUTS, verifierMessages, verifierLigue, verifierBande, DIVISIONS, MESSAGE_MAX };

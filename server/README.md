@@ -32,6 +32,7 @@ Les tables sont créées toutes seules au premier démarrage (`src/schema.sql`).
 | `SUPABASE_SERVICE_ROLE_KEY` | Clé secrète *service_role* : efface aussi l'utilisateur Google dans Supabase quand un joueur supprime son compte. Sans elle, le serveur le signale dans les journaux et il faut l'effacer à la main (Authentication → Users) |
 | `ADMIN_MOT_DE_PASSE`, `ADMIN_TOTP` | Accès au tableau de bord (mot de passe + code à 6 chiffres) |
 | `CONNEXION_GOOGLE` | `1` pour afficher « Se connecter avec Google » dans le jeu (après avoir activé Google dans Supabase, avec la Site URL du jeu) |
+| `SECRET_MATCH_JOUR` | Facultatif : graine secrète des donnes du Match du jour (sinon `SECRET_SERVEUR`). La changer change les donnes à venir |
 | `ORIGINES` | Pages autorisées à appeler l'API (séparées par des virgules) |
 
 ## API (pour l'application)
@@ -57,6 +58,10 @@ Les tables sont créées toutes seules au premier démarrage (`src/schema.sql`).
 | `POST /api/ligue/vu` | L'écran de fin de saison a été vu |
 | `GET /api/classement?type=mondial\|pays\|amis` | Classement de la saison (`&pays=CD` pour un autre pays). Le pays se choisit avec `PATCH /api/moi { pays: 'CD' }` |
 | `GET /api/parrainage`, `POST /api/parrainage` | Parrainage : mon code et lien (`?parrain=CODE`), mes invités, mes paliers ; saisir le code d'un ami `{ code }` (compte Google neuf). Le code passe aussi dans `POST /api/connexion { parrain }` |
+| `GET /api/match-jour`, `GET /api/match-jour/classement?type=mondial\|pays\|amis` | Match du jour (même donne pour tous contre 8 robots Forts, un essai officiel, score sur 100 : +10 par manche passée, +30 la victoire, fin à minuit heure de Kinshasa) : numéro, temps restant, mon score et mon rang ; classement du jour. Compte Google obligatoire |
+| `GET/POST /api/bandes`, `GET /api/bandes/ouvertes`, `POST /api/bandes/rejoindre { code }` | La Bande (2 à 20 joueurs, 3 Bandes au plus) : mes Bandes, créer `{ nom, mise, ouverte }`, Bandes ouvertes de mon pays, rejoindre par le lien `?bande=CODE` |
+| `GET/PATCH /api/bandes/:id`, `POST /api/bandes/:id/miser\|auto\|demander\|quitter`, `POST /api/bandes/:id/demandes/:compte`, `DELETE /api/bandes/:id/membres/:compte` | Une Bande : membres, semaine en cours (mise, inscrits, classement, ce que gagne le Chef), titres de la semaine passée ; miser pour la semaine (jusqu'au mercredi 23 h, jours déjà passés = pire note du jour - 10), mise automatique chaque lundi, demandes pour les Bandes ouvertes (le créateur accepte ou refuse). Fin de semaine le dimanche à minuit : 15 % détruits, le 2e récupère sa mise (3 joueurs en règle ou plus), le Chef prend le reste ; moins de 5 Matchs joués = mise perdue |
+| WebSocket, salle `kopo-jour` | Le Match du jour. Options : `{ jeton }`. Le serveur envoie `matchJour` (`{ debut, numero, officiel }` puis `{ fin, manches, victoire, score, officiel }`) |
 | WebSocket, salle `kopo` | La partie. Options : `{ jeton, code?, publique? }`. Messages : les mêmes que `kopo-salle.js`. Le serveur envoie `vue`, `erreur`, `solde`, `exclu`, `classee` (au début : `{ classee }`) et `ligue` (fin de partie classée : `{ delta, points, division, divisionAvant, promu, relegue, protection, prochaine, saison }`). |
 
 ## Ligue classée et saisons
