@@ -4933,7 +4933,7 @@ var qrcode = function() {
   // ------------------------------------------------------------------ paramètres
   // Réglages du joueur, gardés sur le téléphone (plus tard : rattachés au compte).
   const VERSION = '1.0-essai';
-  const BUILD = '3aecd355d63a'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = '32e37fcdb265'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
@@ -5275,9 +5275,9 @@ var qrcode = function() {
     try {
       const c = await compteServeur(nom);
       const cli = new Colyseus.Client(SERVEUR.replace(/^http/, 'ws'));
-      if (facon.reconnexion) room = await cli.reconnect(facon.reconnexion);
+      if (facon.reconnexion) room = await cli.reconnect(facon.reconnexion).catch(() => facon.code ? reprendreServeur(cli, c.jeton, facon.code).then((r) => r || Promise.reject(new Error('reconnexion'))) : Promise.reject(new Error('reconnexion')));
       else if (facon.creer) room = await cli.create('kopo', { jeton: c.jeton, code: nouveauCode() });
-      else if (facon.code) room = await cli.join('kopo', { jeton: c.jeton, code: facon.code });
+      else if (facon.code) room = (await reprendreServeur(cli, c.jeton, facon.code)) || await cli.join('kopo', { jeton: c.jeton, code: facon.code });
       else if (facon.mise) room = await cli.joinOrCreate('kopo-mise', { jeton: c.jeton, publique: true, taille: facon.taille, mise: facon.mise });
       else room = await cli.joinOrCreate('kopo', { jeton: c.jeton, publique: true, taille: facon.taille });
       clearTimeout(reveil);
@@ -5294,6 +5294,15 @@ var qrcode = function() {
       }
       quitter(); toast(texte);
     }
+  }
+
+  // Déjà assis à cette table (page fermée par erreur, réseau perdu, jeton de reconnexion expiré) :
+  // le serveur rend la place, même si la partie a commencé. null si on n'y est pas (entrée normale).
+  async function reprendreServeur(cli, jeton, code) {
+    let r;
+    try { r = await fetch(SERVEUR + '/api/reprendre', { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + jeton }, body: JSON.stringify({ code }) }); } catch (e) { return null; }
+    if (!r.ok) return null;
+    return cli.consumeSeatReservation(await r.json());
   }
 
   function brancherSalleServeur(cli, room, nom, facon) {
@@ -5324,10 +5333,12 @@ var qrcode = function() {
     room.onLeave((code) => {
       if (moi !== client || moi.depart) return;
       if (code === 4000 || code === 4001) { quitter(); toast(code === 4000 ? 'Ta partie est ouverte sur un autre appareil.' : 'Tu as été exclu de la partie.'); return; }
-      // Coupure réseau : le serveur garde la place 2 minutes.
+      // Coupure réseau : le serveur garde la place. Le jeton de reconnexion vaut 2 minutes ; ensuite on
+      // reprend la place avec le code de la salle, tant que la partie existe.
       montrerBandeau('Connexion perdue. Reconnexion…');
       const essayer = (n) => cli.reconnect(room.reconnectionToken)
-        .then((r) => { if (moi === client) brancherSalleServeur(cli, r, nom, facon); })
+        .catch(() => session && session.code ? compteServeur(nom).then((c) => reprendreServeur(cli, c.jeton, session.code)).then((r) => r || Promise.reject(new Error('reprendre'))) : Promise.reject(new Error('reconnexion')))
+        .then((r) => { if (moi === client) brancherSalleServeur(cli, r, nom, facon); else try { r.leave(); } catch (e) {} })
         .catch(() => { if (moi === client && n < 40) setTimeout(() => essayer(n + 1), 3000); else if (moi === client) { quitter(); toast('Connexion au serveur perdue.'); } });
       essayer(0);
     });

@@ -9,7 +9,7 @@ La logique de jeu n'est pas dupliquée : le serveur utilise `src/kopo-salle.js` 
 cd server
 npm install
 npm start              # sans DATABASE_URL : base Postgres en mémoire (rien n'est gardé)
-npm test               # 52 tests
+npm test               # 63 tests
 npm run charge -- 1500 30   # test de charge : 1 500 joueurs simulés pendant 30 s
 ```
 Tableau de bord en local : http://localhost:2567/admin (définir `ADMIN_MOT_DE_PASSE` et `ADMIN_TOTP`).
@@ -44,6 +44,7 @@ Les tables sont créées toutes seules au premier démarrage (`src/schema.sql`).
 | `POST /api/bonus-du-jour`, `POST /api/remise-a-flot`, `GET /api/pieces` | Pièces (bonus du jour avec joker de série hebdomadaire) |
 | `POST /api/recompense`, `POST /api/cadeau-fondateur` | Pièces des missions, du défi et de la bienvenue gagnées sur le téléphone (plafonnées, sans doublon) ; dos « Les Fondateurs » (tant que la case est cochée dans Pilotage) |
 | `POST /api/signaler`, `GET/POST/DELETE /api/bloques`, `GET/POST/DELETE /api/amis` | Entre joueurs |
+| `POST /api/reprendre` | Reprendre sa place avec le code de la salle (`{ code }`) après une page fermée ou une coupure, même partie commencée : renvoie une réservation de place (`consumeSeatReservation`), 404 si on n'est pas à cette table |
 | `GET /api/en-ligne` | Joueurs connectés et salles publiques ouvertes (`classee` : la salle compte pour la ligue) |
 | `GET /api/rivaux` | Mes face-à-face (qui finit devant l'autre dans les parties jouées ensemble) |
 | `GET /api/notifications`, `POST /api/notifications/lues` | Notifications dans le jeu : rivalité, invitation d'un ami, nouvel ami. Chaque type se coupe avec `PATCH /api/moi { notifs: { rivalite: false } }` |
