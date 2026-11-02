@@ -755,12 +755,20 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.strictEqual((await api('/api/collection', { jeton: pj.jeton })).json.equipes.avatar, 'av-lubumbashi');
   });
   await test('boutique : prix affiché, pas deux fois, objets de saison pas en vente, solde insuffisant refusé', async () => {
-    await srv.comptes.crediter(pj.compte.id, 1000, 'admin', 'test boutique', true);
+    await srv.comptes.crediter(pj.compte.id, 1200, 'admin', 'test boutique', true);
     const b = await api('/api/boutique', { jeton: pj.jeton });
-    assert.ok(b.json.objets.find((o) => o.id === 'av-nuit').prix === 500);
+    assert.ok(b.json.objets.find((o) => o.id === 'av-nuit').prix === 1200);
+    // Par catégorie : chaque dos coûte plus que chaque avatar, qui coûte plus (ou autant) que chaque cadre.
+    const enVente = (t) => b.json.objets.filter((o) => o.type === t && o.prix != null).map((o) => o.prix);
+    assert.ok(Math.min(...enVente('dos')) > Math.max(...enVente('avatar')));
+    assert.ok(Math.min(...enVente('avatar')) > Math.max(...enVente('cadre')));
+    // Thème des pays : plus de ville en vente, mais les objets « ville » restent connus (ceux qui les ont les gardent).
+    assert.ok(b.json.objets.filter((o) => o.ville).every((o) => o.prix == null));
+    assert.strictEqual(b.json.objets.find((o) => o.id === 'av-dakar').nom, 'Sénégal');
+    assert.strictEqual((await api('/api/boutique/acheter', { methode: 'POST', jeton: pj.jeton, corps: { objet: 'cadre-lubumbashi' } })).statut, 400);
     const avant = b.json.solde;
     const a = await api('/api/boutique/acheter', { methode: 'POST', jeton: pj.jeton, corps: { objet: 'av-nuit' } });
-    assert.strictEqual(a.json.solde, avant - 500);
+    assert.strictEqual(a.json.solde, avant - 1200);
     assert.strictEqual((await api('/api/boutique/acheter', { methode: 'POST', jeton: pj.jeton, corps: { objet: 'av-nuit' } })).statut, 409);
     assert.strictEqual((await api('/api/boutique/acheter', { methode: 'POST', jeton: pj.jeton, corps: { objet: 'dos-fondateurs' } })).statut, 400);
     const pauvre = await invite('Pauvre' + Date.now() % 1000);
@@ -768,7 +776,7 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.strictEqual(r.statut, 400);
     assert.match(r.json.erreur, /insuffisant/);
     const reg = (await srv.base.query("SELECT montant, ref FROM registre_pieces WHERE compte_id = $1 AND motif = 'boutique'", [pj.compte.id])).rows;
-    assert.deepStrictEqual(reg, [{ montant: -500, ref: 'av-nuit' }]);
+    assert.deepStrictEqual(reg, [{ montant: -1200, ref: 'av-nuit' }]);
   });
 
   // ----- Parrainage
