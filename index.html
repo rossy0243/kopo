@@ -5258,7 +5258,7 @@ var qrcode = function() {
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = 'f68f42fb47b8'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = '657048b094b1'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
@@ -7344,7 +7344,7 @@ var qrcode = function() {
       const pod = el('div', 'nv-podium');
       const ligne = (e, b, t) => { const d = el('div'); d.append(el('span', 'e', e)); const s2 = el('span'); s2.append(el('b', null, b), ' ' + t); d.append(s2); pod.append(d); };
       ligne('👑', 'Le meilleur devient le Chef', 'et gagne le pot');
-      ligne('🥈', 'Le 2e', 'récupère sa mise');
+      ligne('🥈', 'Le 2e', 'récupère sa mise (dès 3 joueurs)');
       ligne('🤡', 'Le dernier', 'est Loser de la semaine');
       const ch = el('div', 'nv-petit'); ch.append(el('b', null, 'Chaque jour compte'), ' : un Match raté = 0.');
       contenu = [el('span', 'nv-badge', 'NOUVEAU'), el('h2', null, 'La Bande'),

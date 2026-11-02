@@ -3424,7 +3424,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       const pod = el('div', 'nv-podium');
       const ligne = (e, b, t) => { const d = el('div'); d.append(el('span', 'e', e)); const s2 = el('span'); s2.append(el('b', null, b), ' ' + t); d.append(s2); pod.append(d); };
       ligne('👑', 'Le meilleur devient le Chef', 'et gagne le pot');
-      ligne('🥈', 'Le 2e', 'récupère sa mise');
+      ligne('🥈', 'Le 2e', 'récupère sa mise (dès 3 joueurs)');
       ligne('🤡', 'Le dernier', 'est Loser de la semaine');
       const ch = el('div', 'nv-petit'); ch.append(el('b', null, 'Chaque jour compte'), ' : un Match raté = 0.');
       contenu = [el('span', 'nv-badge', 'NOUVEAU'), el('h2', null, 'La Bande'),
