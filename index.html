@@ -213,6 +213,14 @@ details.rappel summary { cursor: pointer; font-weight: 600; }
 }
 /* Invitation à tourner le téléphone (au début d'une partie tenue droite, sur téléphone). */
 .voile-tourner { z-index: 12; }
+/* Messages du tableau de bord : annonce (une fois) et maintenance (bloquante, au-dessus de tout). */
+.voile-annonce { z-index: 45; } /* au-dessus de l'écran de bienvenue (40) */
+.voile-maintenance { z-index: 60; background: rgba(6,14,24,.94); }
+.fenetre-serveur { width: min(380px, 100%); justify-items: center; text-align: center; }
+.fenetre-serveur h2 { font-size: 32px; }
+.fenetre-serveur p { color: var(--ink, #fff); white-space: pre-line; overflow-wrap: anywhere; }
+.fenetre-serveur .btn { width: 100%; }
+.fenetre-serveur small { color: var(--muted); }
 .fenetre-tourner { width: min(340px, 100%); justify-items: center; text-align: center; }
 .fenetre-tourner h2 { font-size: 32px; }
 .fenetre-tourner .btn { width: 100%; }
@@ -940,6 +948,21 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   <div class="splash-sous">Jeu de cartes entre amis</div>
 </div>
 <div class="voile" id="voile" hidden><div class="fenetre" id="fenetre"></div></div>
+<div class="voile voile-annonce" id="voileAnnonce" hidden>
+  <div class="fenetre fenetre-serveur" role="dialog" aria-modal="true" aria-labelledby="titreAnnonce">
+    <h2 id="titreAnnonce">Annonce</h2>
+    <p id="texteAnnonce"></p>
+    <button class="btn principal" id="btnAnnonceOk">OK</button>
+  </div>
+</div>
+<div class="voile voile-maintenance" id="voileMaintenance" hidden>
+  <div class="fenetre fenetre-serveur" role="alertdialog" aria-modal="true" aria-labelledby="titreMaintenance">
+    <h2 id="titreMaintenance">Maintenance</h2>
+    <p id="texteMaintenance"></p>
+    <button class="btn" id="btnMaintenanceReessayer">Réessayer</button>
+    <small>Le jeu se rouvrira tout seul dès la fin de la maintenance.</small>
+  </div>
+</div>
 <div class="toast" id="toast" hidden role="status"></div>
 <div class="maj-dispo" id="majDispo" hidden role="status"><span>Nouvelle version de Kopo disponible.</span><button class="btn principal" id="btnMajDispo">Mettre à jour</button><button class="btn" id="btnMajPlusTard" aria-label="Plus tard">✕</button></div>
 <div class="tirer-actualiser" id="tirerActualiser" hidden aria-hidden="true"><span>↻</span></div>
@@ -4882,7 +4905,7 @@ var qrcode = function() {
   // ------------------------------------------------------------------ paramètres
   // Réglages du joueur, gardés sur le téléphone (plus tard : rattachés au compte).
   const VERSION = '1.0-essai';
-  const BUILD = 'a9e447870002'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = '834dcdb1443a'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
@@ -7167,7 +7190,34 @@ var qrcode = function() {
     try { configServeur = await (await fetch(SERVEUR + '/api/config')).json(); } catch (e) {}
     return configServeur;
   }
-  if (MODE_SERVEUR) lireConfig(); // messages du chat, connexion Google…
+  if (MODE_SERVEUR) lireConfig().then(messagesServeur); // messages du chat, connexion Google, annonce, maintenance…
+
+  // Annonce à tous les joueurs (tableau de bord) : une fenêtre au démarrage, une seule fois par texte.
+  // Maintenance : fenêtre bloquante sans bouton pour fermer ; le jeu revérifie toutes les 30 s
+  // et quand on revient dans l'appli, et se rouvre tout seul quand la maintenance est levée.
+  let verifMaintenance = null;
+  function messagesServeur(cfg) {
+    if (!cfg) return;
+    const enMaintenance = typeof cfg.maintenance === 'string' && cfg.maintenance.trim() !== '';
+    $('voileMaintenance').hidden = !enMaintenance;
+    if (enMaintenance) {
+      $('texteMaintenance').textContent = cfg.maintenance;
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+      if (!verifMaintenance) verifMaintenance = setInterval(relireConfig, 30e3);
+    } else if (verifMaintenance) { clearInterval(verifMaintenance); verifMaintenance = null; }
+    const annonce = typeof cfg.annonce === 'string' ? cfg.annonce.trim() : '';
+    if (annonce && stock.lire('kopo-annonce-vue') !== annonce && $('voileAnnonce').hidden) {
+      $('texteAnnonce').textContent = annonce;
+      $('voileAnnonce').hidden = false;
+    }
+  }
+  async function relireConfig() {
+    if (!MODE_SERVEUR) return;
+    try { const c = await (await fetch(SERVEUR + '/api/config', { cache: 'no-store' })).json(); configServeur = c; messagesServeur(c); } catch (e) {}
+  }
+  $('btnAnnonceOk').onclick = () => { stock.ecrire('kopo-annonce-vue', $('texteAnnonce').textContent); $('voileAnnonce').hidden = true; };
+  $('btnMaintenanceReessayer').onclick = relireConfig;
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) relireConfig(); });
   async function dessinerConnexionGoogle(zone) {
     const ligneG = (texte, aide, controle) => { const l = el('div', 'reglage-ligne'), s2 = el('span', null, texte); if (aide) s2.append(el('small', null, aide)); l.append(s2, controle); zone.replaceChildren(l); return l; };
     ligneG('Connexion Google', 'Bientôt : pour garder tes pièces sur tous tes téléphones', iconeCadenas()).classList.add('bientot');
