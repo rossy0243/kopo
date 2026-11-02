@@ -604,6 +604,7 @@ body.dos-kinshasa { --dos-motif: linear-gradient(135deg, transparent 38%, #f7d03
 
 .missions { display: grid; gap: 10px; }
 .missions h3 { margin: 4px 0 0; font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--brass); display: flex; justify-content: space-between; align-items: baseline; }
+.missions h4.categorie { margin: 8px 0 0; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); font-weight: 600; }
 .missions h3 small { text-transform: none; letter-spacing: 0; color: var(--muted); font-weight: 500; }
 .carte-mission { display: grid; grid-template-columns: auto 1fr auto; gap: 4px 10px; align-items: center; border: 1px solid var(--line); border-radius: 12px; padding: 9px 11px; background: rgba(255,255,255,.03); }
 .carte-mission .ico { font-size: 26px; color: var(--brass); }
@@ -638,7 +639,7 @@ body.dos-kinshasa { --dos-motif: linear-gradient(135deg, transparent 38%, #f7d03
 .carte-mission.defi { border-color: rgba(226,176,74,.5); background: rgba(226,176,74,.07); }
 .fenetre[data-type="boutique"] { width: min(560px, 100%); }
 .boutique-solde { display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 700; font-size: 20px; color: var(--brass); margin-bottom: 6px; }
-.boutique h3 { margin: 14px 0 6px; font-size: 15px; }
+.boutique h3 { margin: 14px 0 6px; font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--brass); }
 .boutique .objet .prix { display: inline-flex; align-items: center; gap: 3px; font-weight: 700; color: var(--brass); }
 .boutique .objet .prix .piece { width: 14px; height: 14px; font-size: 9px; }
 .boutique .objet.trop-cher .prix { color: var(--muted); }
@@ -648,6 +649,7 @@ body.dos-kinshasa { --dos-motif: linear-gradient(135deg, transparent 38%, #f7d03
 .objet:disabled { opacity: .4; }
 .objet .avatar { width: 36px; height: 36px; font-size: 20px; }
 .objet .mini-dos { width: 26px; height: 38px; border-radius: 4px; border: 2px solid #f3e3bd; background: repeating-linear-gradient(45deg, var(--brass) 0 4px, #9c7524 4px 8px); }
+.mini-dos.dos-brazzaville { background: linear-gradient(135deg, #009543 0 40%, #fbde4a 40% 60%, #dc241f 60%) !important; }
 .objet .mini-dos.dos-kinshasa { background: linear-gradient(135deg, transparent 38%, #f7d038 38% 44%, #ce1021 44% 56%, #f7d038 56% 62%, transparent 62%), #3b8fd6; }
 
 .bienvenue7 { display: grid; gap: 12px; justify-items: center; text-align: center; }
@@ -756,7 +758,7 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
 .notif-carte .ico { font-size: 44px; color: var(--brass); }
 .liste-amis-inviter li { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .liste-amis-inviter .en-ligne { color: var(--good); font-size: 12px; }
-/* Apparences des villes (catalogue du serveur). */
+/* Apparences des pays (catalogue du serveur ; identifiants à l'ancien nom de ville). */
 .avatar.av-lubumbashi { background: linear-gradient(160deg, #e39b5b, #b87333 55%, #5a2e0e); color: #fff; }
 .avatar.av-abidjan { background: linear-gradient(90deg, #f77f00 0 33%, #fff 33% 66%, #009e60 66%); color: #1d1606; }
 .avatar.av-dakar { background: linear-gradient(90deg, #00853f 0 33%, #fdef42 33% 66%, #e31b23 66%); color: #1d1606; }
@@ -771,6 +773,7 @@ body.dos-abidjan { --dos-motif: linear-gradient(90deg, #f77f00 0 33%, #fff 33% 6
 body.dos-dakar { --dos-motif: linear-gradient(90deg, #00853f 0 33%, #fdef42 33% 66%, #e31b23 66%); --dos-motif-petit: linear-gradient(90deg, #00853f 0 33%, #fdef42 33% 66%, #e31b23 66%); }
 body.dos-douala { --dos-motif: linear-gradient(90deg, #007a5e 0 33%, #ce1126 33% 66%, #fcd116 66%); --dos-motif-petit: linear-gradient(90deg, #007a5e 0 33%, #ce1126 33% 66%, #fcd116 66%); }
 body.dos-goma { --dos-motif: linear-gradient(160deg, transparent 55%, #3a3a3a 55% 62%, transparent 62%), radial-gradient(circle at 70% 25%, #e0564c 0 14%, #f39a3c 15% 22%, transparent 23%), #1f4d3a; --dos-motif-petit: radial-gradient(circle at 70% 25%, #e0564c 0 20%, transparent 21%), #1f4d3a; }
+body.dos-brazzaville { --dos-motif: linear-gradient(135deg, #009543 0 40%, #fbde4a 40% 60%, #dc241f 60%); --dos-motif-petit: linear-gradient(135deg, #009543 0 40%, #fbde4a 40% 60%, #dc241f 60%); }
 body.dos-fondateurs { --dos-motif: radial-gradient(circle, #e2b04a 18%, transparent 19%) 0 0 / 12px 12px, #1d1606; --dos-motif-petit: radial-gradient(circle, #e2b04a 25%, transparent 26%) 0 0 / 6px 6px, #1d1606; }
 .mini-dos.dos-lubumbashi { background: repeating-linear-gradient(45deg, #b87333 0 4px, #5a2e0e 4px 8px) !important; }
 .mini-dos.dos-abidjan { background: linear-gradient(90deg, #f77f00 0 33%, #fff 33% 66%, #009e60 66%) !important; }
@@ -3170,9 +3173,15 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   // ------------------------------------------------------------------ parcours de saison et collection (serveur)
   // XP de saison en jouant avec des humains ; 30 paliers ; voie gratuite et voie Kopo+ (apparences seulement).
   const OBJETS_SERVEUR = {};
+  // Le serveur fait foi pour le nom et le prix ; « ville » = ancien thème, montré seulement à qui l'a.
+  function objetDuServeur(o) {
+    OBJETS_SERVEUR[o.id] = o;
+    const d = o.prix ? `${formatPieces(o.prix)} pièces` : o.collection === 'parrainage' ? 'Parrainage' : 'Parcours de saison';
+    R.OBJETS[o.id] = Object.assign({ d }, R.OBJETS[o.id], { type: o.type, nom: o.nom }, o.ville ? { ville: true } : {});
+  }
   async function chargerCatalogue() {
     if (Object.keys(OBJETS_SERVEUR).length) return;
-    try { const b = await apiJoueur('/boutique'); for (const o of b.objets) { OBJETS_SERVEUR[o.id] = o; if (!R.OBJETS[o.id]) R.OBJETS[o.id] = { type: o.type, nom: o.nom, d: o.prix ? `${o.prix} pièces` : 'Parcours de saison' }; } } catch (e) {}
+    try { const b = await apiJoueur('/boutique'); for (const o of b.objets) objetDuServeur(o); } catch (e) {}
   }
   // Les apparences gagnées en ligne rejoignent la collection du téléphone (celle des missions).
   async function synchroCollection() {
@@ -3264,31 +3273,28 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   window.ouvrirParcours = ouvrirParcours;
 
   // ------------------------------------------------------------------ boutique (serveur)
-  // Apparences à prix affiché, rangées par ville (strategie-pieces §4.3) : pas de hasard, pas de fausse urgence.
-  const NOMS_COLLECTIONS = { base: 'De base', kinshasa: 'Kinshasa', lubumbashi: 'Lubumbashi', abidjan: 'Abidjan', dakar: 'Dakar', douala: 'Douala', brazzaville: 'Brazzaville' };
+  // Apparences à prix affiché, rangées par catégorie (strategie-pieces §4.3) : pas de hasard, pas de fausse urgence.
   async function ouvrirBoutique() {
     if (!MODE_SERVEUR) return toast('La boutique arrive avec le jeu en ligne.');
     let B;
     try { if (!compteLocal()) { const ps = lirePseudo(); if (!ps) return; await compteServeur(ps); } B = await apiJoueur('/boutique'); } catch (e) { toast(e.message); return; }
     soldeServeur(B.solde);
-    for (const o of B.objets) { OBJETS_SERVEUR[o.id] = o; if (!R.OBJETS[o.id]) R.OBJETS[o.id] = { type: o.type, nom: o.nom, d: o.prix ? `${o.prix} pièces` : 'Parcours de saison' }; }
+    for (const o of B.objets) objetDuServeur(o);
     const possedes = new Set(B.possedes.concat(['av-laiton', 'dos-laiton']));
     const z = el('div', 'boutique');
     const solde = el('div', 'boutique-solde'); solde.append(pieceEl(), formatPieces(B.solde));
     z.append(solde, el('small', 'muted', 'Des apparences seulement : rien n\'aide à gagner. Les pièces se gagnent en jouant.'));
-    const groupes = {};
-    for (const o of B.objets) if (o.prix != null) (groupes[o.collection] || (groupes[o.collection] = [])).push(o);
-    const ordre = { avatar: 0, cadre: 1, dos: 2 };
-    for (const [col, objets] of Object.entries(groupes)) {
-      z.append(el('h3', null, NOMS_COLLECTIONS[col] || col));
+    const enVente = B.objets.filter((o) => o.prix != null && !o.ville).sort((a, b) => a.prix - b.prix || a.nom.localeCompare(b.nom, 'fr'));
+    for (const cat of R.parCategorie(enVente)) {
+      z.append(el('h3', null, cat.nom));
       const g = el('div', 'collection');
-      for (const o of objets.sort((a, b) => ordre[a.type] - ordre[b.type])) {
+      for (const o of cat.objets) {
         const a = possedes.has(o.id), cher = !a && o.prix > B.solde;
         const bt = el('button', 'objet' + (cher ? ' trop-cher' : ''));
         bt.setAttribute('aria-pressed', String(B.equipes[o.type] === o.id));
         const bas = a ? el('small', 'muted', B.equipes[o.type] === o.id ? 'Équipé' : 'À toi') : el('span', 'prix');
         if (!a) bas.append(formatPieces(o.prix), pieceEl());
-        bt.append(apercuObjet(o.id), el('span', null, o.nom), el('small', 'muted', o.type === 'avatar' ? 'Avatar' : o.type === 'dos' ? 'Dos de cartes' : 'Cadre'), bas);
+        bt.append(apercuObjet(o.id), el('span', null, o.nom), bas);
         bt.onclick = () => (a ? equiperDepuisBoutique(o.id) : confirmerAchat(o, B.solde));
         g.append(bt);
       }
@@ -3968,18 +3974,28 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       z.append(rangeeBienvenue(b));
     }
     h('Ta collection', 'touche pour équiper');
-    const col = el('div', 'collection'), c = R.collection(p);
-    for (const [id, o] of Object.entries(R.OBJETS)) {
-      const a = c.possedes.includes(id);
-      if (!a && o.type === 'cadre' && id !== d.cadre) continue; // les autres cadres reviendront avec leur semaine (ou en boutique)
-      const bt = el('button', 'objet');
-      bt.setAttribute('aria-pressed', String(c.equipes[o.type] === id));
-      bt.disabled = !a;
-      bt.append(apercuObjet(id), el('span', null, o.nom), el('small', 'muted', a ? (o.type === 'avatar' ? 'Avatar' : o.type === 'dos' ? 'Dos de cartes' : 'Cadre') : o.d));
-      bt.onclick = () => { const q = lireProfil(); if (R.equiper(q, id)) { ecrireProfil(q); appliquerCollection(q); synchroEquiper(id); ouvrirMissions(); } };
-      col.append(bt);
+    const c = R.collection(p);
+    const visibles = Object.entries(R.OBJETS).map(([id, o]) => Object.assign({ id }, o)).filter((o) => {
+      const a = c.possedes.includes(o.id);
+      if (!a && o.ville) return false; // ancien thème des villes : seulement pour qui l'a déjà
+      if (!a && o.type === 'cadre' && o.id !== d.cadre) return false; // les autres cadres reviendront avec leur semaine (ou en boutique)
+      return true;
+    }).sort((x, y) => c.possedes.includes(y.id) - c.possedes.includes(x.id)); // ce que j'ai d'abord
+    for (const cat of R.parCategorie(visibles)) {
+      const n = cat.objets.filter((o) => c.possedes.includes(o.id)).length;
+      z.append(el('h4', 'categorie', `${cat.nom} · ${n}`));
+      const col = el('div', 'collection');
+      for (const o of cat.objets) {
+        const id = o.id, a = c.possedes.includes(id);
+        const bt = el('button', 'objet');
+        bt.setAttribute('aria-pressed', String(c.equipes[o.type] === id));
+        bt.disabled = !a;
+        bt.append(apercuObjet(id), el('span', null, o.nom), el('small', 'muted', a ? (c.equipes[o.type] === id ? 'Équipé' : 'À toi') : o.d));
+        bt.onclick = () => { const q = lireProfil(); if (R.equiper(q, id)) { ecrireProfil(q); appliquerCollection(q); synchroEquiper(id); ouvrirMissions(); } };
+        col.append(bt);
+      }
+      z.append(col);
     }
-    z.append(col);
     const ok = el('button', 'btn principal large', 'Fermer'); ok.onclick = fermerFenetre;
     if (MODE_SERVEUR) { const bq = el('button', 'btn large', 'Plus d\'apparences : la Boutique'); bq.onclick = ouvrirBoutique; ouvrirFenetre([el('h2', null, 'Missions'), z, bq, ok], 'missions'); }
     else ouvrirFenetre([el('h2', null, 'Missions'), z, ok], 'missions');

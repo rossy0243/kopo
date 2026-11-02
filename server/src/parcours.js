@@ -56,7 +56,7 @@ function creerParcours(base, reglages, comptes, ligue) {
       return {
         saison: s ? ligue.publicSaison(s) : null,
         xp, palier, xpPalier: c.xpPalier, paliersMax: c.paliers, kopoPlus: kopoPlus(compte),
-        paliers: contenuParcours(c.paliers).map((x) => ({
+        paliers: contenuParcours(c.paliers, s ? s.numero : 1).map((x) => ({
           ...x,
           gratuit: { ...x.gratuit, ...(x.gratuit.objet ? { nom: OBJETS[x.gratuit.objet].nom, type: OBJETS[x.gratuit.objet].type } : {}), recupere: g.has(x.n) },
           plus: x.plus && { ...x.plus, nom: OBJETS[x.plus.objet].nom, type: OBJETS[x.plus.objet].type, recupere: pl.has(x.n) },
@@ -70,7 +70,7 @@ function creerParcours(base, reglages, comptes, ligue) {
       const s = await ligue.saisonCourante();
       if (!s) throw erreur('Aucune saison en cours.');
       const c = cfg();
-      const x = contenuParcours(c.paliers).find((p) => p.n === Number(n));
+      const x = contenuParcours(c.paliers, s.numero).find((p) => p.n === Number(n));
       if (!x) throw erreur('Palier inconnu.');
       if (voie !== 'gratuit' && voie !== 'plus') throw erreur('Voie inconnue.');
       const r = voie === 'plus' ? x.plus : x.gratuit;

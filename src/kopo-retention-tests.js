@@ -206,6 +206,24 @@ test('Équiper seulement un objet possédé ; retirer un cadre', () => {
   assert.strictEqual(p.collection.equipes.cadre, null);
   assert.ok(R.equiper(p, 'av-laiton'));
 });
+test('Rangement par catégorie : avatars, dos de cartes, cadres (vides omises)', () => {
+  const l = Object.entries(R.OBJETS).map(([id, o]) => Object.assign({ id }, o));
+  assert.deepStrictEqual(R.parCategorie(l).map((c) => c.nom), ['Avatars', 'Dos de cartes', 'Cadres']);
+  assert.deepStrictEqual(R.parCategorie(l.filter((o) => o.type !== 'dos')).map((c) => c.type), ['avatar', 'cadre']);
+  assert.strictEqual(R.parCategorie(l).reduce((n, c) => n + c.objets.length, 0), l.length);
+});
+test('Thème des pays : le défi ne donne plus de cadre de ville, mais un ancien cadre de ville reste équipable', () => {
+  const p = profil();
+  for (let i = 0; i < 60; i++) {
+    const q = profil();
+    const d = R.defiSemaine(q, R.decaler('2026-11-02', 7 * i));
+    assert.ok(!R.OBJETS[d.cadre].ville, d.cadre);
+  }
+  p.collection = { possedes: ['cadre-lubumbashi'] };
+  assert.ok(R.equiper(p, 'cadre-lubumbashi'));
+  assert.strictEqual(p.collection.equipes.cadre, 'cadre-lubumbashi');
+  assert.strictEqual(R.OBJETS['av-kinshasa'].nom, 'RD Congo');
+});
 
 console.log('\nBilan à partir de la vue');
 test('Place, manches survécues, adversaires humains devant ou derrière', () => {

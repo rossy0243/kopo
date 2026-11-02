@@ -1,6 +1,6 @@
 // Kopo — tout ce qui donne envie de revenir, calculé sur le téléphone (retention.md v1.0, lot A).
 // XP et niveau, stats, face-à-face, missions du jour, défi de la semaine, parcours de bienvenue,
-// joker de série du bonus du jour, objets de collection (thème des villes).
+// joker de série du bonus du jour, objets de collection (thème des pays).
 // Fonctions pures : on leur passe le profil (objet kopo-profil) et le jour ('AAAA-MM-JJ'),
 // elles le modifient et renvoient ce qu'il faut montrer. Aucune dépendance au navigateur.
 (function (root) {
@@ -36,21 +36,33 @@
   }
 
   // ------------------------------------------------------------------ objets de collection
-  // Thème des villes (retention §3.6). Rien n'aide à gagner : ce sont des apparences.
+  // Thème des pays (depuis le 02/11, avant : villes). Rien n'aide à gagner : ce sont des apparences.
+  // Les identifiants gardent leur ancien nom de ville (déjà dans les collections) ; seul le nom affiché change.
+  // ville: true = objet de l'ancien thème, plus proposé, mais toujours valable pour qui l'a déjà.
   const OBJETS = {
     'av-laiton': { type: 'avatar', nom: 'Laiton', d: 'De base' },
     'av-nuit': { type: 'avatar', nom: 'Nuit', d: 'Niveau 2' },
-    'av-kinshasa': { type: 'avatar', nom: 'Kinshasa', d: 'Bienvenue, jour 3' },
+    'av-kinshasa': { type: 'avatar', nom: 'RD Congo', d: 'Bienvenue, jour 3' },
     'av-fleuve': { type: 'avatar', nom: 'Fleuve', d: 'Niveau 5' },
     'dos-laiton': { type: 'dos', nom: 'Laiton', d: 'De base' },
-    'dos-kinshasa': { type: 'dos', nom: 'Kinshasa', d: 'Bienvenue, jour 7' },
-    'cadre-kinshasa': { type: 'cadre', nom: 'Kinshasa', d: 'Défi de la semaine' },
-    'cadre-lubumbashi': { type: 'cadre', nom: 'Lubumbashi', d: 'Défi de la semaine' },
-    'cadre-abidjan': { type: 'cadre', nom: 'Abidjan', d: 'Défi de la semaine' },
-    'cadre-dakar': { type: 'cadre', nom: 'Dakar', d: 'Défi de la semaine' },
-    'cadre-douala': { type: 'cadre', nom: 'Douala', d: 'Défi de la semaine' },
-    'cadre-brazzaville': { type: 'cadre', nom: 'Brazzaville', d: 'Défi de la semaine' },
+    'dos-kinshasa': { type: 'dos', nom: 'RD Congo', d: 'Bienvenue, jour 7' },
+    'cadre-kinshasa': { type: 'cadre', nom: 'RD Congo', d: 'Défi de la semaine' },
+    'cadre-abidjan': { type: 'cadre', nom: "Côte d'Ivoire", d: 'Défi de la semaine' },
+    'cadre-dakar': { type: 'cadre', nom: 'Sénégal', d: 'Défi de la semaine' },
+    'cadre-douala': { type: 'cadre', nom: 'Cameroun', d: 'Défi de la semaine' },
+    'cadre-brazzaville': { type: 'cadre', nom: 'Congo', d: 'Défi de la semaine' },
+    'cadre-lubumbashi': { type: 'cadre', nom: 'Lubumbashi', d: 'Ancien défi', ville: true },
   };
+  // Ordre d'affichage des catégories (boutique et collection).
+  const CATEGORIES = [
+    { type: 'avatar', nom: 'Avatars', un: 'Avatar' },
+    { type: 'dos', nom: 'Dos de cartes', un: 'Dos de cartes' },
+    { type: 'cadre', nom: 'Cadres', un: 'Cadre' },
+  ];
+  // Range une liste d'objets ({ id, type, … }) par catégorie, dans l'ordre de CATEGORIES ; les catégories vides sont omises.
+  function parCategorie(liste) {
+    return CATEGORIES.map((c) => Object.assign({}, c, { objets: liste.filter((o) => o.type === c.type) })).filter((c) => c.objets.length);
+  }
   const OBJETS_NIVEAU = { 2: 'av-nuit', 5: 'av-fleuve' };
   function collection(p) {
     if (!p.collection || typeof p.collection !== 'object') p.collection = {};
@@ -155,7 +167,7 @@
     { id: 'katapss3', texte: 'Fais 3 Katapss cette semaine', cible: 3, compte: (e) => e.katapss },
     { id: 'finales6', texte: 'Atteins 6 finales cette semaine', cible: 6, compte: (e) => (e.finale ? 1 : 0) },
   ];
-  const CADRES = ['cadre-kinshasa', 'cadre-lubumbashi', 'cadre-abidjan', 'cadre-dakar', 'cadre-douala', 'cadre-brazzaville'];
+  const CADRES = ['cadre-kinshasa', 'cadre-abidjan', 'cadre-dakar', 'cadre-douala', 'cadre-brazzaville']; // pays seulement
   const DEFI_PIECES = 300, DEFI_XP = 150;
   function defiSemaine(p, jour) {
     const sem = semaineDe(jour);
@@ -372,7 +384,7 @@
   const KopoRetention = {
     jourDe, decaler, ecart, semaineDe, hasard,
     XP, xpPourNiveau, niveauDe,
-    OBJETS, OBJETS_NIVEAU, collection, donnerObjet, equiper,
+    OBJETS, OBJETS_NIVEAU, CATEGORIES, parCategorie, collection, donnerObjet, equiper,
     MODELES, missionsDuJour, peutChanger, changerMission,
     DEFIS, defiSemaine,
     BIENVENUE, bienvenue, recevoirBienvenue,
