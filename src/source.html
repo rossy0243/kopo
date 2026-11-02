@@ -3259,14 +3259,16 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   // le meilleur (le Chef) gagne le pot moins 15 % ; le dernier est le Loser de la semaine. Le serveur calcule tout.
   const JOURS_COURTS = ['L', 'M', 'Me', 'J', 'V', 'S', 'D'];
   const dureeLisible = (ms) => { const h = Math.floor(ms / 36e5), m = Math.floor((ms % 36e5) / 6e4); return h ? `${h} h ${String(m).padStart(2, '0')}` : `${Math.max(1, m)} min`; };
-  const LIEN_SITE = () => location.origin + location.pathname;
+  // Adresse publique du jeu pour les liens partagés : dans l'appli (capacitor://, https://localhost), l'adresse de la page ne marche pas chez un ami.
+  const LIEN_SITE = () => /^https?:$/.test(location.protocol) && !/^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? location.origin + location.pathname : NOUVELLE_ADRESSE;
   let etatJour = null, etatBandes = null;
   async function compteEnLigne() { if (!compteLocal()) { const p = lirePseudo(); if (!p) return false; await compteServeur(p); } return true; }
 
   // Cartes de l'accueil : « Match du jour » (score, ou temps restant) et « La Bande » (ma place).
   async function majCartesCompetition() {
     $('btnMatchJour').hidden = $('btnBande').hidden = !MODE_SERVEUR;
-    if (!MODE_SERVEUR || !compteLocal()) return;
+    if (!MODE_SERVEUR) return;
+    if (!compteLocal()) return proposerLienBande(); // lien de Bande ouvert sur un téléphone sans compte
     try {
       const e = etatJour = await apiJoueur('/match-jour');
       const m = e.moi && e.moi.fini ? e.moi : null;
@@ -3695,11 +3697,13 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
     const l = stock.lire('kopo-bande-lien');
     if (!l || lienBandeVu || !$('voile').hidden || $('ecranAccueil').hidden) return;
     if (Date.now() - l.le > 7 * 864e5) return stock.effacer('kopo-bande-lien');
+    const texte = 'Chaque semaine, on mise sur nos Matchs du jour, et le meilleur rafle le pot. Connecte-toi avec Google pour entrer dans la Bande.';
+    // Pas encore de compte, ou compte sans Google : on l'invite à se connecter ; le lien reste gardé pour après.
+    if (!compteLocal() || (etatBandes && !etatBandes.google)) { lienBandeVu = true; return fenetreGoogle('Un ami t\'invite dans sa Bande', texte); }
+    if (!etatBandes) return; // état pas encore lu (réseau) : on réessaiera
     lienBandeVu = true;
-    if (etatBandes && !etatBandes.google) return fenetreGoogle('Un ami t\'invite dans sa Bande', 'Chaque semaine, on mise sur nos Matchs du jour, et le meilleur rafle le pot. Connecte-toi avec Google pour entrer dans la Bande.');
-    stock.effacer('kopo-bande-lien');
-    try { const x = await apiJoueur('/bandes/rejoindre', 'POST', { code: l.code }); toast(`Bienvenue dans « ${x.nom} » !`); afficherBande(x); majCartesCompetition(); }
-    catch (e) { toast(e.message); }
+    try { const x = await apiJoueur('/bandes/rejoindre', 'POST', { code: l.code }); stock.effacer('kopo-bande-lien'); toast(`Bienvenue dans « ${x.nom} » !`); afficherBande(x); majCartesCompetition(); }
+    catch (e) { toast(e.message); if (/inconnu|complète|maximum/.test(e.message)) stock.effacer('kopo-bande-lien'); else lienBandeVu = false; } // sinon (réseau, Google…) on réessaiera
   }
 
   $('btnMatchJour').onclick = () => ouvrirMatchJour();
@@ -4158,7 +4162,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
 
   // ------------------------------------------------------------------ parrainage (serveur)
   // Mon lien d'invitation, mes amis venus jouer, mes paliers. Tout est vérifié par le serveur.
-  const lienParrain = (code) => location.origin + location.pathname + '?parrain=' + code;
+  const lienParrain = (code) => LIEN_SITE() + '?parrain=' + code;
   async function ouvrirParrainage(retour) {
     const zone = el('div', 'parrainage');
     const f = el('button', 'btn large', 'Fermer'); f.onclick = () => (retour ? retour() : fermerFenetre());

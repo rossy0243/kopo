@@ -1257,8 +1257,11 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
   await test('Bande ouverte : un inconnu la voit, demande, le créateur accepte ; le créateur qui part passe la main', async () => {
     const [chef, , autre] = membres;
     assert.strictEqual((await api('/api/bandes/' + bandeId, { methode: 'PATCH', jeton: membres[1].jeton, corps: { ouverte: true } })).statut, 403);
-    await api('/api/bandes/' + bandeId, { methode: 'PATCH', jeton: chef.jeton, corps: { ouverte: true, pays: 'CD' } });
+    await api('/api/bandes/' + bandeId, { methode: 'PATCH', jeton: chef.jeton, corps: { ouverte: true, pays: '' } });
     const x = await connexionG('sb-b4', { providerId: 'g-b4' });
+    assert.ok((await api('/api/bandes/ouvertes?pays=CD', { jeton: x.jeton })).json.liste.some((b) => b.id === bandeId), 'Bande sans pays : visible de tous');
+    await api('/api/bandes/' + bandeId, { methode: 'PATCH', jeton: chef.jeton, corps: { ouverte: true, pays: 'CD' } });
+    assert.ok(!(await api('/api/bandes/ouvertes?pays=SN', { jeton: x.jeton })).json.liste.some((b) => b.id === bandeId), 'Bande du Congo : pas dans la liste du Sénégal');
     const l = (await api('/api/bandes/ouvertes?pays=CD', { jeton: x.jeton })).json;
     assert.ok(l.liste.some((b) => b.id === bandeId));
     assert.strictEqual((await api(`/api/bandes/${bandeId}/demander`, { methode: 'POST', jeton: x.jeton })).statut, 200);
