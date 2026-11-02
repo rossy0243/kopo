@@ -759,5 +759,34 @@ test('Plus de 2 joueurs : l’ouvreur reste tiré au hasard', () => {
   assert.strictEqual(vus.size, 3);
 });
 
+test('Salon : chacun se dit prêt ou pas, sans bloquer le lancement par l’hôte', () => {
+  const s = salleAvec(3);
+  S.recevoir(s, 'p1', { type: 'ajouterRobot' });
+  const v = (id) => S.vue(s, id).joueurs;
+  assert.deepStrictEqual(v('p1').map((j) => j.pret), [false, false, false, true]); // un robot est toujours prêt
+  assert.ok(S.recevoir(s, 'p2', { type: 'pret', pret: true }).ok);
+  assert.strictEqual(v('p3').find((j) => j.id === 'p2').pret, true);
+  assert.ok(S.recevoir(s, 'p2', { type: 'pret', pret: false }).ok);
+  assert.strictEqual(v('p3').find((j) => j.id === 'p2').pret, false);
+  assert.ok(!S.recevoir(s, 'inconnu', { type: 'pret', pret: true }).ok);
+  assert.ok(S.recevoir(s, 'p3', { type: 'pret', pret: true }).ok);
+  assert.ok(S.recevoir(s, 'p1', { type: 'lancer' }).ok); // p2 n'est pas prêt : l'hôte lance quand même
+  assert.ok(!S.recevoir(s, 'p3', { type: 'pret', pret: false }).ok); // plus dans le salon
+});
+test('Salon : le chat marche avant le lancement', () => {
+  const s = salleAvec(2);
+  const r = S.recevoir(s, 'p2', { type: 'reaction', emoji: 'Salut tout le monde !' });
+  assert.ok(r.ok);
+  assert.deepStrictEqual(r.evenement, { type: 'reaction', joueur: 'p2', emoji: 'Salut tout le monde !' });
+});
+test('Retour au salon : personne n’est plus prêt', () => {
+  const s = salleAvec(2, 5);
+  S.recevoir(s, 'p2', { type: 'pret', pret: true });
+  S.recevoir(s, 'p1', { type: 'lancer' });
+  s.etat = 'finPartie';
+  assert.ok(S.recevoir(s, 'p1', { type: 'rejouer' }).ok);
+  assert.ok(S.vue(s, 'p1').joueurs.every((j) => !j.pret));
+});
+
 console.log(`\n${ok} tests réussis, ${ko} en échec.`);
 process.exit(ko ? 1 : 0);
