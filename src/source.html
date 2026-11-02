@@ -926,6 +926,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   <symbol id="i-joker" viewBox="0 0 32 32"><rect x="8" y="4" width="16" height="24" rx="2.5"/><path d="M16 9.5l1.9 3.9 4.2.6-3 3 .7 4.2-3.8-2-3.8 2 .7-4.2-3-3 4.2-.6z"/><circle cx="16" cy="24.6" r="1.4" style="fill:var(--acc,#c7362f);stroke:none"/></symbol>
   <symbol id="i-cadeau" viewBox="0 0 32 32"><rect x="7" y="9" width="18" height="19" rx="2.5"/><path d="M16 9v19M7 16h18M16 9c-1-3.6-6-4.4-6-1.4 0 1.2 1.8 1.4 6 1.4 4.2 0 6-.2 6-1.4 0-3-5-2.2-6 1.4z"/><path style="fill:var(--acc,#c7362f);stroke:none" d="M20.5 19.6l1.8 2.4-1.8 2.4-1.8-2.4z"/></symbol>
   <symbol id="i-installer" viewBox="0 0 32 32"><rect x="9" y="3" width="14" height="26" rx="2.5"/><path d="M16 8v11M11.5 14.5L16 19l4.5-4.5M13 24.5h6"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 32 32"><circle cx="16" cy="7" r="2.4" style="fill:currentColor"/><circle cx="16" cy="16" r="2.4" style="fill:currentColor"/><circle cx="16" cy="25" r="2.4" style="fill:currentColor"/></symbol>
   <symbol id="i-ios-partage" viewBox="0 0 32 32"><path d="M11 12H8v16h16V12h-3M16 20V3M11 8l5-5 5 5"/></symbol>
   <symbol id="i-ios-ajouter" viewBox="0 0 32 32"><rect x="5" y="5" width="22" height="22" rx="5"/><path d="M16 10.5v11M10.5 16h11"/></symbol>
   <symbol id="i-cadenas" viewBox="0 0 32 32"><rect x="8" y="14" width="16" height="13" rx="2.5"/><path d="M11.5 14v-3.5a4.5 4.5 0 0 1 9 0V14M16 19v3"/></symbol>
@@ -4356,7 +4357,9 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   if ('serviceWorker' in navigator && !DANS_APPLI_NATIVE && !ANCIENNE_PAGE && (location.protocol === 'https:' || location.hostname === 'localhost')) {
     addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
   }
-  const peutInstaller = () => !DANS_APPLI_NATIVE && !LANCE_ICONE && !ANCIENNE_PAGE && !stock.lire('kopo-installe') && (!!inviteInstallation || IOS);
+  const peutInstaller = () => !DANS_APPLI_NATIVE && !LANCE_ICONE && !ANCIENNE_PAGE && !stock.lire('kopo-installe');
+  // Sans invite du navigateur (Chrome ne la donne qu'après un peu d'usage, Samsung, Firefox, navigateur de WhatsApp…),
+  // le bouton reste là et ouvre un guide : menu du navigateur > Installer / Ajouter à l'écran d'accueil.
   function majBoutonInstaller() { $('btnInstaller').hidden = !peutInstaller(); majPleinEcran(); }
   addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault(); // pas de bandeau automatique : c'est notre bouton qui propose
@@ -4379,29 +4382,34 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       majBoutonInstaller();
       return;
     }
-    if (IOS) guideIphone();
+    guideInstallation();
   }
   $('btnInstaller').onclick = installer;
   const texteCadeauInstallation = () => 'Cadeau : ' + CADEAU_INSTALLATION + ' pièces la première fois que tu ouvres Kopo depuis son icône.';
-  function guideIphone() {
+  function guideInstallation() {
     const etapes = el('ol', 'guide-ios');
     const etape = (morceaux, ico) => { const li = el('li'), t = el('span'); t.append(...morceaux); li.append(t, icone(ico)); return li; };
-    etapes.append(
+    const nav = IOS ? 'Safari' : 'Chrome';
+    if (IOS) etapes.append(
       etape(['Touche ', el('b', null, 'Partager'), ' dans la barre de Safari'], 'i-ios-partage'),
       etape(['Choisis ', el('b', null, 'Sur l\'écran d\'accueil'), ' (fais défiler la liste si besoin)'], 'i-ios-ajouter'),
       etape(['Touche ', el('b', null, 'Ajouter'), ', puis ouvre Kopo depuis sa nouvelle icône'], 'i-installer'));
-    const aide = el('p', null, 'Tu ne vois pas « Sur l\'écran d\'accueil » ? Tu es sans doute dans WhatsApp ou une autre appli : ouvre ce lien dans Safari.');
+    else etapes.append(
+      etape(['Touche le menu ', el('b', null, '⋮'), ' du navigateur (en haut ou en bas à droite)'], 'i-menu'),
+      etape(['Choisis ', el('b', null, 'Installer l\'application'), ' ou ', el('b', null, 'Ajouter à l\'écran d\'accueil')], 'i-ios-ajouter'),
+      etape(['Confirme, puis ouvre Kopo depuis sa nouvelle icône'], 'i-installer'));
+    const aide = el('p', null, 'Tu ne trouves pas ? Tu es sans doute dans WhatsApp, Facebook ou une autre appli : ouvre ce lien dans ' + nav + '.');
     const copier = el('button', 'btn large', 'Copier le lien du jeu');
     copier.onclick = () => {
       const lien = NOUVELLE_ADRESSE || (location.origin + location.pathname);
-      (navigator.clipboard ? navigator.clipboard.writeText(lien) : Promise.reject()).then(() => toast('Lien copié : colle-le dans Safari.'), () => toast(lien));
+      (navigator.clipboard ? navigator.clipboard.writeText(lien) : Promise.reject()).then(() => toast('Lien copié : colle-le dans ' + nav + '.'), () => toast(lien));
     };
     const fait = el('button', 'btn principal large', 'C\'est fait');
     fait.onclick = () => { stock.ecrire('kopo-installe', true); majBoutonInstaller(); fermerFenetre(); };
     const google = el('div'); google.style.display = 'contents';
-    ouvrirFenetre([el('h2', null, 'Installer le jeu'), el('p', null, 'Sur iPhone, ça se fait en 3 gestes depuis Safari :'), etapes, el('p', null, texteCadeauInstallation()), google, aide, copier, fait]);
+    ouvrirFenetre([el('h2', null, 'Installer le jeu'), el('p', null, (IOS ? 'Sur iPhone' : 'Sur ton téléphone') + ', ça se fait en 3 gestes depuis ' + nav + ' :'), etapes, el('p', null, texteCadeauInstallation()), google, aide, copier, fait]);
     // L'appli installée sur iPhone ne voit pas les données de Safari : un invité y repartirait de zéro.
-    if (MODE_SERVEUR) (async () => {
+    if (MODE_SERVEUR && IOS) (async () => {
       try {
         const cfg = await lireConfig();
         if (!cfg || !cfg.google || !compteLocal()) return;
