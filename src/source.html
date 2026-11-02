@@ -3190,7 +3190,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
     z.append(rangs);
     // Classements : entre amis d'abord (c'est le plus parlant), puis pays, puis monde.
     const onglets = el('div', 'ligue-onglets'), liste = el('ul', 'ligue-liste'), pied = el('div');
-    const types = [['amis', 'Amis'], ['pays', 'Pays'], ['mondial', 'Monde']];
+    const types = [['amis', 'Amis'], ['mondial', 'Monde']];
     const charger = async (type) => {
       onglets.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.type === type)));
       liste.replaceChildren(el('li', 'muted', 'Chargement…')); pied.replaceChildren();
@@ -3339,7 +3339,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       const go = el('button', 'btn principal large', 'Jouer'); go.onclick = () => jouerMatchJour();
       boutons.push(go);
     }
-    // Classement du jour : amis, pays, monde.
+    // Classement du jour : amis, monde.
     const onglets = el('div', 'ligue-onglets'), liste = el('ul', 'ligue-liste');
     const charger = async (type) => {
       onglets.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.type === type)));
@@ -3349,7 +3349,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       const ligne = (j) => { const l = el('li', c.moi && j.id === c.moi.id ? 'moi' : null); l.append(el('span', 'rang', String(j.rang)), el('span', null, (j.victoire ? '🏆 ' : '') + j.pseudo), el('span', 'pts', String(j.score))); return l; };
       for (const j of c.liste) liste.append(ligne(j));
       if (c.moi && !c.liste.some((j) => j.id === c.moi.id)) { liste.append(el('li', 'muted', '…')); liste.append(ligne(c.moi)); }
-      if (!c.liste.length) liste.append(el('li', 'muted', type === 'amis' ? 'Aucun ami n\'a encore joué aujourd\'hui.' : type === 'pays' && !(compteLocal().compte || {}).pays ? 'Choisis ton pays dans la Ligue.' : 'Personne n\'a encore fini le Match du jour.'));
+      if (!c.liste.length) liste.append(el('li', 'muted', type === 'amis' ? 'Aucun ami n\'a encore joué aujourd\'hui.' : 'Personne n\'a encore fini le Match du jour.'));
     };
     for (const [t, n] of [['amis', 'Amis'], ['pays', 'Pays'], ['mondial', 'Monde']]) { const b = el('button', null, n); b.dataset.type = t; b.onclick = () => charger(t); onglets.append(b); }
     if (m) z.append(onglets, liste);
