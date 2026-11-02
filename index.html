@@ -602,6 +602,7 @@ body.dos-kinshasa { --dos-motif: linear-gradient(135deg, transparent 38%, #f7d03
 .objet:disabled { opacity: .4; }
 .objet .avatar { width: 36px; height: 36px; font-size: 20px; }
 .objet .mini-dos { width: 26px; height: 38px; border-radius: 4px; border: 2px solid #f3e3bd; background: repeating-linear-gradient(45deg, var(--brass) 0 4px, #9c7524 4px 8px); }
+.mini-dos.dos-brazzaville { background: linear-gradient(135deg, #009543 0 40%, #fbde4a 40% 60%, #dc241f 60%) !important; }
 .objet .mini-dos.dos-kinshasa { background: linear-gradient(135deg, transparent 38%, #f7d038 38% 44%, #ce1021 44% 56%, #f7d038 56% 62%, transparent 62%), #3b8fd6; }
 
 .bienvenue7 { display: grid; gap: 12px; justify-items: center; text-align: center; }
@@ -725,6 +726,7 @@ body.dos-abidjan { --dos-motif: linear-gradient(90deg, #f77f00 0 33%, #fff 33% 6
 body.dos-dakar { --dos-motif: linear-gradient(90deg, #00853f 0 33%, #fdef42 33% 66%, #e31b23 66%); --dos-motif-petit: linear-gradient(90deg, #00853f 0 33%, #fdef42 33% 66%, #e31b23 66%); }
 body.dos-douala { --dos-motif: linear-gradient(90deg, #007a5e 0 33%, #ce1126 33% 66%, #fcd116 66%); --dos-motif-petit: linear-gradient(90deg, #007a5e 0 33%, #ce1126 33% 66%, #fcd116 66%); }
 body.dos-goma { --dos-motif: linear-gradient(160deg, transparent 55%, #3a3a3a 55% 62%, transparent 62%), radial-gradient(circle at 70% 25%, #e0564c 0 14%, #f39a3c 15% 22%, transparent 23%), #1f4d3a; --dos-motif-petit: radial-gradient(circle at 70% 25%, #e0564c 0 20%, transparent 21%), #1f4d3a; }
+body.dos-brazzaville { --dos-motif: linear-gradient(135deg, #009543 0 40%, #fbde4a 40% 60%, #dc241f 60%); --dos-motif-petit: linear-gradient(135deg, #009543 0 40%, #fbde4a 40% 60%, #dc241f 60%); }
 body.dos-fondateurs { --dos-motif: radial-gradient(circle, #e2b04a 18%, transparent 19%) 0 0 / 12px 12px, #1d1606; --dos-motif-petit: radial-gradient(circle, #e2b04a 25%, transparent 26%) 0 0 / 6px 6px, #1d1606; }
 .mini-dos.dos-lubumbashi { background: repeating-linear-gradient(45deg, #b87333 0 4px, #5a2e0e 4px 8px) !important; }
 .mini-dos.dos-abidjan { background: linear-gradient(90deg, #f77f00 0 33%, #fff 33% 66%, #009e60 66%) !important; }
@@ -5027,7 +5029,7 @@ var qrcode = function() {
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = '0ebc5f1d44f4'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = 'a95804816421'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).

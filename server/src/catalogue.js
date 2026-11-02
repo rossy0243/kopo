@@ -33,6 +33,7 @@ const OBJETS = {
   'cadre-dakar': { type: 'cadre', nom: 'Sénégal', collection: 'senegal', prix: PRIX.cadre },
   'cadre-douala': { type: 'cadre', nom: 'Cameroun', collection: 'cameroun', prix: PRIX.cadre },
   'cadre-brazzaville': { type: 'cadre', nom: 'Congo', collection: 'congo', prix: PRIX.cadre },
+  'dos-brazzaville': { type: 'dos', nom: 'Congo', collection: 'congo', prix: null }, // fin de la voie Kopo+ dès la saison 2
   'cadre-lubumbashi': { type: 'cadre', nom: 'Lubumbashi', collection: 'lubumbashi', prix: null, ville: true },
   'cadre-fondateurs': { type: 'cadre', nom: 'Les Fondateurs', collection: 'saison-1', prix: null },
   'cadre-legende': { type: 'cadre', nom: 'Légende', collection: 'saison-1', prix: null },
@@ -45,10 +46,21 @@ const OBJETS = {
 const DE_BASE = ['av-laiton', 'dos-laiton'];
 
 // Parcours de saison : 30 paliers. Voie gratuite : pièces à chaque palier, apparences tous les 5 ;
-// le dos de cartes de saison (Goma) au bout. Voie Kopo+ : apparences en plus, jamais de pièces ni d'avantage.
-function contenuParcours(paliers = 30) {
-  const gratuitObjets = { 3: 'av-lubumbashi', 6: 'cadre-lubumbashi', 10: 'dos-lubumbashi', 15: 'av-dakar', 20: 'dos-dakar', 25: 'av-abidjan', 30: 'dos-goma' };
-  const plusObjets = { 1: 'av-fondateur', 4: 'cadre-fondateurs', 8: 'dos-abidjan', 12: 'av-douala', 16: 'dos-douala', 20: 'av-brazzaville', 24: 'av-goma', 28: 'cadre-brazzaville', 30: 'cadre-legende' };
+// un dos de cartes au bout. Voie Kopo+ : apparences en plus, jamais de pièces ni d'avantage.
+// Saison 1 (« Les Fondateurs ») : contenu d'origine, gardé tel quel jusqu'à sa fin (villes comprises).
+// Dès la saison 2 : thème des pays seulement.
+const OBJETS_PARCOURS = {
+  1: {
+    gratuit: { 3: 'av-lubumbashi', 6: 'cadre-lubumbashi', 10: 'dos-lubumbashi', 15: 'av-dakar', 20: 'dos-dakar', 25: 'av-abidjan', 30: 'dos-goma' },
+    plus: { 1: 'av-fondateur', 4: 'cadre-fondateurs', 8: 'dos-abidjan', 12: 'av-douala', 16: 'dos-douala', 20: 'av-brazzaville', 24: 'av-goma', 28: 'cadre-brazzaville', 30: 'cadre-legende' },
+  },
+  pays: {
+    gratuit: { 3: 'cadre-kinshasa', 6: 'av-abidjan', 10: 'dos-abidjan', 15: 'cadre-dakar', 20: 'av-douala', 25: 'cadre-douala', 30: 'dos-dakar' },
+    plus: { 4: 'cadre-abidjan', 8: 'av-dakar', 12: 'dos-douala', 16: 'av-brazzaville', 20: 'cadre-brazzaville', 30: 'dos-brazzaville' },
+  },
+};
+function contenuParcours(paliers = 30, saison = 1) {
+  const { gratuit: gratuitObjets, plus: plusObjets } = saison === 1 ? OBJETS_PARCOURS[1] : OBJETS_PARCOURS.pays;
   const l = [];
   for (let n = 1; n <= paliers; n++) {
     const g = gratuitObjets[n] ? { objet: gratuitObjets[n] } : { pieces: n % 10 === 0 ? 300 : n % 5 === 0 ? 150 : 60 };
