@@ -446,6 +446,15 @@ ul.regles, ol.regles { margin: 0; padding-left: 20px; display: grid; gap: 6px; c
 .splash-couleurs span:nth-child(3) { animation-delay: .24s; color: var(--bad); }
 .splash-couleurs span:nth-child(4) { animation-delay: .36s; }
 .splash-sous { color: var(--muted); letter-spacing: 4px; text-transform: uppercase; font-size: 13px; }
+/* Barre de chargement : suit la page, les polices puis le réveil du serveur. */
+.splash-charge { display: grid; justify-items: center; gap: 9px; margin-top: 18px; width: min(62vw, 260px); }
+.splash-barre { width: 100%; height: 6px; border-radius: 99px; background: rgba(255,255,255,.08); box-shadow: inset 0 1px 2px rgba(0,0,0,.45); overflow: hidden; }
+.splash-barre i { display: block; height: 100%; width: 100%; border-radius: inherit; transform-origin: left; transform: scaleX(0); background: linear-gradient(90deg, #b9862c, var(--brass) 70%, #f6d68c); box-shadow: 0 0 12px rgba(226,176,74,.55); }
+.splash-etat { min-height: 1.3em; color: var(--muted); font-size: 12px; letter-spacing: .5px; text-align: center; }
+.splash-passer { color: rgba(159,178,200,.6); font-size: 11px; letter-spacing: .5px; visibility: hidden; }
+.splash.attente { cursor: pointer; }
+.splash.attente .splash-passer { visibility: visible; }
+@media (max-height: 480px) { .splash { gap: 7px; } .splash-marque { width: min(18vh, 80px); } .splash-logo { font-size: min(20vh, 110px); } .splash-couleurs { font-size: 22px; } .splash-charge { margin-top: 4px; gap: 5px; } }
 @keyframes entree { from { transform: scale(.5); opacity: 0; } }
 @keyframes saut { 0%, 100% { transform: none; } 50% { transform: translateY(-10px); } }
 @media (prefers-reduced-motion: reduce) { .splash-logo, .splash-marque, .splash-couleurs span { animation: none; } }
@@ -955,7 +964,27 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   <div class="splash-logo">KOPO</div>
   <div class="splash-couleurs"><span>♠</span><span>♥</span><span>♦</span><span>♣</span></div>
   <div class="splash-sous">Jeu de cartes entre amis</div>
+  <div class="splash-charge"><div class="splash-barre"><i id="splashBarre"></i></div><div class="splash-etat" id="splashEtat">Chargement…</div><div class="splash-passer">Touche l'écran pour passer</div></div>
 </div>
+<script>
+// Barre du splash : kopoChargement(étape atteinte en %, texte, plafond). Entre deux étapes,
+// la barre avance doucement vers le plafond, sans jamais l'atteindre ni reculer.
+(function () {
+  var barre = document.getElementById('splashBarre'), etat = document.getElementById('splashEtat');
+  var vise = 3, plafond = 30, affiche = 0;
+  window.kopoChargement = function (p, texte, max) {
+    vise = Math.max(vise, p); plafond = Math.max(vise, max || p);
+    if (texte) etat.textContent = texte;
+  };
+  (function pas() {
+    if (!barre.isConnected) return;
+    if (affiche < vise) affiche = Math.min(vise, affiche + Math.max((vise - affiche) * .16, .4));
+    else if (affiche < plafond) affiche += (plafond - affiche) * .008;
+    barre.style.transform = 'scaleX(' + (affiche / 100) + ')';
+    requestAnimationFrame(pas);
+  })();
+})();
+</script>
 <div class="voile" id="voile" hidden><div class="fenetre" id="fenetre"></div></div>
 <div class="voile voile-annonce" id="voileAnnonce" hidden>
   <div class="fenetre fenetre-serveur" role="dialog" aria-modal="true" aria-labelledby="titreAnnonce">
@@ -1002,14 +1031,23 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
 <div id="calque" aria-hidden="true"></div>
 <div id="filChat" role="log" aria-live="polite" aria-label="Chat de la partie"></div>
 
+<script>kopoChargement(5, 0, 34)</script>
 <script>/*MQTT*/</script>
+<script>kopoChargement(34, 0, 44)</script>
 <script>/*COLYSEUS*/</script>
+<script>kopoChargement(44, 0, 52)</script>
 <script>/*PEERJS*/</script>
+<script>kopoChargement(52, 0, 57)</script>
 <script>/*QRCODE*/</script>
+<script>kopoChargement(57, 0, 59)</script>
 <script>/*MOTEUR*/</script>
+<script>kopoChargement(59, 0, 61)</script>
 <script>/*SALLE*/</script>
+<script>kopoChargement(61, 0, 63)</script>
 <script>/*RETENTION*/</script>
+<script>kopoChargement(63, 0, 64)</script>
 <script>/*SONS*/</script>
+<script>kopoChargement(64, 0, 72)</script>
 <script>
 (function () {
   'use strict';
@@ -4248,7 +4286,39 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   })();
 
   // ------------------------------------------------------------------ démarrage
-  setTimeout(() => { $('splash').classList.add('fini'); setTimeout(() => $('splash').remove(), 500); }, 1300);
+  // Écran de démarrage : la barre suit le chargement de la page (scripts ci-dessus), des polices,
+  // puis le réveil du serveur (endormi par l'hébergeur gratuit, jusqu'à une minute). Après 12 s
+  // ou un toucher, on passe à l'accueil : le serveur continue de se réveiller derrière.
+  (function finirSplash() {
+    const splash = $('splash'), charge = window.kopoChargement || (() => {});
+    const delai = (ms) => new Promise((r) => setTimeout(r, ms));
+    let fini = false;
+    const fermer = (toastReveil) => {
+      if (fini) return; fini = true;
+      splash.classList.remove('attente'); splash.classList.add('fini'); setTimeout(() => splash.remove(), 500);
+      if (toastReveil) toast('Le serveur se réveille encore : les parties en ligne seront prêtes dans un instant.');
+    };
+    const serveurPret = MODE_SERVEUR && navigator.onLine
+      ? fetch(SERVEUR + '/sante', { cache: 'no-store' }).then(() => true, () => true) // une erreur ne bloque pas l'accueil
+      : Promise.resolve(true);
+    const polices = document.fonts && document.fonts.ready ? Promise.race([document.fonts.ready, delai(1500)]) : Promise.resolve();
+    charge(74, 'Préparation de la table…', 80);
+    (async () => {
+      await polices;
+      if (MODE_SERVEUR) charge(82, 'Connexion au serveur…', 93);
+      let pret = await Promise.race([serveurPret, delai(2500).then(() => false)]);
+      if (!pret && !fini) {
+        charge(86, 'Réveil du serveur, un instant…', 98);
+        splash.classList.add('attente');
+        splash.addEventListener('click', () => fermer(true), { once: true });
+        pret = await Promise.race([serveurPret, delai(9500).then(() => false)]);
+      }
+      if (fini) return;
+      charge(100, 'Prêt !');
+      await delai(Math.max(400, 1300 - performance.now())); // le splash reste au moins ~1,3 s
+      fermer(!pret);
+    })();
+  })();
   if (typeof mqtt === 'undefined' && !LOCAL && !MODE_SERVEUR) montrerBandeau("La bibliothèque réseau n'a pas pu se charger.");
   lobby.demarrer();
   const codeLien = location.hash.slice(1).toUpperCase();
