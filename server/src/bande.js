@@ -283,7 +283,7 @@ function creerBande(base, reglages, comptes, matchJour, social) {
       const r = await base.query(`SELECT b.id, b.nom, b.mise, b.pays, count(m.compte_id)::int AS membres,
           EXISTS (SELECT 1 FROM bande_demandes d WHERE d.bande_id = b.id AND d.compte_id = $2) AS demandee
         FROM bandes b JOIN bande_membres m ON m.bande_id = b.id
-        WHERE b.ouverte AND ($1::text IS NULL OR b.pays = $1) AND NOT EXISTS (SELECT 1 FROM bande_membres x WHERE x.bande_id = b.id AND x.compte_id = $2)
+        WHERE b.ouverte AND ($1::text IS NULL OR b.pays IS NULL OR b.pays = $1) AND NOT EXISTS (SELECT 1 FROM bande_membres x WHERE x.bande_id = b.id AND x.compte_id = $2)
         GROUP BY b.id HAVING count(m.compte_id) < $3 ORDER BY count(m.compte_id) DESC, b.cree_le LIMIT 30`, [p || null, compte.id, cfg().membresMax]);
       return { pays: p || null, liste: r.rows };
     },
