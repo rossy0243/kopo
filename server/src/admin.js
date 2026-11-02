@@ -3,7 +3,7 @@
 const express = require('express');
 const { enveloppe, publicCompte } = require('./api');
 
-function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainage, salles, demarrage }) {
+function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainage, bande, salles, demarrage }) {
   const r = express.Router();
   r.use(express.json({ limit: '50kb' }));
 
@@ -216,6 +216,12 @@ function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainag
     const x = await ligue.assurerSaison({ forcer: true });
     await journal('saison:cloturer', String(x.cloturee), x);
     res.json({ ok: true, ...x });
+  }));
+
+  // --- Bandes : semaines, pots, et signal des Bandes suspectes (competition-amis.md §7)
+  r.get('/bandes', enveloppe(async (req, res) => {
+    const jour = (await base.query("SELECT count(*)::int AS joueurs, coalesce(round(avg(score)), 0)::int AS moyenne FROM match_jour WHERE jour = $1 AND statut = 'fini'", [bande ? require('./match-jour').jourDe() : null])).rows[0];
+    res.json({ matchJour: jour, bandes: bande ? await bande.surveillance() : [] });
   }));
 
   // --- Pilotage : gains, bonus, tables, pot, annonce, maintenance

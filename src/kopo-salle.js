@@ -159,7 +159,7 @@
     const d = enCours ? delaiPour(s, m.joueurCourant) : 0;
     s.echeance = d ? s.horloge() + d * 1000 : null;
     s.chronoTotal = d * 1000;
-    s.robotPret = enCours ? s.horloge() + PAUSE_ROBOT : null;
+    s.robotPret = enCours ? s.horloge() + (s.pauseRobot >= 0 ? s.pauseRobot : PAUSE_ROBOT) : null; // pauseRobot : tests du serveur seulement
   }
 
   // Un joueur déconnecté, ou dont le temps s'est écoulé deux fois d'affilée, n'a plus
@@ -296,10 +296,30 @@
     return premier;
   }
 
+  // Match du jour : la même donne pour tous les joueurs (competition-amis.md §3.1).
+  // s.donne = { graine, ordre } : graine entière, ordre = les 9 places fixes (le joueur d'abord, puis les robots).
+  // À chaque manche, un hasard tiré de la graine et du numéro de manche fixe l'ordre autour de la table,
+  // le paquet et qui ouvre. Le joueur reçoit toujours les 4 premières cartes du paquet : à la manche 3,
+  // tout le monde a la même main, quels que soient les robots déjà éliminés.
+  function hasardManche(graine, manche) { return K.hasard((graine + Math.imul(manche, 0x9e3779b1)) >>> 0); }
+  function placerDonne(s) {
+    const rng = hasardManche(s.donne.graine, s.numeroManche + 1);
+    const presents = (l) => l.filter((id) => s.restants.includes(id));
+    const tour = K.melanger(s.donne.ordre, rng); // ordre autour de la table, places vides comprises
+    const { mains, redistributions } = K.distribuer(presents(s.donne.ordre), rng);
+    const depart = Math.floor(rng() * tour.length);
+    const ouvreur = presents(tour.slice(depart).concat(tour.slice(0, depart)))[0];
+    return { sieges: presents(tour), mains, redistributions, premier: ouvreur };
+  }
+
   function demarrerManche(s) {
-    const sieges = K.melanger(s.restants, s.rng);
-    const { mains, redistributions } = K.distribuer(sieges, s.rng);
-    const premier = choisirOuvreur(s, sieges);
+    let sieges, mains, redistributions, premier;
+    if (s.donne) ({ sieges, mains, redistributions, premier } = placerDonne(s));
+    else {
+      sieges = K.melanger(s.restants, s.rng);
+      ({ mains, redistributions } = K.distribuer(sieges, s.rng));
+      premier = choisirOuvreur(s, sieges);
+    }
     s.numeroManche++;
     s.suiteA = null;
     s.manche = K.nouvelleManche(sieges, mains, premier, redistributions);
@@ -575,7 +595,7 @@
     return s;
   }
 
-  const KopoSalle = { MIN, MAX, DELAIS, PAUSE_ROBOT, DUREES, creerSalle, rendrePublique, choixRobot, NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, robotGentil, robotNormal, robotFort, reconnecter, DELAI_ABSENT, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
+  const KopoSalle = { MIN, MAX, hasardManche, placerDonne, DELAIS, PAUSE_ROBOT, DUREES, creerSalle, rendrePublique, choixRobot, NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, robotGentil, robotNormal, robotFort, reconnecter, DELAI_ABSENT, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
   if (typeof module !== 'undefined' && module.exports) module.exports = KopoSalle;
   else root.KopoSalle = KopoSalle;
 })(typeof window !== 'undefined' ? window : globalThis);

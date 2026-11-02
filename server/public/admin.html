@@ -88,7 +88,7 @@ const $ = (s) => document.querySelector(s);
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const nb = (x) => (x ?? 0).toLocaleString('fr-FR');
 const date = (d) => d ? new Date(d).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : '—';
-const MOTIFS = { bienvenue: 'Bienvenue', bonus_jour: 'Bonus du jour', manche: 'Manches survécues', katapss: 'Katapss', victoire: 'Victoires', deuxieme: '2e places', remise_a_flot: 'Remise à flot', admin: 'Corrections admin', cadeau: 'Cadeaux', mise: 'Mises', pot: 'Pots', saison: 'Récompenses de saison', parcours: 'Parcours de saison', boutique: 'Boutique', parrainage: 'Parrainage (parrains)', parrainage_filleul: 'Parrainage (filleuls)', mission: 'Missions du jour', defi: 'Défis de la semaine', bienvenue7: 'Bienvenue 7 jours' };
+const MOTIFS = { bienvenue: 'Bienvenue', bonus_jour: 'Bonus du jour', manche: 'Manches survécues', katapss: 'Katapss', victoire: 'Victoires', deuxieme: '2e places', remise_a_flot: 'Remise à flot', admin: 'Corrections admin', cadeau: 'Cadeaux', mise: 'Mises', pot: 'Pots', saison: 'Récompenses de saison', parcours: 'Parcours de saison', boutique: 'Boutique', parrainage: 'Parrainage (parrains)', parrainage_filleul: 'Parrainage (filleuls)', mission: 'Missions du jour', defi: 'Défis de la semaine', bienvenue7: 'Bienvenue 7 jours', mise_bande: 'Mises de Bande', pot_bande: 'Pots de Bande (Chefs)', mise_rendue_bande: 'Mises rendues (2e de Bande)', remboursement_bande: 'Mises de Bande remboursées' };
 const DIV = { bois: 'Bois', bronze: 'Bronze', argent: 'Argent', or: 'Or', diamant: 'Diamant', legende: 'Légende' };
 let jeton = sessionStorage.getItem('kopo-admin');
 let page = 'direct', minuteur = null;
@@ -122,7 +122,7 @@ $('#btnDeconnexion').onclick = deconnexion;
 // --- Navigation
 const PAGES = [
   ['direct', 'En direct', 'd-direct'], ['audience', 'Audience', 'd-audience'], ['economie', 'Pièces', 'd-pieces'],
-  ['ligue', 'Ligue', 'd-ligue'], ['joueurs', 'Joueurs', 'd-joueurs'], ['signalements', 'Signalements', 'd-signal'], ['pilotage', 'Pilotage', 'd-pilotage'], ['journal', 'Journal', 'd-journal'],
+  ['ligue', 'Ligue', 'd-ligue'], ['bandes', 'Bandes', 'd-joueurs'], ['joueurs', 'Joueurs', 'd-joueurs'], ['signalements', 'Signalements', 'd-signal'], ['pilotage', 'Pilotage', 'd-pilotage'], ['journal', 'Journal', 'd-journal'],
 ];
 function nav() {
   $('#nav').innerHTML = PAGES.map(([id, t, ico]) => `<button data-page="${id}" ${id === page ? 'aria-current="page"' : ''}><svg class="ico-k"><use href="#${ico}"/></svg>${t}${id === 'signalements' ? ' <span class="badge" id="nbSignal" hidden></span>' : ''}</button>`).join('');
@@ -257,6 +257,15 @@ const afficher = {
     };
   },
 
+  async bandes() {
+    const B = await api('/bandes');
+    const suspectes = B.bandes.filter((b) => b.suspecte).length;
+    $('#contenu').innerHTML = `<h2>Match du jour et Bandes</h2>
+      <div class="tuiles">${tuile(nb(B.matchJour.joueurs), 'Matchs du jour joués', 'aujourd\'hui')}${tuile(B.matchJour.moyenne + ' / 100', 'score moyen')}${tuile(nb(B.bandes.length), 'Bandes')}${tuile(nb(suspectes), 'Bandes à vérifier', 'même Chef 3 semaines, d\'autres misent sans jouer')}</div>
+      <p class="muted">Réglages (mise, part de la maison, niveau des robots) : onglet Pilotage.</p>
+      <div class="carte"><table><tr><th>Bande</th><th>Créateur</th><th class="n">Membres</th><th>Dernières semaines (mise · inscrits · Chef · pot · détruit)</th></tr>${B.bandes.map((b) => `<tr><td>${b.suspecte ? '<span class="ko">⚠</span> ' : ''}${esc(b.nom)} <span class="muted">${esc(b.code)}${b.ouverte ? ' · ouverte' : ''}</span></td><td>${esc(b.createur)}</td><td class="n">${b.membres}</td><td>${b.semaines.slice(0, 3).map((s) => `${esc(s.semaine)} : ${nb(s.mise)} · ${s.inscrits} · ${s.statut === 'cloturee' ? esc(s.chefs.join(', ') || '—') + ' · ' + nb(s.pot) + ' · ' + nb(s.detruit) : esc(s.statut)}${s.horsRegle ? ` <span class="ko">(${s.horsRegle} hors règle)</span>` : ''}`).join('<br>') || '<span class="muted">aucune semaine</span>'}</td></tr>`).join('') || '<tr><td colspan="4" class="muted">Aucune Bande pour l\'instant.</td></tr>'}</table></div>`;
+  },
+
   async joueurs(q = '') {
     $('#contenu').innerHTML = `<h2>Joueurs</h2><div class="ligne"><input id="recherche" placeholder="Pseudo, Pseudo#1234 ou identifiant" value="${esc(q)}" style="min-width:300px"><button class="btn principal" id="btnRecherche">Chercher</button></div><div id="resultats"></div>`;
     const go = async () => {
@@ -352,6 +361,9 @@ const afficher = {
         <h3>Remise à flot</h3>${champs('remiseAFlot', { seuil: 'Si le solde passe sous', niveau: 'Remonter à' })}<button class="btn principal" data-enregistrer="remiseAFlot">Enregistrer</button></div>
       <div class="carte"><h3 style="margin-top:0">Tables à mise</h3>${champs('tables', { bronze: 'Bronze', argent: 'Argent', or: 'Or', diamant: 'Diamant' })}<button class="btn principal" data-enregistrer="tables">Enregistrer les mises</button>
         <h3>Partage du pot (en %, total 100)</h3>${champs('pot', { vainqueur: 'Vainqueur', deuxieme: '2e', troisieme: '3e', maison: 'Maison (pièces détruites)' })}<button class="btn principal" data-enregistrer="pot">Enregistrer le partage</button></div>
+      <div class="carte"><h3 style="margin-top:0">Match du jour</h3>
+        <div class="ligne"><label><input type="checkbox" id="mjActif" ${r.matchJour.actif ? 'checked' : ''}> actif</label><label>Robots <select id="mjRobots">${['faciles', 'normaux', 'forts'].map((x) => `<option ${r.matchJour.robots === x ? 'selected' : ''}>${x}</option>`).join('')}</select></label><label>Force <input type="number" id="mjNiveau" value="${+r.matchJour.niveauRobots}" style="width:80px"></label><button class="btn principal" id="btnMatchJour">Enregistrer</button></div>
+        <h3>La Bande</h3><p class="muted">Mettre « Actif » à 0 met les Bandes en pause (plus de création ni de mise ; les semaines lancées vont au bout).</p>${champs('bande', { actif: 'Actif (1 = oui, 0 = non)', maison: 'Part de la maison (%)', miseMin: 'Mise minimum', miseMax: 'Mise maximum', inscritsMin: 'Inscrits minimum', membresMax: 'Membres maximum', bandesMax: 'Bandes par joueur', matchsMin: 'Matchs à jouer sur 7', penaliteRetard: 'Pénalité de retard (points)', joursCompte: 'Âge du compte pour miser (jours)', partiesMin: 'Parties jouées pour miser' })}<button class="btn principal" data-enregistrer="bande">Enregistrer la Bande</button></div>
       <div class="carte"><h3 style="margin-top:0">Messages du chat en partie</h3>
         <p class="muted">Un message par ligne (émoji ou courte phrase, 40 caractères au plus, 40 messages au plus). Les joueurs ne peuvent envoyer que ces messages, dans cet ordre.</p>
         <textarea id="messagesRapides" rows="8" style="width:100%;max-width:520px;font-size:16px">${esc((r.messagesRapides || []).join('\n'))}</textarea>
@@ -368,6 +380,7 @@ const afficher = {
     $('#btnMaint').onclick = () => { if (!$('#maintActive').checked || confirm('Fermer le jeu pour maintenance ?')) ecrire('maintenance', { message: $('#maint').value, active: $('#maintActive').checked }); };
     $('#btnMessages').onclick = () => ecrire('messagesRapides', $('#messagesRapides').value.split('\n'));
     $('#btnFondateur').onclick = () => ecrire('cadeauFondateur', { actif: $('#fondateurActif').checked });
+    $('#btnMatchJour').onclick = () => ecrire('matchJour', { actif: $('#mjActif').checked, robots: $('#mjRobots').value, niveauRobots: Number($('#mjNiveau').value) });
     $('#btnVersion').onclick = () => ecrire('versionMin', $('#version').value.trim());
     $('#btnCadeau').onclick = async () => {
       const montant = Number($('#cadeauMontant').value);

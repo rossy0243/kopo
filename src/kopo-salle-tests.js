@@ -788,5 +788,59 @@ test('Retour au salon : personne n’est plus prêt', () => {
   assert.ok(S.vue(s, 'p1').joueurs.every((j) => !j.pret));
 });
 
+// Match du jour : la même donne pour tous (competition-amis.md §3.1).
+function salleDonne(graine, rngRobots) {
+  const s = S.creerSalle('JOUR', K.hasard(rngRobots));
+  s.durees = { depart: 0, finTour: 0, mancheAuto: 0 };
+  const ordre = ['moi'].concat([1, 2, 3, 4, 5, 6, 7, 8].map((n) => 'robot-' + n));
+  s.donne = { graine, ordre };
+  S.recevoir(s, 'moi', { type: 'rejoindre', nom: 'Moi' });
+  for (let n = 1; n <= 8; n++) s.joueurs.push({ id: 'robot-' + n, nom: 'Robot ' + n, connecte: true, robot: true, voix: false, muet: true });
+  return s;
+}
+test('Match du jour : même graine = même main, même ordre, même ouvreur à la 1re manche', () => {
+  const a = salleDonne(123456, 1), b = salleDonne(123456, 99);
+  S.recevoir(a, 'moi', { type: 'lancer' }); S.recevoir(b, 'moi', { type: 'lancer' });
+  assert.deepStrictEqual(a.manche.mains.moi, b.manche.mains.moi);
+  assert.deepStrictEqual(a.manche.mains, b.manche.mains);
+  assert.deepStrictEqual(a.manche.sieges, b.manche.sieges);
+  assert.strictEqual(a.manche.joueurCourant, b.manche.joueurCourant);
+  const c = salleDonne(654321, 1); S.recevoir(c, 'moi', { type: 'lancer' });
+  assert.notDeepStrictEqual(c.manche.mains.moi, a.manche.mains.moi, 'une autre graine donne une autre main');
+});
+test('Match du jour : à une manche donnée, ma main ne dépend pas des robots déjà éliminés', () => {
+  for (let manche = 2; manche <= 8; manche++) {
+    const mains = [];
+    for (const elimines of [['robot-1', 'robot-2'], ['robot-7', 'robot-3'], ['robot-8', 'robot-5']]) {
+      const s = salleDonne(777, 3);
+      const restants = s.donne.ordre.filter((id) => !elimines.includes(id)).slice(0, 10 - manche);
+      s.restants = restants; s.numeroManche = manche - 1;
+      const d = S.placerDonne(s);
+      assert.deepStrictEqual(d.sieges.slice().sort(), restants.slice().sort());
+      assert.ok(restants.includes(d.premier));
+      mains.push(d.mains.moi);
+    }
+    assert.deepStrictEqual(mains[0], mains[1]); assert.deepStrictEqual(mains[0], mains[2]);
+  }
+});
+test('Match du jour : une partie entière se joue jusqu\'au bout', () => {
+  const s = salleDonne(42, 5);
+  s.robots = 'normaux';
+  let t = 0;
+  s.horloge = () => t;
+  S.recevoir(s, 'moi', { type: 'lancer' });
+  for (let i = 0; i < 20000 && s.etat !== 'finPartie'; i++) {
+    t += 10000;
+    if (s.etat === 'finManche') S.recevoir(s, 'moi', { type: 'mancheSuivante' });
+    if (s.etat === 'manche' && !s.pause && s.manche.joueurCourant === 'moi') {
+      const v = S.vue(s, 'moi');
+      if (v.manche.actions.length) S.recevoir(s, 'moi', { type: 'action', action: v.manche.actions[0] });
+    }
+    S.tic(s);
+  }
+  assert.strictEqual(s.etat, 'finPartie');
+  assert.strictEqual(s.elimines.length, 8);
+});
+
 console.log(`\n${ok} tests réussis, ${ko} en échec.`);
 process.exit(ko ? 1 : 0);

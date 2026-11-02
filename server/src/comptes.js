@@ -120,7 +120,7 @@ function creerComptes(base, reglages) {
       if (notifs !== undefined) {
         if (!notifs || typeof notifs !== 'object') throw Object.assign(new Error('Réglage invalide.'), { statut: 400 });
         const v = {};
-        for (const t of ['rivalite', 'invitation', 'ami']) if (typeof notifs[t] === 'boolean') v[t] = notifs[t];
+        for (const t of ['rivalite', 'invitation', 'ami', 'bande']) if (typeof notifs[t] === 'boolean') v[t] = notifs[t];
         await base.query('UPDATE comptes SET notifs = notifs || $2::jsonb WHERE id = $1', [id, JSON.stringify(v)]);
       }
       // Pays du classement : code à 2 lettres (CD, CI, SN…), ou null pour ne pas l'afficher.

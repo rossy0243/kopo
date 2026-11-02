@@ -1063,6 +1063,216 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.strictEqual(connecte(), false, 'la coupure suivante est vue');
     await a.leave();
   });
+
+  // ===== Match du jour et Bande (competition-amis.md v1.3) =====
+  console.log('Match du jour et Bande');
+  const { classerSemaine, aGagner } = require('../src/bande');
+  const MJ = require('../src/match-jour');
+  // Joue le Match du jour jusqu'au bout (rapide) : renvoie le message de fin et la première main reçue.
+  async function jouerMatchJour(jeton) {
+    const client = new Client(URL_.replace('http', 'ws'));
+    const salle = await client.create('kopo-jour', { jeton, rapide: true });
+    let fin = null, debut = null, premiereMain = null;
+    salle.onMessage('erreur', () => {});
+    salle.onMessage('matchJour', (m) => { if (m.fin) fin = m; else debut = m; });
+    salle.onMessage('vue', (v) => {
+      if (v.manche && v.numeroManche === 1 && !premiereMain && v.manche.main.length === 4) premiereMain = v.manche.main.slice().sort();
+      const a = v.manche && v.manche.actions.find((x) => x.type !== 'katapss') || (v.manche && v.manche.actions[0]);
+      if (v.etat === 'manche' && a) setTimeout(() => { try { salle.send('action', { action: a }); } catch (e) {} }, 1);
+      if (v.etat === 'finManche' && v.hote === v.moi) setTimeout(() => { try { salle.send('mancheSuivante'); } catch (e) {} }, 1);
+    });
+    for (let t = 0; t < 600 && !fin; t++) await attendre(50);
+    await salle.leave().catch(() => {});
+    return { fin, debut, premiereMain };
+  }
+  await test('Match du jour : score sur 100, jours et semaines à l\'heure de Kinshasa', () => {
+    assert.deepStrictEqual([MJ.scoreDe(0, false), MJ.scoreDe(3, false), MJ.scoreDe(7, false), MJ.scoreDe(7, true), MJ.scoreDe(12, false)], [0, 30, 70, 100, 70]);
+    assert.strictEqual(MJ.jourDe(new Date('2026-11-02T22:59:00Z')), '2026-11-02');
+    assert.strictEqual(MJ.jourDe(new Date('2026-11-02T23:00:00Z')), '2026-11-03'); // minuit à Kinshasa
+    assert.strictEqual(MJ.lundiDe('2026-11-08'), '2026-11-02');
+    assert.strictEqual(MJ.lundiDe('2026-11-09'), '2026-11-09');
+    assert.strictEqual(MJ.numeroDu('2026-11-02'), 1);
+    assert.notStrictEqual(MJ.graineDu('2026-11-02', 'a'), MJ.graineDu('2026-11-03', 'a'));
+  });
+  let gA, gB;
+  await test('Match du jour : réservé aux comptes Google', async () => {
+    const inv = await invite('SansG' + Date.now() % 1000);
+    const e = (await api('/api/match-jour', { jeton: inv.jeton })).json;
+    assert.strictEqual(e.google, false);
+    const client = new Client(URL_.replace('http', 'ws'));
+    await assert.rejects(client.create('kopo-jour', { jeton: inv.jeton, rapide: true }), /Google/);
+  });
+  await test('Match du jour : un essai officiel, la même main pour deux joueurs, le score noté', async () => {
+    gA = await connexionG('sb-mj-a', { providerId: 'g-mj-a' });
+    gB = await connexionG('sb-mj-b', { providerId: 'g-mj-b' });
+    const a = await jouerMatchJour(gA.jeton), b = await jouerMatchJour(gB.jeton);
+    assert.ok(a.fin && b.fin, 'les deux Matchs se terminent');
+    assert.strictEqual(a.debut.officiel, true);
+    assert.deepStrictEqual(a.premiereMain, b.premiereMain, 'même donne pour tous');
+    assert.strictEqual(a.fin.score, MJ.scoreDe(a.fin.manches, a.fin.victoire));
+    await attendre(200);
+    const e = (await api('/api/match-jour', { jeton: gA.jeton })).json;
+    assert.deepStrictEqual([e.moi.score, e.moi.fini], [a.fin.score, true]);
+    assert.ok(e.rang >= 1 && e.joueurs >= 2);
+    // Deuxième entrée : entraînement, rien n'est noté.
+    const c = await jouerMatchJour(gA.jeton);
+    assert.strictEqual(c.debut.officiel, false);
+    assert.strictEqual((await api('/api/match-jour', { jeton: gA.jeton })).json.moi.score, a.fin.score);
+    const cl = (await api('/api/match-jour/classement?type=mondial', { jeton: gA.jeton })).json;
+    assert.ok(cl.liste.some((x) => x.id === gA.compte.id) && cl.moi.id === gA.compte.id);
+  });
+  await test('Match du jour : quitter en cours arrête le score là ; un essai en cours bloque l\'entraînement', async () => {
+    const g = await connexionG('sb-mj-c', { providerId: 'g-mj-c' });
+    const client = new Client(URL_.replace('http', 'ws'));
+    const salle = await client.create('kopo-jour', { jeton: g.jeton });
+    salle.onMessage('vue', () => {}); salle.onMessage('matchJour', () => {}); salle.onMessage('erreur', () => {});
+    await attendre(150);
+    await assert.rejects(new Client(URL_.replace('http', 'ws')).create('kopo-jour', { jeton: g.jeton }), /en cours/);
+    await salle.leave(true);
+    await attendre(200);
+    const e = (await api('/api/match-jour', { jeton: g.jeton })).json;
+    assert.deepStrictEqual([e.moi.fini, e.moi.score], [true, 0]);
+  });
+
+  await test('Bande : classement de la semaine, pot, 2e remboursé, Loser, mise détruite sous 5 Matchs', () => {
+    const r = { ...DEFAUTS.bande };
+    const lundi = '2026-11-09', jours = [0, 1, 2, 3, 4, 5, 6].map((i) => MJ.ajouterJours(lundi, i));
+    const ins = ['k', 'g', 'p', 't'].map((id) => ({ id, pseudo: id.toUpperCase(), mise: 1000, inscritLe: new Date('2026-11-08T23:30:00Z') }));
+    const notes = { k: [90, 100, 80, 70, 100, 90, 80], g: [80, 80, 80, 80, 80, 80, 80], p: [10, 0, 20, 30, null, null, 40], t: [100, 100, 100, 100, null, null, null] };
+    const scores = [];
+    for (const [id, l] of Object.entries(notes)) l.forEach((n, i) => { if (n !== null) scores.push({ compte_id: id, jour: jours[i], score: n, statut: 'fini', debut: new Date(Date.parse(jours[i] + 'T10:00:00Z')) }); });
+    const res = classerSemaine({ lundi, inscrits: ins, scores, r, maintenant: new Date('2026-11-16T10:00:00Z'), final: true });
+    const l = Object.fromEntries(res.lignes.map((x) => [x.id, x]));
+    assert.deepStrictEqual([l.k.total, l.g.total, l.p.total, l.t.total], [610, 560, 100, 400]);
+    assert.strictEqual(l.t.enRegle, false, '4 Matchs sur 7 : hors course');
+    assert.strictEqual(l.p.enRegle, true, '5 Matchs : en règle');
+    assert.deepStrictEqual(res.chefs, ['k']); assert.deepStrictEqual(res.deuxiemes, ['g']); assert.deepStrictEqual(res.losers, ['p']);
+    // Pot = 3 mises en règle (3 000) ; maison 15 % = 450 ; le 2e récupère 1 000 ; le Chef gagne 1 550. La mise de T est détruite.
+    assert.deepStrictEqual([res.pot, res.maison, l.k.gain, l.g.gain, l.p.gain, l.t.gain], [3000, 450, 1550, 1000, 0, 0]);
+    assert.strictEqual(res.detruit, 4000 - 2550);
+    assert.strictEqual(aGagner(6, 1000, r), 4100); assert.strictEqual(aGagner(2, 1000, r), 1700); assert.strictEqual(aGagner(1, 1000, r), 0);
+  });
+  await test('Bande : à 2, le Chef gagne plus que sa mise ; égalité de Chefs ; retardataire = pire note - 10', () => {
+    const r = { ...DEFAUTS.bande };
+    const lundi = '2026-11-09', jours = [0, 1, 2, 3, 4, 5, 6].map((i) => MJ.ajouterJours(lundi, i));
+    const d = (i) => new Date(Date.parse(jours[i] + 'T10:00:00Z'));
+    const s = (id, l) => l.map((n, i) => ({ compte_id: id, jour: jours[i], score: n, statut: 'fini', debut: d(i) }));
+    const deux = classerSemaine({ lundi, r, final: true, inscrits: [{ id: 'a', pseudo: 'A', mise: 1000, inscritLe: d(0) }, { id: 'b', pseudo: 'B', mise: 1000, inscritLe: d(0) }].map((x) => ({ ...x, inscritLe: new Date(Date.parse(lundi) - 36e5) })),
+      scores: s('a', [70, 70, 70, 70, 70, 70, 70]).concat(s('b', [60, 60, 60, 60, 60, 60, 60])) });
+    assert.deepStrictEqual([deux.gains.a, deux.rendus.b || 0, deux.losers[0]], [1700, 0, 'b']);
+    const egal = classerSemaine({ lundi, r, final: true, inscrits: ['a', 'b', 'c'].map((id) => ({ id, pseudo: id, mise: 1000, inscritLe: new Date(Date.parse(lundi) - 36e5) })),
+      scores: s('a', [50, 50, 50, 50, 50, 0, 0]).concat(s('b', [50, 50, 50, 50, 50, 0, 0]), s('c', [10, 10, 10, 10, 10, 0, 0])) });
+    assert.deepStrictEqual(egal.chefs.sort(), ['a', 'b']);
+    assert.deepStrictEqual([egal.gains.a, egal.gains.b, egal.deuxiemes.length], [1275, 1275, 0], 'deux Chefs : pas de 2e remboursé');
+    // Inscrit mercredi : lundi et mardi valent la pire note des inscrits ce jour-là, moins 10 ; il doit jouer tous les jours restants.
+    const mercredi = new Date(Date.parse(jours[2] + 'T08:00:00Z'));
+    const ret = classerSemaine({ lundi, r, final: true, inscrits: [{ id: 'a', pseudo: 'A', mise: 1000, inscritLe: new Date(Date.parse(lundi) - 36e5) }, { id: 'b', pseudo: 'B', mise: 1000, inscritLe: new Date(Date.parse(lundi) - 36e5) }, { id: 'z', pseudo: 'Z', mise: 1000, inscritLe: mercredi }],
+      scores: s('a', [40, 90, 50, 50, 50, 50, 50]).concat(s('b', [80, 30, 50, 50, 50, 50, 50]), s('z', [100, 100, 60, 60, 60, 60, 60])) });
+    const z = ret.lignes.find((x) => x.id === 'z');
+    assert.deepStrictEqual(z.jours.slice(0, 2).map((j) => [j.type, j.score]), [['retard', 30], ['retard', 20]], 'ses vrais scores d\'avant ne comptent pas');
+    assert.strictEqual(z.total, 30 + 20 + 5 * 60);
+    assert.strictEqual(z.enRegle, true);
+    const ret2 = classerSemaine({ lundi, r, final: true, inscrits: [{ id: 'a', pseudo: 'A', mise: 1000, inscritLe: new Date(Date.parse(lundi) - 36e5) }, { id: 'z', pseudo: 'Z', mise: 1000, inscritLe: mercredi }],
+      scores: s('a', [40, 90, 50, 50, 50, 50, 50]).concat(s('z', [0, 0, 60, 60, 60, 60]).slice(2)) });
+    assert.strictEqual(ret2.lignes.find((x) => x.id === 'z').enRegle, false, 'un retardataire qui rate un jour est hors course');
+  });
+
+  let bandeId, codeBande, membres;
+  await test('Bande : créer (Google), rejoindre par le lien, 3 Bandes au plus, conditions pour miser', async () => {
+    const inv = await invite('SansG2' + Date.now() % 1000);
+    assert.strictEqual((await api('/api/bandes', { methode: 'POST', jeton: inv.jeton, corps: { nom: 'Les Lions', mise: 1000 } })).statut, 403);
+    membres = [];
+    for (const n of ['b1', 'b2', 'b3']) membres.push(await connexionG('sb-' + n, { providerId: 'g-' + n }));
+    const c = await api('/api/bandes', { methode: 'POST', jeton: membres[0].jeton, corps: { nom: '  Les <Lions> de Matonge ', mise: 1000 } });
+    assert.strictEqual(c.statut, 200, JSON.stringify(c.json));
+    assert.strictEqual(c.json.nom, 'Les Lions de Matonge');
+    bandeId = c.json.id; codeBande = c.json.code;
+    assert.strictEqual((await api('/api/bandes', { methode: 'POST', jeton: membres[0].jeton, corps: { nom: 'Trop cher', mise: 20000 } })).statut, 400);
+    for (const m of membres.slice(1)) assert.strictEqual((await api('/api/bandes/rejoindre', { methode: 'POST', jeton: m.jeton, corps: { code: codeBande } })).statut, 200);
+    assert.strictEqual((await api('/api/bandes/' + bandeId, { jeton: inv.jeton })).statut, 403);
+    const e = (await api('/api/bandes/' + bandeId, { jeton: membres[1].jeton })).json;
+    assert.strictEqual(e.membres.length, 3);
+    assert.strictEqual(e.moi.peutMiser, false, 'compte trop récent, pas assez de parties');
+    assert.strictEqual((await api(`/api/bandes/${bandeId}/miser`, { methode: 'POST', jeton: membres[1].jeton })).statut, 403);
+    // Un 4e Bande refusée.
+    for (let i = 0; i < 2; i++) assert.strictEqual((await api('/api/bandes', { methode: 'POST', jeton: membres[2].jeton, corps: { nom: 'Bande ' + i } })).statut, 200);
+    const trop = await api('/api/bandes', { methode: 'POST', jeton: membres[2].jeton, corps: { nom: 'Bande 3' } });
+    assert.strictEqual(trop.statut, 400); assert.match(trop.json.erreur, /3 Bandes/);
+  });
+  await test('Bande : miser, semaine lancée à 2, fin de semaine avec partage du pot et notifications', async () => {
+    await srv.reglages.ecrire('bande', { ...DEFAUTS.bande, joursCompte: 0, partiesMin: 0 });
+    const lundi = MJ.lundiDe(MJ.jourDe());
+    srv.matchJour.regler(() => new Date(MJ.debutDu(lundi).getTime() + 10 * 36e5)); // lundi 10 h à Kinshasa
+    for (const m of membres) await srv.comptes.crediter(m.compte.id, 5000, 'admin', 'test');
+    const avant = await solde(membres[0].compte.id);
+    const r1 = await api(`/api/bandes/${bandeId}/miser`, { methode: 'POST', jeton: membres[0].jeton });
+    assert.strictEqual(r1.statut, 200, JSON.stringify(r1.json));
+    assert.strictEqual(await solde(membres[0].compte.id), avant - 1000);
+    assert.strictEqual((await api(`/api/bandes/${bandeId}/miser`, { methode: 'POST', jeton: membres[0].jeton })).statut, 400, 'pas deux fois');
+    assert.strictEqual(r1.json.semaine.lancee, false);
+    for (const m of membres.slice(1)) assert.strictEqual((await api(`/api/bandes/${bandeId}/miser`, { methode: 'POST', jeton: m.jeton })).statut, 200);
+    const e = (await api('/api/bandes/' + bandeId, { jeton: membres[0].jeton })).json;
+    assert.deepStrictEqual([e.semaine.inscrits, e.semaine.lancee, e.semaine.aGagner], [3, true, 1550]);
+    // Notes de la semaine : b1 joue tout (80), b2 tout (60), b3 seulement 3 jours (hors course).
+    for (let i = 0; i < 7; i++) {
+      const jour = MJ.ajouterJours(lundi, i);
+      for (const [k, n] of [[0, 80], [1, 60], [2, i < 3 ? 100 : null]]) if (n !== null) await srv.base.query("INSERT INTO match_jour (compte_id, jour, score, manches, statut, debut, fin) VALUES ($1, $2, $3, 0, 'fini', $4, $4) ON CONFLICT (compte_id, jour) DO UPDATE SET score = $3, statut = 'fini', debut = $4", [membres[k].compte.id, jour, n, new Date(MJ.debutDu(jour).getTime() + 12 * 36e5)]);
+    }
+    const soldes = await Promise.all(membres.map((m) => solde(m.compte.id)));
+    srv.matchJour.regler(() => new Date(MJ.debutDu(MJ.ajouterJours(lundi, 7)).getTime() + 60e3)); // lundi suivant, 0 h 01
+    await srv.bande.tic();
+    const apres = await Promise.all(membres.map((m) => solde(m.compte.id)));
+    // 2 joueurs en règle : pot 2 000, maison 300, le Chef gagne 1 700 ; la mise de b3 est détruite.
+    assert.deepStrictEqual(apres.map((x, i) => x - soldes[i]), [1700, 0, 0]);
+    const f = (await api('/api/bandes/' + bandeId, { jeton: membres[1].jeton })).json;
+    assert.deepStrictEqual([f.titres.chefs[0].id, f.titres.losers[0].id], [membres[0].compte.id, membres[2].compte.id]);
+    const n = (await api('/api/notifications', { jeton: membres[0].jeton })).json;
+    assert.ok(n.liste.some((x) => x.type === 'bande' && /Chef/.test(x.texte)));
+    await srv.bande.tic(); // pas deux fois
+    assert.strictEqual(await solde(membres[0].compte.id), apres[0]);
+    const mes = (await api('/api/bandes', { jeton: membres[0].jeton })).json;
+    assert.ok(mes.bandes.find((b) => b.id === bandeId).jeSuisChef);
+  });
+  await test('Bande : inscriptions fermées après mercredi 23 h ; seul inscrit, mise rendue', async () => {
+    const lundi = MJ.lundiDe(MJ.jourDe(srv.matchJour.maintenant()));
+    srv.matchJour.regler(() => new Date(MJ.debutDu(lundi).getTime() + 2 * 864e5 + 22 * 36e5)); // mercredi 22 h
+    const avant = await solde(membres[1].compte.id);
+    assert.strictEqual((await api(`/api/bandes/${bandeId}/miser`, { methode: 'POST', jeton: membres[1].jeton })).statut, 200);
+    srv.matchJour.regler(() => new Date(MJ.debutDu(lundi).getTime() + 2 * 864e5 + 23 * 36e5 + 60e3)); // mercredi 23 h 01
+    const ferme = await api(`/api/bandes/${bandeId}/miser`, { methode: 'POST', jeton: membres[0].jeton });
+    assert.strictEqual(ferme.statut, 400); assert.match(ferme.json.erreur, /mercredi/);
+    await srv.bande.tic();
+    assert.strictEqual(await solde(membres[1].compte.id), avant, 'mise rendue');
+    srv.matchJour.regler(() => new Date());
+    await srv.reglages.ecrire('bande', { ...DEFAUTS.bande });
+  });
+  await test('Bande ouverte : un inconnu la voit, demande, le créateur accepte ; le créateur qui part passe la main', async () => {
+    const [chef, , autre] = membres;
+    assert.strictEqual((await api('/api/bandes/' + bandeId, { methode: 'PATCH', jeton: membres[1].jeton, corps: { ouverte: true } })).statut, 403);
+    await api('/api/bandes/' + bandeId, { methode: 'PATCH', jeton: chef.jeton, corps: { ouverte: true, pays: 'CD' } });
+    const x = await connexionG('sb-b4', { providerId: 'g-b4' });
+    const l = (await api('/api/bandes/ouvertes?pays=CD', { jeton: x.jeton })).json;
+    assert.ok(l.liste.some((b) => b.id === bandeId));
+    assert.strictEqual((await api(`/api/bandes/${bandeId}/demander`, { methode: 'POST', jeton: x.jeton })).statut, 200);
+    const e = (await api('/api/bandes/' + bandeId, { jeton: chef.jeton })).json;
+    assert.deepStrictEqual(e.demandes.map((d) => d.id), [x.compte.id]);
+    await api(`/api/bandes/${bandeId}/demandes/${x.compte.id}`, { methode: 'POST', jeton: chef.jeton, corps: { accepter: true } });
+    assert.strictEqual((await api('/api/bandes/' + bandeId, { jeton: x.jeton })).statut, 200);
+    await api(`/api/bandes/${bandeId}/quitter`, { methode: 'POST', jeton: chef.jeton });
+    const apres = (await api('/api/bandes/' + bandeId, { jeton: membres[1].jeton })).json;
+    assert.strictEqual(apres.createur, true, 'le plus ancien devient créateur');
+    assert.strictEqual(apres.membres.length, 3);
+    assert.ok(autre);
+  });
+  await test('tableau de bord : Bandes et réglages vérifiés', async () => {
+    const t = (await api('/admin/api/bandes', { jeton: adminJeton })).json;
+    assert.ok(t.bandes.some((b) => b.id === bandeId));
+    const mauvais = await api('/admin/api/reglages/bande', { methode: 'PUT', jeton: adminJeton, corps: { valeur: { ...DEFAUTS.bande, miseMin: 20000 } } });
+    assert.strictEqual(mauvais.statut, 400);
+    const ok = await api('/admin/api/reglages/bande', { methode: 'PUT', jeton: adminJeton, corps: { valeur: { ...DEFAUTS.bande, maison: 10 } } });
+    assert.strictEqual(ok.json.valeur.maison, 10);
+    await api('/admin/api/reglages/bande', { methode: 'PUT', jeton: adminJeton, corps: { valeur: { ...DEFAUTS.bande } } });
+  });
   await srv.arreter();
   console.log(`\n${reussis} tests réussis, ${echecs} en échec.`);
   process.exit(echecs ? 1 : 0);

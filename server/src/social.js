@@ -2,7 +2,7 @@
 // Lignes rouges (§5.6) : au plus 1 notification de rivalité par jour, chaque type peut être coupé.
 'use strict';
 
-const TYPES = ['rivalite', 'invitation', 'ami'];
+const TYPES = ['rivalite', 'invitation', 'ami', 'bande'];
 const paire = (x, y) => (x < y ? [x, y] : [y, x]);
 
 function creerSocial(base) {
