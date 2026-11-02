@@ -42,6 +42,16 @@
 
   const uneSeuleCouleur = (main) => main.length > 0 && main.every((c) => couleur(c) === couleur(main[0]));
 
+  // Katapss à la distribution (règle 7.1) : 4 cartes de la même couleur, ou une main dont la plus
+  // forte carte est un 4. Ce second Katapss ne vaut pas quand la manche se joue à 2 (duel ou finale).
+  // Renvoie 'couleur', 'petite' ou null.
+  function typeKatapss(main, nbJoueurs) {
+    if (main.length !== 4) return null;
+    if (uneSeuleCouleur(main)) return 'couleur';
+    if (nbJoueurs > 2 && Math.max(...main.map(valeur)) === 4) return 'petite';
+    return null;
+  }
+
   // ---------------------------------------------------------------------------
   // Manche
   // ---------------------------------------------------------------------------
@@ -69,7 +79,7 @@
     };
     for (const j of sieges) {
       m.mains[j] = mains[j].slice();
-      if (m.mains[j].length === 4 && uneSeuleCouleur(m.mains[j])) m.katapss.push(j);
+      if (typeKatapss(m.mains[j], sieges.length)) m.katapss.push(j);
     }
     noter(m, `Début de la manche : ${sieges.length} joueurs, ${premier} ouvre.`);
     return m;
@@ -339,7 +349,7 @@
 
   const Kopo = {
     COULEURS, NOMS_COULEURS, SYMBOLES,
-    valeur, couleur, afficher, nouveauPaquet, hasard, melanger,
+    valeur, couleur, afficher, typeKatapss, nouveauPaquet, hasard, melanger,
     nouvelleManche, actionsPossibles, jouer, jouerPartie, vuePublique,
     strategieSimple, strategieHasard,
   };
