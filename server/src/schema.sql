@@ -291,3 +291,15 @@ ALTER TABLE notifications ADD CONSTRAINT notifications_type_check CHECK (type IN
 -- une autre adresse du site ou après un nettoyage du navigateur.
 ALTER TABLE comptes ADD COLUMN IF NOT EXISTS profil jsonb;
 ALTER TABLE comptes ADD COLUMN IF NOT EXISTS profil_maj timestamptz;
+
+-- ===== Demandes d'ami =====
+-- Ajouter quelqu'un envoie une demande : il l'accepte (amis des deux côtés) ou la refuse.
+-- Un refus n'est pas dit à l'autre ; il ne peut pas redemander pendant 7 jours (sa demande reste « envoyée »).
+CREATE TABLE IF NOT EXISTS demandes_ami (
+  de_id      text NOT NULL REFERENCES comptes(id),
+  a_id       text NOT NULL REFERENCES comptes(id),
+  cree_le    timestamptz NOT NULL DEFAULT now(),
+  refusee_le timestamptz,
+  PRIMARY KEY (de_id, a_id)
+);
+CREATE INDEX IF NOT EXISTS demandes_ami_a ON demandes_ami (a_id, cree_le);

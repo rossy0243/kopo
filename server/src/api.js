@@ -128,20 +128,22 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours,
     if (!c || c.id === req.compte.id) return res.status(404).json({ erreur: 'Joueur introuvable.' });
     await base.query('INSERT INTO blocages (compte_id, bloque_id) VALUES ($1,$2) ON CONFLICT DO NOTHING', [req.compte.id, c.id]);
     await base.query('DELETE FROM amis WHERE (compte_id = $1 AND ami_id = $2) OR (compte_id = $2 AND ami_id = $1)', [req.compte.id, c.id]);
+    await base.query('DELETE FROM demandes_ami WHERE (de_id = $1 AND a_id = $2) OR (de_id = $2 AND a_id = $1)', [req.compte.id, c.id]);
     res.json({ ok: true });
   }));
   r.delete('/bloques/:id', joueur, enveloppe(async (req, res) => { await base.query('DELETE FROM blocages WHERE compte_id = $1 AND bloque_id = $2', [req.compte.id, req.params.id]); res.json({ ok: true }); }));
 
   r.get('/amis', joueur, enveloppe(async (req, res) => res.json((await base.query("SELECT c.id, c.pseudo, c.numero, c.avatar, c.vu_le > now() - interval '2 minutes' AS en_ligne FROM amis a JOIN comptes c ON c.id = a.ami_id WHERE a.compte_id = $1 AND c.statut <> 'supprime' ORDER BY c.pseudo", [req.compte.id])).rows)));
+  // Ajouter un ami : envoie une demande, qu'il accepte ou refuse (sauf s'il m'avait déjà demandé).
   r.post('/amis', joueur, enveloppe(async (req, res) => {
     const c = await cible(req.body.cible);
     if (!c || c.id === req.compte.id) return res.status(404).json({ erreur: 'Joueur introuvable. Écris son pseudo#numéro, par exemple Kevin#1290.' });
-    const bloque = await base.query('SELECT 1 FROM blocages WHERE compte_id = $1 AND bloque_id = $2', [c.id, req.compte.id]);
-    if (bloque.rows.length) return res.status(404).json({ erreur: 'Joueur introuvable.' });
-    const nouveau = await base.query('INSERT INTO amis (compte_id, ami_id) VALUES ($1,$2) ON CONFLICT DO NOTHING RETURNING 1', [req.compte.id, c.id]);
-    if (nouveau.rows.length) await social.notifier(c.id, 'ami', `${req.compte.pseudo} t'a ajouté en ami`, { de: req.compte.id, pseudo: req.compte.pseudo, numero: req.compte.numero });
-    res.json({ ok: true, ami: c });
+    res.json(await social.demanderAmi(req.compte, c));
   }));
+  r.get('/amis/demandes', joueur, enveloppe(async (req, res) => res.json(await social.demandesAmi(req.compte.id))));
+  r.post('/amis/demandes/:id/accepter', joueur, enveloppe(async (req, res) => res.json(await social.accepterAmi(req.compte, req.params.id))));
+  r.post('/amis/demandes/:id/refuser', joueur, enveloppe(async (req, res) => res.json(await social.refuserAmi(req.compte, req.params.id))));
+  r.delete('/amis/demandes/:id', joueur, enveloppe(async (req, res) => res.json(await social.annulerDemande(req.compte, req.params.id))));
   // Inviter un ami dans ma salle (il reçoit une notification avec le code).
   r.post('/amis/:id/inviter', joueur, enveloppe(async (req, res) => res.json(await social.inviter(req.compte, req.params.id, req.body.code))));
 
@@ -189,7 +191,8 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours,
   r.get('/notifications', joueur, enveloppe(async (req, res) => res.json(await social.liste(req.compte.id))));
   r.post('/notifications/lues', joueur, enveloppe(async (req, res) => { await social.marquerLues(req.compte.id, req.body.ids); res.json({ ok: true }); }));
 
-  r.delete('/amis/:id', joueur, enveloppe(async (req, res) => { await base.query('DELETE FROM amis WHERE compte_id = $1 AND ami_id = $2', [req.compte.id, req.params.id]); res.json({ ok: true }); }));
+  // Retirer un ami : l'amitié est des deux côtés, elle disparaît des deux côtés.
+  r.delete('/amis/:id', joueur, enveloppe(async (req, res) => { await base.query('DELETE FROM amis WHERE (compte_id = $1 AND ami_id = $2) OR (compte_id = $2 AND ami_id = $1)', [req.compte.id, req.params.id]); res.json({ ok: true }); }));
 
   return r;
 }

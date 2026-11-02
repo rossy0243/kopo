@@ -251,6 +251,7 @@ function creerComptes(base, reglages) {
       await base.transaction(async (q) => {
         await q.query("UPDATE comptes SET statut = 'supprime', auth_id = NULL, pseudo = 'Joueur supprimé', pays = NULL, profil = NULL WHERE id = $1", [id]);
         await q.query('DELETE FROM amis WHERE compte_id = $1 OR ami_id = $1', [id]);
+        await q.query('DELETE FROM demandes_ami WHERE de_id = $1 OR a_id = $1', [id]);
         await q.query('DELETE FROM blocages WHERE compte_id = $1', [id]);
       });
       if (avant && avant.auth_id) await supprimerUtilisateurSupabase(avant.auth_id);

@@ -63,7 +63,8 @@ function creerSocial(base) {
 
     async liste(compteId) {
       const l = (await base.query('SELECT id, type, texte, donnees, lue, cree_le FROM notifications WHERE compte_id = $1 ORDER BY id DESC LIMIT 30', [compteId])).rows.map((n) => ({ ...n, id: Number(n.id) }));
-      return { nonLues: l.filter((n) => !n.lue).length, liste: l };
+      const d = (await base.query("SELECT count(*)::int AS n FROM demandes_ami d JOIN comptes c ON c.id = d.de_id WHERE d.a_id = $1 AND d.refusee_le IS NULL AND c.statut NOT IN ('supprime', 'banni')", [compteId])).rows[0].n;
+      return { nonLues: l.filter((n) => !n.lue).length, liste: l, demandesAmi: d }; // demandesAmi : pastille sur Paramètres et « Mes amis »
     },
     async marquerLues(compteId, ids = null) {
       if (Array.isArray(ids) && ids.length) await base.query('UPDATE notifications SET lue = true WHERE compte_id = $1 AND id = ANY($2::bigint[])', [compteId, ids.map(Number).filter(Number.isFinite)]);
@@ -90,6 +91,59 @@ function creerSocial(base) {
         WHERE (f.a = $1 OR f.b = $1) AND c.statut <> 'supprime'
         ORDER BY f.victoires_a + f.victoires_b DESC, f.maj_le DESC LIMIT $2`, [compteId, limite]);
       return r.rows;
+    },
+
+    // --- Demandes d'ami : on ne devient amis que si l'autre accepte.
+    // Renvoie { etat: 'ami' } (déjà amis, ou il m'avait demandé : c'est accepté) ou { etat: 'envoyee' }.
+    async demanderAmi(de, c) {
+      const erreur = (m, statut) => Object.assign(new Error(m), { statut });
+      if (await bloque(base, de.id, c.id)) throw erreur('Joueur introuvable.', 404);
+      if ((await base.query('SELECT 1 FROM amis WHERE compte_id = $1 AND ami_id = $2', [de.id, c.id])).rows.length) return { ok: true, etat: 'ami', ami: c };
+      // Il m'a déjà demandé (ou ajouté avant les demandes) : on devient amis tout de suite.
+      const lui = await base.query('SELECT 1 FROM demandes_ami WHERE de_id = $1 AND a_id = $2 AND refusee_le IS NULL UNION ALL SELECT 1 FROM amis WHERE compte_id = $1 AND ami_id = $2', [c.id, de.id]);
+      if (lui.rows.length) { await api.accepterAmi(de, c.id); return { ok: true, etat: 'ami', ami: c }; }
+      const deja = (await base.query('SELECT refusee_le > now() - interval \'7 days\' AS recent, refusee_le IS NULL AS attente FROM demandes_ami WHERE de_id = $1 AND a_id = $2', [de.id, c.id])).rows[0];
+      if (deja && (deja.attente || deja.recent)) return { ok: true, etat: 'envoyee', ami: c }; // refus récent : rien n'est dit
+      const n = (await base.query("SELECT count(*)::int AS n FROM demandes_ami WHERE de_id = $1 AND cree_le > now() - interval '1 day'", [de.id])).rows[0].n;
+      if (n >= 30) throw erreur('Trop de demandes d\'ami aujourd\'hui. Réessaie demain.', 429);
+      await base.query('INSERT INTO demandes_ami (de_id, a_id) VALUES ($1,$2) ON CONFLICT (de_id, a_id) DO UPDATE SET cree_le = now(), refusee_le = NULL', [de.id, c.id]);
+      await notifier(base, c.id, 'ami', `${de.pseudo} veut être ton ami`, { demande: true, de: de.id, pseudo: de.pseudo, numero: de.numero });
+      return { ok: true, etat: 'envoyee', ami: c };
+    },
+
+    // Mes demandes reçues (à accepter ou refuser) et envoyées (en attente).
+    async demandesAmi(compteId) {
+      const recues = (await base.query(`SELECT c.id, c.pseudo, c.numero, c.avatar, d.cree_le FROM demandes_ami d JOIN comptes c ON c.id = d.de_id
+        WHERE d.a_id = $1 AND d.refusee_le IS NULL AND c.statut NOT IN ('supprime', 'banni') ORDER BY d.cree_le DESC LIMIT 50`, [compteId])).rows;
+      const envoyees = (await base.query(`SELECT c.id, c.pseudo, c.numero, c.avatar, d.cree_le FROM demandes_ami d JOIN comptes c ON c.id = d.a_id
+        WHERE d.de_id = $1 AND c.statut <> 'supprime' ORDER BY d.cree_le DESC LIMIT 50`, [compteId])).rows;
+      return { recues, envoyees };
+    },
+
+    async accepterAmi(moi, deId) {
+      let ok = false;
+      await base.transaction(async (q) => {
+        const d = await q.query('DELETE FROM demandes_ami WHERE de_id = $1 AND a_id = $2 AND refusee_le IS NULL RETURNING 1', [deId, moi.id]);
+        // Ajout d'avant les demandes (il m'avait ajouté d'un seul côté) : vaut une demande.
+        const avant = await q.query('SELECT 1 FROM amis WHERE compte_id = $1 AND ami_id = $2 AND NOT EXISTS (SELECT 1 FROM amis WHERE compte_id = $2 AND ami_id = $1)', [deId, moi.id]);
+        if (!d.rows.length && !avant.rows.length) return;
+        await q.query('INSERT INTO amis (compte_id, ami_id) VALUES ($1,$2), ($2,$1) ON CONFLICT DO NOTHING', [moi.id, deId]);
+        await q.query('DELETE FROM demandes_ami WHERE de_id = $1 AND a_id = $2', [moi.id, deId]);
+        ok = true;
+      });
+      if (!ok) throw Object.assign(new Error('Cette demande n\'existe plus.'), { statut: 404 });
+      await notifier(base, deId, 'ami', `${moi.pseudo} a accepté ta demande d'ami`, { accepte: true, de: moi.id, pseudo: moi.pseudo, numero: moi.numero });
+      return { ok: true };
+    },
+
+    // Refuser : l'autre n'est pas prévenu.
+    async refuserAmi(moi, deId) {
+      await base.query('UPDATE demandes_ami SET refusee_le = now() WHERE de_id = $1 AND a_id = $2 AND refusee_le IS NULL', [deId, moi.id]);
+      return { ok: true };
+    },
+    async annulerDemande(moi, aId) {
+      await base.query('DELETE FROM demandes_ami WHERE de_id = $1 AND a_id = $2', [moi.id, aId]);
+      return { ok: true };
     },
 
     // Invitation d'un ami dans ma salle (code à 4 lettres). Limites : 1 par ami toutes les 2 minutes, 15 par heure.

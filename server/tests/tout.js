@@ -22,6 +22,11 @@ async function api(chemin, { methode = 'GET', corps, jeton } = {}) {
   return { statut: r.status, json: await r.json().catch(() => null) };
 }
 const invite = async (pseudo) => (await api('/api/invite', { methode: 'POST', corps: { pseudo } })).json;
+// x demande, y accepte : amis des deux côtés.
+async function devenirAmis(x, y) {
+  await api('/api/amis', { methode: 'POST', jeton: x.jeton, corps: { cible: y.compte.pseudo + '#' + y.compte.numero } });
+  return api('/api/amis/demandes/' + encodeURIComponent(x.compte.id) + '/accepter', { methode: 'POST', jeton: y.jeton });
+}
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Joue une partie jusqu'au bout : chaque client humain joue la première action permise.
@@ -231,10 +236,58 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
 
   console.log('Amis, blocage, signalement, suppression');
   const a = await invite('Alice'), b = await invite('Bruno');
-  await test('ajouter un ami par pseudo#numéro', async () => {
+  await test('ajouter un ami envoie une demande ; il n\'est ami qu\'une fois acceptée', async () => {
     const r = await api('/api/amis', { methode: 'POST', jeton: a.jeton, corps: { cible: `Bruno#${b.compte.numero}` } });
-    assert.strictEqual(r.json.ok, true);
+    assert.deepStrictEqual([r.json.ok, r.json.etat], [true, 'envoyee']);
+    assert.strictEqual((await api('/api/amis', { jeton: a.jeton })).json.length, 0, 'pas encore ami');
+    assert.strictEqual((await api('/api/amis/demandes', { jeton: a.jeton })).json.envoyees[0].pseudo, 'Bruno');
+    const d = (await api('/api/amis/demandes', { jeton: b.jeton })).json;
+    assert.deepStrictEqual(d.recues.map((x) => x.pseudo), ['Alice']);
+    const n = (await api('/api/notifications', { jeton: b.jeton })).json.liste[0];
+    assert.deepStrictEqual([n.type, n.texte, n.donnees.demande, n.donnees.de], ['ami', 'Alice veut être ton ami', true, a.compte.id]);
+    assert.strictEqual((await api('/api/notifications', { jeton: b.jeton })).json.demandesAmi, 1);
+    // Redemander ne renvoie pas de notification.
+    await api('/api/amis', { methode: 'POST', jeton: a.jeton, corps: { cible: `Bruno#${b.compte.numero}` } });
+    assert.strictEqual((await api('/api/notifications', { jeton: b.jeton })).json.liste.length, 1);
+    // Bruno accepte : amis des deux côtés, Alice est prévenue.
+    assert.strictEqual((await api('/api/amis/demandes/' + a.compte.id + '/accepter', { methode: 'POST', jeton: b.jeton })).json.ok, true);
     assert.strictEqual((await api('/api/amis', { jeton: a.jeton })).json[0].pseudo, 'Bruno');
+    assert.strictEqual((await api('/api/amis', { jeton: b.jeton })).json[0].pseudo, 'Alice');
+    assert.deepStrictEqual((await api('/api/amis/demandes', { jeton: b.jeton })).json, { recues: [], envoyees: [] });
+    const na = (await api('/api/notifications', { jeton: a.jeton })).json.liste[0];
+    assert.deepStrictEqual([na.texte, na.donnees.accepte], ['Bruno a accepté ta demande d\'ami', true]);
+    assert.strictEqual((await api('/api/amis/demandes/' + a.compte.id + '/accepter', { methode: 'POST', jeton: b.jeton })).statut, 404, 'plus de demande');
+    // Un ajout d'avant les demandes (d'un seul côté) vaut une demande : l'autre peut l'accepter.
+    const [x, y] = [await invite('Anc' + Date.now() % 1000), await invite('Anb' + Date.now() % 1000)];
+    await srv.base.query('INSERT INTO amis (compte_id, ami_id) VALUES ($1,$2)', [x.compte.id, y.compte.id]);
+    assert.strictEqual((await api('/api/amis', { methode: 'POST', jeton: y.jeton, corps: { cible: x.compte.id } })).json.etat, 'ami');
+    assert.strictEqual((await api('/api/amis', { jeton: y.jeton })).json.length, 1);
+  });
+  await test('refuser une demande : l\'autre n\'est pas prévenu et ne peut pas insister', async () => {
+    const [x, y] = [await invite('Dem' + Date.now() % 1000), await invite('Ref' + Date.now() % 1000)];
+    await api('/api/amis', { methode: 'POST', jeton: x.jeton, corps: { cible: y.compte.id } });
+    assert.strictEqual((await api('/api/amis/demandes/' + x.compte.id + '/refuser', { methode: 'POST', jeton: y.jeton })).json.ok, true);
+    assert.strictEqual((await api('/api/amis/demandes', { jeton: y.jeton })).json.recues.length, 0);
+    assert.strictEqual((await api('/api/amis', { jeton: x.jeton })).json.length, 0);
+    assert.strictEqual((await api('/api/notifications', { jeton: x.jeton })).json.liste.length, 0, 'pas de « refusé »');
+    assert.strictEqual((await api('/api/amis/demandes', { jeton: x.jeton })).json.envoyees.length, 1, 'reste « envoyée » de son côté');
+    const r = await api('/api/amis', { methode: 'POST', jeton: x.jeton, corps: { cible: y.compte.id } });
+    assert.strictEqual(r.json.etat, 'envoyee');
+    assert.strictEqual((await api('/api/amis/demandes', { jeton: y.jeton })).json.recues.length, 0, 'pas de nouvelle demande pendant 7 jours');
+    assert.strictEqual((await api('/api/notifications', { jeton: y.jeton })).json.liste.length, 1);
+    // Il annule sa demande.
+    await api('/api/amis/demandes/' + y.compte.id, { methode: 'DELETE', jeton: x.jeton });
+    assert.strictEqual((await api('/api/amis/demandes', { jeton: x.jeton })).json.envoyees.length, 0);
+  });
+  await test('demandes croisées : si l\'autre m\'a déjà demandé, on devient amis tout de suite', async () => {
+    const [x, y] = [await invite('Cro' + Date.now() % 1000), await invite('Cri' + Date.now() % 1000)];
+    await api('/api/amis', { methode: 'POST', jeton: x.jeton, corps: { cible: y.compte.id } });
+    const r = await api('/api/amis', { methode: 'POST', jeton: y.jeton, corps: { cible: x.compte.id } });
+    assert.strictEqual(r.json.etat, 'ami');
+    assert.strictEqual((await api('/api/amis', { jeton: x.jeton })).json.length, 1);
+    // Retirer un ami le retire des deux côtés.
+    await api('/api/amis/' + x.compte.id, { methode: 'DELETE', jeton: y.jeton });
+    assert.strictEqual((await api('/api/amis', { jeton: x.jeton })).json.length, 0);
   });
   await test('bloquer retire l\'ami, et le bloqué ne peut plus ajouter', async () => {
     await api('/api/bloques', { methode: 'POST', jeton: a.jeton, corps: { cible: b.compte.id } });
@@ -506,8 +559,8 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.ok(l.json.moi.rangPays >= 1 && l.json.moi.rangMondial >= 2, JSON.stringify(l.json.moi));
     // Amis : moi + mes amis, même un ami qui n'a pas encore joué.
     const nouveau = await invite('PasJoue' + Date.now() % 1000);
-    await api('/api/amis', { methode: 'POST', jeton: b.jeton, corps: { cible: d.compte.pseudo + '#' + d.compte.numero } });
-    await api('/api/amis', { methode: 'POST', jeton: b.jeton, corps: { cible: nouveau.compte.pseudo + '#' + nouveau.compte.numero } });
+    await devenirAmis(b, d);
+    await devenirAmis(b, nouveau);
     const am = await api('/api/classement?type=amis', { jeton: b.jeton });
     assert.deepStrictEqual(am.json.liste.map((x) => x.id), [d.compte.id, b.compte.id, nouveau.compte.id]);
     assert.strictEqual(am.json.liste[2].points, 0);
@@ -550,7 +603,7 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
   });
   await test('rivalité entre amis : « t\'a rattrapé », une seule par jour, et 1 – 0 ne compte pas', async () => {
     const [x, y] = [await invite('Riv' + Date.now() % 1000), await invite('Ral' + Date.now() % 1000)];
-    await api('/api/amis', { methode: 'POST', jeton: x.jeton, corps: { cible: y.compte.pseudo + '#' + y.compte.numero } });
+    await devenirAmis(x, y);
     const S = srv.social;
     assert.deepStrictEqual(await S.apresPartie([{ id: x.compte.id, place: 1 }, { id: y.compte.id, place: 2 }]), []);
     const e = await S.apresPartie([{ id: y.compte.id, place: 1 }, { id: x.compte.id, place: 2 }]);
@@ -559,7 +612,7 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     const n = await api('/api/notifications', { jeton: x.jeton });
     assert.strictEqual(n.json.liste[0].type, 'rivalite');
     assert.deepStrictEqual([n.json.liste[0].donnees.toi, n.json.liste[0].donnees.lui], [1, 1]);
-    // y a reçu « x t'a ajouté en ami ».
+    // y a reçu la demande d'ami de x.
     const ny = await api('/api/notifications', { jeton: y.jeton });
     assert.strictEqual(ny.json.liste[0].type, 'ami');
     assert.strictEqual(ny.json.nonLues, 1);
@@ -575,13 +628,15 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     // z coupe les notifications de rivalité.
     const ch = await api('/api/moi', { methode: 'PATCH', jeton: z.jeton, corps: { notifs: { rivalite: false } } });
     assert.strictEqual(ch.json.compte.notifs.rivalite, false);
-    await api('/api/amis', { methode: 'POST', jeton: x.jeton, corps: { cible: z.compte.pseudo + '#' + z.compte.numero } });
+    await devenirAmis(x, z);
     await srv.social.apresPartie([{ id: z.compte.id, place: 1 }, { id: x.compte.id, place: 2 }]);
     assert.deepStrictEqual(await srv.social.apresPartie([{ id: x.compte.id, place: 1 }, { id: z.compte.id, place: 2 }]), []);
   });
   await test('inviter un ami dans sa salle : ami seulement, code valide, pas de rafale', async () => {
     const [x, y, z] = [await invite('Hot' + Date.now() % 1000), await invite('Inv' + Date.now() % 1000), await invite('Aut' + Date.now() % 1000)];
     await api('/api/amis', { methode: 'POST', jeton: x.jeton, corps: { cible: y.compte.pseudo + '#' + y.compte.numero } });
+    assert.strictEqual((await api('/api/amis/' + y.compte.id + '/inviter', { methode: 'POST', jeton: x.jeton, corps: { code: 'ABCD' } })).statut, 404, 'demande pas encore acceptée');
+    await api('/api/amis/demandes/' + x.compte.id + '/accepter', { methode: 'POST', jeton: y.jeton });
     assert.strictEqual((await api('/api/amis/' + z.compte.id + '/inviter', { methode: 'POST', jeton: x.jeton, corps: { code: 'ABCD' } })).statut, 404);
     assert.strictEqual((await api('/api/amis/' + y.compte.id + '/inviter', { methode: 'POST', jeton: x.jeton, corps: { code: 'ab' } })).statut, 400);
     assert.strictEqual((await api('/api/amis/' + y.compte.id + '/inviter', { methode: 'POST', jeton: x.jeton, corps: { code: 'ABCD' } })).json.envoyee, true);
