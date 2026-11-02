@@ -176,7 +176,7 @@ console.log('\nKatapss');
 
 test("Katapss annoncé avant d'agir : qualifié tout de suite", () => {
   const m = K.nouvelleManche(['A', 'B', 'C'], {
-    A: ['2P', '2C', '3C', '4C'], B: ['2K', '5K', '8K', '10K'], C: ['5P', '6T', '7T', '8T'],
+    A: ['2P', '2C', '3C', '5C'], B: ['2K', '5K', '8K', '10K'], C: ['5P', '6T', '7T', '8T'],
   }, 'A');
   assert.deepStrictEqual(m.katapss, ['B']);
   J(m, 'A', '2P');
@@ -187,7 +187,7 @@ test("Katapss annoncé avant d'agir : qualifié tout de suite", () => {
 
 test('Katapss annoncé hors de son tour', () => {
   const m = K.nouvelleManche(['A', 'B', 'C'], {
-    A: ['2P', '2C', '3C', '4C'], B: ['3P', '6T', '7T', '9T'], C: ['2K', '5K', '8K', '10K'],
+    A: ['2P', '2C', '3C', '5C'], B: ['3P', '6T', '7T', '9T'], C: ['2K', '5K', '8K', '10K'],
   }, 'A');
   J(m, 'A', '2P');
   KA(m, 'C'); // c'est au tour de B
@@ -197,7 +197,7 @@ test('Katapss annoncé hors de son tour', () => {
 
 test("Katapss impossible une fois qu'on a agi (joué ou ramassé)", () => {
   const m = K.nouvelleManche(['A', 'B', 'C'], {
-    A: ['2P', '2C', '3C', '4C'], B: ['2K', '5K', '8K', '10K'], C: ['5P', '6T', '7T', '8T'],
+    A: ['2P', '2C', '3C', '5C'], B: ['2K', '5K', '8K', '10K'], C: ['5P', '6T', '7T', '8T'],
   }, 'A');
   J(m, 'A', '2P');
   R(m, 'B'); // B ramasse au lieu d'annoncer
@@ -234,6 +234,61 @@ test('Celui qui devait ouvrir annonce Katapss : le joueur suivant ouvre', () => 
   assert.strictEqual(m.phase, 'ouverture');
 });
 
+test('Plus forte carte en main = 4 : Katapss (à 3 joueurs et plus)', () => {
+  const m = K.nouvelleManche(['A', 'B', 'C'], {
+    A: ['2P', '3C', '4K', '2T'], B: ['5P', '6T', '7T', '8T'], C: ['9P', '6C', '7C', '8K'],
+  }, 'B');
+  assert.deepStrictEqual(m.katapss, ['A']);
+  KA(m, 'A');
+  assert.deepStrictEqual(qualifies(m), ['A']);
+  assert.strictEqual(m.qualifies[0].raison, 'Katapss');
+});
+
+test("Main 2-3-4 avec un 5 : pas de Katapss (la plus forte n'est pas un 4)", () => {
+  assert.strictEqual(K.typeKatapss(['2P', '3C', '4K', '5T'], 5), null);
+  assert.strictEqual(K.typeKatapss(['2P', '3C', '3K', '2T'], 5), null, 'impossible sans 4, mais le 4 est exigé');
+  assert.strictEqual(K.typeKatapss(['2P', '3C', '4K', '4T'], 5), 'petite');
+  assert.strictEqual(K.typeKatapss(['2P', '5P', '7P', '10P'], 5), 'couleur');
+});
+
+test('Plus forte carte = 4 en duel ou en finale (manche à 2) : pas de Katapss', () => {
+  const m = K.nouvelleManche(['A', 'B'], {
+    A: ['2P', '3C', '4K', '2T'], B: ['5P', '6T', '7T', '8T'],
+  }, 'B');
+  assert.deepStrictEqual(m.katapss, []);
+  assert.ok(!peut(m, 'A', 'katapss'));
+  assert.strictEqual(K.typeKatapss(['2P', '3C', '4K', '2T'], 2), null);
+});
+
+test('En duel ou en finale, 4 cartes de la même couleur restent un Katapss', () => {
+  const m = K.nouvelleManche(['A', 'B'], {
+    A: ['2P', '3P', '4P', '9P'], B: ['5P', '6T', '7T', '8T'],
+  }, 'B');
+  assert.deepStrictEqual(m.katapss, ['A']);
+});
+
+test('Duel ou finale : une main dont la plus forte carte est un 4 est annoncée et on redistribue', () => {
+  let vu = 0;
+  for (let g = 1; g <= 3000; g++) {
+    const { mains, redistributions } = K.distribuer(['A', 'B'], K.hasard(g));
+    for (const j of ['A', 'B']) assert.notStrictEqual(K.typeKatapss(mains[j], 3), 'petite', 'aucune main finale à 4 maximum');
+    for (const r of redistributions) {
+      vu++;
+      assert.strictEqual(Math.max(...r.main.map(K.valeur)), 4);
+    }
+    if (redistributions.length) {
+      const m = K.nouvelleManche(['A', 'B'], mains, 'A', redistributions);
+      assert.ok(m.journal[0].startsWith('Redistribution : la plus forte carte de '));
+      assert.strictEqual(m.redistributions.length, redistributions.length);
+    }
+  }
+  assert.ok(vu > 0, 'le cas se présente sur 3 000 donnes');
+});
+
+test('À 3 joueurs et plus : jamais de redistribution', () => {
+  for (let g = 1; g <= 2000; g++) assert.strictEqual(K.distribuer(['A', 'B', 'C'], K.hasard(g)).redistributions.length, 0);
+});
+
 console.log('\nParties complètes (simulation)');
 
 test('1 000 parties à 9 joueurs se terminent toutes avec 8 éliminés et 1 vainqueur', () => {
@@ -256,17 +311,20 @@ test('1 000 parties à 9 joueurs se terminent toutes avec 8 éliminés et 1 vain
   console.log(`      (${katapss} Katapss annoncés au total)`);
 });
 
-test('À 9 joueurs, jamais plus de 8 Katapss dans une distribution', () => {
-  const rng = K.hasard(42);
-  for (let g = 0; g < 20000; g++) {
-    const paquet = K.melanger(K.nouveauPaquet(), rng);
-    let n = 0;
-    for (let i = 0; i < 9; i++) {
-      const main = paquet.slice(i * 4, i * 4 + 4);
-      if (main.every((c) => K.couleur(c) === K.couleur(main[0]))) n++;
-    }
-    assert.ok(n <= 8);
+test('À 9 joueurs, 9 Katapss sont désormais possibles (une main « plus forte carte 4 » + 8 couleurs)', () => {
+  const sieges = ['J1', 'J2', 'J3', 'J4', 'J5', 'J6', 'J7', 'J8', 'J9'];
+  const mains = { J1: ['2P', '3C', '4K', '2T'] };
+  let i = 1;
+  for (const c of K.COULEURS) {
+    const reste = [];
+    for (let v = 2; v <= 10; v++) if (!mains.J1.includes(v + c)) reste.push(v + c);
+    mains[sieges[i++]] = reste.slice(0, 4);
+    mains[sieges[i++]] = reste.slice(4, 8);
   }
+  const m = K.nouvelleManche(sieges, mains, 'J1');
+  assert.strictEqual(m.katapss.length, 9);
+  sieges.slice(0, 8).forEach((j) => KA(m, j));
+  assert.strictEqual(m.elimine, 'J9', 'tous avaient un Katapss : le dernier est éliminé');
 });
 
 console.log(`\n${ok} tests réussis, ${echecs.length} en échec.`);

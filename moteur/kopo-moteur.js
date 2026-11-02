@@ -42,13 +42,42 @@
 
   const uneSeuleCouleur = (main) => main.length > 0 && main.every((c) => couleur(c) === couleur(main[0]));
 
+  // Katapss à la distribution (règle 7.1) : 4 cartes de la même couleur, ou une main dont la plus
+  // forte carte est un 4. Ce second Katapss ne vaut pas quand la manche se joue à 2 (duel ou finale).
+  // Renvoie 'couleur', 'petite' ou null.
+  function typeKatapss(main, nbJoueurs) {
+    if (main.length !== 4) return null;
+    if (uneSeuleCouleur(main)) return 'couleur';
+    if (nbJoueurs > 2 && Math.max(...main.map(valeur)) === 4) return 'petite';
+    return null;
+  }
+
+  // Distribue 4 cartes à chacun. En manche à 2 (duel ou finale), une main dont la plus forte carte
+  // est un 4 n'est pas un Katapss : on l'annonce à tous et on redistribue.
+  // Renvoie { mains, redistributions: [{ joueur, main }] } (les mains annoncées, dans l'ordre).
+  function distribuer(sieges, rng) {
+    const redistributions = [];
+    for (let essai = 0; ; essai++) {
+      const paquet = melanger(nouveauPaquet(), rng);
+      const mains = {};
+      sieges.forEach((j, i) => (mains[j] = paquet.slice(i * 4, i * 4 + 4)));
+      const petites = sieges.length === 2 && essai < 100
+        ? sieges.filter((j) => !uneSeuleCouleur(mains[j]) && Math.max(...mains[j].map(valeur)) === 4) : [];
+      if (!petites.length) return { mains, redistributions };
+      for (const j of petites) redistributions.push({ joueur: j, main: mains[j].slice() });
+    }
+  }
+
+  const texteRedistribution = (r) => `Redistribution : la plus forte carte de ${r.joueur} était un 4 (${r.main.map(afficher).join(' ')}).`;
+
   // ---------------------------------------------------------------------------
   // Manche
   // ---------------------------------------------------------------------------
 
   // sieges : joueurs dans le sens des aiguilles d'une montre.
   // mains  : { joueur: [cartes] }. premier : joueur qui ouvre la manche.
-  function nouvelleManche(sieges, mains, premier) {
+  // redistributions : annonces faites avant cette distribution (voir distribuer).
+  function nouvelleManche(sieges, mains, premier, redistributions) {
     const m = {
       sieges: sieges.slice(),
       enJeu: sieges.slice(),
@@ -69,8 +98,10 @@
     };
     for (const j of sieges) {
       m.mains[j] = mains[j].slice();
-      if (m.mains[j].length === 4 && uneSeuleCouleur(m.mains[j])) m.katapss.push(j);
+      if (typeKatapss(m.mains[j], sieges.length)) m.katapss.push(j);
     }
+    m.redistributions = (redistributions || []).map((r) => ({ joueur: r.joueur, main: r.main.slice() }));
+    m.redistributions.forEach((r) => noter(m, texteRedistribution(r)));
     noter(m, `Début de la manche : ${sieges.length} joueurs, ${premier} ouvre.`);
     return m;
   }
@@ -288,11 +319,9 @@
     const manches = [];
     while (restants.length > 1) {
       const sieges = melanger(restants, rng);
-      const paquet = melanger(nouveauPaquet(), rng);
-      const mains = {};
-      sieges.forEach((j, i) => (mains[j] = paquet.slice(i * 4, i * 4 + 4)));
+      const { mains, redistributions } = distribuer(sieges, rng);
       const premier = sieges[Math.floor(rng() * sieges.length)];
-      const m = nouvelleManche(sieges, mains, premier);
+      const m = nouvelleManche(sieges, mains, premier, redistributions);
       let coups = 0;
       while (m.phase !== 'terminee') {
         if (++coups > 10000) throw new Error('Manche bloquée');
@@ -339,7 +368,7 @@
 
   const Kopo = {
     COULEURS, NOMS_COULEURS, SYMBOLES,
-    valeur, couleur, afficher, nouveauPaquet, hasard, melanger,
+    valeur, couleur, afficher, typeKatapss, distribuer, nouveauPaquet, hasard, melanger,
     nouvelleManche, actionsPossibles, jouer, jouerPartie, vuePublique,
     strategieSimple, strategieHasard,
   };
