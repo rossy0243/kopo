@@ -270,6 +270,8 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     for (const j of js) assert.strictEqual((await srv.comptes.lire(j.compte.id)).solde, 500);
     const r = (await srv.base.query('SELECT avec_robots FROM parties ORDER BY debut DESC LIMIT 1')).rows[0];
     assert.strictEqual(r.avec_robots, true);
+    await new Promise((ok) => setTimeout(ok, 300));
+    assert.deepStrictEqual(await srv.social.duels(js[0].compte.id, [js[1].compte.id]), [], 'pas de face-à-face avec un robot à la table');
   });
   await test('un joueur banni ne peut pas entrer dans une salle', async () => {
     const x = await invite('Tricheur');
