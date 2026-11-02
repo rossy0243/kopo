@@ -5258,7 +5258,7 @@ var qrcode = function() {
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = '82f7d094cbc6'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = '1a893d14b796'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
@@ -7259,7 +7259,7 @@ var qrcode = function() {
       const go = el('button', 'btn principal large', 'Jouer'); go.onclick = () => jouerMatchJour();
       boutons.push(go);
     }
-    // Classement du jour : amis, pays, monde.
+    // Classement du jour : amis, monde.
     const onglets = el('div', 'ligue-onglets'), liste = el('ul', 'ligue-liste');
     const charger = async (type) => {
       onglets.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.type === type)));
@@ -7269,9 +7269,9 @@ var qrcode = function() {
       const ligne = (j) => { const l = el('li', c.moi && j.id === c.moi.id ? 'moi' : null); l.append(el('span', 'rang', String(j.rang)), el('span', null, (j.victoire ? '🏆 ' : '') + j.pseudo), el('span', 'pts', String(j.score))); return l; };
       for (const j of c.liste) liste.append(ligne(j));
       if (c.moi && !c.liste.some((j) => j.id === c.moi.id)) { liste.append(el('li', 'muted', '…')); liste.append(ligne(c.moi)); }
-      if (!c.liste.length) liste.append(el('li', 'muted', type === 'amis' ? 'Aucun ami n\'a encore joué aujourd\'hui.' : type === 'pays' && !(compteLocal().compte || {}).pays ? 'Choisis ton pays dans la Ligue.' : 'Personne n\'a encore fini le Match du jour.'));
+      if (!c.liste.length) liste.append(el('li', 'muted', type === 'amis' ? 'Aucun ami n\'a encore joué aujourd\'hui.' : 'Personne n\'a encore fini le Match du jour.'));
     };
-    for (const [t, n] of [['amis', 'Amis'], ['pays', 'Pays'], ['mondial', 'Monde']]) { const b = el('button', null, n); b.dataset.type = t; b.onclick = () => charger(t); onglets.append(b); }
+    for (const [t, n] of [['amis', 'Amis'], ['mondial', 'Monde']]) { const b = el('button', null, n); b.dataset.type = t; b.onclick = () => charger(t); onglets.append(b); }
     if (m) z.append(onglets, liste);
     const bande = el('button', 'btn large', 'La Bande'); bande.onclick = () => ouvrirBande();
     const fermer = el('button', 'btn large', 'Fermer'); fermer.onclick = fermerFenetre;

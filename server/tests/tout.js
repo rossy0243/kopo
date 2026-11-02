@@ -1183,6 +1183,12 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     const ret2 = classerSemaine({ lundi, r, final: true, inscrits: [{ id: 'a', pseudo: 'A', mise: 1000, inscritLe: new Date(Date.parse(lundi) - 36e5) }, { id: 'z', pseudo: 'Z', mise: 1000, inscritLe: mercredi }],
       scores: s('a', [40, 90, 50, 50, 50, 50, 50]).concat(s('z', [0, 0, 60, 60, 60, 60]).slice(2)) });
     assert.strictEqual(ret2.lignes.find((x) => x.id === 'z').enRegle, false, 'un retardataire qui rate un jour est hors course');
+    // Jour du lancement (2/11) : un Match joué avant de miser compte avec son vrai score ; le lendemain, plus.
+    const l0 = MJ.PREMIER_JOUR, j0 = [0, 1].map((i) => MJ.ajouterJours(l0, i));
+    const lancement = classerSemaine({ lundi: l0, r, maintenant: new Date(Date.parse(j0[1] + 'T20:00:00Z')), inscrits: [{ id: 'm', pseudo: 'M', mise: 500, inscritLe: new Date(Date.parse(j0[1] + 'T12:00:00Z')) }, { id: 'n', pseudo: 'N', mise: 500, inscritLe: new Date(Date.parse(j0[0] + 'T12:00:00Z')) }],
+      scores: [{ compte_id: 'n', jour: j0[0], score: 30, statut: 'fini', debut: new Date(Date.parse(j0[0] + 'T10:00:00Z')) }, { compte_id: 'm', jour: j0[1], score: 40, statut: 'fini', debut: new Date(Date.parse(j0[1] + 'T10:00:00Z')) }] });
+    assert.deepStrictEqual(lancement.lignes.find((x) => x.id === 'n').jours[0], { jour: j0[0], type: 'joue', score: 30 }, 'joué avant de miser le jour du lancement : compté');
+    assert.strictEqual(lancement.lignes.find((x) => x.id === 'm').jours[1].type, 'retard', 'le lendemain, la règle anti-triche revient');
   });
 
   let bandeId, codeBande, membres;

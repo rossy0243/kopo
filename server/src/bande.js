@@ -3,7 +3,7 @@
 // Seul le serveur tient les mises, les scores et le partage : le téléphone ne fait qu'afficher.
 'use strict';
 const crypto = require('crypto');
-const { jourDe, debutDu, ajouterJours, lundiDe } = require('./match-jour');
+const { jourDe, debutDu, ajouterJours, lundiDe, PREMIER_JOUR } = require('./match-jour');
 
 const HEURE = 36e5;
 const LETTRES = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -32,6 +32,7 @@ function classerSemaine({ lundi, inscrits, scores, r, maintenant = new Date(), f
   const avantInscription = (i, jour) => {
     if (jour < jourDe(i.inscritLe)) return true;
     const s = parCle.get(i.id + '|' + jour);
+    if (jour === PREMIER_JOUR) return false; // jour du lancement : personne ne savait qu'il fallait miser avant de jouer
     return !!(s && s.debut && new Date(s.debut) < new Date(i.inscritLe));
   };
   const pire = new Map();
