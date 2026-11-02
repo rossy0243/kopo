@@ -3190,7 +3190,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
     z.append(rangs);
     // Classements : entre amis d'abord (c'est le plus parlant), puis pays, puis monde.
     const onglets = el('div', 'ligue-onglets'), liste = el('ul', 'ligue-liste'), pied = el('div');
-    const types = [['amis', 'Amis'], ['mondial', 'Monde']];
+    const types = [['amis', 'Amis'], ['pays', 'Pays'], ['mondial', 'Monde']];
     const charger = async (type) => {
       onglets.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.type === type)));
       liste.replaceChildren(el('li', 'muted', 'Chargement…')); pied.replaceChildren();
@@ -3351,7 +3351,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       if (c.moi && !c.liste.some((j) => j.id === c.moi.id)) { liste.append(el('li', 'muted', '…')); liste.append(ligne(c.moi)); }
       if (!c.liste.length) liste.append(el('li', 'muted', type === 'amis' ? 'Aucun ami n\'a encore joué aujourd\'hui.' : 'Personne n\'a encore fini le Match du jour.'));
     };
-    for (const [t, n] of [['amis', 'Amis'], ['pays', 'Pays'], ['mondial', 'Monde']]) { const b = el('button', null, n); b.dataset.type = t; b.onclick = () => charger(t); onglets.append(b); }
+    for (const [t, n] of [['amis', 'Amis'], ['mondial', 'Monde']]) { const b = el('button', null, n); b.dataset.type = t; b.onclick = () => charger(t); onglets.append(b); }
     if (m) z.append(onglets, liste);
     const bande = el('button', 'btn large', 'La Bande'); bande.onclick = () => ouvrirBande();
     const fermer = el('button', 'btn large', 'Fermer'); fermer.onclick = fermerFenetre;
