@@ -196,6 +196,9 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.strictEqual((await rec({ motif: 'defi', montant: 300, ref: 'w45b' })).json.ok, false, 'un défi par semaine');
     assert.strictEqual((await rec({ motif: 'bienvenue', montant: 100, ref: 'j1' })).json.ok, true);
     assert.strictEqual((await rec({ motif: 'bienvenue', montant: 150, ref: 'j2' })).json.ok, false, 'un cadeau par jour');
+    assert.strictEqual((await rec({ motif: 'installation', montant: 500, ref: 'pwa' })).statut, 400, 'cadeau d\'installation plafonné');
+    assert.strictEqual((await rec({ motif: 'installation', montant: 200, ref: 'pwa' })).json.ok, true);
+    assert.strictEqual((await rec({ motif: 'installation', montant: 200, ref: 'pwa2' })).json.ok, false, 'une seule installation récompensée');
   });
   await test('cadeau de fondateur : le dos « Les Fondateurs », une seule fois, coupé par l\'admin', async () => {
     const r = await invite('Fondateur' + Date.now() % 1000);
@@ -270,6 +273,8 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     for (const j of js) assert.strictEqual((await srv.comptes.lire(j.compte.id)).solde, 500);
     const r = (await srv.base.query('SELECT avec_robots FROM parties ORDER BY debut DESC LIMIT 1')).rows[0];
     assert.strictEqual(r.avec_robots, true);
+    await new Promise((ok) => setTimeout(ok, 300));
+    assert.deepStrictEqual(await srv.social.duels(js[0].compte.id, [js[1].compte.id]), [], 'pas de face-à-face avec un robot à la table');
   });
   await test('un joueur banni ne peut pas entrer dans une salle', async () => {
     const x = await invite('Tricheur');
@@ -331,6 +336,60 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     await attendre(200);
     assert.deepStrictEqual(recu, { type: 'reaction', joueur: x.compte.id, emoji: '🔥' });
     await a.leave(); await b.leave();
+  });
+
+  console.log('Tables à mise et pot');
+  await test('table Bronze : chacun paie 50, le pot (150) est partagé 50/25/10, la maison garde le reste', async () => {
+    const client = new Client(URL_.replace('http', 'ws'));
+    const js = [await invite('MiseA'), await invite('MiseB'), await invite('MiseC')];
+    const salles = [], pots = new Map(), mises = new Map();
+    let fin = null;
+    for (const j of js) {
+      const salle = await client.joinOrCreate('kopo-mise', { jeton: j.jeton, publique: true, taille: 3, mise: 'bronze', rapide: true });
+      salle.onMessage('erreur', () => {}); salle.onMessage('solde', () => {}); salle.onMessage('classee', () => {});
+      salle.onMessage('mise', (m) => mises.set(j.compte.id, m));
+      salle.onMessage('pot', (m) => pots.set(j.compte.id, m));
+      salle.onMessage('vue', (v) => {
+        if (v.etat === 'finPartie') fin = fin || v;
+        const a = v.manche && v.manche.actions[0];
+        if (v.etat === 'manche' && a) setTimeout(() => salle.send('action', { action: a }), 5);
+      });
+      salles.push(salle);
+      await attendre(80);
+    }
+    assert.ok(salles.every((x) => x.roomId === salles[0].roomId), 'même salle');
+    for (let t = 0; t < 400 && !fin; t++) await attendre(50);
+    assert.ok(fin, 'la partie doit se terminer');
+    for (let t = 0; t < 40 && pots.size < 3; t++) await attendre(50);
+    assert.deepStrictEqual(mises.get(js[0].compte.id), { niveau: 'bronze', mise: 50, pot: 150 });
+    const ordre = [fin.vainqueur, ...fin.elimines.slice().reverse()];
+    const attendu = [75, 37, 15];
+    for (let i = 0; i < 3; i++) {
+      const moi = await api('/api/moi', { jeton: js.find((j) => j.compte.id === ordre[i]).jeton });
+      assert.strictEqual(moi.json.compte.solde, 500 - 50 + attendu[i], 'solde de la place ' + (i + 1));
+      assert.strictEqual(pots.get(ordre[i]).gain, attendu[i]);
+    }
+    for (const s of salles) await s.leave();
+  });
+  await test('table à mise : refusée sans assez de pièces, ou avec un code ; jamais trouvée par une ancienne version', async () => {
+    const client = new Client(URL_.replace('http', 'ws'));
+    const pauvre = await invite('MisePauvre');
+    await assert.rejects(client.joinOrCreate('kopo-mise', { jeton: pauvre.jeton, publique: true, taille: 4, mise: 'argent' }), /au moins 2000 pièces/);
+    const riche = await invite('MiseRiche');
+    const a = await client.joinOrCreate('kopo-mise', { jeton: riche.jeton, publique: true, taille: 4, mise: 'bronze' });
+    a.onMessage('vue', () => {}); a.onMessage('erreur', () => {});
+    await attendre(100);
+    const ancien = await client.joinOrCreate('kopo', { jeton: pauvre.jeton, publique: true, taille: 4 });
+    ancien.onMessage('vue', () => {}); ancien.onMessage('erreur', () => {});
+    assert.notStrictEqual(ancien.roomId, a.roomId);
+    const enLigne = (await api('/api/en-ligne')).json.sallesOuvertes;
+    assert.strictEqual(enLigne.find((x) => x.id === a.roomId).mise, 'bronze');
+    assert.strictEqual(enLigne.find((x) => x.id === ancien.roomId).mise, null);
+    await assert.rejects(client.joinById(a.roomId, { jeton: pauvre.jeton, code: 'ABCD' }), /sans code/);
+    await assert.rejects(client.create('kopo-mise', { jeton: riche.jeton, publique: true, taille: 4, mise: 'platine' }));
+    const cfg = (await api('/api/config')).json;
+    assert.deepStrictEqual([cfg.tables.bronze, cfg.deblocage, cfg.pot.maison, cfg.remiseAFlot], [50, 10, 15, 20]);
+    await a.leave(); await ancien.leave();
   });
 
   console.log('Ligue classée et saisons');
@@ -462,6 +521,32 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     const r = await api('/api/rivaux', { jeton: js.find((j) => j.compte.id === ordre[0]).jeton });
     assert.strictEqual(r.json.length, 2);
     assert.ok(r.json.every((x) => x.moi === 1 && x.lui === 0), JSON.stringify(r.json));
+  });
+  await test('statistiques du compte et copie du profil : gardées par le serveur', async () => {
+    const js = [await invite('Sta' + Date.now() % 1000), await invite('Stb' + Date.now() % 1000), await invite('Stc' + Date.now() % 1000)];
+    const fin = await jouerPartie(js);
+    const v = js.find((j) => j.compte.id === fin.vainqueur);
+    const st = await api('/api/statistiques', { jeton: v.jeton });
+    assert.strictEqual(st.statut, 200);
+    assert.deepStrictEqual(st.json.stats, { parties: 1, victoires: 1, finales: 1, eliminePremier: 0 });
+    assert.deepStrictEqual(st.json.entrainement, { parties: 0, victoires: 0 });
+    assert.strictEqual(st.json.rivaux.length, 2);
+    // Même duel, vu des deux côtés : les scores sont le miroir l'un de l'autre.
+    const autre = js.find((j) => j.compte.id !== v.compte.id);
+    const [d1] = await srv.social.duels(v.compte.id, [autre.compte.id]);
+    const [d2] = await srv.social.duels(autre.compte.id, [v.compte.id]);
+    assert.deepStrictEqual([d1.moi, d1.lui], [1, 0]);
+    assert.deepStrictEqual([d2.moi, d2.lui], [0, 1]);
+    assert.deepStrictEqual(await srv.social.duels(v.compte.id, []), []);
+    const premier = js.find((j) => j.compte.id === fin.elimines[0]);
+    assert.strictEqual((await api('/api/statistiques', { jeton: premier.jeton })).json.stats.eliminePremier, 1);
+    // Copie du profil du téléphone.
+    assert.strictEqual((await api('/api/profil', { jeton: v.jeton })).json.profil, null);
+    assert.strictEqual((await api('/api/profil', { methode: 'PUT', jeton: v.jeton, corps: { profil: [] } })).statut, 400);
+    const p = { version: 1, xp: 420, premierePartie: '2026-10-01', stats: { parties: 12 } };
+    assert.strictEqual((await api('/api/profil', { methode: 'PUT', jeton: v.jeton, corps: { profil: p } })).statut, 200);
+    assert.deepStrictEqual((await api('/api/profil', { jeton: v.jeton })).json.profil, p);
+    assert.strictEqual((await api('/api/profil', { jeton: premier.jeton })).json.profil, null, 'chacun la sienne');
   });
   await test('rivalité entre amis : « t\'a rattrapé », une seule par jour, et 1 – 0 ne compte pas', async () => {
     const [x, y] = [await invite('Riv' + Date.now() % 1000), await invite('Ral' + Date.now() % 1000)];
@@ -819,6 +904,83 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.match(r.json.erreur, /Trop d'essais/);
   });
 
+  await test('page fermée en pleine partie : le joueur reprend sa place avec le code (mêmes cartes), salle pleine et verrouillée', async () => {
+    const client = new Client(URL_.replace('http', 'ws'));
+    const js = [];
+    for (const p of ['Ret1', 'Ret2', 'Ret3', 'Ret4']) js.push(await invite(p + Math.floor(Math.random() * 1000)));
+    const vues = new Map();
+    const ecouter = (r, j) => { r.onMessage('vue', (v) => vues.set(j.compte.id, v)); r.onMessage('erreur', () => {}); r.onMessage('solde', () => {}); r.onMessage('classee', () => {}); };
+    const salles = [];
+    for (const j of js.slice(0, 3)) {
+      const r = await client.joinOrCreate('kopo', { jeton: j.jeton, publique: true, taille: 3, rapide: true });
+      ecouter(r, j); salles.push(r);
+    }
+    const [a, b] = salles, idB = js[1].compte.id;
+    for (let t = 0; t < 40 && !(vues.get(idB) && vues.get(idB).etat === 'manche'); t++) await attendre(50);
+    const avant = vues.get(idB);
+    assert.strictEqual(avant.etat, 'manche', 'la partie a commencé');
+    const code = avant.code, main = avant.manche.main.slice();
+    // B ferme la page : coupure sans « Quitter ».
+    await b.leave(false);
+    await attendre(150);
+    assert.strictEqual(vues.get(js[0].compte.id).joueurs.find((x) => x.id === idB).connecte, false);
+    // Le code seul ne suffit pas (partie commencée) : c'était le bug.
+    await assert.rejects(client.join('kopo', { jeton: js[1].jeton, code }));
+    // Un inconnu à cette table n'a rien à reprendre.
+    assert.strictEqual((await api('/api/reprendre', { methode: 'POST', jeton: js[3].jeton, corps: { code } })).statut, 404);
+    assert.strictEqual((await api('/api/reprendre', { methode: 'POST', corps: { code } })).statut, 401);
+    // B revient (nouvelle page, sans jeton de reconnexion) : il reprend sa place, ses cartes.
+    const rep = await api('/api/reprendre', { methode: 'POST', jeton: js[1].jeton, corps: { code } });
+    assert.strictEqual(rep.statut, 200, JSON.stringify(rep.json));
+    vues.delete(idB);
+    const b2 = await new Client(URL_.replace('http', 'ws')).consumeSeatReservation(rep.json);
+    ecouter(b2, js[1]);
+    assert.strictEqual(b2.roomId, a.roomId);
+    b2.send('sync');
+    for (let t = 0; t < 40 && !vues.get(idB); t++) await attendre(50);
+    const apres = vues.get(idB);
+    assert.strictEqual(apres.etat, 'manche');
+    assert.deepStrictEqual(apres.manche.main, main, 'mêmes cartes');
+    await attendre(100);
+    const vuA = vues.get(js[0].compte.id).joueurs.find((x) => x.id === idB);
+    assert.ok(vuA.connecte && !vuA.robot, 'les autres le voient revenu');
+    // Ancienne page encore ouverte (coupure pas encore vue par le serveur) : la nouvelle prend la place, l'ancienne est écartée.
+    let ecarte = null; b2.onLeave((c) => (ecarte = c));
+    const rep2 = await api('/api/reprendre', { methode: 'POST', jeton: js[1].jeton, corps: { code } });
+    assert.strictEqual(rep2.statut, 200, JSON.stringify(rep2.json));
+    const b3 = await new Client(URL_.replace('http', 'ws')).consumeSeatReservation(rep2.json);
+    ecouter(b3, js[1]);
+    for (let t = 0; t < 40 && ecarte === null; t++) await attendre(50);
+    assert.strictEqual(ecarte, 4000, 'ancienne page écartée');
+    await attendre(150);
+    assert.ok(vues.get(js[0].compte.id).joueurs.find((x) => x.id === idB).connecte, 'le départ de l\'ancienne page ne le déconnecte pas');
+    for (const r of [a, salles[2], b3]) await r.leave();
+  });
+  await test('coupure réseau : retour avec le jeton de reconnexion, puis nouvelle coupure bien vue', async () => {
+    const client = new Client(URL_.replace('http', 'ws'));
+    const [x, y] = [await invite('Rec' + Date.now() % 1000), await invite('Rek' + (Date.now() + 1) % 1000)];
+    const code = 'RECO';
+    const a = await client.create('kopo', { jeton: x.jeton, code, rapide: true });
+    const b = await client.join('kopo', { jeton: y.jeton, code });
+    let vueA = null; a.onMessage('vue', (v) => (vueA = v)); a.onMessage('erreur', () => {});
+    b.onMessage('vue', () => {}); b.onMessage('erreur', () => {});
+    await attendre(100);
+    a.send('lancer');
+    for (let t = 0; t < 40 && !(vueA && vueA.etat === 'manche'); t++) await attendre(50);
+    const connecte = () => vueA.joueurs.find((j) => j.id === y.compte.id).connecte;
+    const jetonReco = b.reconnectionToken;
+    await b.leave(false);
+    await attendre(150);
+    assert.strictEqual(connecte(), false);
+    const b2 = await client.reconnect(jetonReco);
+    b2.onMessage('vue', () => {}); b2.onMessage('erreur', () => {});
+    await attendre(150);
+    assert.strictEqual(connecte(), true, 'revenu avec le jeton');
+    await b2.leave(false);
+    await attendre(150);
+    assert.strictEqual(connecte(), false, 'la coupure suivante est vue');
+    await a.leave();
+  });
   await srv.arreter();
   console.log(`\n${reussis} tests réussis, ${echecs} en échec.`);
   process.exit(echecs ? 1 : 0);

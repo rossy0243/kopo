@@ -267,7 +267,7 @@
       // On montre l'adversaire avec qui l'histoire est la plus longue (à égalité : celui qui t'a battu).
       const choisi = e.adversaires.slice().sort((a, b) => (rv[b.id].gagnes + rv[b.id].perdus) - (rv[a.id].gagnes + rv[a.id].perdus) || (b.devant - a.devant))[0];
       const r = rv[choisi.id];
-      faceAFace = { nom: r.pseudo, gagnes: r.gagnes, perdus: r.perdus, gagne: !choisi.devant };
+      faceAFace = { id: choisi.id, nom: r.pseudo, gagnes: r.gagnes, perdus: r.perdus, gagne: !choisi.devant };
       // Les 200 plus récents seulement.
       const ids = Object.keys(rv);
       if (ids.length > 200) ids.sort((a, b) => (rv[a].vuLe < rv[b].vuLe ? -1 : 1)).slice(0, ids.length - 200).forEach((id) => delete rv[id]);
@@ -318,6 +318,57 @@
     return meilleur ? 'Le Cauchemar de ' + meilleur.pseudo : null;
   }
 
+  // ------------------------------------------------------------------ réunir deux profils
+  // Un joueur peut se retrouver avec deux profils : l'ancien (resté à l'ancienne adresse du site, ou sauvegardé
+  // sur le serveur) et un neuf, créé en ouvrant le jeu ailleurs. On les réunit au lieu d'en jeter un.
+  // mode 'somme' : les deux profils ont compté des parties différentes (déménagement) : on additionne.
+  // mode 'max'   : ils peuvent avoir des parties en commun (sauvegarde du serveur) : on garde le plus grand.
+  // Renvoie true si le profil local a changé. L'ancien profil n'est jamais modifié.
+  const signatureProfil = (p) => [p.premierePartie || '', p.xp || 0, (p.stats && p.stats.parties) || 0, (p.entrainement && p.entrainement.parties) || 0].join('|');
+  function fusionnerProfils(p, ancien, mode = 'somme') {
+    if (!ancien || typeof ancien !== 'object' || !(ancien.xp > 0 || ancien.premierePartie)) return false;
+    const sig = signatureProfil(ancien);
+    const deja = Array.isArray(p.fusions) ? p.fusions : [];
+    if (deja.includes(sig)) return false;
+    // Le profil local est la suite de l'ancien (copié tel quel, puis joué) : rien à ajouter.
+    if (p.premierePartie && p.premierePartie === ancien.premierePartie && (p.xp || 0) >= (ancien.xp || 0)) return false;
+    const n = (x) => (Number.isFinite(x) && x > 0 ? x : 0);
+    const plus = mode === 'max' ? (a, b) => Math.max(n(a), n(b)) : (a, b) => n(a) + n(b);
+    p.xp = plus(p.xp, ancien.xp);
+    for (const [cle, zero] of [['stats', STATS0], ['entrainement', { parties: 0, victoires: 0 }]]) {
+      if (!ancien[cle]) continue;
+      const s = p[cle] = Object.assign({}, zero, p[cle] || {});
+      for (const k of Object.keys(zero)) s[k] = plus(s[k], ancien[cle][k]);
+    }
+    if (ancien.rivaux && typeof ancien.rivaux === 'object') {
+      const rv = p.rivaux || (p.rivaux = {});
+      for (const [id, a] of Object.entries(ancien.rivaux)) {
+        const r = rv[id];
+        if (!r) { rv[id] = Object.assign({}, a); continue; }
+        r.gagnes = plus(r.gagnes, a.gagnes); r.perdus = plus(r.perdus, a.perdus);
+        if (!r.vuLe || (a.vuLe && a.vuLe > r.vuLe)) { r.vuLe = a.vuLe; r.pseudo = a.pseudo || r.pseudo; }
+      }
+    }
+    if (ancien.premierePartie && (!p.premierePartie || ancien.premierePartie < p.premierePartie)) p.premierePartie = ancien.premierePartie;
+    if (ancien.fondateur && !p.fondateur) p.fondateur = ancien.fondateur;
+    // Parcours de bienvenue : on garde le plus avancé (pas deux fois les mêmes cadeaux).
+    if (ancien.bienvenue && (!p.bienvenue || (ancien.bienvenue.recus || 0) > (p.bienvenue.recus || 0))) p.bienvenue = Object.assign({}, ancien.bienvenue);
+    // Pièces d'essai (hors ligne) : le plus gros solde, pas la somme (chaque profil a reçu le cadeau de départ).
+    if (ancien.pieces && (!p.pieces || (ancien.pieces.solde || 0) > (p.pieces.solde || 0))) p.pieces = Object.assign({}, ancien.pieces);
+    // Collection : tous les objets des deux profils ; on remet ce que l'ancien portait si le neuf porte ceux de base.
+    if (ancien.collection && Array.isArray(ancien.collection.possedes)) {
+      const c = collection(p), ca = ancien.collection;
+      for (const id of ca.possedes) if (!c.possedes.includes(id)) c.possedes.push(id);
+      const base = { avatar: 'av-laiton', dos: 'dos-laiton', cadre: null };
+      for (const t of Object.keys(base)) {
+        const v = ca.equipes && ca.equipes[t];
+        if (v && v !== base[t] && c.equipes[t] === base[t]) c.equipes[t] = v;
+      }
+    }
+    p.fusions = deja.concat(sig).slice(-20);
+    return true;
+  }
+
   const KopoRetention = {
     jourDe, decaler, ecart, semaineDe, hasard,
     XP, xpPourNiveau, niveauDe,
@@ -327,6 +378,7 @@
     BIENVENUE, bienvenue, recevoirBienvenue,
     gainBonus, bonusDuJour, jokerLibre, pieces,
     bilanPartie, enregistrerPartie, titre,
+    fusionnerProfils, signatureProfil,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = KopoRetention;
   else root.KopoRetention = KopoRetention;

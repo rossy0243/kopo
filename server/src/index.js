@@ -11,7 +11,7 @@ const { creerReglages } = require('./reglages');
 const { creerComptes, migrerPseudos } = require('./comptes');
 const { routesJoueurs } = require('./api');
 const { routesAdmin } = require('./admin');
-const { SalleKopo, salles } = require('./salle-kopo');
+const { SalleKopo, salles, reprendre } = require('./salle-kopo');
 const { creerLigue } = require('./ligue');
 const { creerSocial } = require('./social');
 const { creerParcours } = require('./parcours');
@@ -55,13 +55,32 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
   // Compteur en ligne et salles ouvertes (lu par l'accueil).
   app.get('/api/en-ligne', async (req, res) => {
     let joueurs = 0; for (const s of salles) joueurs += s.clientsParId.size;
-    const ouvertes = (await matchMaker.query({ name: 'kopo' })).filter((r) => r.metadata && r.metadata.publique && r.metadata.etat === 'salon' && !r.locked);
-    res.json({ joueurs, sallesOuvertes: ouvertes.map((r) => ({ id: r.roomId, code: r.metadata.code, taille: r.metadata.taille, joueurs: r.clients, classee: !!r.metadata.classee })) });
+    const ouvertes = [...(await matchMaker.query({ name: 'kopo' })), ...(await matchMaker.query({ name: 'kopo-mise' }))].filter((r) => r.metadata && r.metadata.publique && r.metadata.etat === 'salon' && !r.locked);
+    res.json({ joueurs, sallesOuvertes: ouvertes.map((r) => ({ id: r.roomId, code: r.metadata.code, taille: r.metadata.taille, joueurs: r.clients, classee: !!r.metadata.classee, mise: r.metadata.mise ? r.metadata.mise.niveau : null })) });
+  });
+
+  // Reprendre sa place avec le code de la salle (page fermée par erreur, réseau perdu) : la salle d'une
+  // partie commencée est verrouillée, le matchmaking ne la propose plus. Renvoie une réservation de place
+  // (client.consumeSeatReservation), ou 404 si le joueur n'est assis à aucune table ouverte avec ce code.
+  app.post('/api/reprendre', express.json({ limit: '4kb' }), async (req, res) => {
+    try {
+      const id = await auth.verifierJoueur((req.get('authorization') || '').replace(/^Bearer\s+/i, ''));
+      const c = id && (await comptes.statut(id));
+      if (!c || c.statut === 'supprime') return res.status(401).json({ erreur: 'Connexion requise.' });
+      if (c.statut === 'banni' || c.statut === 'suspendu') return res.status(403).json({ erreur: c.statut === 'banni' ? 'Ce compte est banni.' : 'Compte suspendu.' });
+      const code = String((req.body && req.body.code) || '').toUpperCase();
+      if (!/^[A-Z]{4}$/.test(code)) return res.status(400).json({ erreur: 'Code invalide.' });
+      const reservation = await reprendre(c, code);
+      if (!reservation) return res.status(404).json({ erreur: 'Tu n\'es pas à cette table.' });
+      res.json(reservation);
+    } catch (e) { console.error('Reprendre :', e.message); res.status(500).json({ erreur: 'Erreur du serveur.' }); }
   });
 
   const serveurHttp = http.createServer(app);
   const jeu = new Server({ transport: new WebSocketTransport({ server: serveurHttp, pingInterval: 5000, pingMaxRetries: 3 }) });
   jeu.define('kopo', SalleKopo).filterBy(['code', 'publique', 'taille']);
+  // Tables à mise : un autre nom de salle, pour qu'une ancienne version du jeu n'y entre jamais par erreur.
+  jeu.define('kopo-mise', SalleKopo).filterBy(['publique', 'taille', 'mise']);
   await new Promise((ok) => serveurHttp.listen(port, ok));
   const adresse = serveurHttp.address();
   console.log(`Kopo : serveur prêt sur le port ${adresse.port} (base : ${base.genre}).`);

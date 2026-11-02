@@ -70,6 +70,17 @@ function creerSocial(base) {
       else await base.query('UPDATE notifications SET lue = true WHERE compte_id = $1 AND NOT lue', [compteId]);
     },
 
+    // Mes face-à-face avec certains joueurs (ceux de la table qui vient de finir) : le même score des deux côtés.
+    async duels(compteId, autres) {
+      if (!autres.length) return [];
+      const r = await base.query(`SELECT c.id, c.pseudo,
+          CASE WHEN f.a = $1 THEN f.victoires_a ELSE f.victoires_b END AS moi,
+          CASE WHEN f.a = $1 THEN f.victoires_b ELSE f.victoires_a END AS lui
+        FROM face_a_face f JOIN comptes c ON c.id = CASE WHEN f.a = $1 THEN f.b ELSE f.a END
+        WHERE (f.a = $1 AND f.b = ANY($2)) OR (f.b = $1 AND f.a = ANY($2))`, [compteId, autres]);
+      return r.rows;
+    },
+
     // Mes face-à-face les plus disputés.
     async rivaux(compteId, limite = 10) {
       const r = await base.query(`SELECT c.id, c.pseudo, c.numero, c.avatar,

@@ -131,6 +131,13 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
 .fenetre { background: var(--table-2); border: 1px solid var(--line); border-radius: 16px; padding: 20px; width: min(440px, 100%); display: grid; gap: 12px; box-shadow: 0 20px 50px rgba(0,0,0,.5); max-height: 90vh; max-height: 90dvh; overflow-y: auto; grid-auto-rows: max-content; }
 .fenetre h2 { margin: 0; font-family: var(--display); font-size: 36px; letter-spacing: 2px; color: var(--brass); font-weight: 400; line-height: 1; }
 .fenetre p { margin: 0; color: var(--muted); }
+.guide-ios { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; counter-reset: etape; }
+.guide-ios li { display: grid; grid-template-columns: 30px 1fr 44px; align-items: center; gap: 10px; background: rgba(255,255,255,.05); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; counter-increment: etape; }
+.guide-ios li::before { content: counter(etape); width: 28px; height: 28px; border-radius: 50%; background: var(--brass); color: var(--table-2); font-weight: 800; display: grid; place-items: center; }
+.guide-ios .ico { width: 36px; height: 36px; color: #4a9bff; justify-self: end; }
+.guide-ios b { color: var(--ink); }
+.cadeau-installation { display: grid; justify-items: center; gap: 6px; font-size: 40px; font-weight: 800; color: var(--brass); }
+.cadeau-installation .piece { width: 44px; height: 44px; font-size: 24px; }
 .bilan { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .bilan li { display: flex; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--line); padding: 5px 0; }
 .chrono { height: 4px; border-radius: 2px; background: rgba(255,255,255,.12); overflow: hidden; }
@@ -147,6 +154,7 @@ header .vocal .btn { padding: 5px 9px; font-size: 15px; line-height: 1.2; }
 .reglage .btn.actif { background: var(--brass); color: #1d1606; border-color: var(--brass); }
 .depart { width: 100%; display: grid; justify-items: center; gap: 4px; padding: 6px 0; }
 .depart-titre { color: var(--muted); text-transform: uppercase; letter-spacing: 2px; font-size: 13px; }
+.depart-redistrib { color: var(--muted); font-size: 13px; margin-top: 6px; max-width: 280px; text-align: center; }
 .decompte { font-family: var(--display); font-size: 72px; line-height: 1; color: var(--brass); }
 .depart-qui { font-size: 20px; font-weight: 600; }
 .meneur { color: var(--brass); }
@@ -206,9 +214,21 @@ details.rappel summary { cursor: pointer; font-weight: 600; }
 @media (orientation: portrait) {
   body.en-jeu .tourner { display: flex; align-items: center; gap: 8px; flex: none; font-size: 13px; color: var(--brass); background: rgba(226,176,74,.1); border: 1px solid rgba(226,176,74,.35); border-radius: 10px; padding: 6px 10px; }
   body.en-jeu .tourner .btn { margin-left: auto; padding: 4px 10px; font-size: 13px; }
+  body.en-jeu .tourner .fermer-tourner { margin-left: auto; flex: none; background: none; border: 0; color: inherit; font-size: 15px; line-height: 1; padding: 4px 6px; cursor: pointer; opacity: .8; }
+  body.en-jeu .tourner .btn:not([hidden]) + .fermer-tourner { margin-left: 0; }
+  /* Masqué pour de bon (✕), ou quand une fenêtre (fin de manche, fin de partie…) couvre la table. */
+  body.en-jeu.sans-tourner .tourner, body.en-jeu:has(#voile:not([hidden])) .tourner, body.en-jeu:has(#voileTourner:not([hidden])) .tourner { display: none; }
 }
 /* Invitation à tourner le téléphone (au début d'une partie tenue droite, sur téléphone). */
 .voile-tourner { z-index: 12; }
+/* Messages du tableau de bord : annonce (une fois) et maintenance (bloquante, au-dessus de tout). */
+.voile-annonce { z-index: 45; } /* au-dessus de l'écran de bienvenue (40) */
+.voile-maintenance { z-index: 60; background: rgba(6,14,24,.94); }
+.fenetre-serveur { width: min(380px, 100%); justify-items: center; text-align: center; }
+.fenetre-serveur h2 { font-size: 32px; }
+.fenetre-serveur p { color: var(--ink, #fff); white-space: pre-line; overflow-wrap: anywhere; }
+.fenetre-serveur .btn { width: 100%; }
+.fenetre-serveur small { color: var(--muted); }
 .fenetre-tourner { width: min(340px, 100%); justify-items: center; text-align: center; }
 .fenetre-tourner h2 { font-size: 32px; }
 .fenetre-tourner .btn { width: 100%; }
@@ -413,6 +433,7 @@ body.accueil .app { max-width: none; min-height: 100vh; min-height: 100dvh; padd
 .onglet { background: none; border: 0; color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; display: grid; justify-items: center; gap: 2px; padding: 4px 14px; border-radius: 12px; }
 .onglet span { font-size: 24px; line-height: 1; color: var(--brass); }
 .onglet:active { background: rgba(255,255,255,.08); }
+@media (max-width: 400px) { .barre-bas { gap: 0; } .onglet { padding: 4px 6px; min-width: 0; } } /* 5 onglets sur un petit téléphone, sans déborder */
 .choix-salles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
 .choix-salles .btn { display: grid; gap: 2px; padding: 10px 6px; }
 .choix-salles .btn b { font-size: 18px; }
@@ -421,6 +442,12 @@ body.accueil .app { max-width: none; min-height: 100vh; min-height: 100dvh; padd
 .en-ligne-fenetre { color: var(--good) !important; font-weight: 600; }
 .point-en-ligne { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--good); margin: 0 4px 1px 2px; box-shadow: 0 0 6px var(--good); }
 .choix-niveau-robots { width: 100%; }
+.choix-mise { width: 100%; }
+.choix-mise button { flex: 1; padding: 8px 2px; display: grid; justify-items: center; gap: 1px; font-size: 13px; }
+.choix-mise button small { font-weight: 500; font-size: 11px; opacity: .85; }
+.choix-mise button:disabled { opacity: .45; }
+.choix-mise button .ico-k { width: 12px; height: 12px; }
+.aide-mise { text-align: center; }
 .choix-niveau-robots button { flex: 1; padding: 10px 6px; font-size: 15px; }
 .choix-robots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .choix-robots .btn { font-size: 20px; padding: 12px 0; }
@@ -474,6 +501,15 @@ ul.regles, ol.regles { margin: 0; padding-left: 20px; display: grid; gap: 6px; c
 .splash-couleurs span:nth-child(3) { animation-delay: .24s; color: var(--bad); }
 .splash-couleurs span:nth-child(4) { animation-delay: .36s; }
 .splash-sous { color: var(--muted); letter-spacing: 4px; text-transform: uppercase; font-size: 13px; }
+/* Barre de chargement : suit la page, les polices puis le réveil du serveur. */
+.splash-charge { display: grid; justify-items: center; gap: 9px; margin-top: 18px; width: min(62vw, 260px); }
+.splash-barre { width: 100%; height: 6px; border-radius: 99px; background: rgba(255,255,255,.08); box-shadow: inset 0 1px 2px rgba(0,0,0,.45); overflow: hidden; }
+.splash-barre i { display: block; height: 100%; width: 100%; border-radius: inherit; transform-origin: left; transform: scaleX(0); background: linear-gradient(90deg, #b9862c, var(--brass) 70%, #f6d68c); box-shadow: 0 0 12px rgba(226,176,74,.55); }
+.splash-etat { min-height: 1.3em; color: var(--muted); font-size: 12px; letter-spacing: .5px; text-align: center; }
+.splash-passer { color: rgba(159,178,200,.6); font-size: 11px; letter-spacing: .5px; visibility: hidden; }
+.splash.attente { cursor: pointer; }
+.splash.attente .splash-passer { visibility: visible; }
+@media (max-height: 480px) { .splash { gap: 7px; } .splash-marque { width: min(18vh, 80px); } .splash-logo { font-size: min(20vh, 110px); } .splash-couleurs { font-size: 22px; } .splash-charge { margin-top: 4px; gap: 5px; } }
 @keyframes entree { from { transform: scale(.5); opacity: 0; } }
 @keyframes saut { 0%, 100% { transform: none; } 50% { transform: translateY(-10px); } }
 @media (prefers-reduced-motion: reduce) { .splash-logo, .splash-marque, .splash-couleurs span { animation: none; } }
@@ -821,6 +857,9 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   <symbol id="i-missions" viewBox="0 0 32 32"><rect x="7" y="4" width="18" height="24" rx="2.5"/><path d="M11 10.5l1.8 1.8 3.2-3.4M19 11h2.5M11 17.5l1.8 1.8 3.2-3.4M19 18h2.5M11 24h4"/><circle cx="20.5" cy="24" r="1.4" style="fill:var(--acc,#c7362f);stroke:none"/></symbol>
   <symbol id="i-joker" viewBox="0 0 32 32"><rect x="8" y="4" width="16" height="24" rx="2.5"/><path d="M16 9.5l1.9 3.9 4.2.6-3 3 .7 4.2-3.8-2-3.8 2 .7-4.2-3-3 4.2-.6z"/><circle cx="16" cy="24.6" r="1.4" style="fill:var(--acc,#c7362f);stroke:none"/></symbol>
   <symbol id="i-cadeau" viewBox="0 0 32 32"><rect x="7" y="9" width="18" height="19" rx="2.5"/><path d="M16 9v19M7 16h18M16 9c-1-3.6-6-4.4-6-1.4 0 1.2 1.8 1.4 6 1.4 4.2 0 6-.2 6-1.4 0-3-5-2.2-6 1.4z"/><path style="fill:var(--acc,#c7362f);stroke:none" d="M20.5 19.6l1.8 2.4-1.8 2.4-1.8-2.4z"/></symbol>
+  <symbol id="i-installer" viewBox="0 0 32 32"><rect x="9" y="3" width="14" height="26" rx="2.5"/><path d="M16 8v11M11.5 14.5L16 19l4.5-4.5M13 24.5h6"/></symbol>
+  <symbol id="i-ios-partage" viewBox="0 0 32 32"><path d="M11 12H8v16h16V12h-3M16 20V3M11 8l5-5 5 5"/></symbol>
+  <symbol id="i-ios-ajouter" viewBox="0 0 32 32"><rect x="5" y="5" width="22" height="22" rx="5"/><path d="M16 10.5v11M10.5 16h11"/></symbol>
   <symbol id="i-cadenas" viewBox="0 0 32 32"><rect x="8" y="14" width="16" height="13" rx="2.5"/><path d="M11.5 14v-3.5a4.5 4.5 0 0 1 9 0V14M16 19v3"/></symbol>
   </defs>
 </svg>
@@ -863,6 +902,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       <button class="onglet" id="btnRegles"><span><svg class="ico"><use href="#i-regles"/></svg></span>Règles</button>
       <button class="onglet" id="btnParametresAccueil" hidden><span><svg class="ico"><use href="#i-reglages"/></svg></span>Paramètres</button>
       <button class="onglet" id="btnPleinEcranAccueil" hidden><span><svg class="ico"><use href="#i-plein"/></svg></span>Plein écran</button>
+      <button class="onglet" id="btnInstaller" hidden><span><svg class="ico"><use href="#i-installer"/></svg></span>Installer le jeu</button>
     </nav>
     <div class="voile" id="voileRejoindre" hidden>
       <div class="fenetre">
@@ -877,6 +917,8 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       <div class="fenetre">
         <h2>En ligne</h2>
         <p class="en-ligne-fenetre" id="enLigneSalles"></p>
+        <div class="choix choix-mise" id="choixMise" role="group" aria-label="Mise" hidden></div>
+        <small class="muted aide-mise" id="aideMise" hidden></small>
         <div class="salles-vedette" id="sallesVedette"></div>
         <small class="muted">Autres tailles</small>
         <div class="choix-salles" id="choixSalles"></div>
@@ -920,7 +962,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       <ul class="regles">
         <li>Il ne te reste que des cartes de la couleur du tour (ou une seule couleur quand tu ouvres) ? Touche <b>Tout poser</b> : tu les poses toutes d'un coup et tu es qualifié.</li>
         <li>Les cartes avec lesquelles on sort ne comptent pas : personne ne peut les ramasser.</li>
-        <li><b>Katapss</b> : tu reçois 4 cartes de la même couleur ? Annonce-le avant de jouer ou de ramasser : qualifié tout de suite.</li>
+        <li><b>Katapss</b> : tu reçois 4 cartes de la même couleur, ou ta plus forte carte est un 4 ? Annonce-le avant de jouer ou de ramasser : qualifié tout de suite. En duel et en finale, seules les 4 cartes de la même couleur comptent : une main dont la plus forte carte est un 4 est montrée à tous et on redistribue.</li>
       </ul>
       <p class="regles-note">36 cartes, du 2 au 10 dans les 4 couleurs. Le 10 est la plus forte. On tourne dans le sens des aiguilles d'une montre.</p>
     </template>
@@ -966,7 +1008,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   <!-- Partie -->
   <section id="ecranPartie" hidden>
     <div class="tapis" aria-hidden="true"></div>
-    <div class="tourner" id="tourner"><svg class="tel-mini" viewBox="0 0 24 24" aria-hidden="true"><g class="tel"><rect x="7" y="2" width="10" height="20" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><line x1="10.5" y1="18.5" x2="13.5" y2="18.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></g></svg><span>Tourne ton téléphone pour voir la table en grand.</span><button class="btn" id="btnPleinEcran" hidden>Plein écran</button></div>
+    <div class="tourner" id="tourner"><svg class="tel-mini" viewBox="0 0 24 24" aria-hidden="true"><g class="tel"><rect x="7" y="2" width="10" height="20" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><line x1="10.5" y1="18.5" x2="13.5" y2="18.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></g></svg><span>Mets ton téléphone à l'horizontale pour voir la table en grand.</span><button class="btn" id="btnPleinEcran" hidden>Plein écran</button><button class="fermer-tourner" id="btnFermerTourner" aria-label="Masquer ce conseil">✕</button></div>
     <div class="sieges" id="sieges" aria-label="Joueurs, dans l'ordre de jeu"></div>
     <section class="table" aria-label="Table">
       <div class="table-entete" id="entete"></div>
@@ -988,8 +1030,50 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   <div class="splash-logo">KOPO</div>
   <div class="splash-couleurs"><span>♠</span><span>♥</span><span>♦</span><span>♣</span></div>
   <div class="splash-sous">Jeu de cartes entre amis</div>
+  <div class="splash-charge"><div class="splash-barre"><i id="splashBarre"></i></div><div class="splash-etat" id="splashEtat">Chargement…</div><div class="splash-passer">Touche l'écran pour passer</div></div>
 </div>
+<script>
+// Barre du splash : kopoChargement(étape atteinte en %, texte, plafond). Entre deux étapes,
+// la barre avance doucement vers le plafond, sans jamais l'atteindre ni reculer.
+(function () {
+  var barre = document.getElementById('splashBarre'), etat = document.getElementById('splashEtat');
+  var vise = 3, plafond = 30, affiche = 0;
+  window.kopoChargement = function (p, texte, max) {
+    vise = Math.max(vise, p); plafond = Math.max(vise, max || p);
+    if (texte) etat.textContent = texte;
+  };
+  (function pas() {
+    if (!barre.isConnected) return;
+    if (affiche < vise) affiche = Math.min(vise, affiche + Math.max((vise - affiche) * .16, .4));
+    else if (affiche < plafond) affiche += (plafond - affiche) * .008;
+    barre.style.transform = 'scaleX(' + (affiche / 100) + ')';
+    requestAnimationFrame(pas);
+  })();
+})();
+</script>
 <div class="voile" id="voile" hidden><div class="fenetre" id="fenetre"></div></div>
+<div class="voile voile-annonce" id="voileAnnonce" hidden>
+  <div class="fenetre fenetre-serveur" role="dialog" aria-modal="true" aria-labelledby="titreAnnonce">
+    <h2 id="titreAnnonce">Annonce</h2>
+    <p id="texteAnnonce"></p>
+    <button class="btn principal" id="btnAnnonceOk">OK</button>
+  </div>
+</div>
+<div class="voile voile-maintenance" id="voileVersion" hidden>
+  <div class="fenetre fenetre-serveur" role="alertdialog" aria-modal="true" aria-labelledby="titreVersion">
+    <h2 id="titreVersion">Mise à jour</h2>
+    <p>Une nouvelle version du Kopo est obligatoire pour continuer à jouer.</p>
+    <button class="btn principal" id="btnVersionMaj">Mettre à jour</button>
+  </div>
+</div>
+<div class="voile voile-maintenance" id="voileMaintenance" hidden>
+  <div class="fenetre fenetre-serveur" role="alertdialog" aria-modal="true" aria-labelledby="titreMaintenance">
+    <h2 id="titreMaintenance">Maintenance</h2>
+    <p id="texteMaintenance"></p>
+    <button class="btn" id="btnMaintenanceReessayer">Réessayer</button>
+    <small>Le jeu se rouvrira tout seul dès la fin de la maintenance.</small>
+  </div>
+</div>
 <div class="toast" id="toast" hidden role="status"></div>
 <div class="maj-dispo" id="majDispo" hidden role="status"><span>Nouvelle version de Kopo disponible.</span><button class="btn principal" id="btnMajDispo">Mettre à jour</button><button class="btn" id="btnMajPlusTard" aria-label="Plus tard">✕</button></div>
 <div class="tirer-actualiser" id="tirerActualiser" hidden aria-hidden="true"><span>↻</span></div>
@@ -1004,8 +1088,8 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
         <rect x="46" y="46" width="12" height="17" rx="2" fill="#f7efe0"/><rect x="62" y="46" width="12" height="17" rx="2" fill="#f7efe0"/>
       </g>
     </svg>
-    <h2 id="titreTourner">Tourne ton téléphone</h2>
-    <p>Kopo se joue mieux en paysage : la table en grand, les joueurs autour de toi et ta main en éventail.</p>
+    <h2 id="titreTourner">Passe en paysage</h2>
+    <p>Mets ton téléphone à l'horizontale : Kopo se joue mieux comme ça, avec la table en grand, les joueurs autour de toi et ta main en éventail.</p>
     <button class="btn principal large" id="btnTournerPleinEcran" hidden>Plein écran en paysage</button>
     <button class="btn large" id="btnTournerPortrait">Continuer en portrait</button>
   </div>
@@ -1013,14 +1097,23 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
 <div id="calque" aria-hidden="true"></div>
 <div id="filChat" role="log" aria-live="polite" aria-label="Chat de la partie"></div>
 
+<script>kopoChargement(5, 0, 34)</script>
 <script>/*MQTT*/</script>
+<script>kopoChargement(34, 0, 44)</script>
 <script>/*COLYSEUS*/</script>
+<script>kopoChargement(44, 0, 52)</script>
 <script>/*PEERJS*/</script>
+<script>kopoChargement(52, 0, 57)</script>
 <script>/*QRCODE*/</script>
+<script>kopoChargement(57, 0, 59)</script>
 <script>/*MOTEUR*/</script>
+<script>kopoChargement(59, 0, 61)</script>
 <script>/*SALLE*/</script>
+<script>kopoChargement(61, 0, 63)</script>
 <script>/*RETENTION*/</script>
+<script>kopoChargement(63, 0, 64)</script>
 <script>/*SONS*/</script>
+<script>kopoChargement(64, 0, 72)</script>
 <script>
 (function () {
   'use strict';
@@ -1041,7 +1134,33 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   // Passage de GitHub Pages à Render : les données du téléphone (compte invité, profil, réglages) sont liées
   // à l'adresse du site. Quand NOUVELLE_ADRESSE est remplie, l'ancienne adresse envoie ses données kopo-*
   // à la nouvelle dans le # (rien ne passe par un serveur), et la nouvelle les reprend si elle est encore vide.
-  const NOUVELLE_ADRESSE = ''; // ex. 'https://kopo.onrender.com/' (avec le / final)
+  const NOUVELLE_ADRESSE = 'https://kopo-d655.onrender.com/'; // avec le / final
+  const ANCIENNE_ADRESSE = 'https://rossy0243.github.io/kopo/'; // ses données kopo-* y sont restées sur le téléphone
+  // Données arrivées de l'ancienne adresse. Nouvelle adresse encore vide : on recopie tout.
+  // Sinon (le joueur a d'abord ouvert la nouvelle adresse, par exemple par le lien d'un ami, et un profil neuf
+  // y a été créé) : on réunit les deux profils au lieu de jeter l'ancien, et on reprend l'ancien compte
+  // (pièces, ligue, amis). Le compte neuf est gardé de côté dans kopo-compte-serveur-remplace.
+  function reprendreDonnees(d) {
+    const kopo = Object.entries(d).filter(([k, v]) => k.startsWith('kopo-') && typeof v === 'string');
+    const vide = !Object.keys(localStorage).some((k) => k.startsWith('kopo-'));
+    if (vide) for (const [k, v] of kopo) localStorage.setItem(k, v);
+    stock.ecrire('kopo-demenagement', new Date().toISOString()); // l'ancienne adresse est passée par ici
+    if (vide) return;
+    const json = (t) => { try { return JSON.parse(t); } catch (e) { return null; } };
+    const local = stock.lire('kopo-profil');
+    const p = local && typeof local === 'object' ? local : { version: 1 };
+    if (!R.fusionnerProfils(p, json(d['kopo-profil']), 'somme')) return; // déjà réunis (ou rien à reprendre)
+    stock.ecrire('kopo-profil', p);
+    const ancienC = json(d['kopo-compte-serveur']), neufC = stock.lire('kopo-compte-serveur');
+    if (ancienC && ancienC.jeton && !(neufC && neufC.compte && ancienC.compte && neufC.compte.id === ancienC.compte.id)) {
+      if (neufC) stock.ecrire('kopo-compte-serveur-remplace', neufC);
+      localStorage.setItem('kopo-compte-serveur', d['kopo-compte-serveur']);
+      if (d['kopo-pseudo']) localStorage.setItem('kopo-pseudo', d['kopo-pseudo']);
+      if (d['kopo-pseudo-changements']) localStorage.setItem('kopo-pseudo-changements', d['kopo-pseudo-changements']);
+    }
+    for (const [k, v] of kopo) if (localStorage.getItem(k) === null) localStorage.setItem(k, v); // réglages, etc.
+    try { sessionStorage.setItem('kopo-donnees-reprises', '1'); } catch (e) {}
+  }
   (function demenagement() {
     const h = location.hash;
     if (h.startsWith('#demenagement=')) {
@@ -1049,13 +1168,12 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       try {
         const d = JSON.parse(decodeURIComponent(escape(atob(h.slice(14)))));
         suite = typeof d._hash === 'string' ? d._hash : '';
-        const vide = !Object.keys(localStorage).some((k) => k.startsWith('kopo-'));
-        if (vide && d && typeof d === 'object') for (const [k, v] of Object.entries(d)) if (k.startsWith('kopo-') && typeof v === 'string') localStorage.setItem(k, v);
+        if (d && typeof d === 'object') reprendreDonnees(d);
       } catch (e) {}
       history.replaceState(null, '', location.pathname + location.search + suite);
       return;
     }
-    if (!NOUVELLE_ADRESSE || LOCAL) return;
+    if (!NOUVELLE_ADRESSE || LOCAL || !location.hostname.endsWith('.github.io')) return; // seule l'ancienne adresse redirige (pas l'appli ni un test local)
     let cible; try { cible = new URL(NOUVELLE_ADRESSE); } catch (e) { return; }
     if (cible.origin === location.origin) return;
     if (h.startsWith('#access_token') || h.startsWith('#error')) return; // retour de Google : on le traite ici
@@ -1066,7 +1184,9 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
 
   // ------------------------------------------------------------------ paramètres
   // Réglages du joueur, gardés sur le téléphone (plus tard : rattachés au compte).
-  const VERSION = '1.0-essai';
+  // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
+  // (« Version minimale » du tableau de bord).
+  const VERSION = '1.1';
   const BUILD = '__KOPO_BUILD__'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
@@ -1266,7 +1386,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
     },
     // Salles publiques encore ouvertes d'une taille donnée, la plus remplie d'abord.
     ouvertes(taille, exclus) {
-      if (MODE_SERVEUR) return lobbyServeur.salles.filter((x) => x.taille === taille && x.joueurs < x.taille).map((x) => ({ code: x.code, taille: x.taille, nb: x.joueurs })).sort((a, b) => b.nb - a.nb);
+      if (MODE_SERVEUR) return lobbyServeur.salles.filter((x) => x.taille === taille && x.joueurs < x.taille && (x.mise || null) === miseActive()).map((x) => ({ code: x.code, taille: x.taille, nb: x.joueurs })).sort((a, b) => b.nb - a.nb);
       const limite = Date.now() - 10000;
       return [...this.salles.values()].filter((x) => x.t >= limite && x.taille === taille && x.nb < x.taille && !(exclus || []).includes(x.code)).sort((a, b) => b.nb - a.nb);
     },
@@ -1282,7 +1402,40 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   }
   lobby.ecouteurs.push(afficherEnLigne);
 
+  // Tables à mise (serveur) : Gratuit, Bronze, Argent, Or, Diamant. Un niveau s'ouvre avec 10 fois la mise.
+  const NIVEAUX_MISE = [['bronze', 'Bronze'], ['argent', 'Argent'], ['or', 'Or'], ['diamant', 'Diamant']];
+  function tablesMise() { return MODE_SERVEUR && configServeur && configServeur.tables ? configServeur.tables : null; }
+  const seuilMise = (n) => (tablesMise()[n] || 0) * ((configServeur && configServeur.deblocage) || 10);
+  // Le niveau choisi (retenu sur le téléphone), ou null pour une table gratuite. Un niveau devenu trop cher repasse en gratuit.
+  function miseActive() {
+    const t = tablesMise(), n = stock.lire('kopo-mise');
+    return t && t[n] > 0 && soldeAffiche() >= seuilMise(n) ? n : null;
+  }
+  function dessinerMises() {
+    const t = tablesMise(), box = $('choixMise'), aide = $('aideMise');
+    box.hidden = aide.hidden = !t;
+    if (!t) return;
+    const active = miseActive();
+    const bouton = (v, titre, sous, ouvert) => {
+      const b = el('button'); b.type = 'button'; b.dataset.v = v || '';
+      b.setAttribute('aria-pressed', String((v || null) === active));
+      b.disabled = !ouvert;
+      const s2 = el('small', null, sous); if (!ouvert) s2.prepend(iconeCadenas());
+      b.append(el('span', null, titre), s2);
+      b.onclick = () => { stock.ecrire('kopo-mise', v || null); dessinerSalles(); };
+      return b;
+    };
+    box.replaceChildren(bouton(null, 'Gratuit', 'sans mise', true),
+      ...NIVEAUX_MISE.filter(([n]) => t[n] > 0).map(([n, nom]) => bouton(n, nom, formatPieces(t[n]), soldeAffiche() >= seuilMise(n))));
+    const pot = (configServeur && configServeur.pot) || {};
+    if (active) aide.textContent = `Mise de ${formatPieces(t[active])} pièces par partie. Le pot va au 1er (${pot.vainqueur} %), au 2e (${pot.deuxieme} %) et au 3e (${pot.troisieme} %). Quitter en cours, c'est perdre sa mise.`;
+    else {
+      const prochain = NIVEAUX_MISE.find(([n]) => t[n] > 0 && soldeAffiche() < seuilMise(n));
+      aide.textContent = 'Partie gratuite : tu gagnes des pièces à chaque manche.' + (prochain ? ` Table ${prochain[1]} dès ${formatPieces(seuilMise(prochain[0]))} pièces.` : '');
+    }
+  }
   function dessinerSalles() {
+    dessinerMises();
     const bouton = (t, cls, titre, sous) => {
       const meilleure = lobby.ouvertes(t)[0];
       const b = el('button', 'btn' + (cls ? ' ' + cls : '') + (meilleure ? ' attente' : ''));
@@ -1300,7 +1453,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   // Rejoint la salle publique la plus remplie de cette taille ; s'il n'y en a pas, en crée une.
   let rechercheEnCours = null;
   function chercherSalle(nom, taille, exclus) {
-    if (MODE_SERVEUR) return entrerServeur(nom, { taille }); // le serveur choisit la salle la plus adaptée
+    if (MODE_SERVEUR) return entrerServeur(nom, { taille, mise: miseActive() }); // le serveur choisit la salle la plus adaptée
     afficherConnexion(`Recherche d'une salle de ${taille}…`);
     clearTimeout(rechercheEnCours);
     const debut = Date.now();
@@ -1369,16 +1522,17 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   // facon : { creer: true } | { code } | { taille } (salle publique) | { reconnexion: jeton de reconnexion }
   async function entrerServeur(nom, facon) {
     clearTimeout(rechercheEnCours);
-    afficherConnexion(facon.taille ? `Recherche d'une salle de ${facon.taille}…` : facon.code ? 'Connexion à la partie ' + facon.code + '…' : 'Ouverture de la partie…');
+    afficherConnexion(facon.taille ? `Recherche d'une ${facon.mise ? 'table ' + (NIVEAUX_MISE.find((x) => x[0] === facon.mise) || [])[1] : 'salle'} de ${facon.taille}…` : facon.code ? 'Connexion à la partie ' + facon.code + '…' : 'Ouverture de la partie…');
     let room;
     // L'hébergeur gratuit endort le serveur après un moment sans joueurs : le réveil prend jusqu'à une minute.
     const reveil = setTimeout(() => afficherConnexion('Réveil du serveur, ça peut prendre jusqu\'à une minute…'), 6000);
     try {
       const c = await compteServeur(nom);
       const cli = new Colyseus.Client(SERVEUR.replace(/^http/, 'ws'));
-      if (facon.reconnexion) room = await cli.reconnect(facon.reconnexion);
+      if (facon.reconnexion) room = await cli.reconnect(facon.reconnexion).catch(() => facon.code ? reprendreServeur(cli, c.jeton, facon.code).then((r) => r || Promise.reject(new Error('reconnexion'))) : Promise.reject(new Error('reconnexion')));
       else if (facon.creer) room = await cli.create('kopo', { jeton: c.jeton, code: nouveauCode() });
-      else if (facon.code) room = await cli.join('kopo', { jeton: c.jeton, code: facon.code });
+      else if (facon.code) room = (await reprendreServeur(cli, c.jeton, facon.code)) || await cli.join('kopo', { jeton: c.jeton, code: facon.code });
+      else if (facon.mise) room = await cli.joinOrCreate('kopo-mise', { jeton: c.jeton, publique: true, taille: facon.taille, mise: facon.mise });
       else room = await cli.joinOrCreate('kopo', { jeton: c.jeton, publique: true, taille: facon.taille });
       clearTimeout(reveil);
       brancherSalleServeur(cli, room, nom, facon);
@@ -1396,6 +1550,15 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
     }
   }
 
+  // Déjà assis à cette table (page fermée par erreur, réseau perdu, jeton de reconnexion expiré) :
+  // le serveur rend la place, même si la partie a commencé. null si on n'y est pas (entrée normale).
+  async function reprendreServeur(cli, jeton, code) {
+    let r;
+    try { r = await fetch(SERVEUR + '/api/reprendre', { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + jeton }, body: JSON.stringify({ code }) }); } catch (e) { return null; }
+    if (!r.ok) return null;
+    return cli.consumeSeatReservation(await r.json());
+  }
+
   function brancherSalleServeur(cli, room, nom, facon) {
     client = { serveur: true, room, dernierMessage: Date.now(), reseau: {
       envoyer: (msg) => { try { room.send(msg.type, msg); } catch (e) {} },
@@ -1408,21 +1571,28 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       stock.ecrire(cleSession, session);
       majHash(code);
     };
-    room.onMessage('vue', (v) => { cacherBandeau(); memoriser(v.code); afficher(v); });
-    room.onMessage('erreur', (t) => toast(t));
+    // Une salle quittée (partie suivante, Quitter) peut encore envoyer une vue avant de fermer : on l'ignore,
+    // sinon le bilan de l'ancienne partie se rouvrait (et rejouait son animation) par-dessus la nouvelle recherche.
+    room.onMessage('vue', (v) => { if (moi !== client) return; cacherBandeau(); memoriser(v.code); afficher(v); });
+    room.onMessage('erreur', (t) => { if (moi === client) toast(t); });
     room.onMessage('solde', (d) => soldeServeur(d && d.solde));
+    room.onMessage('mise', (d) => { if (moi === client && d) toast(`Mise de ${formatPieces(d.mise)} pièces payée. Pot : ${formatPieces(d.pot)} pièces.`); });
+    room.onMessage('pot', (d) => { if (moi === client && d) toast(d.gain > 0 ? `Tu gagnes ${formatPieces(d.gain)} pièces du pot !` : `Pas de part du pot cette fois (${formatPieces(d.pot)} pièces en jeu).`); });
     room.onMessage('classee', (d) => window.dispatchEvent(new CustomEvent('kopo-classee', { detail: d })));
     room.onMessage('ligue', (d) => window.dispatchEvent(new CustomEvent('kopo-ligue', { detail: d })));
     room.onMessage('parcours', (d) => window.dispatchEvent(new CustomEvent('kopo-parcours', { detail: d })));
+    room.onMessage('faceAFace', (d) => window.dispatchEvent(new CustomEvent('kopo-face-a-face', { detail: d })));
     room.onMessage('reaction', (e) => window.dispatchEvent(new CustomEvent('kopo-reaction', { detail: e })));
     room.onMessage('exclu', (raison) => { quitter(); toast(raison || 'Tu as été exclu de la partie.'); });
     room.onLeave((code) => {
       if (moi !== client || moi.depart) return;
       if (code === 4000 || code === 4001) { quitter(); toast(code === 4000 ? 'Ta partie est ouverte sur un autre appareil.' : 'Tu as été exclu de la partie.'); return; }
-      // Coupure réseau : le serveur garde la place 2 minutes.
+      // Coupure réseau : le serveur garde la place. Le jeton de reconnexion vaut 2 minutes ; ensuite on
+      // reprend la place avec le code de la salle, tant que la partie existe.
       montrerBandeau('Connexion perdue. Reconnexion…');
       const essayer = (n) => cli.reconnect(room.reconnectionToken)
-        .then((r) => { if (moi === client) brancherSalleServeur(cli, r, nom, facon); })
+        .catch(() => session && session.code ? compteServeur(nom).then((c) => reprendreServeur(cli, c.jeton, session.code)).then((r) => r || Promise.reject(new Error('reprendre'))) : Promise.reject(new Error('reconnexion')))
+        .then((r) => { if (moi === client) brancherSalleServeur(cli, r, nom, facon); else try { r.leave(); } catch (e) {} })
         .catch(() => { if (moi === client && n < 40) setTimeout(() => essayer(n + 1), 3000); else if (moi === client) { quitter(); toast('Connexion au serveur perdue.'); } });
       essayer(0);
     });
@@ -1593,7 +1763,8 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
     const enJeu = document.body.classList.contains('en-jeu');
     $('btnPleinEcran').hidden = !peutPleinEcran;
     $('btnPleinEcranEntete').hidden = !peutPleinEcran || !enJeu || !!document.fullscreenElement;
-    $('btnPleinEcranAccueil').hidden = !peutPleinEcran || !!document.fullscreenElement;
+    // « Installer le jeu » prend sa place quand il est proposé (l'appli installée s'ouvre déjà en plein écran).
+    $('btnPleinEcranAccueil').hidden = !peutPleinEcran || !!document.fullscreenElement || !$('btnInstaller').hidden;
   }
   function pleinEcran() {
     document.documentElement.requestFullscreen({ navigationUI: 'hide' })
@@ -1619,6 +1790,9 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   $('btnTournerPleinEcran').onclick = () => { fermerInvitationPaysage(); pleinEcran(); };
   $('voileTourner').onclick = (e) => { if (e.target === e.currentTarget) fermerInvitationPaysage(); };
   mqPortrait.addEventListener('change', () => { if (!mqPortrait.matches) fermerInvitationPaysage(); });
+  // Le petit bandeau en haut de la table : le ✕ le masque pour de bon sur cet appareil.
+  document.body.classList.toggle('sans-tourner', !!stock.lire('kopo-sans-bandeau-paysage'));
+  $('btnFermerTourner').onclick = () => { stock.ecrire('kopo-sans-bandeau-paysage', true); document.body.classList.add('sans-tourner'); };
   // Icône Kopo du sprite (#i-nom) : trait doré, voir docs/icones-kopo.md.
   function ico(nom, cls) { const t = document.createElement('template'); t.innerHTML = '<svg class="ico' + (cls ? ' ' + cls : '') + '" aria-hidden="true"><use href="#i-' + nom + '"/></svg>'; return t.content.firstChild; }
   // Texte précédé d'une icône (dans un bouton, un nom…).
@@ -1631,6 +1805,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
 
   function afficherAccueil() {
     montrerEcran('ecranAccueil');
+    setTimeout(verifierRemiseAFlot, 1500);
     $('info').textContent = '';
     $('pseudo').value = nettoyerPseudo(stock.lire('kopo-pseudo') || '');
     figerPseudo();
@@ -1929,7 +2104,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       try { const q = qrcode(0, 'M'); q.addData(lien); q.make(); $('qr').innerHTML = q.createSvgTag({ cellSize: 4, margin: 0, scalable: true }); qrPour = lien; } catch (e) {}
     }
     const jeSuisHote = v.hote === v.moi;
-    $('noteHote').hidden = !jeSuisHote;
+    $('noteHote').hidden = !jeSuisHote || MODE_SERVEUR; // avec le serveur Kopo, la partie ne tourne pas sur le téléphone de l'hôte
     const rg = $('reglage'); rg.replaceChildren(el('span', null, 'Chrono'));
     for (const d of S.DELAIS) {
       const libelle = d ? d + ' s' : 'sans';
@@ -2035,6 +2210,9 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       d.append(el('div', 'depart-titre', v.restants.length === 2 ? 'Finale' : 'Manche ' + v.numeroManche),
         el('div', 'decompte', ''),
         avecIco(el('div', 'depart-qui'), 'depart', m.joueurCourant === v.moi ? 'Toi' : nom(v, m.joueurCourant)));
+      // Duel ou finale : on dit à tous pourquoi les cartes ont été redistribuées.
+      (m.redistributions || []).forEach((r) => d.append(el('div', 'depart-redistrib',
+        `Cartes redistribuées : la plus forte carte de ${r.joueur === v.moi ? 'ta main' : nom(v, r.joueur)} était un 4 (${r.main.map(K.afficher).join(' ')}).`)));
       poses.append(d);
     }
     m.table.forEach((p, i) => {
@@ -2313,10 +2491,20 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
 
   // ------------------------------------------------------------------ fin de partie : récap, revanche, partie suivante
   // Ce que ce téléphone a vu de la partie en cours (Katapss, premier sorti…), pour le récap.
+  // Il est gardé sur le téléphone (kopo-suivi) : une page rechargée en pleine partie la compte quand même.
   let suivi = null;
   function suivrePartie(v) {
-    if (v.etat === 'manche' && v.numeroManche === 1 && (!suivi || suivi.fini) && v.joueurs.some((j) => j.id === v.moi)) {
-      suivi = { avecRobots: v.joueurs.some((j) => j.robot && !j.remplace), publique: !!v.publique, guidee: v.robots === 'gentils', katapss: 0, premierSorti: 0, manches: {} };
+    const enJeu = v.joueurs.some((j) => j.id === v.moi);
+    if (!suivi && enJeu && v.etat !== 'salon') {
+      const s = stock.lire('kopo-suivi');
+      if (s && s.code === v.code && !s.fini && Date.now() - (s.le || 0) < 3 * 3600e3) suivi = s;
+    }
+    const nouvelle = v.etat === 'manche' && v.numeroManche === 1 && (!suivi || suivi.fini);
+    // Page rechargée en cours de partie sans suivi gardé : on suit la partie à partir d'ici.
+    const reprise = !suivi && v.etat !== 'salon' && v.etat !== 'finPartie';
+    if (enJeu && (nouvelle || reprise)) {
+      suivi = { code: v.code, le: Date.now(), avecRobots: v.joueurs.some((j) => j.robot && !j.remplace), publique: !!v.publique, guidee: v.robots === 'gentils', katapss: 0, premierSorti: 0, manches: {} };
+      stock.ecrire('kopo-suivi', suivi);
     }
     if (!suivi || suivi.fini || !v.manche) return;
     if ((v.etat === 'finManche' || v.etat === 'finPartie') && !suivi.manches[v.numeroManche]) {
@@ -2324,15 +2512,17 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       const q = v.manche.qualifies;
       if (q.some((x) => x.joueur === v.moi && x.raison === 'Katapss')) suivi.katapss++;
       if (q.length && q[0].joueur === v.moi) suivi.premierSorti++;
+      stock.ecrire('kopo-suivi', suivi);
     }
     if (v.etat === 'finPartie') {
       suivi.fini = true;
+      stock.effacer('kopo-suivi');
       try {
         const p = lireProfil();
         const e = R.bilanPartie(v, suivi);
         suivi.recap = R.enregistrerPartie(p, e, jourLocal());
         if (suivi.recap) {
-          suivi.recap.bilan = e; ecrireProfil(p);
+          suivi.recap.bilan = e; ecrireProfil(p); sauvegarderProfil();
           // En ligne, les pièces des missions et du défi sont créditées par le serveur (plafonnées, sans doublon).
           const jour = jourLocal();
           for (const m of suivi.recap.missions || []) if (m.finie && m.avant < m.cible) crediterEnLigne('mission', m.pieces, m.texte.slice(0, 60) + ':' + jour);
@@ -2372,9 +2562,17 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   }
 
   let recapOuvert = null; // { cle, maj(v) } : la fenêtre n'est construite qu'une fois, puis mise à jour
+  const recapsAnimes = new Set(); // bilans déjà montrés : s'ils se rouvrent, plus de « NIVEAU » ni d'animation
   function afficherFinPartie(v) {
     const cle = v.code + '|' + v.vainqueur + '|' + v.elimines.join(',');
     if (recapOuvert && recapOuvert.cle === cle && $('fenetre').dataset.type === 'recap' && !$('voile').hidden) return recapOuvert.maj(v);
+    const dejaVu = recapsAnimes.has(cle);
+    recapsAnimes.add(cle);
+    const animAvant = sansAnim;
+    if (dejaVu) sansAnim = true; // le bilan s'affiche directement dans son état final
+    try { construireFinPartie(v, cle, dejaVu); } finally { sansAnim = animAvant; }
+  }
+  function construireFinPartie(v, cle, dejaVu) {
     const r = suivi && suivi.fini ? suivi.recap : null;
     const e = r && r.bilan;
     const gagne = v.vainqueur === v.moi;
@@ -2408,8 +2606,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
         plus(() => {
           rond.textContent = r.niveauApres.niveau; pop(rond, 1.6, 600);
           remplir(rempli, 0, fB, 0, 600);
-          tampon('NIVEAU ' + r.niveauApres.niveau);
-          vibrer(60);
+          if (!dejaVu) { tampon('NIVEAU ' + r.niveauApres.niveau); vibrer(60); }
         }, 950);
       } else remplir(rempli, fA, fB, 300);
       setTimeout(() => { if (rempli.isConnected) { gain.textContent = '+' + (r.xpPartie + r.xpMissions) + ' XP'; } }, sansAnim ? 0 : 1100);
@@ -2432,6 +2629,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       if (r.faceAFace) {
         const f = r.faceAFace;
         const ff = el('div', 'face-a-face');
+        if (f.id) ff.dataset.rival = f.id;
         const moiB = el('b', null, String(f.gagnes)), luiB = el('b', null, String(f.perdus));
         const score = el('span', 'score'); score.append(moiB, ' – ', luiB);
         ff.append(el('span', null, 'Toi'), score, el('span', null, f.nom));
@@ -2718,6 +2916,25 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   };
   let derniereLigue = null; // { recu, detail } : points de la dernière partie classée
   window.addEventListener('kopo-classee', (e) => { if (e.detail && e.detail.classee) toast('Partie classée : tes points de ligue sont en jeu.'); });
+  // Fin de partie en ligne : le serveur donne le face-à-face qu'il tient pour toute la table. C'est lui qui fait foi
+  // (chaque téléphone ne compte que les parties qu'il a vues) : on le recopie dans le profil et dans le récap affiché.
+  window.addEventListener('kopo-face-a-face', (e) => {
+    const duels = Array.isArray(e.detail) ? e.detail : [];
+    if (!duels.length) return;
+    const p = lireProfil(), rv = p.rivaux || (p.rivaux = {});
+    for (const x of duels) {
+      const r = rv[x.id] || (rv[x.id] = { pseudo: x.pseudo, gagnes: 0, perdus: 0, vuLe: jourLocal() });
+      r.pseudo = x.pseudo; r.gagnes = x.moi; r.perdus = x.lui;
+      const f = suivi && suivi.recap && suivi.recap.faceAFace;
+      if (f && f.id === x.id) { f.gagnes = x.moi; f.perdus = x.lui; }
+      for (const ff of document.querySelectorAll('.face-a-face[data-rival="' + CSS.escape(x.id) + '"]')) {
+        const bs = ff.querySelectorAll('.score b');
+        if (bs.length === 2) { bs[0].textContent = String(x.moi); bs[1].textContent = String(x.lui); }
+      }
+    }
+    ecrireProfil(p); sauvegarderProfil();
+  });
+
   window.addEventListener('kopo-ligue', (e) => {
     derniereLigue = { recu: Date.now(), detail: e.detail };
     const x = document.getElementById('recapExtra');
@@ -3291,6 +3508,9 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
     zone.append(el('small', 'muted', 'Les parties contre des robots, abandonnées ou jouées seul avec ton parrain ne comptent pas. Un compte Google ne peut être invité qu\'une fois, même après une suppression.'));
   }
   window.ouvrirParrainage = ouvrirParrainage;
+  // Données reprises de l'ancienne adresse du site (réunies avec le profil créé ici).
+  try { if (sessionStorage.getItem('kopo-donnees-reprises')) { sessionStorage.removeItem('kopo-donnees-reprises'); setTimeout(() => toast('Tes statistiques de l\'ancienne adresse ont été récupérées.'), 1200); } } catch (e) {}
+  setTimeout(restaurerProfil, 1500);
   if (/^[A-Z0-9]{6}$/.test(parrainLien) && MODE_SERVEUR) setTimeout(() => toast('Un ami t\'invite : connecte-toi avec Google dans Paramètres et joue tes premières parties pour gagner des pièces !'), 2500);
 
   async function ouvrirBloques() {
@@ -3317,7 +3537,64 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
     try { configServeur = await (await fetch(SERVEUR + '/api/config')).json(); } catch (e) {}
     return configServeur;
   }
-  if (MODE_SERVEUR) lireConfig(); // messages du chat, connexion Google…
+  if (MODE_SERVEUR) lireConfig().then((c) => { messagesServeur(c); setTimeout(verifierRemiseAFlot, 2500); }); // messages du chat, connexion Google, annonce, maintenance…
+
+  // Annonce à tous les joueurs (tableau de bord) : une fenêtre au démarrage, une seule fois par texte.
+  // Maintenance : fenêtre bloquante sans bouton pour fermer ; le jeu revérifie toutes les 30 s
+  // et quand on revient dans l'appli, et se rouvre tout seul quand la maintenance est levée.
+  let verifMaintenance = null;
+  const versionPlusVieille = (a, b) => {
+    const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number);
+    for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d < 0; }
+    return false;
+  };
+  function messagesServeur(cfg) {
+    if (!cfg) return;
+    $('voileVersion').hidden = !(cfg.versionMin && versionPlusVieille(VERSION, cfg.versionMin));
+    const enMaintenance = typeof cfg.maintenance === 'string' && cfg.maintenance.trim() !== '';
+    $('voileMaintenance').hidden = !enMaintenance;
+    if (enMaintenance) {
+      $('texteMaintenance').textContent = cfg.maintenance;
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+      if (!verifMaintenance) verifMaintenance = setInterval(relireConfig, 30e3);
+    } else if (verifMaintenance) { clearInterval(verifMaintenance); verifMaintenance = null; }
+    const annonce = typeof cfg.annonce === 'string' ? cfg.annonce.trim() : '';
+    if (annonce && stock.lire('kopo-annonce-vue') !== annonce && $('voileAnnonce').hidden) {
+      $('texteAnnonce').textContent = annonce;
+      $('voileAnnonce').hidden = false;
+    }
+  }
+  async function relireConfig() {
+    if (!MODE_SERVEUR) return;
+    try { const c = await (await fetch(SERVEUR + '/api/config', { cache: 'no-store' })).json(); configServeur = c; messagesServeur(c); } catch (e) {}
+  }
+  $('btnAnnonceOk').onclick = () => { stock.ecrire('kopo-annonce-vue', $('texteAnnonce').textContent); $('voileAnnonce').hidden = true; };
+  $('btnMaintenanceReessayer').onclick = relireConfig;
+  $('btnVersionMaj').onclick = () => rechargerSansCache();
+
+  // Remise à flot : sous le seuil du tableau de bord (20 pièces), le serveur remonte le solde à 100, une fois par jour.
+  // Proposée sur l'accueil seulement, jamais en pleine partie.
+  let remiseEnCours = false;
+  async function verifierRemiseAFlot() {
+    if (!MODE_SERVEUR || remiseEnCours || !compteEnLigne()) return;
+    const cfg = configServeur;
+    if (!cfg || typeof cfg.remiseAFlot !== 'number' || soldeAffiche() >= cfg.remiseAFlot) return;
+    if ($('ecranAccueil').hidden || stock.lire('kopo-remise-a-flot') === jourLocal()) return;
+    remiseEnCours = true;
+    try {
+      const r = await apiJoueur('/remise-a-flot', 'POST');
+      stock.ecrire('kopo-remise-a-flot', jourLocal());
+      if (r && r.ok) {
+        soldeServeur(r.solde);
+        const corps = el('div', 'bonus-jour');
+        corps.append(el('h2', null, 'Remise à flot'), el('p', null, `Tu étais presque à sec : ton solde remonte à ${formatPieces(r.solde)} pièces. C'est possible une fois par jour.`));
+        const ok = el('button', 'btn principal large', 'Merci !');
+        ok.onclick = fermerFenetre;
+        if ($('voile').hidden) ouvrirFenetre([corps, ok]); else toast(`Remise à flot : ${formatPieces(r.solde)} pièces.`);
+      }
+    } catch (e) {} finally { remiseEnCours = false; }
+  }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) relireConfig(); });
   async function dessinerConnexionGoogle(zone) {
     const ligneG = (texte, aide, controle) => { const l = el('div', 'reglage-ligne'), s2 = el('span', null, texte); if (aide) s2.append(el('small', null, aide)); l.append(s2, controle); zone.replaceChildren(l); return l; };
     ligneG('Connexion Google', 'Bientôt : pour garder tes pièces sur tous tes téléphones', iconeCadenas()).classList.add('bientot');
@@ -3348,7 +3625,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       stock.ecrire('kopo-entree', 'google'); $('bienvenue').hidden = true;
       if (j.compte && j.compte.pseudo) { stock.ecrire('kopo-pseudo', j.compte.pseudo); if ($('pseudo')) { $('pseudo').value = j.compte.pseudo; majAvatar(); } figerPseudo(); }
       toast('Connecté avec Google : ' + j.compte.pseudo + '#' + j.compte.numero);
-      majBloques();
+      majBloques(); setTimeout(restaurerProfil, 3000);
       if (j.parrainage) {
         stock.effacer('kopo-parrain');
         setTimeout(() => toast(j.parrainage.ok ? `${j.parrainage.parrain} t'a invité : joue tes premières parties pour gagner ton cadeau !` : j.parrainage.erreur), 3800);
@@ -3377,7 +3654,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       { titre: 'Sortir', texte: 'Nadia a ouvert à trèfle et il ne te reste que des trèfles. Tu peux tout poser d\'un coup et te qualifier.',
         table: [['6T', 'Nadia']], main: ['2T', '9T'], bouton: 'Tout poser (2 cartes) et sortir', ok: 'Qualifié ! Les cartes avec lesquelles tu sors ne comptent pas pour la plus forte.',
         carte: () => [false, 'Utilise « Tout poser » pour sortir d\'un coup.'] },
-      { titre: 'Katapss !', texte: 'À la distribution, tu reçois 4 cartes de la même couleur. Annonce KATAPSS avant de jouer : tu es qualifié tout de suite.',
+      { titre: 'Katapss !', texte: 'À la distribution, tu reçois 4 cartes de la même couleur (ou ta plus forte carte est un 4, sauf en duel et en finale). Annonce KATAPSS avant de jouer : tu es qualifié tout de suite.',
         main: ['2P', '5P', '7P', '10P'], bouton: 'KATAPSS', katapss: true, ok: 'Qualifié d\'office ! Attention : dès que tu as joué ou ramassé, c\'est trop tard.',
         carte: () => [false, 'Annonce plutôt KATAPSS !'] },
     ];
@@ -3504,7 +3781,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       if (an.type === 'sortie') return [(moi(an.joueur) ? 'Tu as' : nom(v, an.joueur) + ' a') + ' tout posé : qualifié ! ', ...relance('ouvre', moi(an.meneur) ? ', avec la couleur de ton choix.' : ', avec la couleur de son choix.')];
     }
     if (m.pause || m.phase === 'terminee') return null;
-    if (a.some((x) => x.type === 'katapss')) return ['4 cartes de la même couleur : touche ', 'KATAPSS', ' pour te qualifier tout de suite !'];
+    if (a.some((x) => x.type === 'katapss')) return [K.typeKatapss(m.main, m.sieges.length) === 'petite' ? 'Ta plus forte carte est un 4 : touche ' : '4 cartes de la même couleur : touche ', 'KATAPSS', ' pour te qualifier tout de suite !'];
     if (!m.enJeu.includes(v.moi)) return ['Qualifié ! Le dernier qui garde des cartes sera ', 'éliminé', '.'];
     if (m.joueurCourant !== v.moi) return null;
     if (m.phase === 'ouverture') {
@@ -3568,20 +3845,44 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       const m = L && L.moi; if (!m) return;
       ligueZ.append(el('h3', null, 'Ligue' + (L.saison ? ' · ' + L.saison.nom : '')), grille([[NOMS_DIVISIONS[m.division] || m.division, 'Division'], [m.points, 'Points'], [m.rangMondial ? '#' + m.rangMondial : '–', 'Rang mondial'], [m.parties, 'Parties classées']]));
     }).catch(() => {});
-    z.append(el('h3', null, 'Statistiques'));
-    if (!s.parties) z.append(el('p', 'muted', 'Joue une partie avec d\'autres joueurs pour voir tes statistiques ici.'));
-    else z.append(grille([[s.parties, 'Parties jouées'], [s.victoires, 'Victoires'], [taux(s.victoires, s.parties), 'Taux de victoire'], [s.finales, 'Finales atteintes'], [s.manchesSurvecues, 'Manches survécues'], [s.katapss, 'Katapss'], [s.eliminePremier, 'Éliminé en premier']]));
-    z.append(el('h3', null, 'Entraînement (robots)'));
-    z.append(en.parties ? grille([[en.parties, 'Parties'], [en.victoires, 'Victoires'], [taux(en.victoires, en.parties), 'Taux de victoire']]) : el('p', 'muted', 'Aucune partie contre les robots pour l\'instant.'));
-    const rivaux = Object.values(p.rivaux || {});
-    if (rivaux.length) {
-      z.append(el('h3', null, 'Rivaux'));
+    // Statistiques du téléphone, complétées par celles du serveur (compte en ligne) : si le téléphone a perdu
+    // son profil (nouvelle adresse du site, navigateur nettoyé), le serveur, lui, a gardé les parties.
+    const statsZ = el('div');
+    z.append(statsZ);
+    const dessinerStats = (s, en, rivaux) => {
+      statsZ.replaceChildren();
+      statsZ.append(el('h3', null, 'Statistiques'));
+      if (!s.parties) statsZ.append(el('p', 'muted', 'Joue une partie avec d\'autres joueurs pour voir tes statistiques ici.'));
+      else statsZ.append(grille([[s.parties, 'Parties jouées'], [s.victoires, 'Victoires'], [taux(s.victoires, s.parties), 'Taux de victoire'], [s.finales, 'Finales atteintes'], [s.manchesSurvecues, 'Manches survécues'], [s.katapss, 'Katapss'], [s.eliminePremier, 'Éliminé en premier']]));
+      statsZ.append(el('h3', null, 'Entraînement (robots)'));
+      statsZ.append(en.parties ? grille([[en.parties, 'Parties'], [en.victoires, 'Victoires'], [taux(en.victoires, en.parties), 'Taux de victoire']]) : el('p', 'muted', 'Aucune partie contre les robots pour l\'instant.'));
+      // Deux lignes seulement : celui que tu as le plus battu, et celui qui t'a le plus battu.
+      statsZ.append(el('h3', null, 'Rivaux'));
       const victime = rivaux.filter((r) => r.gagnes).sort((a, b) => b.gagnes - a.gagnes)[0];
       const bete = rivaux.filter((r) => r.perdus).sort((a, b) => b.perdus - a.perdus)[0];
-      const ligneR = (a, b) => { const l = el('div', 'rival-ligne'); l.append(el('span', null, a), el('small', null, b)); z.append(l); };
+      const ligneR = (a, b) => { const l = el('div', 'rival-ligne'); l.append(el('span', null, a), el('small', null, b)); statsZ.append(l); };
       if (victime) ligneR('Ta victime : ' + victime.pseudo, 'battu ' + victime.gagnes + ' fois');
       if (bete) ligneR('Ta bête noire : ' + bete.pseudo, 't\'a battu ' + bete.perdus + ' fois');
-      for (const r of rivaux.sort((a, b) => (b.gagnes + b.perdus) - (a.gagnes + a.perdus)).slice(0, 5)) ligneR(r.pseudo, 'Toi ' + r.gagnes + ' – ' + r.perdus);
+      if (!victime && !bete) statsZ.append(el('p', 'muted', 'Joue contre d\'autres joueurs pour voir tes rivaux ici.'));
+    };
+    dessinerStats(s, en, Object.values(p.rivaux || {}));
+    if (MODE_SERVEUR && c) apiJoueur('/statistiques').then((srv) => {
+      if (!srv || !srv.stats) return;
+      const plus = (a, b) => Object.fromEntries(Object.keys(a).map((k) => [k, Math.max(a[k] || 0, b[k] || 0)]));
+      const rv = {};
+      for (const [id, r] of Object.entries(p.rivaux || {})) rv[id] = Object.assign({}, r);
+      for (const x of srv.rivaux || []) {
+        const r = rv[x.id] || (rv[x.id] = { pseudo: x.pseudo, gagnes: 0, perdus: 0 });
+        r.pseudo = x.pseudo; r.gagnes = x.moi || 0; r.perdus = x.lui || 0; // le serveur fait foi : même score pour les deux joueurs
+      }
+      dessinerStats(plus(s, srv.stats), plus(en, srv.entrainement || {}), Object.values(rv));
+    }).catch(() => {});
+    // Changement d'adresse du site : un profil neuf a pu être créé ici avant que les anciennes données arrivent.
+    // Passer une fois par l'ancienne adresse les ramène (elles sont réunies avec celles d'ici).
+    if (NOUVELLE_ADRESSE && location.origin === new URL(NOUVELLE_ADRESSE).origin && !stock.lire('kopo-demenagement')) {
+      const rec = el('button', 'btn', 'Statistiques disparues depuis le changement d\'adresse ? Les récupérer');
+      rec.onclick = () => { location.href = ANCIENNE_ADRESSE; };
+      z.append(rec);
     }
     const actions = el('div', 'profil-actions');
     const reg = el('button', 'btn', 'Changer de pseudo'); reg.onclick = ouvrirParametres;
@@ -3724,6 +4025,35 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   const jourLocal = (d) => R.jourDe(d || new Date());
   function lireProfil() { const p = stock.lire('kopo-profil'); return p && typeof p === 'object' ? p : { version: 1 }; }
   function ecrireProfil(p) { stock.ecrire('kopo-profil', p); }
+  // Copie du profil sur le serveur (compte en ligne) : il revient sur un autre téléphone, une autre adresse
+  // du site ou après un nettoyage du navigateur. Les rivaux les plus anciens ne sont pas copiés au-delà de 150.
+  let minuteurSauvegarde = null;
+  function sauvegarderProfil() {
+    if (!MODE_SERVEUR || !compteLocal()) return;
+    clearTimeout(minuteurSauvegarde);
+    minuteurSauvegarde = setTimeout(() => {
+      const p = lireProfil();
+      if (!p.xp && !p.premierePartie) return; // rien encore à garder
+      const copie = Object.assign({}, p);
+      const ids = Object.keys(p.rivaux || {});
+      if (ids.length > 150) { copie.rivaux = {}; ids.sort((a, b) => (p.rivaux[a].vuLe < p.rivaux[b].vuLe ? 1 : -1)).slice(0, 150).forEach((id) => (copie.rivaux[id] = p.rivaux[id])); }
+      apiJoueur('/profil', 'PUT', { profil: copie }).catch(() => {});
+    }, 1500);
+  }
+  // Au démarrage (et après la connexion Google) : la copie du serveur complète le profil du téléphone.
+  // On garde la plus grande valeur de chaque statistique : rien n'est compté deux fois.
+  async function restaurerProfil() {
+    if (!MODE_SERVEUR || !compteLocal()) return;
+    try {
+      const r = await apiJoueur('/profil');
+      const p = lireProfil();
+      if (r && r.profil && R.fusionnerProfils(p, r.profil, 'max')) {
+        ecrireProfil(p); appliquerCollection(p);
+        toast('Ton niveau et tes statistiques ont été récupérés.');
+      }
+    } catch (e) {}
+    sauvegarderProfil();
+  }
   function lirePieces() {
     const p = lireProfil(), neuf = !p.pieces;
     const pc = R.pieces(p);
@@ -3867,10 +4197,126 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       await new Promise((fin) => { ok.onclick = () => { fermerFenetre(); fin(); }; ouvrirFenetre([corps, ok]); });
     } catch (e) {}
   }
+  // ------------------------------------------------------------------ installer le jeu (PWA)
+  // Android (Chrome, Samsung…) : le navigateur donne une vraie fenêtre d'installation (beforeinstallprompt).
+  // iPhone : Apple n'en donne pas. Le bouton ouvre un guide (Partager > Sur l'écran d'accueil).
+  // Le bouton disparaît quand le jeu est ouvert depuis son icône, ou une fois installé.
+  const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const DANS_APPLI_NATIVE = location.protocol === 'capacitor:' || !!window.Capacitor;
+  // Lancé depuis l'icône : mesuré au chargement, avant tout passage en plein écran demandé par le jeu.
+  const LANCE_ICONE = navigator.standalone === true
+    || (!document.fullscreenElement && matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches);
+  const ANCIENNE_PAGE = !!NOUVELLE_ADRESSE && location.href.startsWith(ANCIENNE_ADRESSE); // ses données partent vers la nouvelle adresse
+  const CADEAU_INSTALLATION = 200; // pièces, une fois, à la première ouverture depuis l'icône (plafond serveur : 200)
+  let inviteInstallation = null; // l'événement beforeinstallprompt gardé pour le bouton
+  if (LANCE_ICONE) stock.ecrire('kopo-installe', true);
+  if ('serviceWorker' in navigator && !DANS_APPLI_NATIVE && !ANCIENNE_PAGE && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+    addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  }
+  const peutInstaller = () => !DANS_APPLI_NATIVE && !LANCE_ICONE && !ANCIENNE_PAGE && !stock.lire('kopo-installe') && (!!inviteInstallation || IOS);
+  function majBoutonInstaller() { $('btnInstaller').hidden = !peutInstaller(); majPleinEcran(); }
+  addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault(); // pas de bandeau automatique : c'est notre bouton qui propose
+    if (stock.lire('kopo-installe')) stock.effacer('kopo-installe'); // désinstallé depuis : on peut de nouveau proposer
+    inviteInstallation = e; majBoutonInstaller();
+  });
+  addEventListener('appinstalled', () => {
+    stock.ecrire('kopo-installe', true); inviteInstallation = null; majBoutonInstaller();
+    toast('Kopo est installé ! Ouvre-le depuis ton écran d\'accueil' + (CADEAU_INSTALLATION ? ' pour recevoir ton cadeau.' : '.'));
+  });
+  majBoutonInstaller();
+  async function installer() {
+    if (inviteInstallation) {
+      const inv = inviteInstallation; inviteInstallation = null; majBoutonInstaller(); // une invite ne sert qu'une fois
+      try {
+        await inv.prompt();
+        const r = await inv.userChoice;
+        if (r && r.outcome === 'accepted') stock.ecrire('kopo-installe', true);
+      } catch (e) {}
+      majBoutonInstaller();
+      return;
+    }
+    if (IOS) guideIphone();
+  }
+  $('btnInstaller').onclick = installer;
+  const texteCadeauInstallation = () => 'Cadeau : ' + CADEAU_INSTALLATION + ' pièces la première fois que tu ouvres Kopo depuis son icône.';
+  function guideIphone() {
+    const etapes = el('ol', 'guide-ios');
+    const etape = (morceaux, ico) => { const li = el('li'), t = el('span'); t.append(...morceaux); li.append(t, icone(ico)); return li; };
+    etapes.append(
+      etape(['Touche ', el('b', null, 'Partager'), ' dans la barre de Safari'], 'i-ios-partage'),
+      etape(['Choisis ', el('b', null, 'Sur l\'écran d\'accueil'), ' (fais défiler la liste si besoin)'], 'i-ios-ajouter'),
+      etape(['Touche ', el('b', null, 'Ajouter'), ', puis ouvre Kopo depuis sa nouvelle icône'], 'i-installer'));
+    const aide = el('p', null, 'Tu ne vois pas « Sur l\'écran d\'accueil » ? Tu es sans doute dans WhatsApp ou une autre appli : ouvre ce lien dans Safari.');
+    const copier = el('button', 'btn large', 'Copier le lien du jeu');
+    copier.onclick = () => {
+      const lien = NOUVELLE_ADRESSE || (location.origin + location.pathname);
+      (navigator.clipboard ? navigator.clipboard.writeText(lien) : Promise.reject()).then(() => toast('Lien copié : colle-le dans Safari.'), () => toast(lien));
+    };
+    const fait = el('button', 'btn principal large', 'C\'est fait');
+    fait.onclick = () => { stock.ecrire('kopo-installe', true); majBoutonInstaller(); fermerFenetre(); };
+    const google = el('div'); google.style.display = 'contents';
+    ouvrirFenetre([el('h2', null, 'Installer le jeu'), el('p', null, 'Sur iPhone, ça se fait en 3 gestes depuis Safari :'), etapes, el('p', null, texteCadeauInstallation()), google, aide, copier, fait]);
+    // L'appli installée sur iPhone ne voit pas les données de Safari : un invité y repartirait de zéro.
+    if (MODE_SERVEUR) (async () => {
+      try {
+        const cfg = await lireConfig();
+        if (!cfg || !cfg.google || !compteLocal()) return;
+        const m = await apiJoueur('/moi');
+        if (m.lie) return;
+        const g = el('button', 'btn large', 'Se connecter avec Google');
+        g.onclick = () => connexionGoogle(cfg.google);
+        google.append(el('p', null, 'Important : sur iPhone, l\'appli installée repart de zéro. Connecte-toi d\'abord avec Google pour y retrouver tes pièces et ton niveau.'), g);
+      } catch (e) {}
+    })();
+  }
+  // Rappel après quelques parties : à la 3e, puis 5 parties plus tard, 3 fois au plus. « Non merci » l'arrête pour de bon.
+  function partiesJouees() { const p = lireProfil(); return ((p.stats && p.stats.parties) || 0) + ((p.entrainement && p.entrainement.parties) || 0); }
+  function proposerInstallation() {
+    if (!peutInstaller()) return false;
+    const r = stock.lire('kopo-rappel-installation') || {}, n = partiesJouees();
+    if (r.non || n < 3 || (r.fois || 0) >= 3 || n < (r.apres || 0)) return false;
+    stock.ecrire('kopo-rappel-installation', { fois: (r.fois || 0) + 1, apres: n + 5 });
+    const oui = el('button', 'btn principal large', 'Installer le jeu');
+    oui.onclick = () => { fermerFenetre(); installer(); };
+    const tard = el('button', 'btn large', 'Plus tard'); tard.onclick = fermerFenetre;
+    const non = el('button', 'btn large', 'Non merci');
+    non.onclick = () => { stock.ecrire('kopo-rappel-installation', Object.assign(stock.lire('kopo-rappel-installation') || {}, { non: true })); fermerFenetre(); };
+    ouvrirFenetre([el('h2', null, 'Installer Kopo'), el('p', null, 'Mets Kopo sur ton écran d\'accueil : il s\'ouvre d\'un geste, en plein écran, comme une appli.'), el('p', null, texteCadeauInstallation()), oui, tard, non]);
+    return true;
+  }
+  // Première ouverture depuis l'icône : le cadeau d'installation (une fois par compte, le serveur refuse les doublons).
+  let cadeauInstallationTente = false;
+  function fenetreCadeauInstallation(n) {
+    const g = el('div', 'cadeau-installation'); g.append(pieceEl(), '+' + n);
+    const ok = el('button', 'btn principal large', 'Merci !');
+    ok.onclick = () => { fermerFenetre(); suiteAccueil(); };
+    ouvrirFenetre([el('h2', null, 'Kopo est installé'), el('p', null, 'Merci d\'avoir mis Kopo sur ton écran d\'accueil. Voici ton cadeau :'), g, ok]);
+    vibrer(40); pop(g, 1.4); pop($('btnBourse'), 1.2);
+  }
+  function cadeauInstallation() {
+    if (!LANCE_ICONE || cadeauInstallationTente || stock.lire('kopo-cadeau-installation')) return false;
+    if (!MODE_SERVEUR) {
+      const p = lireProfil(); R.pieces(p).solde += CADEAU_INSTALLATION; ecrireProfil(p); majSolde();
+      stock.ecrire('kopo-cadeau-installation', true);
+      fenetreCadeauInstallation(CADEAU_INSTALLATION);
+      return true;
+    }
+    if (!compteEnLigne()) return false; // pas encore de compte : ce sera à la prochaine ouverture de l'accueil
+    cadeauInstallationTente = true;
+    appelEnLigne('/recompense', 'POST', { motif: 'installation', montant: CADEAU_INSTALLATION, ref: 'pwa' }).then((r) => {
+      stock.ecrire('kopo-cadeau-installation', true); // reçu, ou déjà reçu sur ce compte
+      if (r.ok) { soldeServeur(r.solde); if (!$('ecranAccueil').hidden && $('voile').hidden) return fenetreCadeauInstallation(r.montant); }
+      suiteAccueil();
+    }).catch(() => suiteAccueil()); // réseau : on réessaiera à la prochaine ouverture
+    return true;
+  }
+
   // Après le bonus : le tutoriel la toute première fois, sinon le cadeau de bienvenue du jour.
   function suiteAccueil() {
     if ($('ecranAccueil').hidden || !$('voile').hidden || !$('bienvenue').hidden) return;
-    if (!proposerTutoriel()) proposerBienvenue7();
+    if (cadeauInstallation() || proposerTutoriel() || proposerBienvenue7()) return;
+    proposerInstallation();
   }
   $('btnBourse').onclick = () => fenetrePieces(null);
   function majAvatar() { const p = $('pseudo').value.trim(); $('avatarLettre').textContent = p ? p[0].toUpperCase() : '?'; }
@@ -4028,7 +4474,39 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   })();
 
   // ------------------------------------------------------------------ démarrage
-  setTimeout(() => { $('splash').classList.add('fini'); setTimeout(() => $('splash').remove(), 500); }, 1300);
+  // Écran de démarrage : la barre suit le chargement de la page (scripts ci-dessus), des polices,
+  // puis le réveil du serveur (endormi par l'hébergeur gratuit, jusqu'à une minute). Après 12 s
+  // ou un toucher, on passe à l'accueil : le serveur continue de se réveiller derrière.
+  (function finirSplash() {
+    const splash = $('splash'), charge = window.kopoChargement || (() => {});
+    const delai = (ms) => new Promise((r) => setTimeout(r, ms));
+    let fini = false;
+    const fermer = (toastReveil) => {
+      if (fini) return; fini = true;
+      splash.classList.remove('attente'); splash.classList.add('fini'); setTimeout(() => splash.remove(), 500);
+      if (toastReveil) toast('Le serveur se réveille encore : les parties en ligne seront prêtes dans un instant.');
+    };
+    const serveurPret = MODE_SERVEUR && navigator.onLine
+      ? fetch(SERVEUR + '/sante', { cache: 'no-store' }).then(() => true, () => true) // une erreur ne bloque pas l'accueil
+      : Promise.resolve(true);
+    const polices = document.fonts && document.fonts.ready ? Promise.race([document.fonts.ready, delai(1500)]) : Promise.resolve();
+    charge(74, 'Préparation de la table…', 80);
+    (async () => {
+      await polices;
+      if (MODE_SERVEUR) charge(82, 'Connexion au serveur…', 93);
+      let pret = await Promise.race([serveurPret, delai(2500).then(() => false)]);
+      if (!pret && !fini) {
+        charge(86, 'Réveil du serveur, un instant…', 98);
+        splash.classList.add('attente');
+        splash.addEventListener('click', () => fermer(true), { once: true });
+        pret = await Promise.race([serveurPret, delai(9500).then(() => false)]);
+      }
+      if (fini) return;
+      charge(100, 'Prêt !');
+      await delai(Math.max(400, 1300 - performance.now())); // le splash reste au moins ~1,3 s
+      fermer(!pret);
+    })();
+  })();
   if (typeof mqtt === 'undefined' && !LOCAL && !MODE_SERVEUR) montrerBandeau("La bibliothèque réseau n'a pas pu se charger.");
   lobby.demarrer();
   const codeLien = location.hash.slice(1).toUpperCase();

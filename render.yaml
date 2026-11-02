@@ -30,19 +30,19 @@ services:
       - key: CONNEXION_GOOGLE      # 1 = bouton « Se connecter avec Google » (Google est activé dans Supabase)
         value: "1"
       - key: ORIGINES              # pages autorisées à appeler le serveur
-        value: https://rossy0243.github.io,https://kopo.onrender.com,capacitor://localhost,https://localhost
+        value: https://rossy0243.github.io,https://kopo-d655.onrender.com,capacitor://localhost,https://localhost
 
   # Page du jeu (remplace GitHub Pages, pour pouvoir passer le dépôt en privé).
-  # Seuls la page, le manifeste, les icônes et les pages légales sont publiés (pas le code du serveur).
+  # Seuls la page, le manifeste, le service worker, les icônes et les pages légales sont publiés (pas le code du serveur).
   - type: web
     name: kopo
     runtime: static
-    buildCommand: node build.js && rm -rf _site && mkdir _site && cp -r index.html manifest.webmanifest icons legal _site/
+    buildCommand: node build.js && rm -rf _site && mkdir _site && cp -r index.html manifest.webmanifest sw.js icons legal _site/
     staticPublishPath: _site
     autoDeploy: true
     envVars:
       - key: SITE_URL              # adresse publique du site (aperçus des liens partagés)
-        value: https://kopo.onrender.com/
+        value: https://kopo-d655.onrender.com/
     headers:
       - path: /*
         name: Cache-Control

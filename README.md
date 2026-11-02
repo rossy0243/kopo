@@ -17,7 +17,7 @@ Jeu de cartes multijoueur, de 2 à 9 joueurs, chacun sur son téléphone.
 - Chrono réglable (5 s par défaut) : un joueur trop lent ou hors ligne pioche. En ouverture, sa plus petite carte autorisée est posée.
 - Sons générés par le téléphone (Web Audio, aucun fichier) : cartes posées, distribution, ramassage, à toi de jouer, dernières secondes du chrono, qualifié, Katapss, éliminé, victoire, chat. Musique d'ambiance douce en option. Deux interrupteurs dans Paramètres > Son et vibrations (effets activés et musique coupée par défaut), gardés sur le téléphone.
 - Micro optionnel (WebRTC via PeerJS, avec relais TURN) : chacun l'active, le coupe, ou coupe le son des autres.
-- Fin de partie : récap animé (XP et niveau, missions, face-à-face), **revanche** votée à la table (elle part dès que tout le monde a répondu, ou après 15 s avec au moins 2 joueurs ; les robots acceptent toujours). En salle publique, la partie suivante se cherche seule après 5 s (« Arrêter là » pour rester). Partage de la victoire en image (WhatsApp).
+- Fin de partie : récap animé (XP et niveau, missions, face-à-face), **revanche** votée à la table, en duel c'est l'autre joueur qui commence (elle part dès que tout le monde a répondu, ou après 15 s avec au moins 2 joueurs ; les robots acceptent toujours). En salle publique, la partie suivante se cherche seule après 5 s (« Arrêter là » pour rester). Partage de la victoire en image (WhatsApp).
 - Rétention (sur le téléphone, avec les pièces d'essai) : 3 missions du jour gardées 2 jours avec un « Changer » par jour, défi de la semaine (cadre d'une ville), parcours de bienvenue sur 7 jours de jeu, joker de série (un jour raté par semaine ne casse pas la série du bonus du jour), première partie guidée contre 2 robots gentils avec des bulles d'aide, table rapide à 5 joueurs en ligne.
 
 ## Serveur
@@ -45,10 +45,10 @@ Pour tester à plusieurs onglets sur un seul appareil, sans réseau : ouvrir `in
 
 ## Passer la page du jeu chez Render (pour un dépôt privé)
 `render.yaml` décrit aussi un site statique `kopo` (gratuit) : Render lance `node build.js` et ne publie que la page, le manifeste, les icônes et les pages légales.
-1. Render → le Blueprint du dépôt → *Sync* (ou *New → Blueprint*) : le site `kopo` est créé. Noter son adresse (`https://kopo.onrender.com` si le nom est libre). Si l'adresse est différente, la mettre dans `SITE_URL` (site) et `ORIGINES` (serveur).
-2. Supabase → *Authentication → URL Configuration* : mettre l'adresse dans *Site URL* et ajouter `https://kopo.onrender.com/**` aux *Redirect URLs* (connexion Google).
+1. Render → le Blueprint du dépôt → *Sync* (ou *New → Blueprint*) : le site `kopo` est créé. Noter son adresse (le nom `kopo` étant pris, Render a donné `https://kopo-d655.onrender.com`). Si l'adresse est différente, la mettre dans `SITE_URL` (site) et `ORIGINES` (serveur).
+2. Supabase → *Authentication → URL Configuration* : mettre l'adresse dans *Site URL* et ajouter `https://kopo-d655.onrender.com/**` aux *Redirect URLs* (connexion Google).
 3. Vérifier sur le téléphone : partie, connexion Google, boutique.
-4. Remplir `NOUVELLE_ADRESSE` dans `src/source.html`, `node build.js`, fusionner. Les joueurs qui ouvrent l'ancienne adresse partent sur la nouvelle avec leurs données du téléphone (compte invité, profil, réglages), envoyées dans le `#` de l'adresse.
+4. Fait : `NOUVELLE_ADRESSE` = `https://kopo-d655.onrender.com/` (seule l’adresse `*.github.io` redirige). Pour refaire : remplir `NOUVELLE_ADRESSE` dans `src/source.html`, `node build.js`, fusionner. Les joueurs qui ouvrent l'ancienne adresse partent sur la nouvelle avec leurs données du téléphone (compte invité, profil, réglages), envoyées dans le `#` de l'adresse.
 5. Laisser l'ancienne adresse quelques semaines, puis passer le dépôt en privé (GitHub Pages s'arrête).
 
 ## Licence
