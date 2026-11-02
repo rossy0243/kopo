@@ -244,7 +244,7 @@ details.rappel summary { cursor: pointer; font-weight: 600; }
 /* Partie en paysage : les joueurs autour d'une table ovale, ta main en bas. */
 @media (orientation: landscape) {
   body.en-jeu { overflow: hidden; }
-  body.en-jeu .app { max-width: none; height: 100vh; height: 100dvh; padding: 0; display: block; position: relative; }
+  body.en-jeu .app { max-width: none; height: 100vh; height: 100dvh; padding: 0; display: block; position: relative; overflow: hidden; } /* un siège au bord ne fait pas déborder l'écran */
   body.en-jeu header { position: absolute; top: 0; left: 0; right: 0; z-index: 3; padding: 6px max(10px, env(safe-area-inset-right)) 0 max(10px, env(safe-area-inset-left)); pointer-events: none; }
   body.en-jeu header > * { pointer-events: auto; }
   body.en-jeu #btnPleinEcranEntete:not([hidden]) { display: inline-block; }
@@ -298,10 +298,57 @@ details.rappel summary { cursor: pointer; font-weight: 600; }
 
 /* Accueil et salon en deux colonnes quand le téléphone est couché. */
 @media (orientation: landscape) and (min-width: 560px) {
-  #ecranSalon { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); column-gap: 24px; }
-  #ecranSalon .qr svg { width: 140px; height: 140px; }
-  #ecranSalon .code-geant { font-size: 52px; }
   .app { max-width: 900px; }
+}
+
+/* Salon (Créer une partie) : tout tient dans l'écran du téléphone, sans défiler, jusqu'à 9 joueurs. */
+body.salon .app { display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; padding-bottom: 12px; gap: 10px; }
+#ecranSalon { flex: 1; padding: 12px; gap: 10px; align-content: start; grid-template-rows: auto 1fr; }
+#ecranSalon .colonne { gap: 10px; }
+#ecranSalon .colonne:last-child { display: flex; flex-direction: column; }
+.salon-tete { display: flex; align-items: center; gap: 12px; }
+.salon-code { flex: 1; display: grid; gap: 2px; min-width: 0; }
+.salon-code small { color: var(--muted); font-size: 12px; letter-spacing: 1px; text-transform: uppercase; }
+#ecranSalon .code-geant { font-size: 44px; letter-spacing: 8px; text-align: left; }
+.btn-qr { display: grid; justify-items: center; gap: 2px; padding: 6px 10px; font-size: 11px; color: var(--muted); flex: none; }
+.btn-qr svg { width: 28px; height: 28px; }
+#ecranSalon .qr { display: none; }
+#ecranSalon.qr-ouvert .qr { display: grid; position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,.8); cursor: pointer; }
+#ecranSalon.qr-ouvert .qr svg { width: min(260px, 70vmin); height: min(260px, 70vmin); }
+.salon-invite { display: flex; flex-wrap: wrap; gap: 8px; }
+.salon-invite:has(#btnInviterAmi:not([hidden])) .sauf-paysage { display: none; } /* avec « Amis », le bouton WhatsApp reste sur une ligne */
+.salon-invite .btn-whatsapp { flex: 1; font-size: 15px; padding: 11px 8px; }
+.salon-invite > .btn:not(.btn-whatsapp) { flex: none; padding: 11px 14px; }
+#noteHote { font-size: 12.5px; padding: 6px 10px; }
+#ecranSalon .reglage { flex-wrap: nowrap; gap: 4px; font-size: 13px; }
+#ecranSalon .reglage > span { margin-right: 4px; white-space: nowrap; }
+#ecranSalon .reglage .btn { flex: 1; padding: 7px 0; font-size: 13px; }
+#titreJoueurs { margin: 0; font-size: 14px; }
+#listeJoueurs { grid-template-columns: 1fr 1fr; }
+#listeJoueurs li { padding: 5px 8px; min-height: 38px; font-size: 14px; gap: 5px; white-space: nowrap; overflow: hidden; min-width: 0; }
+#listeJoueurs li > span:first-child { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+#listeJoueurs .pastille { font-size: 10px; padding: 1px 6px; }
+#listeJoueurs li .btn.retirer { padding: 2px 8px; font-size: 14px; line-height: 1.4; }
+.salon-bas { display: flex; gap: 8px; margin-top: auto; }
+.salon-bas .btn.large { font-size: 15px; padding: 13px 10px; }
+.salon-bas #btnRobot { width: auto; padding: 13px 14px; flex: none; }
+.salon-bas #btnLancer { flex: 1; }
+@media (orientation: landscape) {
+  body.salon .app { max-width: 900px; padding: 6px 12px 8px; gap: 6px; }
+  body.salon header .logo { font-size: 26px; }
+  body.salon header .btn { padding: 4px 9px; }
+  #ecranSalon { grid-template-columns: minmax(0, .8fr) minmax(0, 1.45fr); column-gap: 16px; grid-template-rows: 1fr; padding: 10px 12px; }
+  #ecranSalon .code-geant { font-size: 36px; }
+  .salon-code small { font-size: 11px; letter-spacing: .5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #ecranSalon .qr { display: grid; }
+  #ecranSalon .qr svg { width: 92px; height: 92px; padding: 5px; }
+  #ecranSalon.qr-ouvert .qr svg { padding: 8px; }
+  #ecranSalon .btn-qr, #ecranSalon .sauf-paysage, #listeJoueurs .pastille.neutre { display: none; }
+  #listeJoueurs { grid-template-columns: 1fr 1fr 1fr; }
+  #listeJoueurs li { min-height: 36px; padding: 4px 4px 4px 8px; font-size: 13px; }
+  #listeJoueurs li .btn.retirer { border: 0; background: none; padding: 2px 6px; opacity: .7; }
+  .salon-invite > .btn:not(.btn-whatsapp) { padding: 8px 12px; flex: 1; } /* « Amis » passe à la ligne si la colonne est trop étroite */
+  .salon-bas .btn.large { padding: 11px 10px; }
 }
 
 /* Animations : cartes qui volent, bulles au-dessus des joueurs, tampons. */
@@ -361,7 +408,7 @@ body.accueil .app { max-width: none; min-height: 100vh; min-height: 100dvh; padd
 .serie span { width: 22px; height: 6px; border-radius: 3px; background: var(--line); }
 .serie span.ok { background: var(--brass); }
 .note-essai { color: var(--muted); font-size: 12px; }
-@media (max-width: 420px) { .bourse-txt small, .profil-champ small { display: none; } .profil-champ input { width: 96px; } .hub-haut .logo { font-size: 30px; } }
+@media (max-width: 420px) { .bourse-txt small, .profil-champ small { display: none; } .profil-champ input { width: 96px; max-width: 100%; } .hub-haut .logo { font-size: 30px; } .hub-haut { gap: 8px; } .profil, .profil-champ { min-width: 0; } } /* le pseudo rétrécit plutôt que de dépasser à droite */
 .modes { flex: 1; min-width: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-content: center; }
 .mode { position: relative; border: 0; border-radius: 14px; padding: 10px 8px; min-height: 0; aspect-ratio: 5 / 7; display: grid; justify-items: center; align-content: center; gap: 6px; text-align: center; color: #fff; font: inherit;
   background: radial-gradient(ellipse at 50% 30%, var(--table-2), var(--table) 80%); border: 1.5px solid rgba(226,176,74,.6); box-shadow: inset 0 0 0 4px var(--table), inset 0 0 0 5px rgba(226,176,74,.22), 0 8px 18px rgba(0,0,0,.45); transition: transform .12s ease, box-shadow .12s ease; }
@@ -769,6 +816,38 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
 .palier .case .ico-k.gris { width: 18px; height: 18px; margin-left: auto; }
 .parcours-recap { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; align-items: center; font-size: 13px; margin-top: 6px; }
 .parcours-recap b { color: var(--brass); }
+/* Fenêtres quand le téléphone est couché : le bouton principal reste visible sans défiler. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .voile { padding: 8px; }
+  .fenetre { padding: 12px 18px; gap: 8px; max-height: calc(100vh - 16px); max-height: calc(100dvh - 16px); width: min(600px, 100%); }
+  .fenetre h2 { font-size: 26px; }
+  .fenetre p { margin: 0; }
+  /* Bonus du jour et Tes pièces : la pièce et le gain côte à côte */
+  .bonus-jour { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; column-gap: 14px; row-gap: 6px; }
+  .bonus-jour > * { flex-basis: 100%; display: flex; justify-content: center; }
+  .bonus-jour > .piece, .bonus-jour > .gain { flex-basis: auto; }
+  .bonus-jour > .piece { width: 52px; height: 52px; font-size: 30px; }
+  .bonus-jour > .gain { font-size: 40px; }
+  .bonus-jour .joker-etat { font-size: 12px; }
+  /* Contre les robots : les 8 nombres sur une ligne, partie guidée et Annuler côte à côte */
+  .choix-niveau-robots button { padding: 7px 6px; }
+  .choix-robots { grid-template-columns: repeat(8, 1fr); gap: 6px; }
+  .choix-robots .btn { font-size: 18px; padding: 9px 0; }
+  #voileRobots .fenetre { grid-template-columns: 1fr 1fr; column-gap: 8px; }
+  #voileRobots .fenetre > * { grid-column: 1 / -1; }
+  #voileRobots .fenetre > .btn.large { grid-column: auto; padding: 10px; font-size: 15px; }
+  #voileRobots #btnGuidee[hidden] + #btnFermerRobots { grid-column: 1 / -1; }
+  /* En ligne : cartes 5 et 9 plus basses, autres tailles plus compactes */
+  .salles-vedette .btn { padding: 7px 6px; grid-template-columns: auto auto; column-gap: 10px; align-items: center; justify-content: center; }
+  .salles-vedette .btn .gros { font-size: 34px; grid-row: span 2; }
+  .salles-vedette .btn b { font-size: 22px; }
+  .choix-salles { grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 6px; }
+  .choix-salles .btn { padding: 6px 4px; }
+  .choix-salles .btn b { font-size: 15px; }
+  .choix-salles .btn small { font-size: 11px; }
+  #voileSalles .btn.large { padding: 10px; font-size: 15px; }
+}
+
 </style>
 </head>
 <body>
@@ -934,23 +1013,30 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   <!-- Salon -->
   <section class="panneau" id="ecranSalon" hidden>
     <div class="colonne">
-    <h2 id="titreSalon">Salon</h2>
+    <h2 id="titreSalon" hidden>Salon</h2>
     <p class="suite-auto" id="attentePublique" hidden></p>
-    <p id="texteCode">Code de la partie :</p>
-    <div class="code-geant" id="codeSalon"></div>
-    <div class="qr" id="qr"></div>
-    <div class="lien"><input class="texte" id="lienSalon" readonly><button class="btn" id="btnCopier">Copier</button></div>
-    <button class="btn large btn-whatsapp" id="btnWhatsappSalon"><svg class="ico"><use href="#i-partager"/></svg> Inviter sur WhatsApp</button>
-    <button class="btn large" id="btnInviterAmi" hidden>Inviter un ami du Kopo</button>
-    <div class="bandeau info-hote" id="noteHote" hidden>Tu es l'hôte : c'est ton téléphone qui fait tourner la partie. Garde cette page ouverte jusqu'à la fin.</div>
+    <div class="salon-tete">
+      <div class="salon-code"><small id="texteCode">Code de la partie</small><div class="code-geant" id="codeSalon"></div></div>
+      <button class="btn btn-qr" id="btnQr" aria-label="Montrer le QR code"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM20 14v7M14 20h3"/></svg>QR</button>
+      <div class="qr" id="qr" role="button" tabindex="0" aria-label="QR code de la partie"></div>
+    </div>
+    <div class="salon-invite">
+      <button class="btn large btn-whatsapp" id="btnWhatsappSalon"><svg class="ico"><use href="#i-partager"/></svg> <span><span class="sauf-paysage">Inviter sur </span>WhatsApp</span></button>
+      <button class="btn" id="btnCopier" aria-label="Copier le lien de la partie">Copier</button>
+      <button class="btn" id="btnInviterAmi" aria-label="Inviter un ami du Kopo" hidden>Amis</button>
+    </div>
+    <input class="texte" id="lienSalon" readonly hidden>
+    <div class="bandeau info-hote" id="noteHote" hidden>Tu es l'hôte : garde cette page ouverte jusqu'à la fin.</div>
     </div>
     <div class="colonne">
     <div class="reglage" id="reglage"></div>
-    <h3 style="margin:0;font-size:15px" id="titreJoueurs"></h3>
+    <h3 id="titreJoueurs"></h3>
     <ul class="liste-joueurs" id="listeJoueurs"></ul>
-    <button class="btn large" id="btnRobot" hidden><svg class="ico" aria-hidden="true"><use href="#i-robots"/></svg> Ajouter un robot</button>
-    <button class="btn principal large" id="btnLancer" hidden>Lancer la partie</button>
     <p id="attenteHote" hidden>En attente du lancement par l'hôte…</p>
+    <div class="salon-bas">
+      <button class="btn large" id="btnRobot" aria-label="Ajouter un robot" hidden><svg class="ico" aria-hidden="true"><use href="#i-robots"/></svg> + Robot</button>
+      <button class="btn principal large" id="btnLancer" hidden>Lancer la partie</button>
+    </div>
     </div>
   </section>
 
@@ -5029,7 +5115,7 @@ var qrcode = function() {
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = 'a95804816421'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = '0173afa40cbc'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
@@ -5598,7 +5684,7 @@ var qrcode = function() {
 
   // ------------------------------------------------------------------ affichage
   const ecrans = ['ecranAccueil', 'ecranConnexion', 'ecranSalon', 'ecranPartie'];
-  function montrerEcran(nom) { for (const e of ecrans) $(e).hidden = e !== nom; $('btnQuitter').hidden = nom === 'ecranAccueil'; document.body.classList.toggle('en-jeu', nom === 'ecranPartie'); document.body.classList.toggle('accueil', nom === 'ecranAccueil'); if (nom !== 'ecranAccueil') $('voileRejoindre').hidden = $('voileRobots').hidden = $('voileSalles').hidden = true; majPleinEcran(); if (nom !== 'ecranPartie') { tournerVu = false; fermerInvitationPaysage(); } }
+  function montrerEcran(nom) { for (const e of ecrans) $(e).hidden = e !== nom; $('btnQuitter').hidden = nom === 'ecranAccueil'; document.body.classList.toggle('en-jeu', nom === 'ecranPartie'); document.body.classList.toggle('accueil', nom === 'ecranAccueil'); document.body.classList.toggle('salon', nom === 'ecranSalon'); if (nom !== 'ecranSalon') $('ecranSalon').classList.remove('qr-ouvert'); if (nom !== 'ecranAccueil') $('voileRejoindre').hidden = $('voileRobots').hidden = $('voileSalles').hidden = true; majPleinEcran(); if (nom !== 'ecranPartie') { tournerVu = false; fermerInvitationPaysage(); } }
   // Plein écran (Android) : cache les barres du navigateur et bloque le téléphone en paysage.
   const peutPleinEcran = !!(document.fullscreenEnabled && document.documentElement.requestFullscreen);
   function majPleinEcran() {
@@ -5934,11 +6020,11 @@ var qrcode = function() {
   function afficherSalon(v) {
     montrerEcran('ecranSalon');
     $('info').textContent = (v.publique ? 'Salle publique · ' : 'Salon · ') + v.code;
-    $('titreSalon').textContent = v.publique ? `Salle de ${v.taille}` : 'Salon';
+    $('titreSalon').textContent = `Salle de ${v.taille}`; $('titreSalon').hidden = !v.publique; // le salon privé est déjà nommé dans l'en-tête
     $('attentePublique').hidden = !v.publique;
     $('btnInviterAmi').hidden = !(MODE_SERVEUR && compteLocal() && !v.publique); // une salle publique rejointe par code n'est plus classée
     if (v.publique) $('attentePublique').replaceChildren('En attente de joueurs : ', el('strong', null, `${v.joueurs.length}/${v.taille}`), `. La partie démarre dès que la salle est pleine. ${lobby.enLigne()} en ligne.`);
-    $('texteCode').textContent = v.publique ? 'Tes amis peuvent aussi rejoindre avec ce code :' : 'Code de la partie :';
+    $('texteCode').textContent = v.publique ? 'Code pour tes amis' : 'Code de la partie';
     $('codeSalon').textContent = v.code;
     const lien = lienPartie(v.code);
     $('lienSalon').value = lien;
@@ -5947,7 +6033,7 @@ var qrcode = function() {
     }
     const jeSuisHote = v.hote === v.moi;
     $('noteHote').hidden = !jeSuisHote || MODE_SERVEUR; // avec le serveur Kopo, la partie ne tourne pas sur le téléphone de l'hôte
-    const rg = $('reglage'); rg.replaceChildren(el('span', null, 'Temps pour jouer :'));
+    const rg = $('reglage'); rg.replaceChildren(el('span', null, 'Chrono'));
     for (const d of S.DELAIS) {
       const libelle = d ? d + ' s' : 'sans';
       if (jeSuisHote && !v.publique) {
@@ -5966,7 +6052,8 @@ var qrcode = function() {
       if (!j.connecte && !j.robot) li.append(el('span', 'pastille ko', 'déconnecté'));
       if (j.voix) li.append(avecIco(el('span'), j.muet ? 'micro-coupe' : 'micro'));
       if (jeSuisHote && j.id !== v.moi && !v.publique) {
-        const b = el('button', 'btn', 'Retirer');
+        const b = el('button', 'btn retirer', '✕');
+        b.setAttribute('aria-label', 'Retirer ' + j.nom);
         b.onclick = () => envoyer({ type: 'retirer', cible: j.id });
         li.append(b);
       }
@@ -5975,7 +6062,7 @@ var qrcode = function() {
     $('btnRobot').hidden = !jeSuisHote || v.joueurs.length >= 9 || v.publique;
     $('btnLancer').hidden = !jeSuisHote || v.publique;
     $('btnLancer').disabled = v.joueurs.length < 2;
-    $('btnLancer').textContent = v.joueurs.length < 2 ? 'En attente d\'au moins 2 joueurs' : `Lancer la partie (${v.joueurs.length} joueurs)`;
+    $('btnLancer').textContent = v.joueurs.length < 2 ? 'En attente d\'au moins 2 joueurs' : `Lancer · ${v.joueurs.length} joueurs`;
     $('attenteHote').hidden = jeSuisHote || v.publique;
   }
 
@@ -8243,9 +8330,13 @@ var qrcode = function() {
     const v = vueActuelle; if (!v) return;
     ouvrirWhatsApp(`Viens jouer au Kopo avec moi ! Code de la partie : ${v.code}\n${lienPartie(v.code)}`);
   };
+  // QR code du salon : le bouton QR (portrait) ou le petit QR (paysage) l'ouvre en grand par-dessus l'écran, toucher le referme.
+  const basculerQr = () => $('ecranSalon').classList.toggle('qr-ouvert');
+  $('btnQr').onclick = $('qr').onclick = basculerQr;
+  $('qr').onkeydown = (e) => { if (e.key === 'Enter' || (e.key === 'Escape' && $('ecranSalon').classList.contains('qr-ouvert'))) basculerQr(); };
   $('btnCopier').onclick = async () => {
     try { await navigator.clipboard.writeText($('lienSalon').value); toast('Lien copié.'); }
-    catch (e) { $('lienSalon').select(); toast('Sélectionne le lien et copie-le.'); }
+    catch (e) { $('lienSalon').hidden = false; $('lienSalon').select(); toast('Sélectionne le lien et copie-le.'); }
   };
 
   // ------------------------------------------------------------------ actualiser
