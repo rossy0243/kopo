@@ -147,6 +147,7 @@ header .vocal .btn { padding: 5px 9px; font-size: 15px; line-height: 1.2; }
 .reglage .btn.actif { background: var(--brass); color: #1d1606; border-color: var(--brass); }
 .depart { width: 100%; display: grid; justify-items: center; gap: 4px; padding: 6px 0; }
 .depart-titre { color: var(--muted); text-transform: uppercase; letter-spacing: 2px; font-size: 13px; }
+.depart-redistrib { color: var(--muted); font-size: 13px; margin-top: 6px; max-width: 280px; text-align: center; }
 .decompte { font-family: var(--display); font-size: 72px; line-height: 1; color: var(--brass); }
 .depart-qui { font-size: 20px; font-weight: 600; }
 .meneur { color: var(--brass); }
@@ -893,7 +894,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       <ul class="regles">
         <li>Il ne te reste que des cartes de la couleur du tour (ou une seule couleur quand tu ouvres) ? Touche <b>Tout poser</b> : tu les poses toutes d'un coup et tu es qualifié.</li>
         <li>Les cartes avec lesquelles on sort ne comptent pas : personne ne peut les ramasser.</li>
-        <li><b>Katapss</b> : tu reçois 4 cartes de la même couleur ? Annonce-le avant de jouer ou de ramasser : qualifié tout de suite.</li>
+        <li><b>Katapss</b> : tu reçois 4 cartes de la même couleur, ou ta plus forte carte est un 4 ? Annonce-le avant de jouer ou de ramasser : qualifié tout de suite. En duel et en finale, seules les 4 cartes de la même couleur comptent : une main dont la plus forte carte est un 4 est montrée à tous et on redistribue.</li>
       </ul>
       <p class="regles-note">36 cartes, du 2 au 10 dans les 4 couleurs. Le 10 est la plus forte. On tourne dans le sens des aiguilles d'une montre.</p>
     </template>
@@ -2090,6 +2091,9 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       d.append(el('div', 'depart-titre', v.restants.length === 2 ? 'Finale' : 'Manche ' + v.numeroManche),
         el('div', 'decompte', ''),
         avecIco(el('div', 'depart-qui'), 'depart', m.joueurCourant === v.moi ? 'Toi' : nom(v, m.joueurCourant)));
+      // Duel ou finale : on dit à tous pourquoi les cartes ont été redistribuées.
+      (m.redistributions || []).forEach((r) => d.append(el('div', 'depart-redistrib',
+        `Cartes redistribuées : la plus forte carte de ${r.joueur === v.moi ? 'ta main' : nom(v, r.joueur)} était un 4 (${r.main.map(K.afficher).join(' ')}).`)));
       poses.append(d);
     }
     m.table.forEach((p, i) => {
@@ -3533,7 +3537,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       { titre: 'Sortir', texte: 'Nadia a ouvert à trèfle et il ne te reste que des trèfles. Tu peux tout poser d\'un coup et te qualifier.',
         table: [['6T', 'Nadia']], main: ['2T', '9T'], bouton: 'Tout poser (2 cartes) et sortir', ok: 'Qualifié ! Les cartes avec lesquelles tu sors ne comptent pas pour la plus forte.',
         carte: () => [false, 'Utilise « Tout poser » pour sortir d\'un coup.'] },
-      { titre: 'Katapss !', texte: 'À la distribution, tu reçois 4 cartes de la même couleur. Annonce KATAPSS avant de jouer : tu es qualifié tout de suite.',
+      { titre: 'Katapss !', texte: 'À la distribution, tu reçois 4 cartes de la même couleur (ou ta plus forte carte est un 4, sauf en duel et en finale). Annonce KATAPSS avant de jouer : tu es qualifié tout de suite.',
         main: ['2P', '5P', '7P', '10P'], bouton: 'KATAPSS', katapss: true, ok: 'Qualifié d\'office ! Attention : dès que tu as joué ou ramassé, c\'est trop tard.',
         carte: () => [false, 'Annonce plutôt KATAPSS !'] },
     ];
@@ -3660,7 +3664,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       if (an.type === 'sortie') return [(moi(an.joueur) ? 'Tu as' : nom(v, an.joueur) + ' a') + ' tout posé : qualifié ! ', ...relance('ouvre', moi(an.meneur) ? ', avec la couleur de ton choix.' : ', avec la couleur de son choix.')];
     }
     if (m.pause || m.phase === 'terminee') return null;
-    if (a.some((x) => x.type === 'katapss')) return ['4 cartes de la même couleur : touche ', 'KATAPSS', ' pour te qualifier tout de suite !'];
+    if (a.some((x) => x.type === 'katapss')) return [K.typeKatapss(m.main, m.sieges.length) === 'petite' ? 'Ta plus forte carte est un 4 : touche ' : '4 cartes de la même couleur : touche ', 'KATAPSS', ' pour te qualifier tout de suite !'];
     if (!m.enJeu.includes(v.moi)) return ['Qualifié ! Le dernier qui garde des cartes sera ', 'éliminé', '.'];
     if (m.joueurCourant !== v.moi) return null;
     if (m.phase === 'ouverture') {
