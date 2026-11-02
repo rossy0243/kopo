@@ -4933,7 +4933,7 @@ var qrcode = function() {
   // ------------------------------------------------------------------ paramètres
   // Réglages du joueur, gardés sur le téléphone (plus tard : rattachés au compte).
   const VERSION = '1.0-essai';
-  const BUILD = '8becd0adcb3f'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = '3aecd355d63a'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
@@ -6221,10 +6221,20 @@ var qrcode = function() {
 
   // ------------------------------------------------------------------ fin de partie : récap, revanche, partie suivante
   // Ce que ce téléphone a vu de la partie en cours (Katapss, premier sorti…), pour le récap.
+  // Il est gardé sur le téléphone (kopo-suivi) : une page rechargée en pleine partie la compte quand même.
   let suivi = null;
   function suivrePartie(v) {
-    if (v.etat === 'manche' && v.numeroManche === 1 && (!suivi || suivi.fini) && v.joueurs.some((j) => j.id === v.moi)) {
-      suivi = { avecRobots: v.joueurs.some((j) => j.robot && !j.remplace), publique: !!v.publique, guidee: v.robots === 'gentils', katapss: 0, premierSorti: 0, manches: {} };
+    const enJeu = v.joueurs.some((j) => j.id === v.moi);
+    if (!suivi && enJeu && v.etat !== 'salon') {
+      const s = stock.lire('kopo-suivi');
+      if (s && s.code === v.code && !s.fini && Date.now() - (s.le || 0) < 3 * 3600e3) suivi = s;
+    }
+    const nouvelle = v.etat === 'manche' && v.numeroManche === 1 && (!suivi || suivi.fini);
+    // Page rechargée en cours de partie sans suivi gardé : on suit la partie à partir d'ici.
+    const reprise = !suivi && v.etat !== 'salon' && v.etat !== 'finPartie';
+    if (enJeu && (nouvelle || reprise)) {
+      suivi = { code: v.code, le: Date.now(), avecRobots: v.joueurs.some((j) => j.robot && !j.remplace), publique: !!v.publique, guidee: v.robots === 'gentils', katapss: 0, premierSorti: 0, manches: {} };
+      stock.ecrire('kopo-suivi', suivi);
     }
     if (!suivi || suivi.fini || !v.manche) return;
     if ((v.etat === 'finManche' || v.etat === 'finPartie') && !suivi.manches[v.numeroManche]) {
@@ -6232,9 +6242,11 @@ var qrcode = function() {
       const q = v.manche.qualifies;
       if (q.some((x) => x.joueur === v.moi && x.raison === 'Katapss')) suivi.katapss++;
       if (q.length && q[0].joueur === v.moi) suivi.premierSorti++;
+      stock.ecrire('kopo-suivi', suivi);
     }
     if (v.etat === 'finPartie') {
       suivi.fini = true;
+      stock.effacer('kopo-suivi');
       try {
         const p = lireProfil();
         const e = R.bilanPartie(v, suivi);
@@ -7576,14 +7588,14 @@ var qrcode = function() {
       else statsZ.append(grille([[s.parties, 'Parties jouées'], [s.victoires, 'Victoires'], [taux(s.victoires, s.parties), 'Taux de victoire'], [s.finales, 'Finales atteintes'], [s.manchesSurvecues, 'Manches survécues'], [s.katapss, 'Katapss'], [s.eliminePremier, 'Éliminé en premier']]));
       statsZ.append(el('h3', null, 'Entraînement (robots)'));
       statsZ.append(en.parties ? grille([[en.parties, 'Parties'], [en.victoires, 'Victoires'], [taux(en.victoires, en.parties), 'Taux de victoire']]) : el('p', 'muted', 'Aucune partie contre les robots pour l\'instant.'));
-      if (!rivaux.length) return;
+      // Deux lignes seulement : celui que tu as le plus battu, et celui qui t'a le plus battu.
       statsZ.append(el('h3', null, 'Rivaux'));
       const victime = rivaux.filter((r) => r.gagnes).sort((a, b) => b.gagnes - a.gagnes)[0];
       const bete = rivaux.filter((r) => r.perdus).sort((a, b) => b.perdus - a.perdus)[0];
       const ligneR = (a, b) => { const l = el('div', 'rival-ligne'); l.append(el('span', null, a), el('small', null, b)); statsZ.append(l); };
       if (victime) ligneR('Ta victime : ' + victime.pseudo, 'battu ' + victime.gagnes + ' fois');
       if (bete) ligneR('Ta bête noire : ' + bete.pseudo, 't\'a battu ' + bete.perdus + ' fois');
-      for (const r of rivaux.slice().sort((a, b) => (b.gagnes + b.perdus) - (a.gagnes + a.perdus)).slice(0, 5)) ligneR(r.pseudo, 'Toi ' + r.gagnes + ' – ' + r.perdus);
+      if (!victime && !bete) statsZ.append(el('p', 'muted', 'Joue contre d\'autres joueurs pour voir tes rivaux ici.'));
     };
     dessinerStats(s, en, Object.values(p.rivaux || {}));
     if (MODE_SERVEUR && c) apiJoueur('/statistiques').then((srv) => {
