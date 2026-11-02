@@ -226,11 +226,11 @@ function creerParrainage(base, reglages, comptes, social, env = process.env) {
     },
 
     // Tableau de bord : parrainages d'un joueur (comme parrain et comme filleul).
-    async resumeAdmin(compteId) {
+    async resumeAdmin(compteId, limite = 50) {
       return (await base.query(`SELECT p.statut, p.parties, p.pieces_parrain, p.pieces_filleul, p.note, p.cree_le, p.valide_le,
           p.parrain_id, cp.pseudo AS parrain, cp.numero AS parrain_numero, p.filleul_id, cf.pseudo AS filleul, cf.numero AS filleul_numero
         FROM parrainages p JOIN comptes cp ON cp.id = p.parrain_id JOIN comptes cf ON cf.id = p.filleul_id
-        WHERE p.parrain_id = $1 OR p.filleul_id = $1 ORDER BY p.cree_le DESC LIMIT 100`, [compteId])).rows;
+        WHERE p.parrain_id = $1 OR p.filleul_id = $1 ORDER BY p.cree_le DESC LIMIT $2`, [compteId, limite])).rows;
     },
   };
   return api;

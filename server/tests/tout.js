@@ -617,6 +617,9 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.strictEqual(l.json[0].id, a.compte.id);
     const f = await api('/admin/api/joueurs/' + a.compte.id, { jeton: adminJeton });
     assert.strictEqual(f.json.signalementsRecus.length, 1);
+    assert.strictEqual(f.json.stats.signalements, 1);
+    assert.strictEqual(typeof f.json.stats.operations, 'number');
+    assert.ok(f.json.parties.length <= 50 && f.json.pieces.length <= 50, 'listes de la fiche plafonnées');
     await api(`/admin/api/joueurs/${a.compte.id}/sanction`, { methode: 'POST', jeton: adminJeton, corps: { type: 'suspension', motif: 'insultes', jours: 1 } });
     assert.strictEqual((await srv.comptes.lire(a.compte.id)).statut, 'suspendu');
     await api(`/admin/api/joueurs/${a.compte.id}/sanction`, { methode: 'POST', jeton: adminJeton, corps: { type: 'levee', motif: 'erreur' } });

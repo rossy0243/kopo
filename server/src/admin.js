@@ -89,6 +89,8 @@ function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainag
   }));
 
   // --- Joueurs
+  // Les listes de la fiche sont plafonnées ici ; le tableau de bord n'en montre que les premières (bouton « Voir plus »).
+  const FICHE = { parties: 50, pieces: 50, signalements: 30, sanctions: 30, titres: 20, inventaire: 100, parrainages: 50 };
   r.get('/joueurs', enveloppe(async (req, res) => {
     const t = String(req.query.q || '').trim();
     const m = /^(.*)#(\d{4})$/.exec(t);
@@ -104,17 +106,20 @@ function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainag
     const q = async (sql) => n((await base.query(sql, [c.id])).rows);
     res.json({
       compte: { ...c, auth_id: c.auth_id ? 'lié' : null, parrain_createur: !!((await base.query('SELECT parrain_createur FROM comptes WHERE id = $1', [c.id])).rows[0] || {}).parrain_createur },
-      stats: (await q(`SELECT count(*)::int AS parties, count(*) FILTER (WHERE place = 1)::int AS victoires, count(*) FILTER (WHERE abandon)::int AS abandons FROM participations WHERE compte_id = $1`))[0],
-      parties: await q(`SELECT x.id, x.code, x.debut, x.nb_joueurs, x.avec_robots, p.place, p.abandon FROM participations p JOIN parties x ON x.id = p.partie_id WHERE p.compte_id = $1 ORDER BY x.debut DESC LIMIT 30`),
-      pieces: await comptes.historique(c.id, 100),
-      signalementsRecus: await q(`SELECT s.id, s.motif, s.details, s.statut, s.cree_le, a.pseudo AS auteur FROM signalements s JOIN comptes a ON a.id = s.auteur_id WHERE s.cible_id = $1 ORDER BY s.id DESC LIMIT 50`),
-      sanctions: await q(`SELECT type, motif, jusqu, cree_le FROM sanctions WHERE compte_id = $1 ORDER BY id DESC`),
+      stats: (await q(`SELECT count(*)::int AS parties, count(*) FILTER (WHERE place = 1)::int AS victoires, count(*) FILTER (WHERE abandon)::int AS abandons,
+        (SELECT count(*) FROM signalements WHERE cible_id = $1)::int AS signalements, (SELECT count(*) FROM sanctions WHERE compte_id = $1)::int AS sanctions,
+        (SELECT count(*) FROM registre_pieces WHERE compte_id = $1)::int AS operations, (SELECT count(*) FROM inventaire WHERE compte_id = $1)::int AS objets
+        FROM participations WHERE compte_id = $1`))[0],
+      parties: await q(`SELECT x.id, x.code, x.debut, x.nb_joueurs, x.avec_robots, p.place, p.abandon FROM participations p JOIN parties x ON x.id = p.partie_id WHERE p.compte_id = $1 ORDER BY x.debut DESC LIMIT ${FICHE.parties}`),
+      pieces: await comptes.historique(c.id, FICHE.pieces),
+      signalementsRecus: await q(`SELECT s.id, s.motif, s.details, s.statut, s.cree_le, a.pseudo AS auteur FROM signalements s JOIN comptes a ON a.id = s.auteur_id WHERE s.cible_id = $1 ORDER BY s.id DESC LIMIT ${FICHE.signalements}`),
+      sanctions: await q(`SELECT type, motif, jusqu, cree_le FROM sanctions WHERE compte_id = $1 ORDER BY id DESC LIMIT ${FICHE.sanctions}`),
       // Joueurs souvent à la même table : aide à repérer la complicité (strategie-pieces §6.3).
       ligue: (await q(`SELECT l.saison, l.points, l.division, l.meilleure, l.parties, l.victoires FROM ligue l JOIN saisons s ON s.numero = l.saison WHERE l.compte_id = $1 AND s.statut = 'en_cours'`))[0] || null,
-      titres: await q(`SELECT saison, titre, rang, pieces FROM recompenses_saison WHERE compte_id = $1 ORDER BY saison DESC`),
-      inventaire: await q(`SELECT objet, source, cree_le FROM inventaire WHERE compte_id = $1 ORDER BY cree_le DESC`),
+      titres: await q(`SELECT saison, titre, rang, pieces FROM recompenses_saison WHERE compte_id = $1 ORDER BY saison DESC LIMIT ${FICHE.titres}`),
+      inventaire: await q(`SELECT objet, source, cree_le FROM inventaire WHERE compte_id = $1 ORDER BY cree_le DESC LIMIT ${FICHE.inventaire}`),
       parcours: (await q(`SELECT p.xp, cardinality(p.gratuits)::int AS gratuits, cardinality(p.plus)::int AS plus FROM parcours p JOIN saisons s ON s.numero = p.saison AND s.statut = 'en_cours' WHERE p.compte_id = $1`))[0] || null,
-      parrainages: parrainage ? n(await parrainage.resumeAdmin(c.id)) : [],
+      parrainages: parrainage ? n(await parrainage.resumeAdmin(c.id, FICHE.parrainages)) : [],
       partenaires: await q(`SELECT c2.id, c2.pseudo, c2.numero, count(*)::int AS ensemble FROM participations a JOIN participations b ON b.partie_id = a.partie_id AND b.compte_id <> a.compte_id JOIN comptes c2 ON c2.id = b.compte_id WHERE a.compte_id = $1 GROUP BY c2.id, c2.pseudo, c2.numero ORDER BY ensemble DESC LIMIT 5`),
     });
   }));
@@ -222,7 +227,7 @@ function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainag
     res.json({ ok: true, valeur: v });
   }));
 
-  r.get('/journal', enveloppe(async (req, res) => res.json(n((await base.query('SELECT * FROM journal_admin ORDER BY id DESC LIMIT 200')).rows))));
+  r.get('/journal', enveloppe(async (req, res) => res.json(n((await base.query('SELECT * FROM journal_admin ORDER BY id DESC LIMIT 100')).rows))));
 
   return r;
 }
