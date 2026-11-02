@@ -333,6 +333,60 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     await a.leave(); await b.leave();
   });
 
+  console.log('Tables à mise et pot');
+  await test('table Bronze : chacun paie 50, le pot (150) est partagé 50/25/10, la maison garde le reste', async () => {
+    const client = new Client(URL_.replace('http', 'ws'));
+    const js = [await invite('MiseA'), await invite('MiseB'), await invite('MiseC')];
+    const salles = [], pots = new Map(), mises = new Map();
+    let fin = null;
+    for (const j of js) {
+      const salle = await client.joinOrCreate('kopo-mise', { jeton: j.jeton, publique: true, taille: 3, mise: 'bronze', rapide: true });
+      salle.onMessage('erreur', () => {}); salle.onMessage('solde', () => {}); salle.onMessage('classee', () => {});
+      salle.onMessage('mise', (m) => mises.set(j.compte.id, m));
+      salle.onMessage('pot', (m) => pots.set(j.compte.id, m));
+      salle.onMessage('vue', (v) => {
+        if (v.etat === 'finPartie') fin = fin || v;
+        const a = v.manche && v.manche.actions[0];
+        if (v.etat === 'manche' && a) setTimeout(() => salle.send('action', { action: a }), 5);
+      });
+      salles.push(salle);
+      await attendre(80);
+    }
+    assert.ok(salles.every((x) => x.roomId === salles[0].roomId), 'même salle');
+    for (let t = 0; t < 400 && !fin; t++) await attendre(50);
+    assert.ok(fin, 'la partie doit se terminer');
+    for (let t = 0; t < 40 && pots.size < 3; t++) await attendre(50);
+    assert.deepStrictEqual(mises.get(js[0].compte.id), { niveau: 'bronze', mise: 50, pot: 150 });
+    const ordre = [fin.vainqueur, ...fin.elimines.slice().reverse()];
+    const attendu = [75, 37, 15];
+    for (let i = 0; i < 3; i++) {
+      const moi = await api('/api/moi', { jeton: js.find((j) => j.compte.id === ordre[i]).jeton });
+      assert.strictEqual(moi.json.compte.solde, 500 - 50 + attendu[i], 'solde de la place ' + (i + 1));
+      assert.strictEqual(pots.get(ordre[i]).gain, attendu[i]);
+    }
+    for (const s of salles) await s.leave();
+  });
+  await test('table à mise : refusée sans assez de pièces, ou avec un code ; jamais trouvée par une ancienne version', async () => {
+    const client = new Client(URL_.replace('http', 'ws'));
+    const pauvre = await invite('MisePauvre');
+    await assert.rejects(client.joinOrCreate('kopo-mise', { jeton: pauvre.jeton, publique: true, taille: 4, mise: 'argent' }), /au moins 2000 pièces/);
+    const riche = await invite('MiseRiche');
+    const a = await client.joinOrCreate('kopo-mise', { jeton: riche.jeton, publique: true, taille: 4, mise: 'bronze' });
+    a.onMessage('vue', () => {}); a.onMessage('erreur', () => {});
+    await attendre(100);
+    const ancien = await client.joinOrCreate('kopo', { jeton: pauvre.jeton, publique: true, taille: 4 });
+    ancien.onMessage('vue', () => {}); ancien.onMessage('erreur', () => {});
+    assert.notStrictEqual(ancien.roomId, a.roomId);
+    const enLigne = (await api('/api/en-ligne')).json.sallesOuvertes;
+    assert.strictEqual(enLigne.find((x) => x.id === a.roomId).mise, 'bronze');
+    assert.strictEqual(enLigne.find((x) => x.id === ancien.roomId).mise, null);
+    await assert.rejects(client.joinById(a.roomId, { jeton: pauvre.jeton, code: 'ABCD' }), /sans code/);
+    await assert.rejects(client.create('kopo-mise', { jeton: riche.jeton, publique: true, taille: 4, mise: 'platine' }));
+    const cfg = (await api('/api/config')).json;
+    assert.deepStrictEqual([cfg.tables.bronze, cfg.deblocage, cfg.pot.maison, cfg.remiseAFlot], [50, 10, 15, 20]);
+    await a.leave(); await ancien.leave();
+  });
+
   console.log('Ligue classée et saisons');
   const P = DEFAUTS.ligue.points;
   const ligneLigue = async (id) => (await srv.base.query("SELECT l.* FROM ligue l JOIN saisons s ON s.numero = l.saison AND s.statut = 'en_cours' WHERE l.compte_id = $1", [id])).rows[0];
@@ -462,6 +516,32 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     const r = await api('/api/rivaux', { jeton: js.find((j) => j.compte.id === ordre[0]).jeton });
     assert.strictEqual(r.json.length, 2);
     assert.ok(r.json.every((x) => x.moi === 1 && x.lui === 0), JSON.stringify(r.json));
+  });
+  await test('statistiques du compte et copie du profil : gardées par le serveur', async () => {
+    const js = [await invite('Sta' + Date.now() % 1000), await invite('Stb' + Date.now() % 1000), await invite('Stc' + Date.now() % 1000)];
+    const fin = await jouerPartie(js);
+    const v = js.find((j) => j.compte.id === fin.vainqueur);
+    const st = await api('/api/statistiques', { jeton: v.jeton });
+    assert.strictEqual(st.statut, 200);
+    assert.deepStrictEqual(st.json.stats, { parties: 1, victoires: 1, finales: 1, eliminePremier: 0 });
+    assert.deepStrictEqual(st.json.entrainement, { parties: 0, victoires: 0 });
+    assert.strictEqual(st.json.rivaux.length, 2);
+    // Même duel, vu des deux côtés : les scores sont le miroir l'un de l'autre.
+    const autre = js.find((j) => j.compte.id !== v.compte.id);
+    const [d1] = await srv.social.duels(v.compte.id, [autre.compte.id]);
+    const [d2] = await srv.social.duels(autre.compte.id, [v.compte.id]);
+    assert.deepStrictEqual([d1.moi, d1.lui], [1, 0]);
+    assert.deepStrictEqual([d2.moi, d2.lui], [0, 1]);
+    assert.deepStrictEqual(await srv.social.duels(v.compte.id, []), []);
+    const premier = js.find((j) => j.compte.id === fin.elimines[0]);
+    assert.strictEqual((await api('/api/statistiques', { jeton: premier.jeton })).json.stats.eliminePremier, 1);
+    // Copie du profil du téléphone.
+    assert.strictEqual((await api('/api/profil', { jeton: v.jeton })).json.profil, null);
+    assert.strictEqual((await api('/api/profil', { methode: 'PUT', jeton: v.jeton, corps: { profil: [] } })).statut, 400);
+    const p = { version: 1, xp: 420, premierePartie: '2026-10-01', stats: { parties: 12 } };
+    assert.strictEqual((await api('/api/profil', { methode: 'PUT', jeton: v.jeton, corps: { profil: p } })).statut, 200);
+    assert.deepStrictEqual((await api('/api/profil', { jeton: v.jeton })).json.profil, p);
+    assert.strictEqual((await api('/api/profil', { jeton: premier.jeton })).json.profil, null, 'chacun la sienne');
   });
   await test('rivalité entre amis : « t\'a rattrapé », une seule par jour, et 1 – 0 ne compte pas', async () => {
     const [x, y] = [await invite('Riv' + Date.now() % 1000), await invite('Ral' + Date.now() % 1000)];
