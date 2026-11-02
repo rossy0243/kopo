@@ -214,6 +214,14 @@ details.rappel summary { cursor: pointer; font-weight: 600; }
 }
 /* Invitation à tourner le téléphone (au début d'une partie tenue droite, sur téléphone). */
 .voile-tourner { z-index: 12; }
+/* Messages du tableau de bord : annonce (une fois) et maintenance (bloquante, au-dessus de tout). */
+.voile-annonce { z-index: 45; } /* au-dessus de l'écran de bienvenue (40) */
+.voile-maintenance { z-index: 60; background: rgba(6,14,24,.94); }
+.fenetre-serveur { width: min(380px, 100%); justify-items: center; text-align: center; }
+.fenetre-serveur h2 { font-size: 32px; }
+.fenetre-serveur p { color: var(--ink, #fff); white-space: pre-line; overflow-wrap: anywhere; }
+.fenetre-serveur .btn { width: 100%; }
+.fenetre-serveur small { color: var(--muted); }
 .fenetre-tourner { width: min(340px, 100%); justify-items: center; text-align: center; }
 .fenetre-tourner h2 { font-size: 32px; }
 .fenetre-tourner .btn { width: 100%; }
@@ -379,6 +387,12 @@ body.accueil .app { max-width: none; min-height: 100vh; min-height: 100dvh; padd
 .en-ligne-fenetre { color: var(--good) !important; font-weight: 600; }
 .point-en-ligne { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--good); margin: 0 4px 1px 2px; box-shadow: 0 0 6px var(--good); }
 .choix-niveau-robots { width: 100%; }
+.choix-mise { width: 100%; }
+.choix-mise button { flex: 1; padding: 8px 2px; display: grid; justify-items: center; gap: 1px; font-size: 13px; }
+.choix-mise button small { font-weight: 500; font-size: 11px; opacity: .85; }
+.choix-mise button:disabled { opacity: .45; }
+.choix-mise button .ico-k { width: 12px; height: 12px; }
+.aide-mise { text-align: center; }
 .choix-niveau-robots button { flex: 1; padding: 10px 6px; font-size: 15px; }
 .choix-robots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .choix-robots .btn { font-size: 20px; padding: 12px 0; }
@@ -835,6 +849,8 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       <div class="fenetre">
         <h2>En ligne</h2>
         <p class="en-ligne-fenetre" id="enLigneSalles"></p>
+        <div class="choix choix-mise" id="choixMise" role="group" aria-label="Mise" hidden></div>
+        <small class="muted aide-mise" id="aideMise" hidden></small>
         <div class="salles-vedette" id="sallesVedette"></div>
         <small class="muted">Autres tailles</small>
         <div class="choix-salles" id="choixSalles"></div>
@@ -941,6 +957,28 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   <div class="splash-sous">Jeu de cartes entre amis</div>
 </div>
 <div class="voile" id="voile" hidden><div class="fenetre" id="fenetre"></div></div>
+<div class="voile voile-annonce" id="voileAnnonce" hidden>
+  <div class="fenetre fenetre-serveur" role="dialog" aria-modal="true" aria-labelledby="titreAnnonce">
+    <h2 id="titreAnnonce">Annonce</h2>
+    <p id="texteAnnonce"></p>
+    <button class="btn principal" id="btnAnnonceOk">OK</button>
+  </div>
+</div>
+<div class="voile voile-maintenance" id="voileVersion" hidden>
+  <div class="fenetre fenetre-serveur" role="alertdialog" aria-modal="true" aria-labelledby="titreVersion">
+    <h2 id="titreVersion">Mise à jour</h2>
+    <p>Une nouvelle version du Kopo est obligatoire pour continuer à jouer.</p>
+    <button class="btn principal" id="btnVersionMaj">Mettre à jour</button>
+  </div>
+</div>
+<div class="voile voile-maintenance" id="voileMaintenance" hidden>
+  <div class="fenetre fenetre-serveur" role="alertdialog" aria-modal="true" aria-labelledby="titreMaintenance">
+    <h2 id="titreMaintenance">Maintenance</h2>
+    <p id="texteMaintenance"></p>
+    <button class="btn" id="btnMaintenanceReessayer">Réessayer</button>
+    <small>Le jeu se rouvrira tout seul dès la fin de la maintenance.</small>
+  </div>
+</div>
 <div class="toast" id="toast" hidden role="status"></div>
 <div class="maj-dispo" id="majDispo" hidden role="status"><span>Nouvelle version de Kopo disponible.</span><button class="btn principal" id="btnMajDispo">Mettre à jour</button><button class="btn" id="btnMajPlusTard" aria-label="Plus tard">✕</button></div>
 <div class="tirer-actualiser" id="tirerActualiser" hidden aria-hidden="true"><span>↻</span></div>
@@ -3717,6 +3755,7 @@ var qrcode = function() {
       niveauJoueur: 1, // niveau (XP) de l'hôte : les robots se renforcent avec lui
       revanche: null, // fin de partie : { oui: [ids], non: [ids], jusqua } ; la partie repart si au moins 2 joueurs acceptent
       revancheRatee: false,
+      dernierDuel: null, // duel : { paire, ouvreur } de la dernière partie à 2, pour alterner qui commence
       horloge: Date.now,
       rng: rng || hasardFort(),
     };
@@ -3955,10 +3994,22 @@ var qrcode = function() {
     return String(nom || '').replace(/[<>]/g, '').trim().slice(0, 16) || 'Joueur';
   }
 
+  // Qui ouvre la manche : au hasard (règlement 4), sauf en duel (partie à 2 joueurs) :
+  // quand les deux mêmes joueurs rejouent, c'est à tour de rôle (règlement 4).
+  function choisirOuvreur(s, sieges) {
+    const auHasard = sieges[Math.floor(s.rng() * sieges.length)];
+    if (sieges.length !== 2 || s.numeroManche !== 0) return auHasard;
+    const paire = sieges.slice().sort().join('|');
+    const d = s.dernierDuel;
+    const premier = d && d.paire === paire && sieges.includes(d.ouvreur) ? sieges.find((j) => j !== d.ouvreur) : auHasard;
+    s.dernierDuel = { paire, ouvreur: premier }; // gardé d'une partie à l'autre (revanche, rejouer)
+    return premier;
+  }
+
   function demarrerManche(s) {
     const sieges = K.melanger(s.restants, s.rng);
     const { mains, redistributions } = K.distribuer(sieges, s.rng);
-    const premier = sieges[Math.floor(s.rng() * sieges.length)];
+    const premier = choisirOuvreur(s, sieges);
     s.numeroManche++;
     s.suiteA = null;
     s.manche = K.nouvelleManche(sieges, mains, premier, redistributions);
@@ -4911,7 +4962,7 @@ var qrcode = function() {
   // ------------------------------------------------------------------ paramètres
   // Réglages du joueur, gardés sur le téléphone (plus tard : rattachés au compte).
   const VERSION = '1.0-essai';
-  const BUILD = 'b585a2f71cdd'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = 'e763f66612cd'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
@@ -5110,7 +5161,7 @@ var qrcode = function() {
     },
     // Salles publiques encore ouvertes d'une taille donnée, la plus remplie d'abord.
     ouvertes(taille, exclus) {
-      if (MODE_SERVEUR) return lobbyServeur.salles.filter((x) => x.taille === taille && x.joueurs < x.taille).map((x) => ({ code: x.code, taille: x.taille, nb: x.joueurs })).sort((a, b) => b.nb - a.nb);
+      if (MODE_SERVEUR) return lobbyServeur.salles.filter((x) => x.taille === taille && x.joueurs < x.taille && (x.mise || null) === miseActive()).map((x) => ({ code: x.code, taille: x.taille, nb: x.joueurs })).sort((a, b) => b.nb - a.nb);
       const limite = Date.now() - 10000;
       return [...this.salles.values()].filter((x) => x.t >= limite && x.taille === taille && x.nb < x.taille && !(exclus || []).includes(x.code)).sort((a, b) => b.nb - a.nb);
     },
@@ -5126,7 +5177,40 @@ var qrcode = function() {
   }
   lobby.ecouteurs.push(afficherEnLigne);
 
+  // Tables à mise (serveur) : Gratuit, Bronze, Argent, Or, Diamant. Un niveau s'ouvre avec 10 fois la mise.
+  const NIVEAUX_MISE = [['bronze', 'Bronze'], ['argent', 'Argent'], ['or', 'Or'], ['diamant', 'Diamant']];
+  function tablesMise() { return MODE_SERVEUR && configServeur && configServeur.tables ? configServeur.tables : null; }
+  const seuilMise = (n) => (tablesMise()[n] || 0) * ((configServeur && configServeur.deblocage) || 10);
+  // Le niveau choisi (retenu sur le téléphone), ou null pour une table gratuite. Un niveau devenu trop cher repasse en gratuit.
+  function miseActive() {
+    const t = tablesMise(), n = stock.lire('kopo-mise');
+    return t && t[n] > 0 && soldeAffiche() >= seuilMise(n) ? n : null;
+  }
+  function dessinerMises() {
+    const t = tablesMise(), box = $('choixMise'), aide = $('aideMise');
+    box.hidden = aide.hidden = !t;
+    if (!t) return;
+    const active = miseActive();
+    const bouton = (v, titre, sous, ouvert) => {
+      const b = el('button'); b.type = 'button'; b.dataset.v = v || '';
+      b.setAttribute('aria-pressed', String((v || null) === active));
+      b.disabled = !ouvert;
+      const s2 = el('small', null, sous); if (!ouvert) s2.prepend(iconeCadenas());
+      b.append(el('span', null, titre), s2);
+      b.onclick = () => { stock.ecrire('kopo-mise', v || null); dessinerSalles(); };
+      return b;
+    };
+    box.replaceChildren(bouton(null, 'Gratuit', 'sans mise', true),
+      ...NIVEAUX_MISE.filter(([n]) => t[n] > 0).map(([n, nom]) => bouton(n, nom, formatPieces(t[n]), soldeAffiche() >= seuilMise(n))));
+    const pot = (configServeur && configServeur.pot) || {};
+    if (active) aide.textContent = `Mise de ${formatPieces(t[active])} pièces par partie. Le pot va au 1er (${pot.vainqueur} %), au 2e (${pot.deuxieme} %) et au 3e (${pot.troisieme} %). Quitter en cours, c'est perdre sa mise.`;
+    else {
+      const prochain = NIVEAUX_MISE.find(([n]) => t[n] > 0 && soldeAffiche() < seuilMise(n));
+      aide.textContent = 'Partie gratuite : tu gagnes des pièces à chaque manche.' + (prochain ? ` Table ${prochain[1]} dès ${formatPieces(seuilMise(prochain[0]))} pièces.` : '');
+    }
+  }
   function dessinerSalles() {
+    dessinerMises();
     const bouton = (t, cls, titre, sous) => {
       const meilleure = lobby.ouvertes(t)[0];
       const b = el('button', 'btn' + (cls ? ' ' + cls : '') + (meilleure ? ' attente' : ''));
@@ -5144,7 +5228,7 @@ var qrcode = function() {
   // Rejoint la salle publique la plus remplie de cette taille ; s'il n'y en a pas, en crée une.
   let rechercheEnCours = null;
   function chercherSalle(nom, taille, exclus) {
-    if (MODE_SERVEUR) return entrerServeur(nom, { taille }); // le serveur choisit la salle la plus adaptée
+    if (MODE_SERVEUR) return entrerServeur(nom, { taille, mise: miseActive() }); // le serveur choisit la salle la plus adaptée
     afficherConnexion(`Recherche d'une salle de ${taille}…`);
     clearTimeout(rechercheEnCours);
     const debut = Date.now();
@@ -5213,7 +5297,7 @@ var qrcode = function() {
   // facon : { creer: true } | { code } | { taille } (salle publique) | { reconnexion: jeton de reconnexion }
   async function entrerServeur(nom, facon) {
     clearTimeout(rechercheEnCours);
-    afficherConnexion(facon.taille ? `Recherche d'une salle de ${facon.taille}…` : facon.code ? 'Connexion à la partie ' + facon.code + '…' : 'Ouverture de la partie…');
+    afficherConnexion(facon.taille ? `Recherche d'une ${facon.mise ? 'table ' + (NIVEAUX_MISE.find((x) => x[0] === facon.mise) || [])[1] : 'salle'} de ${facon.taille}…` : facon.code ? 'Connexion à la partie ' + facon.code + '…' : 'Ouverture de la partie…');
     let room;
     // L'hébergeur gratuit endort le serveur après un moment sans joueurs : le réveil prend jusqu'à une minute.
     const reveil = setTimeout(() => afficherConnexion('Réveil du serveur, ça peut prendre jusqu\'à une minute…'), 6000);
@@ -5223,6 +5307,7 @@ var qrcode = function() {
       if (facon.reconnexion) room = await cli.reconnect(facon.reconnexion);
       else if (facon.creer) room = await cli.create('kopo', { jeton: c.jeton, code: nouveauCode() });
       else if (facon.code) room = await cli.join('kopo', { jeton: c.jeton, code: facon.code });
+      else if (facon.mise) room = await cli.joinOrCreate('kopo-mise', { jeton: c.jeton, publique: true, taille: facon.taille, mise: facon.mise });
       else room = await cli.joinOrCreate('kopo', { jeton: c.jeton, publique: true, taille: facon.taille });
       clearTimeout(reveil);
       brancherSalleServeur(cli, room, nom, facon);
@@ -5257,6 +5342,8 @@ var qrcode = function() {
     room.onMessage('vue', (v) => { if (moi !== client) return; cacherBandeau(); memoriser(v.code); afficher(v); });
     room.onMessage('erreur', (t) => { if (moi === client) toast(t); });
     room.onMessage('solde', (d) => soldeServeur(d && d.solde));
+    room.onMessage('mise', (d) => { if (moi === client && d) toast(`Mise de ${formatPieces(d.mise)} pièces payée. Pot : ${formatPieces(d.pot)} pièces.`); });
+    room.onMessage('pot', (d) => { if (moi === client && d) toast(d.gain > 0 ? `Tu gagnes ${formatPieces(d.gain)} pièces du pot !` : `Pas de part du pot cette fois (${formatPieces(d.pot)} pièces en jeu).`); });
     room.onMessage('classee', (d) => window.dispatchEvent(new CustomEvent('kopo-classee', { detail: d })));
     room.onMessage('ligue', (d) => window.dispatchEvent(new CustomEvent('kopo-ligue', { detail: d })));
     room.onMessage('parcours', (d) => window.dispatchEvent(new CustomEvent('kopo-parcours', { detail: d })));
@@ -5481,6 +5568,7 @@ var qrcode = function() {
 
   function afficherAccueil() {
     montrerEcran('ecranAccueil');
+    setTimeout(verifierRemiseAFlot, 1500);
     $('info').textContent = '';
     $('pseudo').value = nettoyerPseudo(stock.lire('kopo-pseudo') || '');
     figerPseudo();
@@ -6165,10 +6253,20 @@ var qrcode = function() {
 
   // ------------------------------------------------------------------ fin de partie : récap, revanche, partie suivante
   // Ce que ce téléphone a vu de la partie en cours (Katapss, premier sorti…), pour le récap.
+  // Il est gardé sur le téléphone (kopo-suivi) : une page rechargée en pleine partie la compte quand même.
   let suivi = null;
   function suivrePartie(v) {
-    if (v.etat === 'manche' && v.numeroManche === 1 && (!suivi || suivi.fini) && v.joueurs.some((j) => j.id === v.moi)) {
-      suivi = { avecRobots: v.joueurs.some((j) => j.robot && !j.remplace), publique: !!v.publique, guidee: v.robots === 'gentils', katapss: 0, premierSorti: 0, manches: {} };
+    const enJeu = v.joueurs.some((j) => j.id === v.moi);
+    if (!suivi && enJeu && v.etat !== 'salon') {
+      const s = stock.lire('kopo-suivi');
+      if (s && s.code === v.code && !s.fini && Date.now() - (s.le || 0) < 3 * 3600e3) suivi = s;
+    }
+    const nouvelle = v.etat === 'manche' && v.numeroManche === 1 && (!suivi || suivi.fini);
+    // Page rechargée en cours de partie sans suivi gardé : on suit la partie à partir d'ici.
+    const reprise = !suivi && v.etat !== 'salon' && v.etat !== 'finPartie';
+    if (enJeu && (nouvelle || reprise)) {
+      suivi = { code: v.code, le: Date.now(), avecRobots: v.joueurs.some((j) => j.robot && !j.remplace), publique: !!v.publique, guidee: v.robots === 'gentils', katapss: 0, premierSorti: 0, manches: {} };
+      stock.ecrire('kopo-suivi', suivi);
     }
     if (!suivi || suivi.fini || !v.manche) return;
     if ((v.etat === 'finManche' || v.etat === 'finPartie') && !suivi.manches[v.numeroManche]) {
@@ -6176,9 +6274,11 @@ var qrcode = function() {
       const q = v.manche.qualifies;
       if (q.some((x) => x.joueur === v.moi && x.raison === 'Katapss')) suivi.katapss++;
       if (q.length && q[0].joueur === v.moi) suivi.premierSorti++;
+      stock.ecrire('kopo-suivi', suivi);
     }
     if (v.etat === 'finPartie') {
       suivi.fini = true;
+      stock.effacer('kopo-suivi');
       try {
         const p = lireProfil();
         const e = R.bilanPartie(v, suivi);
@@ -7199,7 +7299,66 @@ var qrcode = function() {
     try { configServeur = await (await fetch(SERVEUR + '/api/config')).json(); } catch (e) {}
     return configServeur;
   }
-  if (MODE_SERVEUR) lireConfig(); // messages du chat, connexion Google…
+  if (MODE_SERVEUR) lireConfig().then((c) => { messagesServeur(c); setTimeout(verifierRemiseAFlot, 2500); }); // messages du chat, connexion Google, annonce, maintenance…
+
+  // Annonce à tous les joueurs (tableau de bord) : une fenêtre au démarrage, une seule fois par texte.
+  // Maintenance : fenêtre bloquante sans bouton pour fermer ; le jeu revérifie toutes les 30 s
+  // et quand on revient dans l'appli, et se rouvre tout seul quand la maintenance est levée.
+  let verifMaintenance = null;
+  // Version de l'application : à augmenter quand le serveur exige la nouvelle page (« Version minimale » du tableau de bord).
+  const VERSION_APP = '1.1';
+  const versionPlusVieille = (a, b) => {
+    const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number);
+    for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d < 0; }
+    return false;
+  };
+  function messagesServeur(cfg) {
+    if (!cfg) return;
+    $('voileVersion').hidden = !(cfg.versionMin && versionPlusVieille(VERSION_APP, cfg.versionMin));
+    const enMaintenance = typeof cfg.maintenance === 'string' && cfg.maintenance.trim() !== '';
+    $('voileMaintenance').hidden = !enMaintenance;
+    if (enMaintenance) {
+      $('texteMaintenance').textContent = cfg.maintenance;
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+      if (!verifMaintenance) verifMaintenance = setInterval(relireConfig, 30e3);
+    } else if (verifMaintenance) { clearInterval(verifMaintenance); verifMaintenance = null; }
+    const annonce = typeof cfg.annonce === 'string' ? cfg.annonce.trim() : '';
+    if (annonce && stock.lire('kopo-annonce-vue') !== annonce && $('voileAnnonce').hidden) {
+      $('texteAnnonce').textContent = annonce;
+      $('voileAnnonce').hidden = false;
+    }
+  }
+  async function relireConfig() {
+    if (!MODE_SERVEUR) return;
+    try { const c = await (await fetch(SERVEUR + '/api/config', { cache: 'no-store' })).json(); configServeur = c; messagesServeur(c); } catch (e) {}
+  }
+  $('btnAnnonceOk').onclick = () => { stock.ecrire('kopo-annonce-vue', $('texteAnnonce').textContent); $('voileAnnonce').hidden = true; };
+  $('btnMaintenanceReessayer').onclick = relireConfig;
+  $('btnVersionMaj').onclick = () => rechargerSansCache();
+
+  // Remise à flot : sous le seuil du tableau de bord (20 pièces), le serveur remonte le solde à 100, une fois par jour.
+  // Proposée sur l'accueil seulement, jamais en pleine partie.
+  let remiseEnCours = false;
+  async function verifierRemiseAFlot() {
+    if (!MODE_SERVEUR || remiseEnCours || !compteEnLigne()) return;
+    const cfg = configServeur;
+    if (!cfg || typeof cfg.remiseAFlot !== 'number' || soldeAffiche() >= cfg.remiseAFlot) return;
+    if ($('ecranAccueil').hidden || stock.lire('kopo-remise-a-flot') === jourLocal()) return;
+    remiseEnCours = true;
+    try {
+      const r = await apiJoueur('/remise-a-flot', 'POST');
+      stock.ecrire('kopo-remise-a-flot', jourLocal());
+      if (r && r.ok) {
+        soldeServeur(r.solde);
+        const corps = el('div', 'bonus-jour');
+        corps.append(el('h2', null, 'Remise à flot'), el('p', null, `Tu étais presque à sec : ton solde remonte à ${formatPieces(r.solde)} pièces. C'est possible une fois par jour.`));
+        const ok = el('button', 'btn principal large', 'Merci !');
+        ok.onclick = fermerFenetre;
+        if ($('voile').hidden) ouvrirFenetre([corps, ok]); else toast(`Remise à flot : ${formatPieces(r.solde)} pièces.`);
+      }
+    } catch (e) {} finally { remiseEnCours = false; }
+  }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) relireConfig(); });
   async function dessinerConnexionGoogle(zone) {
     const ligneG = (texte, aide, controle) => { const l = el('div', 'reglage-ligne'), s2 = el('span', null, texte); if (aide) s2.append(el('small', null, aide)); l.append(s2, controle); zone.replaceChildren(l); return l; };
     ligneG('Connexion Google', 'Bientôt : pour garder tes pièces sur tous tes téléphones', iconeCadenas()).classList.add('bientot');
@@ -7461,14 +7620,14 @@ var qrcode = function() {
       else statsZ.append(grille([[s.parties, 'Parties jouées'], [s.victoires, 'Victoires'], [taux(s.victoires, s.parties), 'Taux de victoire'], [s.finales, 'Finales atteintes'], [s.manchesSurvecues, 'Manches survécues'], [s.katapss, 'Katapss'], [s.eliminePremier, 'Éliminé en premier']]));
       statsZ.append(el('h3', null, 'Entraînement (robots)'));
       statsZ.append(en.parties ? grille([[en.parties, 'Parties'], [en.victoires, 'Victoires'], [taux(en.victoires, en.parties), 'Taux de victoire']]) : el('p', 'muted', 'Aucune partie contre les robots pour l\'instant.'));
-      if (!rivaux.length) return;
+      // Deux lignes seulement : celui que tu as le plus battu, et celui qui t'a le plus battu.
       statsZ.append(el('h3', null, 'Rivaux'));
       const victime = rivaux.filter((r) => r.gagnes).sort((a, b) => b.gagnes - a.gagnes)[0];
       const bete = rivaux.filter((r) => r.perdus).sort((a, b) => b.perdus - a.perdus)[0];
       const ligneR = (a, b) => { const l = el('div', 'rival-ligne'); l.append(el('span', null, a), el('small', null, b)); statsZ.append(l); };
       if (victime) ligneR('Ta victime : ' + victime.pseudo, 'battu ' + victime.gagnes + ' fois');
       if (bete) ligneR('Ta bête noire : ' + bete.pseudo, 't\'a battu ' + bete.perdus + ' fois');
-      for (const r of rivaux.slice().sort((a, b) => (b.gagnes + b.perdus) - (a.gagnes + a.perdus)).slice(0, 5)) ligneR(r.pseudo, 'Toi ' + r.gagnes + ' – ' + r.perdus);
+      if (!victime && !bete) statsZ.append(el('p', 'muted', 'Joue contre d\'autres joueurs pour voir tes rivaux ici.'));
     };
     dessinerStats(s, en, Object.values(p.rivaux || {}));
     if (MODE_SERVEUR && c) apiJoueur('/statistiques').then((srv) => {

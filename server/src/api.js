@@ -1,6 +1,7 @@
 // API des joueurs (application web et mobile).
 'use strict';
 const express = require('express');
+const { DEBLOCAGE } = require('./salle-kopo');
 
 const MOTIFS = ['pseudo', 'insultes', 'triche', 'abandon', 'autre'];
 const enveloppe = (fn) => (req, res) => fn(req, res).catch((e) => res.status(e.statut || 500).json({ erreur: e.statut ? e.message : 'Erreur du serveur.' }) && (e.statut || console.error(e)));
@@ -32,7 +33,7 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours,
   }
   r.get('/config', (req, res) => {
     const t = reglages.tout();
-    res.json({ annonce: t.annonce.active ? t.annonce.texte : null, maintenance: t.maintenance.active ? t.maintenance.message : null, versionMin: t.versionMin, tables: t.tables, messages: t.messagesRapides,
+    res.json({ annonce: t.annonce.active ? t.annonce.texte : null, maintenance: t.maintenance.active ? t.maintenance.message : null, versionMin: t.versionMin, tables: t.tables, deblocage: DEBLOCAGE, pot: t.pot, remiseAFlot: t.remiseAFlot.seuil, messages: t.messagesRapides,
       // Connexion Google : active quand CONNEXION_GOOGLE=1 et que Google est activé dans Supabase.
       google: process.env.CONNEXION_GOOGLE === '1' && process.env.SUPABASE_URL ? origineSupabase(process.env.SUPABASE_URL) : null });
   });
