@@ -34,6 +34,7 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours,
   r.get('/config', (req, res) => {
     const t = reglages.tout();
     res.json({ annonce: t.annonce.active ? t.annonce.texte : null, maintenance: t.maintenance.active ? t.maintenance.message : null, versionMin: t.versionMin, tables: t.tables, deblocage: DEBLOCAGE, pot: t.pot, remiseAFlot: t.remiseAFlot.seuil, messages: t.messagesRapides,
+      nouveaute: t.nouveaute && t.nouveaute.bande ? 'bande' : null, // fenêtre « Nouveau : Match du jour et Bande »
       // Connexion Google : active quand CONNEXION_GOOGLE=1 et que Google est activé dans Supabase.
       google: process.env.CONNEXION_GOOGLE === '1' && process.env.SUPABASE_URL ? origineSupabase(process.env.SUPABASE_URL) : null });
   });
