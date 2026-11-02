@@ -285,13 +285,11 @@
 
   function demarrerManche(s) {
     const sieges = K.melanger(s.restants, s.rng);
-    const paquet = K.melanger(K.nouveauPaquet(), s.rng);
-    const mains = {};
-    sieges.forEach((j, i) => (mains[j] = paquet.slice(i * 4, i * 4 + 4)));
+    const { mains, redistributions } = K.distribuer(sieges, s.rng);
     const premier = sieges[Math.floor(s.rng() * sieges.length)];
     s.numeroManche++;
     s.suiteA = null;
-    s.manche = K.nouvelleManche(sieges, mains, premier);
+    s.manche = K.nouvelleManche(sieges, mains, premier, redistributions);
     s.etat = 'manche';
     // Compte à rebours : chacun découvre ses cartes et qui commence.
     s.pause = s.durees.depart > 0 ? { type: 'depart', jusqua: s.horloge() + s.durees.depart, total: s.durees.depart } : null;
@@ -536,6 +534,7 @@
         qualifies: m.qualifies.map((q) => ({ joueur: q.joueur, raison: q.raison })),
         elimine: m.elimine,
         journal: journalLisible(s, m),
+        redistributions: (m.redistributions || []).map((r) => ({ joueur: r.joueur, main: r.main.slice() })),
         main: m.mains[id] ? m.mains[id].slice() : [],
         actions: s.pause ? [] : K.actionsPossibles(m, id).map((a) => ({ type: a.type, carte: a.carte })),
       };

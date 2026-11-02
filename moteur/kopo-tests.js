@@ -267,6 +267,28 @@ test('En duel ou en finale, 4 cartes de la même couleur restent un Katapss', ()
   assert.deepStrictEqual(m.katapss, ['A']);
 });
 
+test('Duel ou finale : une main dont la plus forte carte est un 4 est annoncée et on redistribue', () => {
+  let vu = 0;
+  for (let g = 1; g <= 3000; g++) {
+    const { mains, redistributions } = K.distribuer(['A', 'B'], K.hasard(g));
+    for (const j of ['A', 'B']) assert.notStrictEqual(K.typeKatapss(mains[j], 3), 'petite', 'aucune main finale à 4 maximum');
+    for (const r of redistributions) {
+      vu++;
+      assert.strictEqual(Math.max(...r.main.map(K.valeur)), 4);
+    }
+    if (redistributions.length) {
+      const m = K.nouvelleManche(['A', 'B'], mains, 'A', redistributions);
+      assert.ok(m.journal[0].startsWith('Redistribution : la plus forte carte de '));
+      assert.strictEqual(m.redistributions.length, redistributions.length);
+    }
+  }
+  assert.ok(vu > 0, 'le cas se présente sur 3 000 donnes');
+});
+
+test('À 3 joueurs et plus : jamais de redistribution', () => {
+  for (let g = 1; g <= 2000; g++) assert.strictEqual(K.distribuer(['A', 'B', 'C'], K.hasard(g)).redistributions.length, 0);
+});
+
 console.log('\nParties complètes (simulation)');
 
 test('1 000 parties à 9 joueurs se terminent toutes avec 8 éliminés et 1 vainqueur', () => {
