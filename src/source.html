@@ -244,7 +244,7 @@ details.rappel summary { cursor: pointer; font-weight: 600; }
 /* Partie en paysage : les joueurs autour d'une table ovale, ta main en bas. */
 @media (orientation: landscape) {
   body.en-jeu { overflow: hidden; }
-  body.en-jeu .app { max-width: none; height: 100vh; height: 100dvh; padding: 0; display: block; position: relative; }
+  body.en-jeu .app { max-width: none; height: 100vh; height: 100dvh; padding: 0; display: block; position: relative; overflow: hidden; } /* un siège au bord ne fait pas déborder l'écran */
   body.en-jeu header { position: absolute; top: 0; left: 0; right: 0; z-index: 3; padding: 6px max(10px, env(safe-area-inset-right)) 0 max(10px, env(safe-area-inset-left)); pointer-events: none; }
   body.en-jeu header > * { pointer-events: auto; }
   body.en-jeu #btnPleinEcranEntete:not([hidden]) { display: inline-block; }
@@ -408,7 +408,7 @@ body.accueil .app { max-width: none; min-height: 100vh; min-height: 100dvh; padd
 .serie span { width: 22px; height: 6px; border-radius: 3px; background: var(--line); }
 .serie span.ok { background: var(--brass); }
 .note-essai { color: var(--muted); font-size: 12px; }
-@media (max-width: 420px) { .bourse-txt small, .profil-champ small { display: none; } .profil-champ input { width: 96px; } .hub-haut .logo { font-size: 30px; } }
+@media (max-width: 420px) { .bourse-txt small, .profil-champ small { display: none; } .profil-champ input { width: 96px; max-width: 100%; } .hub-haut .logo { font-size: 30px; } .hub-haut { gap: 8px; } .profil, .profil-champ { min-width: 0; } } /* le pseudo rétrécit plutôt que de dépasser à droite */
 .modes { flex: 1; min-width: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-content: center; }
 .mode { position: relative; border: 0; border-radius: 14px; padding: 10px 8px; min-height: 0; aspect-ratio: 5 / 7; display: grid; justify-items: center; align-content: center; gap: 6px; text-align: center; color: #fff; font: inherit;
   background: radial-gradient(ellipse at 50% 30%, var(--table-2), var(--table) 80%); border: 1.5px solid rgba(226,176,74,.6); box-shadow: inset 0 0 0 4px var(--table), inset 0 0 0 5px rgba(226,176,74,.22), 0 8px 18px rgba(0,0,0,.45); transition: transform .12s ease, box-shadow .12s ease; }
@@ -813,6 +813,38 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
 .palier .case .ico-k.gris { width: 18px; height: 18px; margin-left: auto; }
 .parcours-recap { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; align-items: center; font-size: 13px; margin-top: 6px; }
 .parcours-recap b { color: var(--brass); }
+/* Fenêtres quand le téléphone est couché : le bouton principal reste visible sans défiler. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .voile { padding: 8px; }
+  .fenetre { padding: 12px 18px; gap: 8px; max-height: calc(100vh - 16px); max-height: calc(100dvh - 16px); width: min(600px, 100%); }
+  .fenetre h2 { font-size: 26px; }
+  .fenetre p { margin: 0; }
+  /* Bonus du jour et Tes pièces : la pièce et le gain côte à côte */
+  .bonus-jour { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; column-gap: 14px; row-gap: 6px; }
+  .bonus-jour > * { flex-basis: 100%; display: flex; justify-content: center; }
+  .bonus-jour > .piece, .bonus-jour > .gain { flex-basis: auto; }
+  .bonus-jour > .piece { width: 52px; height: 52px; font-size: 30px; }
+  .bonus-jour > .gain { font-size: 40px; }
+  .bonus-jour .joker-etat { font-size: 12px; }
+  /* Contre les robots : les 8 nombres sur une ligne, partie guidée et Annuler côte à côte */
+  .choix-niveau-robots button { padding: 7px 6px; }
+  .choix-robots { grid-template-columns: repeat(8, 1fr); gap: 6px; }
+  .choix-robots .btn { font-size: 18px; padding: 9px 0; }
+  #voileRobots .fenetre { grid-template-columns: 1fr 1fr; column-gap: 8px; }
+  #voileRobots .fenetre > * { grid-column: 1 / -1; }
+  #voileRobots .fenetre > .btn.large { grid-column: auto; padding: 10px; font-size: 15px; }
+  #voileRobots #btnGuidee[hidden] + #btnFermerRobots { grid-column: 1 / -1; }
+  /* En ligne : cartes 5 et 9 plus basses, autres tailles plus compactes */
+  .salles-vedette .btn { padding: 7px 6px; grid-template-columns: auto auto; column-gap: 10px; align-items: center; justify-content: center; }
+  .salles-vedette .btn .gros { font-size: 34px; grid-row: span 2; }
+  .salles-vedette .btn b { font-size: 22px; }
+  .choix-salles { grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 6px; }
+  .choix-salles .btn { padding: 6px 4px; }
+  .choix-salles .btn b { font-size: 15px; }
+  .choix-salles .btn small { font-size: 11px; }
+  #voileSalles .btn.large { padding: 10px; font-size: 15px; }
+}
+
 </style>
 </head>
 <body>
