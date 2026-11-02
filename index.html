@@ -5011,8 +5011,10 @@ var qrcode = function() {
 
   // ------------------------------------------------------------------ paramètres
   // Réglages du joueur, gardés sur le téléphone (plus tard : rattachés au compte).
-  const VERSION = '1.0-essai';
-  const BUILD = '864f4ceb5862'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
+  // (« Version minimale » du tableau de bord).
+  const VERSION = '1.1';
+  const BUILD = 'b72d3a25266e'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
@@ -7367,8 +7369,6 @@ var qrcode = function() {
   // Maintenance : fenêtre bloquante sans bouton pour fermer ; le jeu revérifie toutes les 30 s
   // et quand on revient dans l'appli, et se rouvre tout seul quand la maintenance est levée.
   let verifMaintenance = null;
-  // Version de l'application : à augmenter quand le serveur exige la nouvelle page (« Version minimale » du tableau de bord).
-  const VERSION_APP = '1.1';
   const versionPlusVieille = (a, b) => {
     const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number);
     for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d < 0; }
@@ -7376,7 +7376,7 @@ var qrcode = function() {
   };
   function messagesServeur(cfg) {
     if (!cfg) return;
-    $('voileVersion').hidden = !(cfg.versionMin && versionPlusVieille(VERSION_APP, cfg.versionMin));
+    $('voileVersion').hidden = !(cfg.versionMin && versionPlusVieille(VERSION, cfg.versionMin));
     const enMaintenance = typeof cfg.maintenance === 'string' && cfg.maintenance.trim() !== '';
     $('voileMaintenance').hidden = !enMaintenance;
     if (enMaintenance) {
