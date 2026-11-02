@@ -198,10 +198,11 @@ function creerComptes(base, reglages) {
       });
     },
 
-    // Récompenses calculées sur le téléphone (missions du jour, défi de la semaine, bienvenue 7 jours).
+    // Récompenses calculées sur le téléphone (missions du jour, défi de la semaine, bienvenue 7 jours,
+    // cadeau d'installation : une seule fois par compte, au premier lancement depuis l'icône).
     // Le serveur ne peut pas tout vérifier : il plafonne (montant, nombre par jour / semaine) et refuse les doublons.
     async recompense(id, { motif, montant, ref }) {
-      const L = { mission: { max: 100, parJour: 5 }, defi: { max: 300, parSemaine: 1 }, bienvenue: { max: 300, parJour: 1, total: 7 } }[motif];
+      const L = { mission: { max: 100, parJour: 5 }, defi: { max: 300, parSemaine: 1 }, bienvenue: { max: 300, parJour: 1, total: 7 }, installation: { max: 200, total: 1 } }[motif];
       montant = Math.trunc(Number(montant));
       if (!L) throw Object.assign(new Error('Récompense inconnue.'), { statut: 400 });
       if (!(montant > 0 && montant <= L.max)) throw Object.assign(new Error('Montant invalide.'), { statut: 400 });

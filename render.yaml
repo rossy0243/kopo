@@ -33,11 +33,11 @@ services:
         value: https://rossy0243.github.io,https://kopo-d655.onrender.com,capacitor://localhost,https://localhost
 
   # Page du jeu (remplace GitHub Pages, pour pouvoir passer le dépôt en privé).
-  # Seuls la page, le manifeste, les icônes et les pages légales sont publiés (pas le code du serveur).
+  # Seuls la page, le manifeste, le service worker, les icônes et les pages légales sont publiés (pas le code du serveur).
   - type: web
     name: kopo
     runtime: static
-    buildCommand: node build.js && rm -rf _site && mkdir _site && cp -r index.html manifest.webmanifest icons legal _site/
+    buildCommand: node build.js && rm -rf _site && mkdir _site && cp -r index.html manifest.webmanifest sw.js icons legal _site/
     staticPublishPath: _site
     autoDeploy: true
     envVars:
