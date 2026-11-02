@@ -44,10 +44,11 @@ Les tables sont créées toutes seules au premier démarrage (`src/schema.sql`).
 | `POST /api/bonus-du-jour`, `POST /api/remise-a-flot`, `GET /api/pieces` | Pièces (bonus du jour avec joker de série hebdomadaire) |
 | `POST /api/recompense`, `POST /api/cadeau-fondateur` | Pièces des missions, du défi et de la bienvenue gagnées sur le téléphone (plafonnées, sans doublon) ; dos « Les Fondateurs » (tant que la case est cochée dans Pilotage) |
 | `POST /api/signaler`, `GET/POST/DELETE /api/bloques`, `GET/POST/DELETE /api/amis` | Entre joueurs |
+| `POST /api/amis { cible }`, `GET /api/amis/demandes`, `POST /api/amis/demandes/:id/accepter\|refuser`, `DELETE /api/amis/demandes/:id` | Demandes d'ami : ajouter envoie une demande que l'autre accepte (amis des deux côtés) ou refuse (il n'est pas prévenu, et ne peut pas redemander pendant 7 jours). Si l'autre m'avait déjà demandé, on devient amis tout de suite. 30 demandes par jour au plus. Retirer un ami le retire des deux côtés |
 | `POST /api/reprendre` | Reprendre sa place avec le code de la salle (`{ code }`) après une page fermée ou une coupure, même partie commencée : renvoie une réservation de place (`consumeSeatReservation`), 404 si on n'est pas à cette table |
 | `GET /api/en-ligne` | Joueurs connectés et salles publiques ouvertes (`classee` : la salle compte pour la ligue) |
 | `GET /api/rivaux` | Mes face-à-face (qui finit devant l'autre dans les parties jouées ensemble) |
-| `GET /api/notifications`, `POST /api/notifications/lues` | Notifications dans le jeu : rivalité, invitation d'un ami, nouvel ami. Chaque type se coupe avec `PATCH /api/moi { notifs: { rivalite: false } }` |
+| `GET /api/notifications`, `POST /api/notifications/lues` | Notifications dans le jeu : rivalité, invitation d'un ami, demande d'ami (et demande acceptée) ; `demandesAmi` = demandes reçues en attente. Chaque type se coupe avec `PATCH /api/moi { notifs: { rivalite: false } }` |
 | `POST /api/amis/:id/inviter` | Inviter un ami à sa table (`{ code }`) : 1 fois par ami toutes les 2 min, 15 par heure |
 | `GET /api/parcours`, `POST /api/parcours/recuperer` | Parcours de saison : XP, 30 paliers (voie gratuite et voie Kopo+), récupérer un palier `{ palier, voie: 'gratuit'\|'plus' }` |
 | `GET /api/collection`, `POST /api/collection/equiper` | Apparences possédées et équipées (avatar, dos de cartes, cadre) |

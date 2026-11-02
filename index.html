@@ -758,6 +758,12 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
 .notif-carte .ico { font-size: 44px; color: var(--brass); }
 .liste-amis-inviter li { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .liste-amis-inviter .en-ligne { color: var(--good); font-size: 12px; }
+/* Demandes d'ami reçues : pastille rouge avec le nombre (Paramètres, Mes amis). */
+[data-demandes] { position: relative; }
+[data-demandes]::after { content: attr(data-demandes); position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box; border-radius: 9px; background: var(--bad); color: #fff; font: 700 11px/18px var(--body); text-align: center; pointer-events: none; }
+.demandes-ami h3 { margin: 4px 0; font-size: 14px; }
+.demandes-ami .actions { display: flex; gap: 6px; flex-shrink: 0; }
+.demandes-ami li > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 /* Apparences des pays (catalogue du serveur ; identifiants à l'ancien nom de ville). */
 .avatar.av-lubumbashi { background: linear-gradient(160deg, #e39b5b, #b87333 55%, #5a2e0e); color: #fff; }
 .avatar.av-abidjan { background: linear-gradient(90deg, #f77f00 0 33%, #fff 33% 66%, #009e60 66%); color: #1d1606; }
@@ -5143,7 +5149,7 @@ var qrcode = function() {
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = '3e3732c6f140'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = '5d333cca623b'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
@@ -6813,7 +6819,8 @@ var qrcode = function() {
     if (compteLocal()) {
       const c = compteLocal();
       ligne('Ton identifiant', 'À donner à tes amis', el('b', null, c.compte.pseudo + '#' + c.compte.numero));
-      const amis = el('button', 'btn', 'Mes amis'); amis.onclick = ouvrirAmis;
+      const amis = el('button', 'btn', 'Mes amis'); amis.onclick = ouvrirAmis; amis.dataset.mesAmis = '';
+      setTimeout(() => majPastilleAmis(), 0);
       const bl = el('button', 'btn', 'Joueurs bloqués'); bl.onclick = ouvrirBloques;
       z.append(amis, bl);
     }
@@ -7035,6 +7042,7 @@ var qrcode = function() {
     if (!MODE_SERVEUR || !compteLocal() || $('ecranAccueil').hidden || !$('voile').hidden) return;
     let n;
     try { n = await apiJoueur('/notifications'); } catch (e) { return; }
+    if (typeof n.demandesAmi === 'number') majPastilleAmis(n.demandesAmi);
     const nonLues = n.liste.filter((x) => !x.lue && !notifsVues.has(x.id)).reverse(); // de la plus ancienne à la plus récente
     const a = nonLues.find((x) => x.type === 'invitation' && Date.now() - new Date(x.cree_le) < 10 * 60e3) || nonLues[0]; // une invitation passe devant
     if (!a || $('ecranAccueil').hidden || !$('voile').hidden) return;
@@ -7066,10 +7074,23 @@ var qrcode = function() {
       const voir = el('button', 'btn principal large', 'Inviter d\'autres amis');
       voir.onclick = () => ouvrirParrainage();
       boutons.push(voir, fermer());
+    } else if (a.type === 'ami' && d.demande) {
+      // Demande d'ami : accepter ou refuser (« Plus tard » la laisse dans Paramètres → Mes amis).
+      z.append(icone('i-creer'), el('h2', null, a.texte), el('p', null, d.pseudo + '#' + d.numero), el('small', 'muted', 'Vous pourrez vous inviter à vos tables et vous comparer dans la ligue.'));
+      const suite = () => { fermerFenetre(); setTimeout(lireNotifications, 400); };
+      const oui = el('button', 'btn principal large', 'Accepter');
+      oui.onclick = async () => { try { await repondreDemande(d.de, true); toast(d.pseudo + ' est dans tes amis.'); } catch (e) { toast(e.message); } suite(); };
+      const non = el('button', 'btn large', 'Refuser');
+      non.onclick = async () => { try { await repondreDemande(d.de, false); toast('Demande refusée.'); } catch (e) { toast(e.message); } suite(); };
+      boutons.push(oui, non, fermer('Plus tard'));
+    } else if (a.type === 'ami' && d.accepte) {
+      z.append(icone('i-creer'), el('h2', null, a.texte), el('small', 'muted', 'Invite-le à ta table depuis le salon d\'une partie.'));
+      boutons.push(fermer());
     } else if (a.type === 'ami') {
+      // Ancienne notification (« t'a ajouté en ami », d'avant les demandes).
       z.append(icone('i-creer'), el('h2', null, a.texte));
       const aj = el('button', 'btn principal large', 'L\'ajouter aussi');
-      aj.onclick = async () => { try { await apiJoueur('/amis', 'POST', { cible: d.pseudo + '#' + d.numero }); toast('Ami ajouté.'); } catch (e) { toast(e.message); } fermerFenetre(); setTimeout(lireNotifications, 400); };
+      aj.onclick = async () => { try { toastAjoutAmi(await apiJoueur('/amis', 'POST', { cible: d.pseudo + '#' + d.numero }), d.pseudo); } catch (e) { toast(e.message); } fermerFenetre(); setTimeout(lireNotifications, 400); };
       boutons.push(aj, fermer('Plus tard'));
     } else return;
     ouvrirFenetre([z, ...boutons]);
@@ -7336,7 +7357,7 @@ var qrcode = function() {
       contenu.push(el('p', null, 'Amis, blocage et signalement arrivent avec les comptes en ligne.'));
     } else {
       const ami = el('button', 'btn principal large', 'Ajouter en ami');
-      ami.onclick = async () => { try { await apiJoueur('/amis', 'POST', { cible: id }); toast((nomJoueur || 'Ce joueur') + ' est dans tes amis.'); retour(); } catch (e) { toast(e.message); } };
+      ami.onclick = async () => { try { toastAjoutAmi(await apiJoueur('/amis', 'POST', { cible: id }), nomJoueur); retour(); } catch (e) { toast(e.message); } };
       const estBloque = bloques.has(id);
       const bloquer = el('button', 'btn large', estBloque ? 'Débloquer' : 'Bloquer');
       bloquer.onclick = async () => {
@@ -7368,14 +7389,48 @@ var qrcode = function() {
     ouvrirFenetre(contenu);
   }
 
+  // Demande d'ami : « Demande envoyée », ou ami tout de suite s'il m'avait déjà demandé.
+  function toastAjoutAmi(r, nom) {
+    nom = (r && r.ami && r.ami.pseudo) || nom || 'Ce joueur';
+    toast(r && r.etat === 'ami' ? nom + ' est dans tes amis.' : 'Demande envoyée à ' + nom + '. Il doit l\'accepter.');
+  }
+  // Pastille rouge sur Paramètres (et « Mes amis ») tant qu'une demande d'ami attend une réponse.
+  let demandesAmi = 0;
+  function majPastilleAmis(n) {
+    if (n != null) demandesAmi = n;
+    for (const b of [$('btnParametres'), $('btnParametresAccueil'), document.querySelector('[data-mes-amis]')]) {
+      if (!b) continue;
+      if (demandesAmi > 0) b.dataset.demandes = String(demandesAmi); else delete b.dataset.demandes;
+    }
+  }
+  async function repondreDemande(id, accepter) {
+    await apiJoueur('/amis/demandes/' + encodeURIComponent(id) + '/' + (accepter ? 'accepter' : 'refuser'), 'POST');
+    majPastilleAmis(Math.max(0, demandesAmi - 1));
+  }
+
   async function ouvrirAmis() {
     const liste = el('ul', 'liste-k');
+    const demandes = el('div', 'demandes-ami');
     const champ = el('input', 'texte'); champ.placeholder = 'Pseudo#1234'; champ.setAttribute('aria-label', 'Pseudo et numéro de ton ami');
     const ajouter = el('button', 'btn principal', 'Ajouter');
     const dessiner = async () => {
       liste.replaceChildren(el('li', null, 'Chargement…'));
       try {
-        const [amis, rivaux] = await Promise.all([apiJoueur('/amis'), apiJoueur('/rivaux').catch(() => [])]);
+        const [amis, rivaux, dm] = await Promise.all([apiJoueur('/amis'), apiJoueur('/rivaux').catch(() => []), apiJoueur('/amis/demandes').catch(() => ({ recues: [], envoyees: [] }))]);
+        majPastilleAmis(dm.recues.length);
+        demandes.replaceChildren();
+        if (dm.recues.length) {
+          const ul = el('ul', 'liste-k');
+          for (const d of dm.recues) {
+            const li = el('li'), act = el('span', 'actions');
+            const oui = el('button', 'btn principal', 'Accepter'), non = el('button', 'btn', 'Refuser');
+            oui.onclick = async () => { try { await repondreDemande(d.id, true); toast(d.pseudo + ' est dans tes amis.'); dessiner(); } catch (e) { toast(e.message); dessiner(); } };
+            non.onclick = async () => { try { await repondreDemande(d.id, false); dessiner(); } catch (e) { toast(e.message); dessiner(); } };
+            act.append(oui, non);
+            li.append(el('span', null, d.pseudo + '#' + d.numero), act); ul.append(li);
+          }
+          demandes.append(el('h3', null, dm.recues.length > 1 ? `${dm.recues.length} demandes d'ami` : 'Demande d\'ami'), ul);
+        }
         liste.replaceChildren();
         if (!amis.length) liste.append(el('li', null, 'Pas encore d\'amis. Ajoute-les avec leur pseudo#numéro.'));
         for (const a of amis) {
@@ -7388,9 +7443,16 @@ var qrcode = function() {
           x.onclick = async () => { try { await apiJoueur('/amis/' + encodeURIComponent(a.id), 'DELETE'); dessiner(); } catch (e) { toast(e.message); } };
           li.append(t, x); liste.append(li);
         }
+        for (const d of dm.envoyees) {
+          const li = el('li');
+          const t = el('span', null, d.pseudo + '#' + d.numero + ' '); t.append(el('small', null, '· demande envoyée'));
+          const x = el('button', 'btn', 'Annuler');
+          x.onclick = async () => { try { await apiJoueur('/amis/demandes/' + encodeURIComponent(d.id), 'DELETE'); dessiner(); } catch (e) { toast(e.message); } };
+          li.append(t, x); liste.append(li);
+        }
       } catch (e) { liste.replaceChildren(el('li', null, e.message)); }
     };
-    ajouter.onclick = async () => { try { await apiJoueur('/amis', 'POST', { cible: champ.value.trim() }); champ.value = ''; dessiner(); } catch (e) { toast(e.message); } };
+    ajouter.onclick = async () => { try { toastAjoutAmi(await apiJoueur('/amis', 'POST', { cible: champ.value.trim() })); champ.value = ''; dessiner(); } catch (e) { toast(e.message); } };
     const ligne = el('div', 'lien'); ligne.append(champ, ajouter);
     const c = compteLocal();
     const moi = el('p', null, 'Ton identifiant à donner à tes amis : ');
@@ -7400,7 +7462,7 @@ var qrcode = function() {
     const f = el('button', 'btn large', 'Fermer'); f.onclick = () => ouvrirParametres();
     const parrainer = el('button', 'btn principal large', 'Inviter et gagner des pièces');
     parrainer.onclick = () => ouvrirParrainage(ouvrirAmis);
-    ouvrirFenetre([el('h2', null, 'Mes amis'), moi, ligne, liste, parrainer, inviter, f]);
+    ouvrirFenetre([el('h2', null, 'Mes amis'), demandes, moi, ligne, liste, parrainer, inviter, f]);
     dessiner();
   }
 
