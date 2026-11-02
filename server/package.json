@@ -13,14 +13,22 @@
     "charge": "node tests/charge.js"
   },
   "dependencies": {
+    "@colyseus/core": "^0.16.26",
+    "@colyseus/redis-driver": "^0.16.1",
+    "@colyseus/redis-presence": "^0.16.4",
+    "@colyseus/schema": "^3.0.76",
     "@colyseus/ws-transport": "^0.16.5",
     "colyseus": "^0.16.5",
     "express": "^4.22.3",
     "jose": "^6.2.14",
+    "nanoid": "file:vendor/nanoid",
     "pg": "^8.23.1"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.14",
     "colyseus.js": "^0.16.22"
+  },
+  "overrides": {
+    "nanoid": "$nanoid"
   }
 }
