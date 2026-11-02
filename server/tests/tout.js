@@ -702,6 +702,14 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     await api('/admin/api/reglages/annonce', { methode: 'PUT', jeton: adminJeton, corps: { valeur: { texte: 'Tournoi samedi !', active: true } } });
     assert.strictEqual((await api('/api/config')).json.annonce, 'Tournoi samedi !');
   });
+  await test('réglages : fenêtre « Nouveau » de la compétition, éteinte par défaut', async () => {
+    assert.strictEqual((await api('/api/config')).json.nouveaute, null);
+    await api('/admin/api/reglages/nouveaute', { methode: 'PUT', jeton: adminJeton, corps: { valeur: { bande: true, autre: '<b>' } } });
+    assert.strictEqual((await api('/api/config')).json.nouveaute, 'bande');
+    assert.deepStrictEqual((await api('/admin/api/reglages', { jeton: adminJeton })).json.nouveaute, { bande: true });
+    await api('/admin/api/reglages/nouveaute', { methode: 'PUT', jeton: adminJeton, corps: { valeur: { bande: false } } });
+    assert.strictEqual((await api('/api/config')).json.nouveaute, null);
+  });
   await test('chat : messages gérés dans l\'admin, les autres sont refusés en partie', async () => {
     const mauvais = await api('/admin/api/reglages/messagesRapides', { methode: 'PUT', jeton: adminJeton, corps: { valeur: ['x'.repeat(41)] } });
     assert.strictEqual(mauvais.statut, 400);

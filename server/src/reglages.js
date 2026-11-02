@@ -8,6 +8,8 @@ const DEFAUTS = {
   pot: { vainqueur: 50, deuxieme: 25, troisieme: 10, maison: 15 },
   tables: { bronze: 50, argent: 200, or: 1000, diamant: 5000 },
   annonce: { texte: '', active: false },
+  // Fenêtre « Nouveau » au premier lancement (annonce-competition.md) : éteinte tant qu'on n'ouvre pas la compétition.
+  nouveaute: { bande: false },
   maintenance: { active: false, message: 'Le Kopo est en maintenance. On revient très vite !' },
   versionMin: '1.0',
   // Messages du chat en partie : les joueurs ne peuvent envoyer que ceux-là (pas de texte libre, donc pas d'insultes).
@@ -147,6 +149,7 @@ function creerReglages(base) {
         valeur = { actif: valeur.actif !== false && valeur.actif !== 0, robots: valeur.robots, niveauRobots: n };
       }
       if (cle === 'bande') valeur = verifierBande(valeur);
+      if (cle === 'nouveaute') valeur = { bande: !!(valeur && valeur.bande === true) };
       if (cle === 'prochaineSaison') valeur = { nom: String(valeur.nom || '').replace(/[<>]/g, '').trim().slice(0, 40), theme: String(valeur.theme || '').replace(/[<>]/g, '').trim().slice(0, 40) };
       if (cle === 'pot') {
         const t = ['vainqueur', 'deuxieme', 'troisieme', 'maison'].reduce((s, k) => s + Number(valeur[k] || 0), 0);

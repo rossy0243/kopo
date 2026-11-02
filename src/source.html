@@ -748,6 +748,32 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
 .mj-bulles { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; text-align: left; counter-reset: b; }
 .mj-bulles li { counter-increment: b; display: grid; grid-template-columns: 30px 1fr; gap: 10px; align-items: start; background: rgba(255,255,255,.05); border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
 .mj-bulles li::before { content: counter(b); width: 28px; height: 28px; border-radius: 50%; background: var(--brass); color: #1d1606; display: grid; place-items: center; font-weight: 700; }
+/* Fenêtre « Nouveau » : Match du jour et Bande (annonce-competition.md v1.0), une seule fois */
+.fenetre[data-type="nouveaute"] { position: relative; text-align: center; border-color: rgba(226,176,74,.35); touch-action: pan-y; }
+.fenetre[data-type="nouveaute"] h2 { font-size: 42px; }
+.fenetre[data-type="nouveaute"] p b { color: var(--ink); }
+.nv-passer { position: absolute; top: 10px; right: 10px; background: none; border: 0; color: var(--muted); font-size: 13px; padding: 6px; }
+.nv-badge { justify-self: center; background: var(--red); color: #fff; font-weight: 800; font-size: 11px; letter-spacing: 2px; padding: 4px 10px; border-radius: 6px; }
+.nv-illu { background: rgba(0,0,0,.25); border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: grid; gap: 6px; }
+.nv-illu.gauche { text-align: left; }
+.nv-cases { font-size: 22px; letter-spacing: 2px; line-height: 1; }
+.nv-score { font: 400 34px/1 var(--display); color: var(--ink); }
+.nv-score small { font-size: 20px; color: var(--muted); }
+.nv-petit { font-size: 13px; color: var(--muted); }
+.nv-podium { display: grid; gap: 6px; text-align: left; }
+.nv-podium div { display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,.05); border-radius: 10px; padding: 8px 10px; font-size: 14px; color: var(--muted); }
+.nv-podium .e { font-size: 20px; width: 26px; text-align: center; flex: none; }
+.nv-podium b { color: var(--ink); }
+.nv-points { display: flex; gap: 6px; justify-content: center; }
+.nv-points i { width: 8px; height: 8px; border-radius: 4px; background: rgba(255,255,255,.2); transition: width .2s; }
+.nv-points i.on { background: var(--brass); width: 20px; }
+.nv-lien { background: none; border: 0; color: var(--muted); font-size: 14px; padding: 4px; }
+.badge-nouveau { position: absolute; top: -8px; right: 8px; background: var(--red); color: #fff; font: 800 10px/1 var(--body); letter-spacing: 1.5px; padding: 4px 7px; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,.4); pointer-events: none; }
+.mode-bande .badge-nouveau { background: var(--brass); color: #1d1606; }
+.rappel-bande { position: fixed; left: max(16px, env(safe-area-inset-left)); right: max(16px, env(safe-area-inset-right)); bottom: calc(76px + env(safe-area-inset-bottom)); z-index: 9; max-width: 440px; margin: 0 auto; display: flex; gap: 10px; align-items: center; text-align: left; border: 1px solid rgba(226,176,74,.45); background: #1b2f4a; border-radius: 12px; padding: 10px 12px; font-size: 13px; color: var(--ink); box-shadow: 0 8px 24px rgba(0,0,0,.5); }
+.rappel-bande .e { font-size: 22px; }
+.rappel-bande button.ouvrir { flex: 1; background: none; border: 0; color: inherit; text-align: left; padding: 0; font: inherit; }
+.rappel-bande button.x { background: none; border: 0; color: var(--muted); font-size: 16px; padding: 4px 6px; }
 .bande { display: grid; gap: 10px; }
 .bande-tete { display: grid; gap: 2px; text-align: center; }
 .bande-tete small { color: var(--muted); }
@@ -3253,6 +3279,8 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       $('bandeResume').textContent = !x ? 'Défie tes amis' : x.inscrit ? `${x.jeSuisChef ? '👑 ' : ''}${x.nom} · ${x.rang}e` : x.nom;
     } catch (e) {}
     proposerLienBande();
+    majBadgesNouveaute();
+    rappelBande();
   }
 
   // Sans Google : on explique pourquoi, et on propose de se connecter.
@@ -3350,6 +3378,120 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
     const f = el('button', 'btn large', 'Fermer'); f.onclick = () => { fermerFenetre(); majCartesCompetition(); };
     ouvrirFenetre([z, ...boutons, b, f]);
     majCartesCompetition();
+  }
+
+
+  // ----- Fenêtre « Nouveau » : Match du jour et Bande (annonce-competition.md v1.0)
+  // Une seule fois par appareil, sur l'accueil, quand le tableau de bord l'allume (réglage « nouveaute »).
+  // Pas pour les tout nouveaux joueurs (écran de bienvenue) ni pour ceux qui arrivent par un lien de Bande.
+  // Ensuite : badges NOUVEAU sur les deux cartes pendant 7 jours, et un seul rappel à J+2 si pas de Bande.
+  const NOUVEAUTE = 'bande';
+  const lireNouveaute = () => { const v = stock.lire('kopo-nouveaute-vue'); return v && v.id === NOUVEAUTE ? v : null; };
+  const ecrireNouveaute = (x) => stock.ecrire('kopo-nouveaute-vue', Object.assign({ id: NOUVEAUTE, le: Date.now() }, lireNouveaute() || {}, x));
+  const nouveauteAllumee = () => MODE_SERVEUR && !!(configServeur && configServeur.nouveaute === NOUVEAUTE);
+  const avecGoogle = () => { const c = compteLocal(); return !!(c && c.compte && c.compte.google); };
+  // Heure de Kinshasa (UTC+1) : jour de la semaine (0 = dimanche) et heure, pour les heures limites d'inscription.
+  function momentKinshasa() { const d = new Date(Date.now() + 36e5); return { jour: d.getUTCDay(), heure: d.getUTCHours() }; }
+  // 'normal' : on peut encore miser pour les 7 Matchs ; 'retard' : jusqu'au mercredi 23 h ; 'ferme' : on attend dimanche minuit.
+  function periodeInscription() {
+    const { jour, heure } = momentKinshasa();
+    if (jour === 0 || (jour === 1 && heure < 23)) return 'normal';
+    if (jour === 1 || jour === 2 || (jour === 3 && heure < 23)) return 'retard';
+    return 'ferme';
+  }
+  function annonceNouveaute() {
+    if (!nouveauteAllumee() || lireNouveaute()) return false;
+    if (stock.lire('kopo-bande-lien')) { ecrireNouveaute({ saute: true }); return false; } // il va directement dans sa Bande
+    ecrireNouveaute({});
+    stock.ecrire('kopo-jour-explique', true); // remplace les 3 bulles de la première fois
+    majBadgesNouveaute();
+    fenetreNouveaute(0);
+    return true;
+  }
+  function fenetreNouveaute(etape) {
+    const fermer = () => { fermerFenetre(); suiteAccueil(); };
+    const points = el('div', 'nv-points'); for (let i = 0; i < 3; i++) points.append(el('i', i === etape ? 'on' : null));
+    const suivant = () => fenetreNouveaute(etape + 1);
+    const p = (...morceaux) => { const x = el('p'); for (const m of morceaux) x.append(Array.isArray(m) ? el('b', null, m[0]) : m); return x; };
+    let contenu;
+    if (etape === 0) {
+      const illu = el('div', 'nv-illu'), sc = el('div', 'nv-score', '100'); sc.append(el('small', null, ' / 100'));
+      illu.append(el('div', 'nv-cases', '🟩🟩🟩🟩🟩🟩🟩🏆'), sc, el('div', 'nv-petit', '+10 par manche passée · +30 si tu gagnes la finale'));
+      contenu = [el('span', 'nv-badge', 'NOUVEAU'), el('h2', null, 'Le Match du jour'),
+        p(['Chaque jour, une partie contre 8 robots.'], ' La même pour tous les joueurs. ', ['Un seul essai.']),
+        illu, el('div', 'nv-petit', 'Il change chaque nuit à minuit.')];
+    } else if (etape === 1) {
+      const pod = el('div', 'nv-podium');
+      const ligne = (e, b, t) => { const d = el('div'); d.append(el('span', 'e', e)); const s2 = el('span'); s2.append(el('b', null, b), ' ' + t); d.append(s2); pod.append(d); };
+      ligne('👑', 'Le meilleur devient le Chef', 'et gagne le pot');
+      ligne('🥈', 'Le 2e', 'récupère sa mise');
+      ligne('🤡', 'Le dernier', 'est Loser de la semaine');
+      const ch = el('div', 'nv-petit'); ch.append(el('b', null, 'Chaque jour compte'), ' : un Match raté = 0.');
+      contenu = [el('span', 'nv-badge', 'NOUVEAU'), el('h2', null, 'La Bande'),
+        p(['Forme une Bande avec tes amis'], ' et misez vos pièces pour la semaine. Vos scores du Match du jour s\'additionnent, du lundi au dimanche.'),
+        pod, ch];
+    } else if (avecGoogle()) {
+      const per = periodeInscription(), mini = (etatBandes && etatBandes.regles) || {};
+      const cadre = el('div', 'nv-illu gauche'), t = el('div', 'nv-petit');
+      cadre.append(el('b', null, 'Première semaine'));
+      if (per === 'normal') t.append('Crée ou rejoins une Bande et mise ', el('b', null, 'avant lundi 23 h'), ` pour jouer les 7 Matchs. Mise à partir de ${formatPieces(mini.miseMin || 500)} pièces.`);
+      else if (per === 'retard') t.append('Tu peux encore miser jusqu\'à ', el('b', null, 'mercredi 23 h'), `. Les jours manqués comptent comme la pire note de la Bande moins ${mini.penaliteRetard != null ? mini.penaliteRetard : 10}.`);
+      else t.append('Les inscriptions rouvrent dimanche à minuit. En attendant, entraîne-toi sur le Match du jour et invite tes amis.');
+      cadre.append(t);
+      const jouer = el('button', 'btn principal large', 'Jouer le Match du jour'); jouer.onclick = () => { fermerFenetre(); ouvrirMatchJour(); };
+      const bande = el('button', 'btn large', 'Créer ma Bande'); bande.onclick = () => { fermerFenetre(); ouvrirBande({ creer: true }); };
+      const tard = el('button', 'nv-lien', 'Plus tard'); tard.onclick = fermer;
+      const n = etatJour && etatJour.numero ? ` n°${etatJour.numero}` : '';
+      contenu = [el('h2', null, 'À toi de jouer'), p([`Le Match du jour${n} t'attend.`], ' Il disparaît à minuit.'), cadre, jouer, bande, points, tard];
+    } else {
+      const cfg = configServeur || {};
+      const z = [el('h2', null, 'À toi de jouer'), p('Le Match du jour et la Bande se jouent ', ['avec un compte Google'], '. Une seule partie par jour et par joueur : c\'est ce qui rend le classement juste.')];
+      if (cfg.google) { const g = el('button', 'btn principal large', 'Se connecter avec Google'); g.onclick = () => connexionGoogle(cfg.google); z.push(g, el('small', 'nv-petit', 'Tes pièces et ta collection te suivent sur ton compte.')); }
+      else z.push(el('small', 'nv-petit', 'La connexion Google arrive très bientôt.'));
+      const tard = el('button', 'nv-lien', 'Plus tard'); tard.onclick = fermer;
+      contenu = [...z, points, tard];
+    }
+    if (etape < 2) {
+      const passer = el('button', 'nv-passer', 'Passer'); passer.onclick = fermer;
+      const go = el('button', 'btn principal large', 'Suivant'); go.onclick = suivant;
+      contenu = [passer, ...contenu, points, go];
+    }
+    ouvrirFenetre(contenu, 'nouveaute');
+    // Glisser vers la gauche : écran suivant ; vers la droite : écran précédent.
+    const f = $('fenetre'); let x0 = null;
+    f.ontouchstart = (e) => { x0 = e.touches[0].clientX; };
+    f.ontouchend = (e) => {
+      if (x0 === null || f.dataset.type !== 'nouveaute') return;
+      const dx = e.changedTouches[0].clientX - x0; x0 = null;
+      if (dx < -50 && etape < 2) fenetreNouveaute(etape + 1); else if (dx > 50 && etape > 0) fenetreNouveaute(etape - 1);
+    };
+  }
+  // Badges NOUVEAU : 7 jours après la fenêtre, jusqu'à ce que le joueur touche la carte.
+  function majBadgesNouveaute() {
+    const v = lireNouveaute(), frais = !!(v && Date.now() - v.le < 7 * 864e5);
+    for (const [id, cle] of [['btnMatchJour', 'jourVu'], ['btnBande', 'bandeVu']]) {
+      const b = $(id); let x = b.querySelector('.badge-nouveau');
+      const montrer = frais && !v[cle];
+      if (montrer && !x) { x = el('span', 'badge-nouveau', 'NOUVEAU'); b.append(x); }
+      if (x) x.hidden = !montrer;
+    }
+  }
+  $('btnMatchJour').addEventListener('click', () => { if (lireNouveaute()) { ecrireNouveaute({ jourVu: true }); majBadgesNouveaute(); } });
+  $('btnBande').addEventListener('click', () => { if (lireNouveaute()) { ecrireNouveaute({ bandeVu: true }); majBadgesNouveaute(); } });
+  // Rappel unique, deux jours après : connecté avec Google, dans aucune Bande, inscriptions encore ouvertes.
+  function rappelBande() {
+    const v = lireNouveaute();
+    if (!v || v.rappel || v.saute || Date.now() - v.le < 2 * 864e5 || !avecGoogle() || !etatBandes || etatBandes.bandes.length) return;
+    const per = periodeInscription(); if (per === 'ferme') return;
+    if ($('ecranAccueil').hidden || !$('voile').hidden || document.querySelector('.rappel-bande')) return;
+    ecrireNouveaute({ rappel: true });
+    const r = el('div', 'rappel-bande'), o = el('button', 'ouvrir'), x = el('button', 'x', '✕');
+    o.append(el('b', null, 'Tes amis jouent déjà ?'), el('br'), per === 'normal' ? 'Crée ta Bande avant lundi 23 h.' : 'Crée ta Bande avant mercredi 23 h.');
+    x.setAttribute('aria-label', 'Fermer');
+    o.onclick = () => { r.remove(); ouvrirBande({ creer: true }); };
+    x.onclick = () => r.remove();
+    r.append(el('span', 'e', '👑'), o, x);
+    $('ecranAccueil').append(r);
   }
 
   // ----- La Bande
@@ -4313,6 +4455,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
     if (stock.lire('kopo-pseudo')) { stock.ecrire('kopo-entree', 'invite'); return false; }
     $('bienvenue').hidden = false;
     lireConfig().then((cfg) => {
+      if (cfg && cfg.nouveaute === NOUVEAUTE && !lireNouveaute()) ecrireNouveaute({ saute: true }); // nouveau joueur : pas de fenêtre « Nouveau »
       const ok = !!(cfg && cfg.google);
       $('btnEntreeGoogle').hidden = $('aideGoogle').hidden = $('ouGoogle').hidden = !ok;
       if (ok) $('btnEntreeGoogle').onclick = () => connexionGoogle(cfg.google);
@@ -4907,7 +5050,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   // Après le bonus : le tutoriel la toute première fois, sinon le cadeau de bienvenue du jour.
   function suiteAccueil() {
     if ($('ecranAccueil').hidden || !$('voile').hidden || !$('bienvenue').hidden) return;
-    if (cadeauInstallation() || proposerTutoriel() || proposerBienvenue7()) return;
+    if (annonceNouveaute() || cadeauInstallation() || proposerTutoriel() || proposerBienvenue7()) return;
     proposerInstallation();
   }
   $('btnBourse').onclick = () => fenetrePieces(null);
@@ -4955,7 +5098,9 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
     ok.onclick = fermerFenetre;
     const tuto = el('button', 'btn large', 'Apprendre en jouant (1 min)');
     tuto.onclick = ouvrirTutoriel;
-    ouvrirFenetre([el('h2', null, 'Règles'), $('modeleRegles').content.cloneNode(true), ok, tuto]);
+    const extra = [];
+    if (MODE_SERVEUR) { const nv = el('button', 'btn large', 'Match du jour et Bande'); nv.onclick = () => fenetreNouveaute(0); extra.push(nv); }
+    ouvrirFenetre([el('h2', null, 'Règles'), $('modeleRegles').content.cloneNode(true), ok, tuto, ...extra]);
   }
   $('btnRegles').onclick = montrerRegles;
   $('btnMissions').onclick = ouvrirMissions;

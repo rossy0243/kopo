@@ -363,6 +363,8 @@ const afficher = {
         <h3>Partage du pot (en %, total 100)</h3>${champs('pot', { vainqueur: 'Vainqueur', deuxieme: '2e', troisieme: '3e', maison: 'Maison (pièces détruites)' })}<button class="btn principal" data-enregistrer="pot">Enregistrer le partage</button></div>
       <div class="carte"><h3 style="margin-top:0">Match du jour</h3>
         <div class="ligne"><label><input type="checkbox" id="mjActif" ${r.matchJour.actif ? 'checked' : ''}> actif</label><label>Robots <select id="mjRobots">${['faciles', 'normaux', 'forts'].map((x) => `<option ${r.matchJour.robots === x ? 'selected' : ''}>${x}</option>`).join('')}</select></label><label>Force <input type="number" id="mjNiveau" value="${+r.matchJour.niveauRobots}" style="width:80px"></label><button class="btn principal" id="btnMatchJour">Enregistrer</button></div>
+        <h3>Annonce de la compétition</h3>
+        <div class="ligne"><label><input type="checkbox" id="nouveauteBande" ${r.nouveaute && r.nouveaute.bande ? 'checked' : ''}> afficher la fenêtre « Nouveau : Match du jour et Bande » (une fois par joueur, à l'ouverture du jeu)</label><button class="btn" id="btnNouveaute">Enregistrer</button></div>
         <h3>La Bande</h3><p class="muted">Mettre « Actif » à 0 met les Bandes en pause (plus de création ni de mise ; les semaines lancées vont au bout).</p>${champs('bande', { actif: 'Actif (1 = oui, 0 = non)', maison: 'Part de la maison (%)', miseMin: 'Mise minimum', miseMax: 'Mise maximum', inscritsMin: 'Inscrits minimum', membresMax: 'Membres maximum', bandesMax: 'Bandes par joueur', matchsMin: 'Matchs à jouer sur 7', penaliteRetard: 'Pénalité de retard (points)', joursCompte: 'Âge du compte pour miser (jours)', partiesMin: 'Parties jouées pour miser' })}<button class="btn principal" data-enregistrer="bande">Enregistrer la Bande</button></div>
       <div class="carte"><h3 style="margin-top:0">Messages du chat en partie</h3>
         <p class="muted">Un message par ligne (émoji ou courte phrase, 40 caractères au plus, 40 messages au plus). Les joueurs ne peuvent envoyer que ces messages, dans cet ordre.</p>
@@ -381,6 +383,7 @@ const afficher = {
     $('#btnMessages').onclick = () => ecrire('messagesRapides', $('#messagesRapides').value.split('\n'));
     $('#btnFondateur').onclick = () => ecrire('cadeauFondateur', { actif: $('#fondateurActif').checked });
     $('#btnMatchJour').onclick = () => ecrire('matchJour', { actif: $('#mjActif').checked, robots: $('#mjRobots').value, niveauRobots: Number($('#mjNiveau').value) });
+    $('#btnNouveaute').onclick = () => ecrire('nouveaute', { bande: $('#nouveauteBande').checked });
     $('#btnVersion').onclick = () => ecrire('versionMin', $('#version').value.trim());
     $('#btnCadeau').onclick = async () => {
       const montant = Number($('#cadeauMontant').value);
