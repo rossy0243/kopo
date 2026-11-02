@@ -901,6 +901,83 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.match(r.json.erreur, /Trop d'essais/);
   });
 
+  await test('page fermée en pleine partie : le joueur reprend sa place avec le code (mêmes cartes), salle pleine et verrouillée', async () => {
+    const client = new Client(URL_.replace('http', 'ws'));
+    const js = [];
+    for (const p of ['Ret1', 'Ret2', 'Ret3', 'Ret4']) js.push(await invite(p + Math.floor(Math.random() * 1000)));
+    const vues = new Map();
+    const ecouter = (r, j) => { r.onMessage('vue', (v) => vues.set(j.compte.id, v)); r.onMessage('erreur', () => {}); r.onMessage('solde', () => {}); r.onMessage('classee', () => {}); };
+    const salles = [];
+    for (const j of js.slice(0, 3)) {
+      const r = await client.joinOrCreate('kopo', { jeton: j.jeton, publique: true, taille: 3, rapide: true });
+      ecouter(r, j); salles.push(r);
+    }
+    const [a, b] = salles, idB = js[1].compte.id;
+    for (let t = 0; t < 40 && !(vues.get(idB) && vues.get(idB).etat === 'manche'); t++) await attendre(50);
+    const avant = vues.get(idB);
+    assert.strictEqual(avant.etat, 'manche', 'la partie a commencé');
+    const code = avant.code, main = avant.manche.main.slice();
+    // B ferme la page : coupure sans « Quitter ».
+    await b.leave(false);
+    await attendre(150);
+    assert.strictEqual(vues.get(js[0].compte.id).joueurs.find((x) => x.id === idB).connecte, false);
+    // Le code seul ne suffit pas (partie commencée) : c'était le bug.
+    await assert.rejects(client.join('kopo', { jeton: js[1].jeton, code }));
+    // Un inconnu à cette table n'a rien à reprendre.
+    assert.strictEqual((await api('/api/reprendre', { methode: 'POST', jeton: js[3].jeton, corps: { code } })).statut, 404);
+    assert.strictEqual((await api('/api/reprendre', { methode: 'POST', corps: { code } })).statut, 401);
+    // B revient (nouvelle page, sans jeton de reconnexion) : il reprend sa place, ses cartes.
+    const rep = await api('/api/reprendre', { methode: 'POST', jeton: js[1].jeton, corps: { code } });
+    assert.strictEqual(rep.statut, 200, JSON.stringify(rep.json));
+    vues.delete(idB);
+    const b2 = await new Client(URL_.replace('http', 'ws')).consumeSeatReservation(rep.json);
+    ecouter(b2, js[1]);
+    assert.strictEqual(b2.roomId, a.roomId);
+    b2.send('sync');
+    for (let t = 0; t < 40 && !vues.get(idB); t++) await attendre(50);
+    const apres = vues.get(idB);
+    assert.strictEqual(apres.etat, 'manche');
+    assert.deepStrictEqual(apres.manche.main, main, 'mêmes cartes');
+    await attendre(100);
+    const vuA = vues.get(js[0].compte.id).joueurs.find((x) => x.id === idB);
+    assert.ok(vuA.connecte && !vuA.robot, 'les autres le voient revenu');
+    // Ancienne page encore ouverte (coupure pas encore vue par le serveur) : la nouvelle prend la place, l'ancienne est écartée.
+    let ecarte = null; b2.onLeave((c) => (ecarte = c));
+    const rep2 = await api('/api/reprendre', { methode: 'POST', jeton: js[1].jeton, corps: { code } });
+    assert.strictEqual(rep2.statut, 200, JSON.stringify(rep2.json));
+    const b3 = await new Client(URL_.replace('http', 'ws')).consumeSeatReservation(rep2.json);
+    ecouter(b3, js[1]);
+    for (let t = 0; t < 40 && ecarte === null; t++) await attendre(50);
+    assert.strictEqual(ecarte, 4000, 'ancienne page écartée');
+    await attendre(150);
+    assert.ok(vues.get(js[0].compte.id).joueurs.find((x) => x.id === idB).connecte, 'le départ de l\'ancienne page ne le déconnecte pas');
+    for (const r of [a, salles[2], b3]) await r.leave();
+  });
+  await test('coupure réseau : retour avec le jeton de reconnexion, puis nouvelle coupure bien vue', async () => {
+    const client = new Client(URL_.replace('http', 'ws'));
+    const [x, y] = [await invite('Rec' + Date.now() % 1000), await invite('Rek' + (Date.now() + 1) % 1000)];
+    const code = 'RECO';
+    const a = await client.create('kopo', { jeton: x.jeton, code, rapide: true });
+    const b = await client.join('kopo', { jeton: y.jeton, code });
+    let vueA = null; a.onMessage('vue', (v) => (vueA = v)); a.onMessage('erreur', () => {});
+    b.onMessage('vue', () => {}); b.onMessage('erreur', () => {});
+    await attendre(100);
+    a.send('lancer');
+    for (let t = 0; t < 40 && !(vueA && vueA.etat === 'manche'); t++) await attendre(50);
+    const connecte = () => vueA.joueurs.find((j) => j.id === y.compte.id).connecte;
+    const jetonReco = b.reconnectionToken;
+    await b.leave(false);
+    await attendre(150);
+    assert.strictEqual(connecte(), false);
+    const b2 = await client.reconnect(jetonReco);
+    b2.onMessage('vue', () => {}); b2.onMessage('erreur', () => {});
+    await attendre(150);
+    assert.strictEqual(connecte(), true, 'revenu avec le jeton');
+    await b2.leave(false);
+    await attendre(150);
+    assert.strictEqual(connecte(), false, 'la coupure suivante est vue');
+    await a.leave();
+  });
   await srv.arreter();
   console.log(`\n${reussis} tests réussis, ${echecs} en échec.`);
   process.exit(echecs ? 1 : 0);

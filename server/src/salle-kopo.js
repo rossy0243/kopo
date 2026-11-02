@@ -2,7 +2,7 @@
 // Toute la logique de jeu reste dans src/kopo-salle.js (la même que sur le téléphone de l'hôte) :
 // le serveur lui passe les messages des joueurs et envoie à chacun SA vue.
 'use strict';
-const { Room } = require('colyseus');
+const { Room, matchMaker } = require('colyseus');
 const S = require('../../src/kopo-salle.js');
 const { idAleatoire } = require('./comptes');
 
@@ -40,6 +40,7 @@ class SalleKopo extends Room {
     if (options.rapide && process.env.KOPO_TESTS === '1') this.salle.durees = { depart: 0, finTour: 0, mancheAuto: 1 }; // tests seulement
     this.clientsParId = new Map();
     this.comptes = new Map(); // id -> compte (au moment de l'entrée)
+    this.attentes = new Map(); // id -> reconnexion en attente (allowReconnection), annulée si le joueur revient par le code
     this.partie = null; // { id, katapss: Map, abandons: Set, coupures: Set, classee, enregistree }
     // Ligue : seulement en salle publique (inconnus placés au hasard). Dès qu'un joueur entre
     // avec le code (un ami), la salle n'est plus classée : pas de complicité (strategie-pieces §6.3).
@@ -73,11 +74,12 @@ class SalleKopo extends Room {
     const id = compte.id;
     if (this.publique && options && options.code && this.salle.etat === 'salon') this.classee = false;
     const ancien = this.clientsParId.get(id);
-    if (ancien && ancien !== client) try { ancien.leave(4000); } catch (e) {} // même compte ouvert ailleurs
     const r = S.recevoir(this.salle, id, { type: 'rejoindre', nom: compte.pseudo });
     if (!r.ok) throw new Error(r.erreur);
     client.userData = { id };
-    this.clientsParId.set(id, client);
+    this.clientsParId.set(id, client); // avant d'écarter l'ancien : son départ ne touche plus à la place
+    if (ancien && ancien !== client) try { ancien.leave(4000); } catch (e) {} // même compte ouvert ailleurs (ou ancienne page)
+    if (this.partie) this.partie.coupures.delete(id);
     this.comptes.set(id, compte);
     this.apresChangement();
   }
@@ -85,18 +87,42 @@ class SalleKopo extends Room {
   async onLeave(client, volontaire) {
     const id = client.userData && client.userData.id;
     if (!id) return;
+    // Ancienne connexion d'un joueur revenu entre-temps (page rouverte, autre appareil) : sa place est déjà reprise.
+    if (this.clientsParId.get(id) !== client) return;
     S.deconnecter(this.salle, id);
     if (volontaire && this.partie && this.salle.etat !== 'salon') this.partie.abandons.add(id);
     const partie = this.partie;
     if (!volontaire && partie && this.salle.etat !== 'salon') partie.coupures.add(id); // pas sa faute : pas de points perdus
     this.apresChangement();
     if (volontaire) return;
+    const attente = this.allowReconnection(client, 120); // 2 minutes pour revenir avec le jeton de reconnexion
+    this.attentes.set(id, attente);
     try {
-      await this.allowReconnection(client, 120); // 2 minutes pour revenir après une coupure réseau
+      const nouveau = await attente;
+      this.clientsParId.set(id, nouveau);
       if (partie) partie.coupures.delete(id);
       S.reconnecter(this.salle, id);
       this.apresChangement();
-    } catch (e) { /* pas revenu : un robot peut le remplacer (règle de la salle) */ }
+    } catch (e) { /* pas revenu par le jeton : il garde sa place et peut revenir avec le code (reserverRetour) */ }
+    finally { if (this.attentes.get(id) === attente) this.attentes.delete(id); }
+  }
+
+  // Retour d'un joueur déjà assis à la table (page fermée par erreur, réseau perdu, jeton de reconnexion
+  // oublié ou expiré) : il reprend sa place, ses cartes et la partie en cours, même si la salle est
+  // verrouillée (partie commencée) ou pleine. Renvoie la réservation à consommer, ou null s'il n'est pas assis ici.
+  async reserverRetour(compte) {
+    const id = compte.id;
+    if (!this.salle.joueurs.some((j) => j.id === id && (!j.robot || j.remplace))) return null;
+    const attente = this.attentes.get(id);
+    if (attente) { // libère la place réservée pour l'ancienne connexion
+      this.attentes.delete(id);
+      attente.reject(new Error('retour par le code'));
+      await new Promise((ok) => setImmediate(ok));
+    }
+    // L'ancienne connexion peut encore compter (coupure pas encore détectée) : une place de plus le temps qu'elle parte.
+    if (this.hasReachedMaxClients()) this.maxClients = this.clients.length + Object.keys(this.reservedSeats).length + 1;
+    const r = await matchMaker.reserveSeatFor(this.listing, { code: this.code, retour: true }, compte);
+    return { room: { name: this.roomName, roomId: this.roomId, processId: r.room.processId, publicAddress: r.room.publicAddress }, sessionId: r.sessionId };
   }
 
   onDispose() { salles.delete(this); }
@@ -136,7 +162,9 @@ class SalleKopo extends Room {
     }
     // Une partie commencée ne reçoit plus de nouveaux joueurs (seulement les reconnexions).
     if (s.etat !== 'salon' && !this.locked) this.lock();
-    if (s.etat === 'salon' && this.locked && s.joueurs.length < (this.publique ? this.taille : S.MAX)) this.unlock();
+    const places = this.publique ? this.taille : S.MAX;
+    if (s.etat === 'salon' && this.maxClients !== places) this.maxClients = places; // place ajoutée par reserverRetour
+    if (s.etat === 'salon' && this.locked && s.joueurs.length < places) this.unlock();
     this.setMetadata(this.meta(s.etat, s.joueurs.filter((j) => !j.robot).length));
     for (const [id, c] of this.clientsParId) c.send('vue', S.vue(s, id));
   }
@@ -252,4 +280,14 @@ class SalleKopo extends Room {
   }
 }
 
-module.exports = { SalleKopo, salles, DEBLOCAGE };
+// Retrouver la place d'un joueur avec le code de la salle (POST /api/reprendre).
+async function reprendre(compte, code) {
+  for (const salle of salles) {
+    if (salle.code !== code) continue;
+    const r = await salle.reserverRetour(compte);
+    if (r) return r;
+  }
+  return null;
+}
+
+module.exports = { SalleKopo, salles, DEBLOCAGE, reprendre };
