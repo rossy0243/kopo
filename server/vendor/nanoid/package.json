@@ -1,0 +1,8 @@
+{
+  "name": "nanoid",
+  "version": "2.1.11-kopo.1",
+  "private": true,
+  "description": "Remplaçant local de nanoid 2 (même appel : nanoid(taille)) pour Colyseus 0.16, sans les failles de nanoid <= 3.3.17.",
+  "main": "index.js",
+  "license": "MIT"
+}
