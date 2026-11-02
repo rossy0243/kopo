@@ -848,6 +848,33 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   #voileSalles .btn.large { padding: 10px; font-size: 15px; }
 }
 
+/* Fin de partie : tout tient dans l'écran, jusqu'à 9 joueurs. */
+.bilan.deux { grid-template-columns: 1fr 1fr; grid-auto-flow: column; grid-template-rows: repeat(var(--rangs, 5), auto); column-gap: 14px; row-gap: 0; }
+.bilan.deux li { padding: 4px 0; font-size: 14px; gap: 6px; min-width: 0; }
+.bilan.deux li > :first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.bilan.deux .pastille { font-size: 11px; padding: 1px 6px; white-space: nowrap; }
+.fenetre[data-type="recap"], .fenetre[data-type="recap"] .recap, .fenetre[data-type="recap"] .recap-col { gap: 8px; }
+.fenetre[data-type="recap"] .recap-boutons .rangee { grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 6px; }
+.fenetre[data-type="recap"] .recap-boutons .rangee .btn { font-size: 13px; padding: 9px 4px; line-height: 1.2; gap: 5px; }
+.fenetre[data-type="recap"] .recap-boutons .rangee .btn .ico { font-size: 15px; }
+.fenetre[data-type="recap"] .btn-revanche { padding: 10px; }
+.fenetre[data-type="recap"] .recap-tete .ico, .fenetre[data-type="recap"] .recap-place { font-size: 40px; }
+.fenetre[data-type="recap"] .recap-tete h2 { font-size: 28px; }
+.fenetre[data-type="recap"] .recap-progres { padding: 8px 10px; gap: 6px; }
+.fenetre[data-type="recap"] .recap-progres .muted, .fenetre[data-type="recap"] .recap-progres p { font-size: 12px; }
+/* Chat : 8 émojis sur une ligne, phrases plus petites, historique sur 3 lignes, Fermer en haut à droite. */
+.fenetre[data-type="chat"] { gap: 10px; position: relative; }
+.fenetre[data-type="chat"] .reactions { grid-template-columns: repeat(8, 1fr); gap: 4px; }
+.fenetre[data-type="chat"] .reactions button { font-size: 20px; padding: 6px 0; }
+.fenetre[data-type="chat"] .phrases-chat { gap: 5px; }
+.fenetre[data-type="chat"] .phrases-chat button { font-size: 13px; padding: 6px 10px; }
+.fenetre[data-type="chat"] .histo-chat { max-height: 84px; margin-bottom: 0; }
+.fenetre[data-type="chat"] > .btn.large:last-child { position: absolute; top: 12px; right: 14px; width: auto; padding: 6px 14px; font-size: 14px; }
+@media (orientation: landscape) and (max-height: 500px) {
+  .fenetre[data-type="recap"] .recap-tete h2 { font-size: 24px; }
+  .fenetre[data-type="recap"] .recap-progres { gap: 4px; font-size: 13px; }
+  .fenetre[data-type="chat"] .phrases-chat button { padding: 5px 9px; }
+}
 </style>
 </head>
 <body>
@@ -2506,7 +2533,8 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
 
   function afficherFinManche(v) {
     const m = v.manche;
-    const ul = el('ul', 'bilan');
+    const ul = el('ul', 'bilan' + (m.qualifies.length >= 4 ? ' deux' : '')); // 5 joueurs ou plus : deux colonnes, comme en fin de partie
+    ul.style.setProperty('--rangs', Math.ceil((m.qualifies.length + 1) / 2));
     m.qualifies.forEach((q, i) => { const li = el('li'); li.append(el('span', null, `${i + 1}. ${nom(v, q.joueur)}`), el('span', 'pastille ok', q.raison === 'Katapss' ? 'Katapss' : 'qualifié')); ul.append(li); });
     const li = el('li'); li.append(el('span', null, nom(v, m.elimine)), el('span', 'pastille ko', 'éliminé')); ul.append(li);
     const contenu = [el('h2', null, `Fin de la manche ${v.numeroManche}`), el('p', null, m.elimine === v.moi ? 'Tu es éliminé. Tu peux continuer à regarder la partie.' : `${nom(v, m.elimine)} est éliminé.`), ul];
@@ -2722,12 +2750,14 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
     const rangee = el('div', 'rangee');
     if (gagne || (r && r.titre)) {
       const sh = el('button', 'btn btn-whatsapp');
-      sh.append(icone('i-partager'), gagne ? 'Partager ma victoire' : 'Partager mon titre');
+      sh.append(icone('i-partager'), 'Partager'); // libellé court : les trois boutons tiennent sur une ligne
+      sh.setAttribute('aria-label', gagne ? 'Partager ma victoire' : 'Partager mon titre');
       sh.onclick = () => partagerVictoire(v, r);
       rangee.append(sh);
     }
     if (v.hote === v.moi && !v.publique) {
-      const ch = el('button', 'btn', 'Changer les joueurs');
+      const ch = el('button', 'btn', 'Changer');
+      ch.setAttribute('aria-label', 'Changer les joueurs');
       ch.onclick = () => { arreterSuiteAuto(); envoyer({ type: 'rejouer' }); };
       rangee.append(ch);
     }
@@ -2736,8 +2766,11 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
     boutons.append(rangee);
     droite.append(boutons);
     // Classement
-    const ul = el('ul', 'bilan');
-    classement.forEach((id, i) => { const li = el('li' , id === v.moi ? 'moi' : null); li.append(el('span', null, `${i + 1}. ${nom(v, id)}`), el('span', 'pastille ' + (i ? 'neutre' : 'ok'), i ? `éliminé manche ${v.elimines.length - i + 1}` : 'vainqueur')); ul.append(li); });
+    // À partir de 5 joueurs, le classement passe en deux colonnes pour tenir dans l'écran.
+    const deux = classement.length >= 5;
+    const ul = el('ul', 'bilan' + (deux ? ' deux' : ''));
+    if (deux) ul.style.setProperty('--rangs', Math.ceil(classement.length / 2));
+    classement.forEach((id, i) => { const li = el('li' , id === v.moi ? 'moi' : null); li.append(el('span', null, `${i + 1}. ${nom(v, id)}`), el('span', 'pastille ' + (i ? 'neutre' : 'ok'), i ? `${deux ? '' : 'éliminé '}manche ${v.elimines.length - i + 1}` : 'vainqueur')); ul.append(li); });
     droite.append(ul);
     recap.append(gauche, droite);
 
