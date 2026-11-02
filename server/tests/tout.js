@@ -196,6 +196,9 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.strictEqual((await rec({ motif: 'defi', montant: 300, ref: 'w45b' })).json.ok, false, 'un défi par semaine');
     assert.strictEqual((await rec({ motif: 'bienvenue', montant: 100, ref: 'j1' })).json.ok, true);
     assert.strictEqual((await rec({ motif: 'bienvenue', montant: 150, ref: 'j2' })).json.ok, false, 'un cadeau par jour');
+    assert.strictEqual((await rec({ motif: 'installation', montant: 500, ref: 'pwa' })).statut, 400, 'cadeau d\'installation plafonné');
+    assert.strictEqual((await rec({ motif: 'installation', montant: 200, ref: 'pwa' })).json.ok, true);
+    assert.strictEqual((await rec({ motif: 'installation', montant: 200, ref: 'pwa2' })).json.ok, false, 'une seule installation récompensée');
   });
   await test('cadeau de fondateur : le dos « Les Fondateurs », une seule fois, coupé par l\'admin', async () => {
     const r = await invite('Fondateur' + Date.now() % 1000);
