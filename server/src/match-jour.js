@@ -92,11 +92,18 @@ function creerMatchJour(base, reglages, env = process.env) {
       const n = (await base.query("SELECT count(*)::int AS n FROM match_jour WHERE jour = $1 AND statut = 'fini'", [jour])).rows[0].n;
       joueurs = n;
       if (moi && moi.statut === 'fini') rang = (await base.query("SELECT count(*)::int + 1 AS r FROM match_jour WHERE jour = $1 AND statut = 'fini' AND score > $2", [jour, moi.score])).rows[0].r;
+      // Rappel d'hier : mon score et ma place mondiale (le classement d'hier n'est plus affiché).
+      const veille = ajouterJours(jour, -1), h = await lire(compte.id, veille);
+      let hier = null;
+      if (h && h.statut === 'fini') {
+        const x = (await base.query("SELECT count(*)::int AS n, count(*) FILTER (WHERE score > $2)::int AS devant FROM match_jour WHERE jour = $1 AND statut = 'fini'", [veille, h.score])).rows[0];
+        hier = { numero: numeroDu(veille), score: h.score, victoire: h.victoire, rang: x.devant + 1, joueurs: x.n };
+      }
       return {
         actif: !!cfg().actif, numero: numeroDu(jour), jour, google: !!compte.auth_id,
         finA: debutDu(ajouterJours(jour, 1)).toISOString(), resteMs: debutDu(ajouterJours(jour, 1)) - maintenant,
         moi: moi && { score: moi.score, manches: moi.manches, victoire: moi.victoire, fini: moi.statut === 'fini' },
-        rang, joueurs,
+        rang, joueurs, hier,
         regles: { parManche: PAR_MANCHE, victoire: VICTOIRE, manches: MANCHES_AVANT_FINALE },
       };
     },

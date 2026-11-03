@@ -741,6 +741,7 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
 @media (orientation: portrait) { .mode.mode-jour, .mode.mode-bande { aspect-ratio: auto; min-height: 74px; grid-template-columns: auto 1fr; justify-items: start; text-align: left; column-gap: 10px; padding: 8px 12px; } .mode-jour .mode-icone, .mode-bande .mode-icone { grid-row: span 2; font-size: 32px; } .mode-jour b, .mode-bande b { font-size: 17px; } }
 .mj { display: grid; gap: 10px; text-align: center; }
 .mj-numero { color: var(--muted); font-size: 13px; letter-spacing: 1px; text-transform: uppercase; }
+.mj-hier { display: block; margin: 6px 0 2px; opacity: .85; }
 .mj-score { font: 400 64px/1 var(--display); color: var(--brass); }
 .mj-score small { font-size: 26px; color: var(--muted); }
 .mj-cases { font-size: 22px; letter-spacing: 2px; }
@@ -3326,10 +3327,11 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
     const z = el('div', 'mj'), boutons = [];
     z.append(el('div', 'mj-numero', `Match du jour n°${e.numero}`));
     const m = e.moi && e.moi.fini ? e.moi : null;
+    if (e.hier) z.append(el('small', 'mj-hier', `Hier (n°${e.hier.numero}) : ${e.hier.victoire ? '🏆 ' : ''}${e.hier.score} / 100 · ${e.hier.rang === 1 ? '1er' : e.hier.rang + 'e'} sur ${e.hier.joueurs} dans le monde`));
     if (!e.actif) z.append(el('p', null, 'Le Match du jour est en pause. Reviens bientôt !'));
     else if (m) {
       const sc = el('div', 'mj-score', String(m.score)); sc.append(el('small', null, ' / 100'));
-      z.append(sc, el('div', 'mj-cases', casesMatch(m)), el('p', null, `Tu es ${e.rang}e sur ${e.joueurs} joueurs aujourd'hui.`), el('small', 'muted', `Nouveau match dans ${dureeLisible(e.resteMs)}.`));
+      z.append(sc, el('div', 'mj-cases', casesMatch(m)), el('p', null, `Tu es ${e.rang === 1 ? '1er' : e.rang + 'e'} sur ${e.joueurs} joueurs aujourd'hui.`), el('small', 'muted', `Nouveau match dans ${dureeLisible(e.resteMs)}.`));
       const part = el('button', 'btn principal large', 'Partager'); part.onclick = () => partagerMatchJour({ ...m, numero: e.numero });
       const ent = el('button', 'btn large', 'S\'entraîner (ne compte pas)'); ent.onclick = () => jouerMatchJour();
       boutons.push(part, ent);
