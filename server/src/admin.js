@@ -2,6 +2,7 @@
 'use strict';
 const express = require('express');
 const { enveloppe, publicCompte } = require('./api');
+const { emailSupabase } = require('./comptes');
 
 function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainage, bande, salles, demarrage }) {
   const r = express.Router();
@@ -91,13 +92,25 @@ function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainag
   // --- Joueurs
   // Les listes de la fiche sont plafonnées ici ; le tableau de bord n'en montre que les premières (bouton « Voir plus »).
   const FICHE = { parties: 50, pieces: 50, signalements: 30, sanctions: 30, titres: 20, inventaire: 100, parrainages: 50 };
+  // Recherche par pseudo, Pseudo#1234, identifiant ou adresse e-mail ; filtre google (compte lié) / invite.
   r.get('/joueurs', enveloppe(async (req, res) => {
     const t = String(req.query.q || '').trim();
+    const filtre = ['google', 'invite'].includes(req.query.filtre) ? req.query.filtre : 'tous';
+    const condFiltre = { tous: 'true', google: 'auth_id IS NOT NULL', invite: 'auth_id IS NULL' }[filtre];
     const m = /^(.*)#(\d{4})$/.exec(t);
     const rows = m
-      ? (await base.query('SELECT * FROM comptes WHERE lower(pseudo) = lower($1) AND numero = $2 LIMIT 50', [m[1], m[2]])).rows
-      : (await base.query('SELECT * FROM comptes WHERE $1 = \'\' OR lower(pseudo) LIKE lower($2) OR id = $1 ORDER BY vu_le DESC LIMIT 50', [t, '%' + t.replace(/[%_]/g, '') + '%'])).rows;
-    res.json(n(rows).map((c) => ({ ...publicCompte(c), creeLe: c.cree_le, vuLe: c.vu_le, lie: !!c.auth_id, pays: c.pays })));
+      ? (await base.query(`SELECT * FROM comptes WHERE lower(pseudo) = lower($1) AND numero = $2 AND ${condFiltre} LIMIT 100`, [m[1], m[2]])).rows
+      : (await base.query(`SELECT * FROM comptes WHERE ($1 = '' OR lower(pseudo) LIKE lower($2) OR lower(email) LIKE lower($2) OR id = $1) AND ${condFiltre} ORDER BY vu_le DESC LIMIT 100`, [t, '%' + t.replace(/[%_]/g, '') + '%'])).rows;
+    // Comptes liés avant que le serveur ne note l'adresse : on la demande une fois à Supabase.
+    await Promise.all(rows.filter((c) => c.auth_id && c.email == null).map(async (c) => {
+      const e = await emailSupabase(c.auth_id);
+      if (e != null) { c.email = e; await comptes.noterEmail(c.id, e); }
+    }));
+    const comptage = (await base.query("SELECT count(*)::int AS total, count(*) FILTER (WHERE auth_id IS NOT NULL)::int AS google, count(*) FILTER (WHERE auth_id IS NULL)::int AS invites FROM comptes WHERE statut <> 'supprime'")).rows[0];
+    res.json({
+      joueurs: n(rows).map((c) => ({ ...publicCompte(c), creeLe: c.cree_le, vuLe: c.vu_le, lie: !!c.auth_id, email: c.email || null, pays: c.pays })),
+      comptage: { ...n([comptage])[0], resultats: rows.length, plafond: 100 },
+    });
   }));
 
   r.get('/joueurs/:id', enveloppe(async (req, res) => {
@@ -105,7 +118,7 @@ function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainag
     if (!c) return res.status(404).json({ erreur: 'Joueur introuvable.' });
     const q = async (sql) => n((await base.query(sql, [c.id])).rows);
     res.json({
-      compte: { ...c, auth_id: c.auth_id ? 'lié' : null, parrain_createur: !!((await base.query('SELECT parrain_createur FROM comptes WHERE id = $1', [c.id])).rows[0] || {}).parrain_createur },
+      compte: { ...c, auth_id: c.auth_id ? 'lié' : null, email: ((await base.query('SELECT email FROM comptes WHERE id = $1', [c.id])).rows[0] || {}).email || null, parrain_createur: !!((await base.query('SELECT parrain_createur FROM comptes WHERE id = $1', [c.id])).rows[0] || {}).parrain_createur },
       stats: (await q(`SELECT count(*)::int AS parties, count(*) FILTER (WHERE place = 1)::int AS victoires, count(*) FILTER (WHERE abandon)::int AS abandons,
         (SELECT count(*) FROM signalements WHERE cible_id = $1)::int AS signalements, (SELECT count(*) FROM sanctions WHERE compte_id = $1)::int AS sanctions,
         (SELECT count(*) FROM registre_pieces WHERE compte_id = $1)::int AS operations, (SELECT count(*) FROM inventaire WHERE compte_id = $1)::int AS objets

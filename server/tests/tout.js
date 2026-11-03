@@ -669,7 +669,8 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
   });
   await test('recherche et fiche joueur, sanction, journal', async () => {
     const l = await api('/admin/api/joueurs?q=Alice', { jeton: adminJeton });
-    assert.strictEqual(l.json[0].id, a.compte.id);
+    assert.strictEqual(l.json.joueurs[0].id, a.compte.id);
+    assert.strictEqual(typeof l.json.comptage.total, 'number');
     const f = await api('/admin/api/joueurs/' + a.compte.id, { jeton: adminJeton });
     assert.strictEqual(f.json.signalementsRecus.length, 1);
     assert.strictEqual(f.json.stats.signalements, 1);
@@ -874,6 +875,23 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
   };
   const solde = async (id) => (await srv.comptes.lire(id)).solde;
   let parrain, filleul, codeParrain;
+  await test("admin Joueurs : e-mail Google affiché, filtre et comptage", async () => {
+    const g = await connexionG('google-mail-1', { email: 'Mail.Test@Gmail.com' });
+    const l = (await api('/admin/api/joueurs?q=mail.test@gmail', { jeton: adminJeton })).json;
+    assert.strictEqual(l.joueurs.length, 1);
+    assert.strictEqual(l.joueurs[0].id, g.compte.id);
+    assert.strictEqual(l.joueurs[0].email, 'mail.test@gmail.com');
+    const google = (await api('/admin/api/joueurs?filtre=google', { jeton: adminJeton })).json;
+    assert.ok(google.joueurs.length && google.joueurs.every((c) => c.lie));
+    const invites = (await api('/admin/api/joueurs?filtre=invite', { jeton: adminJeton })).json;
+    assert.ok(invites.joueurs.length && invites.joueurs.every((c) => !c.lie && !c.email));
+    const k = google.comptage;
+    assert.ok(k.google >= 1 && k.total === k.google + k.invites);
+    const f = (await api('/admin/api/joueurs/' + g.compte.id, { jeton: adminJeton })).json;
+    assert.strictEqual(f.compte.email, 'mail.test@gmail.com');
+    // L'adresse ne sort jamais vers les joueurs.
+    assert.strictEqual((await api('/api/moi', { jeton: g.jeton })).json.compte.email, undefined);
+  });
   await test('parrainage : lien réservé aux comptes Google, code stable', async () => {
     const inv = await invite('SansGoogle' + Date.now() % 1000);
     const e0 = (await api('/api/parrainage', { jeton: inv.jeton })).json;
