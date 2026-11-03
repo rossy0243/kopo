@@ -1128,6 +1128,13 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.strictEqual((await api('/api/match-jour', { jeton: gA.jeton })).json.moi.score, a.fin.score);
     const cl = (await api('/api/match-jour/classement?type=mondial', { jeton: gA.jeton })).json;
     assert.ok(cl.liste.some((x) => x.id === gA.compte.id) && cl.moi.id === gA.compte.id);
+    // Le lendemain : rappel de mon score et de ma place mondiale d'hier.
+    assert.strictEqual(e.hier, null);
+    srv.matchJour.regler(() => new Date(Date.now() + 864e5));
+    const demain = (await api('/api/match-jour', { jeton: gA.jeton })).json;
+    srv.matchJour.regler(() => new Date());
+    assert.deepStrictEqual([demain.hier.score, demain.hier.rang, demain.hier.numero, demain.moi], [a.fin.score, e.rang, e.numero, null]);
+    assert.ok(demain.hier.joueurs >= 2);
   });
   await test('Match du jour : quitter en cours arrête le score là ; un essai en cours bloque l\'entraînement', async () => {
     const g = await connexionG('sb-mj-c', { providerId: 'g-mj-c' });
