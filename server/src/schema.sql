@@ -365,3 +365,7 @@ CREATE TABLE IF NOT EXISTS bande_inscriptions (
   FOREIGN KEY (bande_id, semaine) REFERENCES bande_semaines(bande_id, semaine) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS bande_inscriptions_compte ON bande_inscriptions (compte_id, semaine);
+
+-- ===== Adresse Google visible dans l'admin (onglet Joueurs) =====
+-- Notée à chaque connexion Google ; '' = compte lié sans adresse (téléphone). Effacée à la suppression du compte.
+ALTER TABLE comptes ADD COLUMN IF NOT EXISTS email text;

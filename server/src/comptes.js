@@ -70,6 +70,20 @@ async function supprimerUtilisateurSupabase(authId) {
   } catch (e) { console.warn('Suppression Supabase ' + authId + ' : ' + e.message); return false; }
 }
 
+// Adresse e-mail d'un utilisateur Supabase Auth (comptes liés avant que le serveur ne la note).
+// '' si l'utilisateur n'en a pas (téléphone), null si Supabase n'a pas pu répondre.
+async function emailSupabase(authId) {
+  const url = process.env.SUPABASE_URL, cle = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !cle) return null;
+  try {
+    const r = await fetch(new URL('/auth/v1/admin/users/' + encodeURIComponent(authId), url), { headers: { apikey: cle, authorization: 'Bearer ' + cle }, signal: AbortSignal.timeout(5000) });
+    if (r.status === 404) return '';
+    if (!r.ok) return null;
+    const u = await r.json();
+    return typeof u.email === 'string' ? u.email.trim().toLowerCase() : '';
+  } catch (e) { return null; }
+}
+
 function creerComptes(base, reglages) {
   // Ajoute un mouvement au registre et met à jour le solde, dans une transaction.
   async function mouvement(q, compteId, montant, motif, ref, parAdmin = false) {
@@ -113,6 +127,11 @@ function creerComptes(base, reglages) {
       // Le compte de l'appareil est déjà lié à un autre compte Google : on n'y touche pas.
       const r = await base.query('UPDATE comptes SET auth_id = $2 WHERE id = $1 AND auth_id IS NULL RETURNING id', [id, authId]);
       return r.rows.length ? api.lire(id) : null;
+    },
+
+    // Adresse e-mail du compte Google, montrée seulement dans l'admin. '' = connexion sans e-mail (téléphone).
+    async noterEmail(id, email) {
+      await base.query('UPDATE comptes SET email = $2 WHERE id = $1 AND email IS DISTINCT FROM $2', [id, typeof email === 'string' ? email.trim().toLowerCase().slice(0, 254) : '']);
     },
 
     async changerProfil(id, { pseudo, avatar, pays, notifs }) {
@@ -249,7 +268,7 @@ function creerComptes(base, reglages) {
     async supprimer(id) {
       const avant = await api.lire(id);
       await base.transaction(async (q) => {
-        await q.query("UPDATE comptes SET statut = 'supprime', auth_id = NULL, pseudo = 'Joueur supprimé', pays = NULL, profil = NULL WHERE id = $1", [id]);
+        await q.query("UPDATE comptes SET statut = 'supprime', auth_id = NULL, email = NULL, pseudo = 'Joueur supprimé', pays = NULL, profil = NULL WHERE id = $1", [id]);
         await q.query('DELETE FROM amis WHERE compte_id = $1 OR ami_id = $1', [id]);
         await q.query('DELETE FROM demandes_ami WHERE de_id = $1 OR a_id = $1', [id]);
         await q.query('DELETE FROM blocages WHERE compte_id = $1', [id]);
@@ -260,4 +279,4 @@ function creerComptes(base, reglages) {
   return api;
 }
 
-module.exports = { creerComptes, verifierPseudo, nettoyerPseudo, migrerPseudos, jourUTC, idAleatoire };
+module.exports = { creerComptes, emailSupabase, verifierPseudo, nettoyerPseudo, migrerPseudos, jourUTC, idAleatoire };

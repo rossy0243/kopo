@@ -266,14 +266,18 @@ const afficher = {
       <div class="carte"><table><tr><th>Bande</th><th>Créateur</th><th class="n">Membres</th><th>Dernières semaines (mise · inscrits · Chef · pot · détruit)</th></tr>${B.bandes.map((b) => `<tr><td>${b.suspecte ? '<span class="ko">⚠</span> ' : ''}${esc(b.nom)} <span class="muted">${esc(b.code)}${b.ouverte ? ' · ouverte' : ''}</span></td><td>${esc(b.createur)}</td><td class="n">${b.membres}</td><td>${b.semaines.slice(0, 3).map((s) => `${esc(s.semaine)} : ${nb(s.mise)} · ${s.inscrits} · ${s.statut === 'cloturee' ? esc(s.chefs.join(', ') || '—') + ' · ' + nb(s.pot) + ' · ' + nb(s.detruit) : esc(s.statut)}${s.horsRegle ? ` <span class="ko">(${s.horsRegle} hors règle)</span>` : ''}`).join('<br>') || '<span class="muted">aucune semaine</span>'}</td></tr>`).join('') || '<tr><td colspan="4" class="muted">Aucune Bande pour l\'instant.</td></tr>'}</table></div>`;
   },
 
-  async joueurs(q = '') {
-    $('#contenu').innerHTML = `<h2>Joueurs</h2><div class="ligne"><input id="recherche" placeholder="Pseudo, Pseudo#1234 ou identifiant" value="${esc(q)}" style="min-width:300px"><button class="btn principal" id="btnRecherche">Chercher</button></div><div id="resultats"></div>`;
+  async joueurs(q = '', filtre = 'tous') {
+    $('#contenu').innerHTML = `<h2>Joueurs</h2><div id="comptage"></div><div class="ligne"><input id="recherche" placeholder="Pseudo, Pseudo#1234, e-mail ou identifiant" value="${esc(q)}" style="min-width:300px"><select id="filtre">${[['tous', 'Tous les joueurs'], ['google', 'Connectés avec Google'], ['invite', 'Invités (non connectés)']].map(([v, t]) => `<option value="${v}"${v === filtre ? ' selected' : ''}>${t}</option>`).join('')}</select><button class="btn principal" id="btnRecherche">Chercher</button></div><div id="resultats"></div>`;
     const go = async () => {
-      const l = await api('/joueurs?q=' + encodeURIComponent($('#recherche').value));
-      $('#resultats').innerHTML = `<div class="carte"><table><tr><th>Joueur</th><th class="n">Pièces</th><th>Statut</th><th>Inscrit</th><th>Vu</th></tr>${lignes('joueurs', l, (c) => `<tr><td><button class="lien" data-joueur="${esc(c.id)}">${esc(c.pseudo)}#${c.numero}</button>${c.lie ? '' : ' <span class="muted">(invité)</span>'}</td><td class="n">${nb(c.solde)}</td><td class="statut-${c.statut}">${esc(c.statut)}</td><td>${date(c.creeLe)}</td><td>${date(c.vuLe)}</td></tr>`, { par: 20, colonnes: 5, vide: '<tr><td colspan="5" class="muted">Aucun joueur.</td></tr>' })}</table></div>`;
+      const r = await api('/joueurs?q=' + encodeURIComponent($('#recherche').value) + '&filtre=' + encodeURIComponent($('#filtre').value));
+      const k = r.comptage, l = r.joueurs;
+      const part = k.total ? Math.round((100 * k.google) / k.total) : 0;
+      $('#comptage').innerHTML = `<div class="tuiles">${tuile(nb(k.total), 'joueurs au total')}${tuile(nb(k.google), 'connectés avec Google', part + ' % des joueurs')}${tuile(nb(k.invites), 'invités (non connectés)')}${tuile(nb(k.resultats) + (k.resultats >= k.plafond ? '+' : ''), 'dans cette recherche', k.resultats >= k.plafond ? 'les ' + k.plafond + ' plus récents' : '')}</div>`;
+      $('#resultats').innerHTML = `<div class="carte"><table><tr><th>Joueur</th><th>E-mail Google</th><th class="n">Pièces</th><th>Statut</th><th>Inscrit</th><th>Vu</th></tr>${lignes('joueurs', l, (c) => `<tr><td><button class="lien" data-joueur="${esc(c.id)}">${esc(c.pseudo)}#${c.numero}</button>${c.lie ? '' : ' <span class="muted">(invité)</span>'}</td><td>${c.email ? esc(c.email) : `<span class="muted">${c.lie ? '—' : ''}</span>`}</td><td class="n">${nb(c.solde)}</td><td class="statut-${c.statut}">${esc(c.statut)}</td><td>${date(c.creeLe)}</td><td>${date(c.vuLe)}</td></tr>`, { par: 20, colonnes: 6, vide: '<tr><td colspan="6" class="muted">Aucun joueur.</td></tr>' })}</table></div>`;
       lierJoueurs();
     };
     $('#btnRecherche').onclick = go;
+    $('#filtre').onchange = go;
     $('#recherche').addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
     await go();
   },
@@ -284,7 +288,7 @@ const afficher = {
     $('#contenu').innerHTML = `<p><button class="lien" id="retour">← Joueurs</button></p>
       <h2>${esc(c.pseudo)}#${c.numero}</h2>
       <div class="tuiles">${tuile(nb(c.solde), 'pièces')}${tuile(nb(f.stats.parties), 'parties')}${tuile(nb(f.stats.victoires), 'victoires')}${tuile(nb(f.stats.abandons), 'abandons')}${tuile(`<span class="statut-${c.statut}">${esc(c.statut)}</span>`, c.suspendu_jusqu ? "jusqu'au " + date(c.suspendu_jusqu) : (c.micro_coupe ? 'micro coupé' : 'statut'))}</div>
-      <p class="muted">Identifiant ${esc(c.id)} · inscrit le ${date(c.cree_le)} · vu le ${date(c.vu_le)} · ${c.auth_id ? 'compte Google/téléphone' : 'invité'}${c.pays ? ' · ' + esc(c.pays) : ''}</p>
+      <p class="muted">Identifiant ${esc(c.id)} · inscrit le ${date(c.cree_le)} · vu le ${date(c.vu_le)} · ${c.auth_id ? (c.email ? 'Google : ' + esc(c.email) : 'compte Google/téléphone') : 'invité'}${c.pays ? ' · ' + esc(c.pays) : ''}</p>
       ${f.ligue || f.titres.length ? `<p>Ligue : ${f.ligue ? `<b>${esc(DIV[f.ligue.division] || f.ligue.division)}</b>, ${nb(f.ligue.points)} points, ${nb(f.ligue.parties)} parties classées cette saison` : 'pas encore classé cette saison'}${f.titres.length ? ' · titres : ' + f.titres.map((t) => esc(t.titre) + (t.rang ? ' (' + t.rang + 'e)' : '')).join(', ') : ''}</p>` : ''}
       <div class="carte"><h3 style="margin-top:0">Sanction</h3>
         <div class="ligne"><select id="sType"><option value="avertissement">Avertir</option><option value="micro">Couper le micro</option><option value="suspension">Suspendre</option><option value="bannissement">Bannir</option><option value="levee">Lever les sanctions</option></select>

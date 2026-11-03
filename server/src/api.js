@@ -67,6 +67,7 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours,
     });
     if (c.statut === 'banni') return res.status(403).json({ erreur: 'Ce compte est banni.' });
     await comptes.presence(c.id);
+    await comptes.noterEmail(c.id, s.email);
     // Empreinte du compte Google (anti-abus du parrainage), puis le code du lien d'invitation s'il y en a un.
     let parrain = null;
     if (parrainage) {
