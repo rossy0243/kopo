@@ -374,6 +374,10 @@ const afficher = {
         <h3>Annonce de la compétition</h3>
         <div class="ligne"><label><input type="checkbox" id="nouveauteBande" ${r.nouveaute && r.nouveaute.bande ? 'checked' : ''}> afficher la fenêtre « Nouveau : Match du jour et Bande » (une fois par joueur, à l'ouverture du jeu)</label><button class="btn" id="btnNouveaute">Enregistrer</button></div>
         <h3>La Bande</h3><p class="muted">Mettre « Actif » à 0 met les Bandes en pause (plus de création ni de mise ; les semaines lancées vont au bout).</p>${champs('bande', { actif: 'Actif (1 = oui, 0 = non)', maison: 'Part de la maison (%)', miseMin: 'Mise minimum', miseMax: 'Mise maximum', inscritsMin: 'Inscrits minimum', membresMax: 'Membres maximum', bandesMax: 'Bandes par joueur', matchsMin: 'Matchs à jouer sur 7', penaliteRetard: 'Pénalité de retard (points)', joursCompte: 'Âge du compte pour miser (jours)', partiesMin: 'Parties jouées pour miser' })}<button class="btn principal" data-enregistrer="bande">Enregistrer la Bande</button></div>
+      <div class="carte"><h3 style="margin-top:0">Groupes de la communauté (bouton Partager)</h3>
+        <p class="muted">Les joueurs les voient sous « Inviter un ami » quand ils touchent Partager, dans cet ordre. Un groupe sans lien ou décoché n'est pas montré. Sans aucun groupe, Partager partage directement le jeu, comme avant. Liens en https:// seulement.</p>
+        <div id="groupes"></div>
+        <div class="ligne"><button class="btn" id="btnAjoutGroupe">+ Ajouter un groupe</button><button class="btn principal" id="btnGroupes">Enregistrer les groupes</button></div></div>
       <div class="carte"><h3 style="margin-top:0">Messages du chat en partie</h3>
         <p class="muted">Un message par ligne (émoji ou courte phrase, 40 caractères au plus, 40 messages au plus). Les joueurs ne peuvent envoyer que ces messages, dans cet ordre.</p>
         <textarea id="messagesRapides" rows="8" style="width:100%;max-width:520px;font-size:16px">${esc((r.messagesRapides || []).join('\n'))}</textarea>
@@ -405,6 +409,32 @@ const afficher = {
       }, 250);
     };
     $('#btnJeux').onclick = () => ecrire('jeux', { kopo: $('#jeu_kopo').value, inter8: $('#jeu_inter8').value, testeurs: $('#testeurs').value });
+    // Groupes de la communauté : une ligne par groupe (réseau, nom, lien, visible), qu'on monte, descend ou supprime.
+    const RESEAUX = [['whatsapp', 'WhatsApp'], ['telegram', 'Telegram'], ['facebook', 'Facebook'], ['instagram', 'Instagram'], ['tiktok', 'TikTok'], ['youtube', 'YouTube'], ['x', 'X'], ['discord', 'Discord'], ['autre', 'Autre']];
+    let groupes = (r.communautes || []).map((g) => ({ ...g }));
+    const lireGroupes = () => $('#groupes').querySelectorAll('[data-groupe]').forEach((l) => {
+      const g = groupes[+l.dataset.groupe];
+      g.reseau = l.querySelector('select').value; g.libelle = l.querySelector('.g-nom').value; g.url = l.querySelector('.g-url').value; g.visible = l.querySelector('.g-vis').checked;
+    });
+    const dessinerGroupes = () => {
+      $('#groupes').innerHTML = groupes.length ? groupes.map((g, i) => `<div class="ligne" data-groupe="${i}">
+        <select>${RESEAUX.map(([v, t]) => `<option value="${v}" ${g.reseau === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
+        <input class="g-nom" value="${esc(g.libelle || '')}" placeholder="Nom (ex. Kopo Kinshasa)" maxlength="40" style="width:200px">
+        <input class="g-url" value="${esc(g.url || '')}" placeholder="https://chat.whatsapp.com/…" style="flex:1;min-width:240px">
+        <label><input type="checkbox" class="g-vis" ${g.visible !== false ? 'checked' : ''}> visible</label>
+        <button class="btn" data-monter="${i}" ${i ? '' : 'disabled'} title="Monter">↑</button><button class="btn" data-descendre="${i}" ${i < groupes.length - 1 ? '' : 'disabled'} title="Descendre">↓</button><button class="btn" data-suppr="${i}" title="Supprimer">✕</button>
+      </div>`).join('') : '<p class="muted">Aucun groupe pour l\'instant.</p>';
+      const deplacer = (i, j) => { lireGroupes(); [groupes[i], groupes[j]] = [groupes[j], groupes[i]]; dessinerGroupes(); };
+      $('#groupes').querySelectorAll('[data-monter]').forEach((b) => (b.onclick = () => deplacer(+b.dataset.monter, +b.dataset.monter - 1)));
+      $('#groupes').querySelectorAll('[data-descendre]').forEach((b) => (b.onclick = () => deplacer(+b.dataset.descendre, +b.dataset.descendre + 1)));
+      $('#groupes').querySelectorAll('[data-suppr]').forEach((b) => (b.onclick = () => { lireGroupes(); groupes.splice(+b.dataset.suppr, 1); dessinerGroupes(); }));
+    };
+    dessinerGroupes();
+    $('#btnAjoutGroupe').onclick = () => { lireGroupes(); groupes.push({ reseau: 'whatsapp', libelle: '', url: '', visible: true }); dessinerGroupes(); };
+    $('#btnGroupes').onclick = async () => {
+      lireGroupes();
+      try { const x = await api('/reglages/communautes', { methode: 'PUT', corps: { valeur: groupes } }); groupes = x.valeur; dessinerGroupes(); message('Groupes enregistrés.'); } catch (e) { message(e.message); }
+    };
     $('#btnMessages').onclick = () => ecrire('messagesRapides', $('#messagesRapides').value.split('\n'));
     $('#btnFondateur').onclick = () => ecrire('cadeauFondateur', { actif: $('#fondateurActif').checked });
     $('#btnMatchJour').onclick = () => ecrire('matchJour', { actif: $('#mjActif').checked, robots: $('#mjRobots').value, niveauRobots: Number($('#mjNiveau').value) });

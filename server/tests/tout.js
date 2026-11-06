@@ -787,6 +787,27 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     await api('/admin/api/reglages/nouveaute', { methode: 'PUT', jeton: adminJeton, corps: { valeur: { bande: false } } });
     assert.strictEqual((await api('/api/config')).json.nouveaute, null);
   });
+  await test('groupes de la communauté : gérés dans l\'admin, seuls les visibles avec un lien vont aux joueurs, dans l\'ordre', async () => {
+    assert.deepStrictEqual((await api('/api/config')).json.communautes, []);
+    const mettre = (valeur) => api('/admin/api/reglages/communautes', { methode: 'PUT', jeton: adminJeton, corps: { valeur } });
+    assert.strictEqual((await mettre([{ reseau: 'myspace', url: 'https://a.b' }])).statut, 400, 'réseau inconnu');
+    assert.strictEqual((await mettre([{ reseau: 'whatsapp', url: 'javascript:alert(1)' }])).statut, 400, 'lien dangereux');
+    assert.strictEqual((await mettre([{ reseau: 'whatsapp', url: 'http://chat.whatsapp.com/x' }])).statut, 400, 'http refusé');
+    assert.strictEqual((await mettre([{ reseau: 'whatsapp', libelle: '<b>', url: 'https://a.b' }])).statut, 400);
+    const ok = await mettre([
+      { reseau: 'telegram', libelle: '  Kopo   Kinshasa ', url: 't.me/kopo', visible: true },
+      { reseau: 'facebook', libelle: 'Page', url: 'https://facebook.com/kopo', visible: false },
+      { reseau: 'whatsapp', libelle: '', url: '', visible: true },
+      { reseau: 'whatsapp', libelle: '', url: 'https://chat.whatsapp.com/abc', visible: true },
+    ]);
+    assert.strictEqual(ok.statut, 200);
+    assert.strictEqual(ok.json.valeur.length, 4, 'l\'admin garde aussi les groupes cachés ou sans lien');
+    assert.deepStrictEqual((await api('/api/config')).json.communautes, [
+      { reseau: 'telegram', libelle: 'Kopo Kinshasa', url: 'https://t.me/kopo' },
+      { reseau: 'whatsapp', libelle: 'WhatsApp', url: 'https://chat.whatsapp.com/abc' },
+    ]);
+    await mettre([]);
+  });
   await test('chat : messages gérés dans l\'admin, les autres sont refusés en partie', async () => {
     const mauvais = await api('/admin/api/reglages/messagesRapides', { methode: 'PUT', jeton: adminJeton, corps: { valeur: ['x'.repeat(41)] } });
     assert.strictEqual(mauvais.statut, 400);
