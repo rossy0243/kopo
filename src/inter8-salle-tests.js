@@ -1,0 +1,252 @@
+// Tests de la salle d'Inter (8). Lancer : node src/inter8-salle-tests.js
+'use strict';
+const assert = require('assert');
+const I = require('../moteur/inter8-moteur.js');
+const S = require('./inter8-salle.js');
+
+let ok = 0, ko = 0;
+function test(nom, fn) {
+  try { fn(); ok++; console.log('  ✓ ' + nom); }
+  catch (e) { ko++; console.log('  ✗ ' + nom + '\n      ' + e.stack.split('\n').slice(0, 3).join('\n      ')); }
+}
+
+// Horloge manuelle pour les tests de chrono.
+function horloge() { let t = 1000; const h = () => t; h.avancer = (ms) => (t += ms); return h; }
+
+function salleAvec(n, graine) {
+  const s = S.creerSalle('ABCD', I.hasard(graine === undefined ? 1 : graine));
+  s.durees = { depart: 0, mancheAuto: 0, revanche: 15000 };
+  for (let i = 1; i <= n; i++) assert.ok(S.recevoir(s, 'p' + i, { type: 'rejoindre', nom: 'Ami' + i }).ok);
+  return s;
+}
+
+// Fait jouer tous les téléphones au hasard, uniquement à partir de leur vue.
+function jouerPartieParLesVues(s, rng) {
+  let coups = 0;
+  while (s.etat !== 'finPartie') {
+    if (++coups > 100000) throw new Error('Partie bloquée');
+    if (s.etat === 'finManche') { assert.ok(S.recevoir(s, s.hote, { type: 'mancheSuivante' }).ok); continue; }
+    const ids = s.manche.enJeu.slice().sort(() => rng() - 0.5);
+    let fait = false;
+    for (const id of ids) {
+      const v = S.vue(s, id);
+      const actions = v.manche.actions;
+      if (!actions.length) continue;
+      const horsTour = actions.filter((a) => a.type === 'annoncer' || a.type === 'contester');
+      if (horsTour.length && rng() < 0.5) { assert.ok(S.recevoir(s, id, { type: 'action', action: horsTour[0] }).ok); fait = true; break; }
+      if (v.manche.joueurCourant === id) {
+        const jeu = actions.filter((a) => a.type !== 'annoncer' && a.type !== 'contester');
+        const a = jeu[Math.floor(rng() * jeu.length)];
+        assert.ok(S.recevoir(s, id, { type: 'action', action: a }).ok, JSON.stringify(a));
+        fait = true; break;
+      }
+    }
+    assert.ok(fait, 'personne ne pouvait agir');
+  }
+}
+
+console.log('\nSalon');
+
+test("Le premier arrivé est l'hôte, 8 joueurs maximum", () => {
+  const s = salleAvec(8);
+  assert.strictEqual(s.hote, 'p1');
+  assert.ok(!S.recevoir(s, 'p9', { type: 'rejoindre', nom: 'X' }).ok);
+  assert.ok(!S.recevoir(s, 'p1', { type: 'ajouterRobot' }).ok);
+});
+
+test("Seul l'hôte lance, et il faut 2 joueurs", () => {
+  const s = salleAvec(1);
+  assert.ok(!S.recevoir(s, 'p1', { type: 'lancer' }).ok);
+  S.recevoir(s, 'p2', { type: 'rejoindre', nom: 'B' });
+  assert.ok(!S.recevoir(s, 'p2', { type: 'lancer' }).ok);
+  assert.ok(S.recevoir(s, 'p1', { type: 'lancer' }).ok);
+  assert.strictEqual(s.etat, 'manche');
+});
+
+test("Style de partie : l'hôte choisit Simple ou Délire dans le salon", () => {
+  const s = salleAvec(3);
+  assert.ok(!S.recevoir(s, 'p2', { type: 'reglages', mode: 'delire' }).ok, 'pas un invité');
+  assert.ok(!S.recevoir(s, 'p1', { type: 'reglages', mode: 'fou' }).ok);
+  assert.ok(S.recevoir(s, 'p1', { type: 'reglages', mode: 'delire' }).ok);
+  assert.strictEqual(S.vue(s, 'p2').mode, 'delire');
+  S.recevoir(s, 'p1', { type: 'lancer' });
+  assert.strictEqual(s.manche.mode, 'delire');
+  assert.ok(!S.recevoir(s, 'p1', { type: 'reglages', mode: 'simple' }).ok, 'plus pendant la partie');
+});
+
+test('1 paquet jusqu\'à 4 joueurs, 2 paquets dès 5, gardés toute la partie', () => {
+  const s4 = salleAvec(4); S.recevoir(s4, 'p1', { type: 'lancer' });
+  assert.strictEqual(s4.paquets, 1);
+  const s5 = salleAvec(5); S.recevoir(s5, 'p1', { type: 'lancer' });
+  assert.strictEqual(s5.paquets, 2);
+});
+
+console.log('\nCe que voit chaque joueur');
+
+test('Chacun ne voit que sa main, la carte de référence et le nombre de cartes des autres', () => {
+  const s = salleAvec(3);
+  S.recevoir(s, 'p1', { type: 'lancer' });
+  const v = S.vue(s, 'p2');
+  assert.strictEqual(v.jeu, 'inter8');
+  assert.deepStrictEqual(v.manche.main, s.manche.mains.p2);
+  assert.strictEqual(v.manche.reference, s.manche.defausse[s.manche.defausse.length - 1]);
+  const autres = s.manche.mains.p1.concat(s.manche.mains.p3).filter((c) => !s.manche.mains.p2.includes(c));
+  const texte = JSON.stringify(v);
+  for (const c of autres) assert.ok(!texte.includes('"' + c + '"'), 'la carte ' + c + ' des autres est visible');
+  assert.strictEqual(v.manche.nbCartes.p1, s.manche.mains.p1.length);
+});
+
+test('On ne joue que pour soi : une action au nom d\'un autre est ignorée', () => {
+  const s = salleAvec(2);
+  S.recevoir(s, 'p1', { type: 'lancer' });
+  const courant = s.manche.joueurCourant;
+  const autre = courant === 'p1' ? 'p2' : 'p1';
+  const a = S.vue(s, courant).manche.actions.find((x) => x.type !== 'annoncer');
+  assert.ok(!S.recevoir(s, autre, { type: 'action', action: Object.assign({ joueur: courant }, a) }).ok);
+});
+
+test('Une action mal formée est refusée sans casser la salle', () => {
+  const s = salleAvec(2);
+  S.recevoir(s, 'p1', { type: 'lancer' });
+  const id = s.manche.joueurCourant;
+  assert.ok(!S.recevoir(s, id, { type: 'action', action: { type: 'jouer', cartes: 'AP' } }).ok);
+  assert.ok(!S.recevoir(s, id, { type: 'action', action: { type: 'tricher' } }).ok);
+  assert.ok(!S.recevoir(s, id, { type: 'action', action: { type: 'jouer', cartes: ['ZZ'] } }).ok);
+  assert.strictEqual(s.etat, 'manche');
+});
+
+console.log('\nParties complètes');
+
+test('100 parties jouées par les vues (2 à 8 joueurs, simple et délire) : un vainqueur, les autres éliminés', () => {
+  const rng = I.hasard(3);
+  for (let n = 0; n < 100; n++) {
+    const nb = 2 + (n % 7);
+    const s = salleAvec(nb, n + 10);
+    S.recevoir(s, 'p1', { type: 'reglages', mode: n % 2 ? 'delire' : 'simple' });
+    S.recevoir(s, 'p1', { type: 'lancer' });
+    jouerPartieParLesVues(s, rng);
+    assert.strictEqual(s.elimines.length, nb - 1);
+    assert.ok(!s.elimines.includes(s.vainqueur));
+  }
+});
+
+test('Partie contre les robots : ils jouent seuls jusqu\'à la fin', () => {
+  for (const niveau of S.NIVEAUX_ROBOTS) {
+    const s = salleAvec(1, 5);
+    const h = horloge(); s.horloge = h;
+    S.recevoir(s, 'p1', { type: 'reglages', robots: niveau, niveau: 5 });
+    for (let i = 0; i < 3; i++) S.recevoir(s, 'p1', { type: 'ajouterRobot' });
+    S.recevoir(s, 'p1', { type: 'remplacerParRobot', cible: 'p1' }); // refusé : c'est l'hôte
+    S.recevoir(s, 'p1', { type: 'lancer' });
+    // L'hôte joue par son coup automatique (temps écoulé), les robots jouent seuls.
+    let tours = 0;
+    while (s.etat !== 'finPartie') {
+      if (++tours > 200000) throw new Error('Partie bloquée');
+      if (s.etat === 'finManche') { S.recevoir(s, 'p1', { type: 'mancheSuivante' }); continue; }
+      h.avancer(500);
+      S.tic(s);
+    }
+    assert.strictEqual(s.elimines.length, 3);
+  }
+});
+
+console.log('\nChrono, annonce et pauses');
+
+test('Temps écoulé : coup automatique (pioche) ; après 2 fois, le joueur est absent', () => {
+  const s = salleAvec(2, 8);
+  const h = horloge(); s.horloge = h;
+  S.recevoir(s, 'p1', { type: 'reglages', delai: 5 });
+  S.recevoir(s, 'p1', { type: 'lancer' });
+  const j = s.manche.joueurCourant;
+  h.avancer(5001);
+  assert.ok(S.tic(s));
+  assert.strictEqual(s.expirations[j], 1);
+  assert.ok(s.manche.journal.some((t) => /Temps écoulé/.test(t)));
+});
+
+test("Un robot laisse 3 s à un humain pour annoncer avant de le contester", () => {
+  // p1 humain, p2 robot. On prépare une manche où p1 peut finir au prochain coup.
+  const s = salleAvec(1, 4);
+  const h = horloge(); s.horloge = h; s.pauseRobot = 0;
+  S.recevoir(s, 'p1', { type: 'reglages', robots: 'normaux' });
+  S.recevoir(s, 'p1', { type: 'ajouterRobot' });
+  S.recevoir(s, 'p1', { type: 'lancer' });
+  const robot = s.joueurs[1].id;
+  s.manche = I.nouvelleManche(['p1', robot], { p1: ['3C', '4C'], [robot]: ['3P', '4P', '5P', '6P'] },
+    Array.from({ length: 20 }, (_, i) => '9' + 'PCKT'[i % 4] + '*').concat('5C'), 'p1', { graine: 1 });
+  assert.ok(S.recevoir(s, 'p1', { type: 'action', action: { type: 'jouer', cartes: ['3C'] } }).ok);
+  assert.strictEqual(s.manche.contestable, 'p1');
+  h.avancer(1000);
+  S.tic(s);
+  assert.strictEqual(s.manche.contestable, 'p1', 'le robot attend');
+  assert.ok(S.recevoir(s, 'p1', { type: 'action', action: { type: 'annoncer' } }).ok);
+  assert.strictEqual(s.manche.contestable, null);
+  assert.strictEqual(s.manche.mains.p1.length, 1, 'pas d\'amende');
+});
+
+test("Passé ce délai, le robot conteste : amende d'1 carte", () => {
+  const s = salleAvec(1, 4);
+  const h = horloge(); s.horloge = h; s.pauseRobot = 0;
+  S.recevoir(s, 'p1', { type: 'reglages', robots: 'normaux' });
+  S.recevoir(s, 'p1', { type: 'ajouterRobot' });
+  S.recevoir(s, 'p1', { type: 'lancer' });
+  const robot = s.joueurs[1].id;
+  s.manche = I.nouvelleManche(['p1', robot], { p1: ['3C', '4C'], [robot]: ['3P', '4P', '5P', '6P'] },
+    Array.from({ length: 20 }, (_, i) => '9' + 'PCKT'[i % 4] + '*').concat('5C'), 'p1', { graine: 1 });
+  S.recevoir(s, 'p1', { type: 'action', action: { type: 'jouer', cartes: ['3C'] } });
+  h.avancer(S.DELAI_ANNONCE + 1);
+  S.tic(s);
+  assert.strictEqual(s.manche.mains.p1.length, 2);
+});
+
+test('Compte à rebours de départ : personne ne joue pendant la pause', () => {
+  const s = salleAvec(2);
+  const h = horloge(); s.horloge = h;
+  s.durees.depart = 5000;
+  S.recevoir(s, 'p1', { type: 'lancer' });
+  const id = s.manche.joueurCourant;
+  assert.deepStrictEqual(S.vue(s, id).manche.actions, []);
+  h.avancer(5001);
+  S.tic(s);
+  assert.ok(S.vue(s, id).manche.actions.length > 0);
+});
+
+console.log('\nFin de partie');
+
+test('Revanche : elle repart quand tous les présents ont accepté', () => {
+  const s = salleAvec(2, 6);
+  S.recevoir(s, 'p1', { type: 'lancer' });
+  jouerPartieParLesVues(s, I.hasard(1));
+  S.recevoir(s, 'p1', { type: 'revanche' });
+  assert.strictEqual(s.etat, 'finPartie');
+  S.recevoir(s, 'p2', { type: 'revanche' });
+  assert.strictEqual(s.etat, 'manche');
+});
+
+test('Duel : en revanche, c\'est l\'autre joueur qui commence', () => {
+  const s = salleAvec(2, 7);
+  S.recevoir(s, 'p1', { type: 'lancer' });
+  const premier = s.dernierDuel.ouvreur;
+  jouerPartieParLesVues(s, I.hasard(2));
+  S.recevoir(s, 'p1', { type: 'revanche' });
+  S.recevoir(s, 'p2', { type: 'revanche' });
+  assert.notStrictEqual(s.dernierDuel.ouvreur, premier);
+});
+
+test('Sauvegarde et reprise : la partie continue à l\'identique', () => {
+  const s = salleAvec(3, 9);
+  S.recevoir(s, 'p1', { type: 'lancer' });
+  const t = S.exporter(s);
+  const s2 = S.importer(t, I.hasard(1));
+  assert.deepStrictEqual(s2.manche.mains, s.manche.mains);
+  assert.strictEqual(s2.manche.joueurCourant, s.manche.joueurCourant);
+  S.recevoir(s2, 'p1', { type: 'rejoindre' });
+  S.recevoir(s2, 'p2', { type: 'rejoindre' });
+  S.recevoir(s2, 'p3', { type: 'rejoindre' });
+  s2.durees = { depart: 0, mancheAuto: 0 };
+  jouerPartieParLesVues(s2, I.hasard(4));
+  assert.ok(s2.vainqueur);
+});
+
+console.log(`\n${ok} test(s) réussi(s), ${ko} échec(s).`);
+if (ko) process.exit(1);
