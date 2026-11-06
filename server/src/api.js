@@ -2,6 +2,7 @@
 'use strict';
 const express = require('express');
 const { DEBLOCAGE } = require('./salle-kopo');
+const { etatJeuPour, NOMS_JEUX } = require('./reglages');
 
 const MOTIFS = ['pseudo', 'insultes', 'triche', 'abandon', 'autre'];
 const enveloppe = (fn) => (req, res) => fn(req, res).catch((e) => res.status(e.statut || 500).json({ erreur: e.statut ? e.message : 'Erreur du serveur.' }) && (e.statut || console.error(e)));
@@ -31,13 +32,20 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours,
   function origineSupabase(u) {
     try { return new URL(/^https?:\/\//.test(u.trim()) ? u.trim() : 'https://' + u.trim()).origin; } catch (e) { return null; }
   }
-  r.get('/config', (req, res) => {
+  r.get('/config', enveloppe(async (req, res) => {
     const t = reglages.tout();
-    res.json({ annonce: t.annonce.active ? t.annonce.texte : null, maintenance: t.maintenance.active ? t.maintenance.message : null, versionMin: t.versionMin, tables: t.tables, deblocage: DEBLOCAGE, pot: t.pot, remiseAFlot: t.remiseAFlot.seuil, messages: t.messagesRapides,
+    // État des jeux pour ce joueur (s'il envoie son jeton) : un testeur voit les jeux réservés aux testeurs.
+    let pseudo = null;
+    const jeton = (req.get('authorization') || '').replace(/^Bearer\s+/i, '');
+    if (jeton && (t.jeux.inter8 === 'testeurs' || t.jeux.kopo === 'testeurs')) {
+      try { const id = await auth.verifierJoueur(jeton); const c = id && (await comptes.statut(id)); pseudo = c && c.pseudo; } catch (e) {}
+    }
+    const jeux = Object.fromEntries(Object.keys(NOMS_JEUX).map((j) => [j, etatJeuPour(t.jeux, j, pseudo)]));
+    res.json({ jeux, annonce: t.annonce.active ? t.annonce.texte : null, maintenance: t.maintenance.active ? t.maintenance.message : null, versionMin: t.versionMin, tables: t.tables, deblocage: DEBLOCAGE, pot: t.pot, remiseAFlot: t.remiseAFlot.seuil, messages: t.messagesRapides,
       nouveaute: t.nouveaute && t.nouveaute.bande ? 'bande' : null, // fenêtre « Nouveau : Match du jour et Bande »
       // Connexion Google : active quand CONNEXION_GOOGLE=1 et que Google est activé dans Supabase.
       google: process.env.CONNEXION_GOOGLE === '1' && process.env.SUPABASE_URL ? origineSupabase(process.env.SUPABASE_URL) : null });
-  });
+  }));
 
   // Jouer sans compte (invité). Le compte pourra être rattaché à Google ou au téléphone ensuite.
   // Limite : 20 comptes invités par adresse et par heure (évite les créations en masse).

@@ -406,6 +406,20 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.notStrictEqual(inc.roomId, prive.roomId);
     for (const r of [pub, ami, prive, inc]) await r.leave();
   });
+  await test('un code n\'est jamais partagé entre une salle Kopo et une salle Inter (8) ouvertes', async () => {
+    const client = new Client(URL_.replace('http', 'ws'));
+    const [x, y] = [await invite('Duo' + Date.now() % 1000), await invite('Dua' + (Date.now() + 1) % 1000)];
+    const a = await client.create('kopo', { jeton: x.jeton, code: 'DOUB' });
+    const b = await client.create('inter8', { jeton: y.jeton, code: 'DOUB' });
+    let codeA = null, codeB = null;
+    a.onMessage('vue', (v) => (codeA = v.code)); b.onMessage('vue', (v) => (codeB = v.code));
+    a.send('sync'); b.send('sync');
+    [a, b].forEach((r) => r.onMessage('erreur', () => {}));
+    await attendre(200);
+    assert.strictEqual(codeA, 'DOUB');
+    assert.ok(codeB && codeB !== 'DOUB', codeB);
+    await a.leave(); await b.leave();
+  });
   await test('émoji rapide relayé à toute la table', async () => {
     const client = new Client(URL_.replace('http', 'ws'));
     const [x, y] = [await invite('Emo' + Date.now() % 1000), await invite('Emi' + Date.now() % 1000)];
@@ -740,6 +754,30 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     await api('/admin/api/reglages/versionMin', { methode: 'PUT', jeton: adminJeton, corps: { valeur: actuelle } });
     assert.strictEqual((await api('/api/config')).json.versionMin, actuelle);
     await api('/admin/api/reglages/versionMin', { methode: 'PUT', jeton: adminJeton, corps: { valeur: '1.0' } });
+  });
+  await test('réglages : Inter (8) réservé aux testeurs, Kopo en maintenance, Kopo continue pour les autres', async () => {
+    const t = await invite('Testeuse'), autre = await invite('Passant');
+    const ecrireJeux = (valeur) => api('/admin/api/reglages/jeux', { methode: 'PUT', jeton: adminJeton, corps: { valeur } });
+    assert.deepStrictEqual((await api('/api/config')).json.jeux, { kopo: 'ouvert', inter8: 'ouvert' });
+    assert.strictEqual((await ecrireJeux({ kopo: 'maintenance', inter8: 'testeurs', testeurs: '' })).statut, 400, 'au moins un jeu ouvert');
+    assert.strictEqual((await ecrireJeux({ kopo: 'ouvert', inter8: 'ferme' })).statut, 400);
+    await ecrireJeux({ kopo: 'ouvert', inter8: 'testeurs', testeurs: 'testeuse, Testeuse\n' });
+    assert.deepStrictEqual((await api('/admin/api/reglages', { jeton: adminJeton })).json.jeux.testeurs, ['testeuse']);
+    assert.deepStrictEqual((await api('/api/config', { jeton: t.jeton })).json.jeux, { kopo: 'ouvert', inter8: 'test' });
+    assert.deepStrictEqual((await api('/api/config', { jeton: autre.jeton })).json.jeux, { kopo: 'ouvert', inter8: 'ferme' });
+    assert.deepStrictEqual((await api('/api/config')).json.jeux, { kopo: 'ouvert', inter8: 'ferme' });
+    const client = new Client(URL_.replace('http', 'ws'));
+    const a = await client.create('inter8', { jeton: t.jeton, code: 'TEST' });
+    a.onMessage('vue', () => {}); a.onMessage('erreur', () => {});
+    await assert.rejects(client.join('inter8', { jeton: autre.jeton, code: 'TEST' }), /pas encore ouvert/);
+    const k = await client.create('kopo', { jeton: autre.jeton, code: 'KOKO' });
+    k.onMessage('vue', () => {}); k.onMessage('erreur', () => {});
+    // Kopo en maintenance : on n'entre plus, mais Inter reste ouvert à tous.
+    await ecrireJeux({ kopo: 'maintenance', inter8: 'ouvert', testeurs: [] });
+    assert.deepStrictEqual((await api('/api/config')).json.jeux, { kopo: 'maintenance', inter8: 'ouvert' });
+    await assert.rejects(client.join('kopo', { jeton: t.jeton, code: 'KOKO' }), /Kopo est en maintenance/);
+    await ecrireJeux({ kopo: 'ouvert', inter8: 'ouvert', testeurs: [] });
+    await a.leave(); await k.leave();
   });
   await test('réglages : fenêtre « Nouveau » de la compétition, éteinte par défaut', async () => {
     assert.strictEqual((await api('/api/config')).json.nouveaute, null);
