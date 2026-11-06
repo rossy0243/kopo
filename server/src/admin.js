@@ -66,11 +66,14 @@ function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainag
         (SELECT count(*) FROM presences p WHERE p.jour = d::date)::int AS actifs,
         (SELECT count(*) FROM comptes c WHERE c.cree_le::date = d::date)::int AS nouveaux,
         (SELECT count(*) FROM parties x WHERE x.debut::date = d::date)::int AS parties,
-        (SELECT count(*) FROM parties x WHERE x.debut::date = d::date AND x.avec_robots)::int AS parties_robots
+        (SELECT count(*) FROM parties x WHERE x.debut::date = d::date AND x.avec_robots)::int AS parties_robots,
+        (SELECT count(*) FROM parties x WHERE x.debut::date = d::date AND x.jeu = 'inter8')::int AS parties_inter8
       FROM generate_series(current_date - 29, current_date, interval '1 day') d ORDER BY d`);
     const [partiesInfo] = await q(`SELECT coalesce(round(avg(extract(epoch FROM fin - debut) / 60)::numeric, 1), 0)::float AS duree_min,
         coalesce(round(avg(nb_joueurs)::numeric, 1), 0)::float AS joueurs_moyens,
-        (SELECT count(*) FROM participations WHERE abandon)::int AS abandons
+        (SELECT count(*) FROM participations WHERE abandon)::int AS abandons,
+        count(*) FILTER (WHERE jeu = 'kopo')::int AS kopo,
+        count(*) FILTER (WHERE jeu = 'inter8')::int AS inter8
       FROM parties WHERE fin IS NOT NULL AND debut > now() - interval '30 days'`);
     res.json({ actifs, inscrits, retention, parJour, parties: partiesInfo });
   }));
@@ -123,7 +126,7 @@ function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainag
         (SELECT count(*) FROM signalements WHERE cible_id = $1)::int AS signalements, (SELECT count(*) FROM sanctions WHERE compte_id = $1)::int AS sanctions,
         (SELECT count(*) FROM registre_pieces WHERE compte_id = $1)::int AS operations, (SELECT count(*) FROM inventaire WHERE compte_id = $1)::int AS objets
         FROM participations WHERE compte_id = $1`))[0],
-      parties: await q(`SELECT x.id, x.code, x.debut, x.nb_joueurs, x.avec_robots, p.place, p.abandon FROM participations p JOIN parties x ON x.id = p.partie_id WHERE p.compte_id = $1 ORDER BY x.debut DESC LIMIT ${FICHE.parties}`),
+      parties: await q(`SELECT x.id, x.code, x.jeu, x.debut, x.nb_joueurs, x.avec_robots, p.place, p.abandon FROM participations p JOIN parties x ON x.id = p.partie_id WHERE p.compte_id = $1 ORDER BY x.debut DESC LIMIT ${FICHE.parties}`),
       pieces: await comptes.historique(c.id, FICHE.pieces),
       signalementsRecus: await q(`SELECT s.id, s.motif, s.details, s.statut, s.cree_le, a.pseudo AS auteur FROM signalements s JOIN comptes a ON a.id = s.auteur_id WHERE s.cible_id = $1 ORDER BY s.id DESC LIMIT ${FICHE.signalements}`),
       sanctions: await q(`SELECT type, motif, jusqu, cree_le FROM sanctions WHERE compte_id = $1 ORDER BY id DESC LIMIT ${FICHE.sanctions}`),

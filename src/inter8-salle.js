@@ -87,7 +87,7 @@
   // Applique une action du moteur, puis fait suivre la salle (fin de manche, chrono).
   function appliquer(s, action) {
     const courantAvant = s.manche.joueurCourant;
-    const contestableAvant = s.manche.contestable;
+    const contestablesAvant = (s.manche.contestables || []).slice();
     I.jouer(s.manche, action);
     finirMancheSiBesoin(s);
     // Annoncer ou contester ne change pas le joueur courant : on ne relance pas son chrono.
@@ -97,12 +97,12 @@
     const m = s.manche;
     // Plusieurs cartes posées d'un coup : elles sont d'abord montrées en éventail à toute la table.
     if (action.type === 'jouer' && action.cartes.length > 1 && s.robotPret && !(s.pauseRobot >= 0)) s.robotPret += PAUSE_EVENTAIL;
-    // Pendant ces 3 s, personne (humain ou robot) ne peut contester ; ensuite, tout le monde peut.
-    if (m && m.contestable && m.contestable !== contestableAvant) s.annonceJusqua = estRobot(s, m.contestable) ? null : s.horloge() + DELAI_ANNONCE;
-    if (!m || !m.contestable) s.annonceJusqua = null;
-    if (m && m.contestable && m.contestable !== contestableAvant && !estRobot(s, m.contestable) && s.robotPret) {
-      s.robotPret = Math.max(s.robotPret, s.horloge() + DELAI_ANNONCE);
-    }
+    // Pendant ces 3 s, personne (humain ou robot) ne peut contester ; ensuite, tout le monde peut,
+    // jusqu'au prochain tour du joueur (même si d'autres ont joué entre-temps).
+    const nouveaux = m ? (m.contestables || []).filter((j) => !contestablesAvant.includes(j) && !estRobot(s, j)) : [];
+    s.graces = Object.fromEntries(Object.entries(s.graces || {}).filter(([j]) => m && (m.contestables || []).includes(j)));
+    for (const j of nouveaux) s.graces[j] = s.horloge() + DELAI_ANNONCE;
+    if (nouveaux.length && s.robotPret) s.robotPret = Math.max(s.robotPret, s.horloge() + DELAI_ANNONCE);
   }
 
   function lancer(s) {
@@ -118,8 +118,9 @@
 
   function tic(s) {
     // Fin des 3 s pour annoncer : le bouton « Contester » apparaît chez les autres (la vue change).
-    const finAnnonce = !!(s.annonceJusqua && s.horloge() >= s.annonceJusqua);
-    if (finAnnonce) s.annonceJusqua = null;
+    const finies = Object.keys(s.graces || {}).filter((j) => s.horloge() >= s.graces[j]);
+    finies.forEach((j) => delete s.graces[j]);
+    const finAnnonce = finies.length > 0;
     return avancer(s) || finAnnonce;
   }
   function avancer(s) {
@@ -143,6 +144,7 @@
       if (estRobot(s, m.joueurCourant)) candidats.push(m.joueurCourant);
       for (const j of candidats) {
         const a = choixRobot(s, j);
+        if (a && a.type === 'contester' && enGrace(s, a.cible || (m.contestables || [])[0])) continue; // il attend la fin des 3 s
         if (a) { appliquer(s, a); return true; }
       }
     }
@@ -182,7 +184,7 @@
     const premier = choisirPremier(s, sieges);
     s.numeroManche++;
     s.suiteA = null;
-    s.annonceJusqua = null;
+    s.graces = {};
     s.manche = I.nouvelleManche(sieges, mains, pioche, premier, { mode: s.mode, graine: Math.floor(s.rng() * 4294967296) });
     s.etat = 'manche';
     s.pause = s.durees.depart > 0 ? { type: 'depart', jusqua: s.horloge() + s.durees.depart, total: s.durees.depart } : null;
@@ -259,6 +261,7 @@
       action.cartes = a.cartes.slice();
       if (typeof a.demande === 'string') action.demande = a.demande.slice(0, 2);
     } else if (!['piocher', 'passer', 'annoncer', 'contester'].includes(a.type)) return null;
+    if (a.type === 'contester' && typeof a.cible === 'string') action.cible = a.cible.slice(0, 64);
     return action;
   }
 
@@ -384,7 +387,11 @@
         // Le joueur ne peut agir que pour lui-même : on impose son id.
         const action = actionDe(id, msg.action || {});
         if (!action) return { ok: false, erreur: 'Action impossible maintenant.' };
-        if (action.type === 'contester' && enGraceAnnonce(s)) return { ok: false, erreur: 'Laisse-lui 3 secondes pour annoncer.' };
+        if (action.type === 'contester') {
+          // Sans cible précise : le premier joueur qu'on peut déjà contester.
+          if (!action.cible) action.cible = (s.manche.contestables || []).find((c) => c !== id && !enGrace(s, c));
+          if (!action.cible || enGrace(s, action.cible)) return { ok: false, erreur: 'Laisse-lui 3 secondes pour annoncer.' };
+        }
         try {
           appliquer(s, action);
           revenu(s, id);
@@ -415,7 +422,8 @@
     });
   }
 
-  const enGraceAnnonce = (s) => !!(s.annonceJusqua && s.horloge() < s.annonceJusqua);
+  // Le joueur « j » a encore ses 3 s pour annoncer : personne ne peut le contester.
+  const enGrace = (s, j) => !!(j && s.graces && s.graces[j] && s.horloge() < s.graces[j]);
 
   // Vue envoyée à un joueur : uniquement ce qu'il a le droit de voir.
   function vue(s, id) {
@@ -453,7 +461,7 @@
         sens: p.sens,
         pioche: p.pioche,
         annonces: p.annonces,
-        contestable: p.contestable,
+        contestables: p.contestables,
         aPioche: p.aPioche,
         phase: m.phase,
         nulle: m.phase === 'nulle',
@@ -467,8 +475,8 @@
         dernier: p.dernier, // qui a posé la carte du centre
         paquets: p.paquets,
         pause: s.pause ? { type: s.pause.type, resteMs: Math.max(0, s.pause.jusqua - s.horloge()), totalMs: s.pause.total } : null,
-        annonce: enGraceAnnonce(s) ? { resteMs: s.annonceJusqua - s.horloge(), totalMs: DELAI_ANNONCE } : null,
-        actions: s.pause ? [] : I.actionsPossibles(m, id).filter((a) => !(a.type === 'contester' && enGraceAnnonce(s))).map((a) => {
+        enGrace: (p.contestables || []).filter((j) => enGrace(s, j)), // pas encore contestables (3 s pour annoncer)
+        actions: s.pause ? [] : I.actionsPossibles(m, id).filter((a) => !(a.type === 'contester' && enGrace(s, a.cible))).map((a) => {
           const r = { type: a.type };
           if (a.cartes) r.cartes = a.cartes.slice();
           if (a.demande) r.demande = a.demande;
