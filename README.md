@@ -26,7 +26,7 @@ Le dossier `server/` contient le serveur de la V1 (comptes, parties sur le serve
 ## Fichiers
 - `index.html` : la page complète, générée par `node build.js`.
 - `moteur/` : moteur de règles de Kopo (règlement v1.2) et ses tests.
-- `moteur/inter8-moteur.js` : moteur de règles d'Inter (8) (règlement v1.0), le second jeu de l'appli, et ses tests (`moteur/inter8-tests.js`). Pas encore branché sur l'appli.
+- `moteur/inter8-moteur.js` : moteur de règles d'Inter (8) (règlement v1.0), le second jeu de l'appli, et ses tests (`moteur/inter8-tests.js`). Robots Facile, Normal et Fort dans `moteur/inter8-robots.js` (tests : `moteur/inter8-robots-tests.js`). Pas encore branché sur l'appli.
 - `src/kopo-salle.js` : salle de jeu (salon, manches, chrono, revanche, vues par joueur) et ses tests.
 - `src/kopo-retention.js` : XP, niveau, stats, face-à-face, missions, défi, bienvenue, joker, collection (calculés sur le téléphone, dans `kopo-profil`) et ses tests.
 - `src/kopo-sons.js` : effets sonores et musique d'ambiance, synthétisés en Web Audio.
@@ -40,6 +40,7 @@ Quand une adresse de serveur est renseignée (`SERVEUR_PAR_DEFAUT` dans `src/sou
 ```
 node moteur/kopo-tests.js
 node moteur/inter8-tests.js
+node moteur/inter8-robots-tests.js
 node src/kopo-salle-tests.js
 node src/kopo-retention-tests.js
 ```

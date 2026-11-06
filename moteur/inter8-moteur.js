@@ -404,6 +404,7 @@
       demande: m.demande ? { ...m.demande } : null,
       sens: m.sens,
       mode: m.mode,
+      paquets: Math.round((m.pioche.length + m.defausse.length + Object.values(m.mains).reduce((t, l) => t + l.length, 0)) / 54),
       pioche: m.pioche.length,
       joueurCourant: m.joueurCourant,
       aPioche: m.joueurCourant === joueur ? m.aPioche : null,
