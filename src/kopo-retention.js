@@ -27,12 +27,31 @@
   }
 
   // ------------------------------------------------------------------ XP et niveau (profil-joueur §3)
-  const XP = { partie: 5, manche: 10, katapss: 15, finale: 20, victoire: 50, premiere: 100 };
-  const xpPourNiveau = (n) => 100 + 25 * (n - 1); // XP pour passer du niveau n au niveau n+1
-  function niveauDe(xp) {
+  // Barème 2 (06/11) : on avance un peu à chaque partie, mais monter vite est réservé à ceux qui jouent beaucoup et bien.
+  // Avant : 5 / 10 par manche / 15 / 20 / 50, première partie 100, et 100 + 25 par niveau.
+  const XP = { partie: 2, manche: 2, katapss: 5, finale: 5, victoire: 10, premiere: 50 };
+  const BAREME = 2;
+  const xpPourNiveau = (n) => 100 + 50 * (n - 1); // XP pour passer du niveau n au niveau n+1
+  const ancienXpPourNiveau = (n) => 100 + 25 * (n - 1);
+  function niveauSelon(xp, cout) {
     let n = 1, reste = Math.max(0, xp || 0);
-    while (reste >= xpPourNiveau(n)) { reste -= xpPourNiveau(n); n++; }
-    return { niveau: n, dansNiveau: reste, pourSuivant: xpPourNiveau(n) };
+    while (reste >= cout(n)) { reste -= cout(n); n++; }
+    return { niveau: n, dansNiveau: reste, pourSuivant: cout(n) };
+  }
+  const niveauDe = (xp) => niveauSelon(xp, xpPourNiveau);
+  // XP total pour arriver au début du niveau n.
+  function debutNiveau(n) { let t = 0; for (let i = 1; i < n; i++) t += xpPourNiveau(i); return t; }
+  // Passage au barème 2 : chacun garde son niveau et l'avancée dans la barre ; la suite se fait avec la nouvelle courbe.
+  // Renvoie true si le profil a changé.
+  function convertirXp(p) {
+    if (!p || typeof p !== 'object' || p.bareme === BAREME) return false;
+    const xp = Number.isFinite(p.xp) && p.xp > 0 ? p.xp : 0;
+    if (xp) {
+      const a = niveauSelon(xp, ancienXpPourNiveau);
+      p.xp = debutNiveau(a.niveau) + Math.floor((a.dansNiveau / a.pourSuivant) * xpPourNiveau(a.niveau));
+    }
+    p.bareme = BAREME;
+    return true;
   }
 
   // ------------------------------------------------------------------ objets de collection
@@ -111,7 +130,7 @@
   ];
   const modele = (id) => MODELES.find((m) => m.id === id);
   const PAR_JOUR = 3, DUREE_MISSION = 2; // 3 missions par jour, gardées 2 jours (on peut rater un jour)
-  const xpMission = (m) => Math.round(m.pieces / 2);
+  const xpMission = (m) => Math.round(m.pieces / 10); // 4 à 10 XP (avant : la moitié des pièces)
 
   function tirerMissions(jour, exclus, n, sel) {
     const r = hasard('missions-' + jour + (sel || ''));
@@ -168,7 +187,7 @@
     { id: 'finales6', texte: 'Atteins 6 finales cette semaine', cible: 6, compte: (e) => (e.finale ? 1 : 0) },
   ];
   const CADRES = ['cadre-kinshasa', 'cadre-abidjan', 'cadre-dakar', 'cadre-douala', 'cadre-brazzaville']; // pays seulement
-  const DEFI_PIECES = 300, DEFI_XP = 150;
+  const DEFI_PIECES = 300, DEFI_XP = 30;
   function defiSemaine(p, jour) {
     const sem = semaineDe(jour);
     if (!p.defi || p.defi.semaine !== sem) {
@@ -251,11 +270,12 @@
   // Enregistre une partie terminée. Renvoie le récap à montrer (XP, missions, défi, face-à-face).
   function enregistrerPartie(p, e, jour) {
     if (e.place < 1) return null;
+    convertirXp(p);
     const xpAvant = p.xp || 0;
     const premiere = !p.premierePartie;
-    // XP (divisée par deux avec des robots) + bonus de la toute première partie (niveau 2 tout de suite).
+    // XP (divisée par deux avec des robots, 1 au moins) + bonus de la toute première partie (une demi-barre).
     let xp = XP.partie + e.manches * XP.manche + e.katapss * XP.katapss + (e.finale ? XP.finale : 0) + (e.victoire ? XP.victoire : 0);
-    if (e.avecRobots) xp = Math.floor(xp / 2);
+    if (e.avecRobots) xp = Math.max(1, Math.floor(xp / 2));
     if (premiere) { xp += XP.premiere; p.premierePartie = jour; }
     // Stats (les parties avec des robots sont rangées à part : entraînement)
     if (e.avecRobots) {
@@ -340,6 +360,9 @@
   function fusionnerProfils(p, ancien, mode = 'somme') {
     if (!ancien || typeof ancien !== 'object' || !(ancien.xp > 0 || ancien.premierePartie)) return false;
     const sig = signatureProfil(ancien);
+    // Les deux profils sur le même barème avant de comparer ou d'additionner (l'ancien n'est pas modifié).
+    convertirXp(p);
+    if (ancien.bareme !== BAREME) { ancien = Object.assign({}, ancien); convertirXp(ancien); }
     const deja = Array.isArray(p.fusions) ? p.fusions : [];
     if (deja.includes(sig)) return false;
     // Le profil local est la suite de l'ancien (copié tel quel, puis joué) : rien à ajouter.
@@ -383,7 +406,7 @@
 
   const KopoRetention = {
     jourDe, decaler, ecart, semaineDe, hasard,
-    XP, xpPourNiveau, niveauDe,
+    XP, BAREME, xpPourNiveau, niveauDe, debutNiveau, convertirXp,
     OBJETS, OBJETS_NIVEAU, CATEGORIES, parCategorie, collection, donnerObjet, equiper,
     MODELES, missionsDuJour, peutChanger, changerMission,
     DEFIS, defiSemaine,

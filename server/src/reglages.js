@@ -18,15 +18,19 @@ const DEFAUTS = {
   // Ligue classée (retention.md §3.4). Divisions : bois, bronze, argent, or, diamant, legende.
   ligue: {
     seuils: { bois: 0, bronze: 100, argent: 250, or: 450, diamant: 700, legende: 1000 }, // points pour entrer dans la division
-    points: { premier: 30, deuxieme: 15, troisieme: 5, avantDernier: -5, dernier: -10, abandon: -15 },
+    // Durcis le 06/11 (avant : 30 / 15 / 5 / -5 / -10 / -15) : un joueur moyen ne gagne plus que 2 à 3 points par partie.
+    points: { premier: 20, deuxieme: 8, troisieme: 2, avantDernier: -8, dernier: -12, abandon: -20 },
     protection: 3, // parties après une montée (ou un début de saison) pendant lesquelles on ne peut pas redescendre
     joueursMin: 3, // joueurs humains minimum pour qu'une partie publique soit classée
     dureeJours: 28, // 4 semaines (décision du 31/10)
     recompenses: { bois: 100, bronze: 200, argent: 400, or: 700, diamant: 1000, legende: 1500 }, // pièces selon la division atteinte
     descente: { bois: 0, bronze: 1, argent: 1, or: 1, diamant: 2, legende: 2 }, // divisions perdues au début de la saison suivante
   },
-  // Parcours de saison (retention.md §3.5) : environ 50 XP par partie, 100 XP par palier, 30 paliers.
-  parcours: { xpPartie: 30, xpManche: 5, xpVictoire: 15, xpPalier: 100, paliers: 30 },
+  // Parcours de saison (retention.md §3.5), durci le 06/11 : environ 18 XP par partie (avant : 30 / 5 / 15, environ 43).
+  parcours: { xpPartie: 10, xpManche: 3, xpVictoire: 10, xpPalier: 100, paliers: 30 },
+  // Seuils de la ligue et XP par palier plus durs : appliqués à l'ouverture de la prochaine saison (décision du 06/11),
+  // pour ne faire redescendre personne en pleine saison. Remis à { enAttente: false } une fois appliqués.
+  durcissement: { enAttente: true, seuils: { bois: 0, bronze: 100, argent: 300, or: 600, diamant: 1000, legende: 1500 }, xpPalier: 120 },
   // Cadeau de fondateur (dos « Les Fondateurs ») pour ceux qui avaient des pièces d'essai (décision du 01/11).
   cadeauFondateur: { actif: true },
   // Parrainage : quand l'ami invité (compte Google neuf) a joué `parties` parties entre humains.
@@ -228,6 +232,13 @@ function creerReglages(base) {
         valeur = { actif: valeur.actif !== false && valeur.actif !== 0, robots: valeur.robots, niveauRobots: n };
       }
       if (cle === 'bande') valeur = verifierBande(valeur);
+      if (cle === 'durcissement') {
+        if (valeur.enAttente) {
+          verifierLigue({ ...DEFAUTS.ligue, seuils: valeur.seuils });
+          if (!(entier(valeur.xpPalier) >= 10)) throw Object.assign(new Error('Il faut au moins 10 XP par palier.'), { statut: 400 });
+          valeur = { enAttente: true, seuils: { ...valeur.seuils }, xpPalier: entier(valeur.xpPalier) };
+        } else valeur = { enAttente: false };
+      }
       if (cle === 'jeux') valeur = verifierJeux(valeur);
       if (cle === 'nouveaute') valeur = { bande: !!(valeur && valeur.bande === true) };
       if (cle === 'prochaineSaison') valeur = { nom: String(valeur.nom || '').replace(/[<>]/g, '').trim().slice(0, 40), theme: String(valeur.theme || '').replace(/[<>]/g, '').trim().slice(0, 40) };

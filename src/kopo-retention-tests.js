@@ -27,29 +27,57 @@ test('Décalage de jours et écart', () => {
 });
 
 console.log('\nXP et niveau');
-test('Courbe : 100 XP pour le niveau 2, 125 pour le 3', () => {
+test('Courbe : 100 XP pour le niveau 2, 150 pour le 3, puis 50 de plus à chaque niveau', () => {
   assert.deepStrictEqual(R.niveauDe(0), { niveau: 1, dansNiveau: 0, pourSuivant: 100 });
   assert.strictEqual(R.niveauDe(99).niveau, 1);
   assert.strictEqual(R.niveauDe(100).niveau, 2);
-  assert.strictEqual(R.niveauDe(224).niveau, 2);
-  assert.strictEqual(R.niveauDe(225).niveau, 3);
+  assert.strictEqual(R.niveauDe(249).niveau, 2);
+  assert.strictEqual(R.niveauDe(250).niveau, 3);
+  assert.strictEqual(R.debutNiveau(10), 2700);
+  assert.strictEqual(R.debutNiveau(20), 10450);
+  assert.strictEqual(R.niveauDe(2700).niveau, 10);
 });
-test('Première partie, même perdue contre des robots : niveau 2 et avatar débloqué', () => {
+test('Première partie, même perdue contre des robots : une demi-barre, pas encore le niveau 2', () => {
   const p = profil();
   const r = R.enregistrerPartie(p, partie({ place: 3, nbJoueurs: 3, manches: 0, avecRobots: true, publique: false }), '2026-10-31');
   assert.strictEqual(r.premiere, true);
-  assert.strictEqual(r.niveauApres.niveau, 2);
-  assert.deepStrictEqual(r.objets, ['av-nuit']);
-  assert.strictEqual(p.collection.equipes.avatar, 'av-nuit');
+  assert.strictEqual(r.xpPartie, 1 + 50);
+  assert.strictEqual(r.niveauApres.niveau, 1);
+  assert.deepStrictEqual(r.objets, []);
   assert.strictEqual(p.entrainement.parties, 1);
   assert.ok(!p.stats, 'les parties avec robots ne comptent pas dans les stats');
 });
-test('XP : victoire à 5 = 5 + 4×10 + 20 + 50, divisée par deux avec des robots', () => {
+test('Niveau 2 atteint : avatar débloqué', () => {
+  const p = profil(); p.premierePartie = 'x'; p.bareme = R.BAREME; p.xp = 95;
+  const r = R.enregistrerPartie(p, partie({ place: 2, manches: 3 }), '2026-10-31');
+  assert.strictEqual(r.niveauApres.niveau, 2);
+  assert.deepStrictEqual(r.objets, ['av-nuit']);
+  assert.strictEqual(p.collection.equipes.avatar, 'av-nuit');
+});
+test('XP : victoire à 5 = 2 + 4×2 + 5 + 10, divisée par deux avec des robots', () => {
   const p = profil(); p.premierePartie = 'x';
   let r = R.enregistrerPartie(p, partie({ place: 1, manches: 4, finale: true, victoire: true }), '2026-10-31');
-  assert.strictEqual(r.xpPartie, 115);
+  assert.strictEqual(r.xpPartie, 25);
   r = R.enregistrerPartie(p, partie({ place: 1, manches: 4, finale: true, victoire: true, avecRobots: true }), '2026-10-31');
-  assert.strictEqual(r.xpPartie, 57);
+  assert.strictEqual(r.xpPartie, 12);
+  r = R.enregistrerPartie(p, partie({ place: 5, manches: 0, finale: false, victoire: false, avecRobots: true }), '2026-10-31');
+  assert.strictEqual(r.xpPartie, 1, 'au moins 1 XP : la barre bouge toujours');
+});
+test('Ancien barème : chacun garde son niveau et son avancée dans la barre', () => {
+  // Ancien : niveau 10 = 1800 XP, 325 XP pour le 11. 1800 + 162 = mi-chemin du niveau 10.
+  const p = { xp: 1800 + 162 };
+  assert.strictEqual(R.convertirXp(p), true);
+  assert.strictEqual(p.bareme, R.BAREME);
+  assert.strictEqual(R.niveauDe(p.xp).niveau, 10);
+  assert.strictEqual(p.xp, 2700 + Math.floor((162 / 325) * 550));
+  assert.strictEqual(R.convertirXp(p), false, 'une seule fois');
+  const neuf = {}; R.convertirXp(neuf);
+  assert.strictEqual(neuf.xp, undefined);
+  // Un profil sur l'ancien barème est converti avant d'ajouter la partie.
+  const q = { xp: 100, premierePartie: 'x' };
+  const r = R.enregistrerPartie(q, partie({ place: 1, manches: 4, finale: true, victoire: true }), '2026-10-31');
+  assert.strictEqual(r.xpAvant, 100);
+  assert.strictEqual(r.niveauAvant.niveau, 2);
 });
 
 console.log('\nFace-à-face');
