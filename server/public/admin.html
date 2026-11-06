@@ -353,6 +353,10 @@ const afficher = {
         <div class="ligne"><input id="annonce" value="${esc(r.annonce.texte)}" placeholder="Ex. Tournoi samedi à 20 h !" style="flex:1;min-width:260px"><label><input type="checkbox" id="annonceActive" ${r.annonce.active ? 'checked' : ''}> affichée</label><button class="btn principal" id="btnAnnonce">Enregistrer</button></div>
         <h3>Maintenance</h3>
         <div class="ligne"><input id="maint" value="${esc(r.maintenance.message)}" style="flex:1;min-width:260px"><label><input type="checkbox" id="maintActive" ${r.maintenance.active ? 'checked' : ''}> <span class="ko">jeu fermé</span></label><button class="btn" id="btnMaint">Enregistrer</button></div>
+        <h3>État des jeux</h3>
+        <p class="muted">« Testeurs seulement » : le jeu est caché aux autres joueurs, seuls les pseudos de la liste le voient et y jouent. « Maintenance » : le jeu reste visible mais on ne peut plus y entrer ; les parties en cours vont au bout. L'autre jeu continue normalement.</p>
+        ${[['kopo', 'Kopo'], ['inter8', 'Inter (8)']].map(([j, nom]) => `<label class="ligne"><span style="min-width:120px">${nom}</span><select id="jeu_${j}">${[['ouvert', 'Ouvert à tous'], ['testeurs', 'Testeurs seulement'], ['maintenance', 'En maintenance']].map(([v, t]) => `<option value="${v}" ${(r.jeux || {})[j] === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>`).join('')}
+        <div class="ligne"><input id="testeurs" value="${esc(((r.jeux || {}).testeurs || []).join(', '))}" placeholder="Pseudos des testeurs, séparés par des virgules" style="flex:1;min-width:260px"><button class="btn principal" id="btnJeux">Enregistrer</button></div>
         <h3>Cadeau de fondateur</h3>
         <div class="ligne"><label><input type="checkbox" id="fondateurActif" ${r.cadeauFondateur && r.cadeauFondateur.active !== false && r.cadeauFondateur.actif ? 'checked' : ''}> distribuer le dos « Les Fondateurs » aux joueurs qui avaient des pièces d'essai</label><button class="btn" id="btnFondateur">Enregistrer</button></div>
         <h3>Version minimale de l'application</h3>
@@ -384,6 +388,7 @@ const afficher = {
     }));
     $('#btnAnnonce').onclick = () => ecrire('annonce', { texte: $('#annonce').value, active: $('#annonceActive').checked });
     $('#btnMaint').onclick = () => { if (!$('#maintActive').checked || confirm('Fermer le jeu pour maintenance ?')) ecrire('maintenance', { message: $('#maint').value, active: $('#maintActive').checked }); };
+    $('#btnJeux').onclick = () => ecrire('jeux', { kopo: $('#jeu_kopo').value, inter8: $('#jeu_inter8').value, testeurs: $('#testeurs').value });
     $('#btnMessages').onclick = () => ecrire('messagesRapides', $('#messagesRapides').value.split('\n'));
     $('#btnFondateur').onclick = () => ecrire('cadeauFondateur', { actif: $('#fondateurActif').checked });
     $('#btnMatchJour').onclick = () => ecrire('matchJour', { actif: $('#mjActif').checked, robots: $('#mjRobots').value, niveauRobots: Number($('#mjNiveau').value) });

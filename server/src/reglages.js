@@ -12,6 +12,8 @@ const DEFAUTS = {
   nouveaute: { bande: false },
   maintenance: { active: false, message: 'Masano est en maintenance. On revient très vite !' },
   versionMin: '1.0',
+  // État de chaque jeu : ouvert à tous, réservé aux testeurs (pseudos de la liste), ou en maintenance.
+  jeux: { kopo: 'ouvert', inter8: 'ouvert', testeurs: [] },
   // Messages du chat en partie : les joueurs ne peuvent envoyer que ceux-là (pas de texte libre, donc pas d'insultes).
   // Ligue classée (retention.md §3.4). Divisions : bois, bronze, argent, or, diamant, legende.
   ligue: {
@@ -113,6 +115,31 @@ function verifierBande(v) {
   return out;
 }
 
+// État des jeux : chaque jeu ouvert, testeurs ou maintenance ; au moins un jeu ouvert ; pseudos des testeurs.
+const ETATS_JEU = ['ouvert', 'testeurs', 'maintenance'];
+const NOMS_JEUX = { kopo: 'Kopo', inter8: 'Inter (8)' };
+function verifierJeux(v) {
+  const err = (m) => { throw Object.assign(new Error(m), { statut: 400 }); };
+  const out = {};
+  for (const j of Object.keys(NOMS_JEUX)) {
+    if (!ETATS_JEU.includes(v[j])) err(`État invalide pour ${NOMS_JEUX[j]} : ouvert, testeurs ou maintenance.`);
+    out[j] = v[j];
+  }
+  if (!Object.keys(NOMS_JEUX).some((j) => out[j] === 'ouvert')) err('Garde au moins un jeu ouvert à tous.');
+  const liste = Array.isArray(v.testeurs) ? v.testeurs : String(v.testeurs || '').split(/[\n,]/);
+  const vus = new Set();
+  out.testeurs = liste.map((x) => String(x || '').trim()).filter((x) => x && !vus.has(x.toLowerCase()) && vus.add(x.toLowerCase())).slice(0, 50);
+  if (out.testeurs.some((x) => x.length > 24 || /[<>]/.test(x))) err('Pseudo de testeur invalide.');
+  return out;
+}
+// Ce qu'un joueur voit d'un jeu : 'ouvert', 'test' (testeur d'un jeu réservé), 'ferme' (réservé, pas testeur) ou 'maintenance'.
+function etatJeuPour(jeux, jeu, pseudo) {
+  const e = (jeux && jeux[jeu]) || 'ouvert';
+  if (e !== 'testeurs') return e;
+  const p = String(pseudo || '').toLowerCase();
+  return p && (jeux.testeurs || []).some((t) => t.toLowerCase() === p) ? 'test' : 'ferme';
+}
+
 function creerReglages(base) {
   let cache = JSON.parse(JSON.stringify(DEFAUTS));
   return {
@@ -170,6 +197,7 @@ function creerReglages(base) {
         valeur = { actif: valeur.actif !== false && valeur.actif !== 0, robots: valeur.robots, niveauRobots: n };
       }
       if (cle === 'bande') valeur = verifierBande(valeur);
+      if (cle === 'jeux') valeur = verifierJeux(valeur);
       if (cle === 'nouveaute') valeur = { bande: !!(valeur && valeur.bande === true) };
       if (cle === 'prochaineSaison') valeur = { nom: String(valeur.nom || '').replace(/[<>]/g, '').trim().slice(0, 40), theme: String(valeur.theme || '').replace(/[<>]/g, '').trim().slice(0, 40) };
       if (cle === 'pot') {
@@ -183,4 +211,4 @@ function creerReglages(base) {
   };
 }
 
-module.exports = { creerReglages, DEFAUTS, VERSION_APPLI, versionPlusRecente, verifierMessages, verifierLigue, verifierBande, DIVISIONS, MESSAGE_MAX };
+module.exports = { verifierJeux, etatJeuPour, NOMS_JEUX, creerReglages, DEFAUTS, VERSION_APPLI, versionPlusRecente, verifierMessages, verifierLigue, verifierBande, DIVISIONS, MESSAGE_MAX };

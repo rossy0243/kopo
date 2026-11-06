@@ -9,6 +9,7 @@ const SK = require('../../src/kopo-salle.js');
 const SI = require('../../src/inter8-salle.js');
 const K = require('../../moteur/kopo-moteur.js');
 const { idAleatoire } = require('./comptes');
+const { etatJeuPour, NOMS_JEUX } = require('./reglages');
 
 const salles = new Set(); // salles ouvertes (tableau de bord : en direct)
 const LETTRES = 'ABCDEFGHJKMNPQRSTUVWXYZ';
@@ -26,7 +27,11 @@ class SalleKopo extends Room {
     this.S = this.jeu === 'inter8' ? SI : SK;
     this.maxClients = this.S.MAX;
     this.autoDispose = true;
-    this.code = options.code && /^[A-Z]{4}$/.test(options.code) ? options.code : nouveauCode();
+    // Un code n'est jamais partagé par deux salles ouvertes, Kopo et Inter (8) confondus :
+    // sinon un ami qui tape le code pourrait arriver dans la mauvaise partie.
+    const pris = (c) => [...salles].some((x) => x.code === c);
+    this.code = options.code && /^[A-Z]{4}$/.test(options.code) && !pris(options.code) ? options.code : nouveauCode();
+    while (pris(this.code)) this.code = nouveauCode();
     this.publique = !!options.publique;
     // Match du jour (salles « kopo-jour ») : un joueur seul contre 8 robots, la même donne pour tous ce jour-là.
     this.jour = null;
@@ -83,6 +88,11 @@ class SalleKopo extends Room {
     if (!c || c.statut === 'supprime') throw new Error('Compte inconnu.');
     if (c.statut === 'banni') throw new Error('Ce compte est banni.');
     if (c.statut === 'suspendu') throw new Error('Compte suspendu jusqu\'au ' + new Date(c.suspendu_jusqu).toLocaleString('fr-FR') + '.');
+    // Jeu en maintenance, ou réservé aux testeurs : on n'entre plus (sauf pour reprendre sa place).
+    const etat = etatJeuPour(SalleKopo.services.reglages.get('jeux'), this.jeu, c.pseudo);
+    const assis = this.salle && this.salle.joueurs.some((j) => j.id === c.id);
+    if (!assis && etat === 'maintenance') throw new Error(`${NOMS_JEUX[this.jeu]} est en maintenance. On revient très vite !`);
+    if (!assis && etat === 'ferme') throw new Error(`${NOMS_JEUX[this.jeu]} n'est pas encore ouvert.`);
     if (this.jour) {
       // Une seule personne par salle du jour : son retour après une coupure, ou rien.
       if (this.jour.compteId) { if (this.jour.compteId !== c.id) throw new Error('Cette partie n\'est pas la tienne.'); }

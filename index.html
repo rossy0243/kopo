@@ -442,6 +442,8 @@ body.accueil .app { max-width: none; min-height: 100vh; min-height: 100dvh; padd
 .choix-jeu button { display: flex; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: 12px; padding: 10px 6px; background: transparent; color: var(--muted); font-family: var(--display); font-size: 20px; letter-spacing: 1.5px; cursor: pointer; }
 .choix-jeu button i { font-style: normal; width: 22px; height: 30px; border-radius: 4px; display: grid; place-items: center; font-size: 16px; border: 2px solid currentColor; }
 .choix-jeu button[aria-pressed="true"] { background: linear-gradient(180deg, #f3d48a, #e2b04a); color: #1d1606; box-shadow: 0 3px 10px rgba(0,0,0,.35); }
+.choix-jeu .etat-jeu { font: 700 10px/1 var(--body); letter-spacing: .5px; text-transform: uppercase; padding: 3px 6px; border-radius: 6px; background: var(--brass); color: #1d1606; }
+.choix-jeu .etat-jeu.maint { background: var(--bad); color: #fff; }
 .choix-jeu button[aria-pressed="true"] i { background: #1d1606; color: #f3d48a; border-color: #1d1606; }
 @media (max-height: 500px) { .choix-jeu { padding: 3px; } .choix-jeu button { padding: 5px; font-size: 16px; } .choix-jeu button i { width: 16px; height: 22px; font-size: 12px; } }
 .profil { margin-left: auto; display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,.3); border: 1px solid var(--line); border-radius: 99px; padding: 4px 14px 4px 4px; cursor: text; }
@@ -6481,7 +6483,7 @@ var qrcode = function() {
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = '13cfc10b7aa3'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = 'd383e2424176'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
@@ -6795,6 +6797,7 @@ var qrcode = function() {
       c = { serveur: SERVEUR, jeton: j.jeton, compte: j.compte };
       stock.ecrire('kopo-compte-serveur', c);
       adopterPseudo(c.compte && c.compte.pseudo, true);
+      relireConfig(); // testeur ? le serveur le sait maintenant
     } else adopterPseudo(c.compte && c.compte.pseudo, false);
     // Le pseudo du compte en ligne fait foi : il ne change que dans les Paramètres (2 fois par an),
     // qui l'envoient au serveur. On ne pousse plus ici un pseudo modifié sur le téléphone.
@@ -8061,6 +8064,7 @@ var qrcode = function() {
   // ------------------------------------------------------------------ micro
   // Chaque téléphone appelle directement les autres (audio seulement). Le micro est coupé
   // tant que le joueur ne l'a pas activé, et chacun peut le couper à tout moment.
+  const MICRO_EN_MAINTENANCE = true;
   const vocal = {
     actif: false, muet: true, sonCoupe: !!prefs.sonAutresCoupe, flux: null, appels: new Map(), vue: null,
     pair: null,
@@ -8080,6 +8084,11 @@ var qrcode = function() {
       this.pair.on('error', () => {});
     },
     async activer() {
+      // Micro en maintenance, le temps d'avoir notre propre relais audio (les relais gratuits ne passent pas en 4G).
+      if (MICRO_EN_MAINTENANCE) {
+        toast('Micro en maintenance : il revient très vite, avec une meilleure connexion. En attendant, utilise les messages du chat.');
+        return;
+      }
       try {
         this.flux = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false });
         this.muet = false;
@@ -9790,9 +9799,11 @@ var qrcode = function() {
   // Connexion Google : garde son compte et ses pièces sur tous ses téléphones.
   // Le serveur dit si elle est active (/api/config) ; la page passe par Supabase puis par /api/connexion.
   let configServeur = null;
+  // Le jeton (s'il existe) permet au serveur de montrer aux testeurs un jeu réservé aux testeurs.
+  function enteteConfig() { const c = stock.lire('kopo-compte-serveur'); return c && c.jeton && c.serveur === SERVEUR ? { authorization: 'Bearer ' + c.jeton } : {}; }
   async function lireConfig() {
     if (configServeur || typeof SERVEUR === 'undefined' || !SERVEUR) return configServeur;
-    try { configServeur = await (await fetch(SERVEUR + '/api/config')).json(); } catch (e) {}
+    try { configServeur = await (await fetch(SERVEUR + '/api/config', { headers: enteteConfig() })).json(); } catch (e) {}
     return configServeur;
   }
   if (MODE_SERVEUR) lireConfig().then((c) => { messagesServeur(c); setTimeout(verifierRemiseAFlot, 2500); }); // messages du chat, connexion Google, annonce, maintenance…
@@ -9808,6 +9819,7 @@ var qrcode = function() {
   };
   function messagesServeur(cfg) {
     if (!cfg) return;
+    majChoixJeu(); // un jeu peut passer en maintenance, ou être réservé aux testeurs
     $('voileVersion').hidden = !(cfg.versionMin && versionPlusVieille(VERSION, cfg.versionMin));
     const enMaintenance = typeof cfg.maintenance === 'string' && cfg.maintenance.trim() !== '';
     $('voileMaintenance').hidden = !enMaintenance;
@@ -9824,7 +9836,7 @@ var qrcode = function() {
   }
   async function relireConfig() {
     if (!MODE_SERVEUR) return;
-    try { const c = await (await fetch(SERVEUR + '/api/config', { cache: 'no-store' })).json(); configServeur = c; messagesServeur(c); } catch (e) {}
+    try { const c = await (await fetch(SERVEUR + '/api/config', { cache: 'no-store', headers: enteteConfig() })).json(); configServeur = c; messagesServeur(c); } catch (e) {}
   }
   $('btnAnnonceOk').onclick = () => { stock.ecrire('kopo-annonce-vue', $('texteAnnonce').textContent); $('voileAnnonce').hidden = true; };
   $('btnMaintenanceReessayer').onclick = relireConfig;
@@ -10684,14 +10696,35 @@ var qrcode = function() {
     kopo: { btnCreer: 'Entre amis, de 2 à 9', btnModeRobots: 'Partie rapide, seul' },
     inter8: { btnCreer: 'Entre amis, de 2 à 8 · simple ou délire', btnModeRobots: 'Pour apprendre Inter (8)' },
   };
-  function jeuChoisi() { return JEUX_HUB.includes(stock.lire('kopo-jeu')) ? stock.lire('kopo-jeu') : 'kopo'; } // déclarée (hissée) : sert aussi plus haut
+  // État de chaque jeu (tableau de bord) : 'ouvert', 'test' (je suis testeur), 'ferme' (réservé aux testeurs) ou 'maintenance'.
+  function etatJeu(jeu) { const j = configServeur && configServeur.jeux; return (j && j[jeu]) || 'ouvert'; }
+  function jeuxVisibles() { const l = JEUX_HUB.filter((j) => etatJeu(j) !== 'ferme'); return l.length ? l : ['kopo']; }
+  function jeuChoisi() { const l = jeuxVisibles(), j = stock.lire('kopo-jeu'); return l.includes(j) ? j : l[0]; } // déclarée (hissée) : sert aussi plus haut
   function majChoixJeu() {
-    const jeu = jeuChoisi();
-    $('choixJeu').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.jeu === jeu)));
+    if (!$('choixJeu')) return;
+    const jeu = jeuChoisi(), visibles = jeuxVisibles();
+    $('choixJeu').hidden = visibles.length < 2; // un seul jeu ouvert : pas de choix à faire
+    $('choixJeu').querySelectorAll('button').forEach((b) => {
+      const e = etatJeu(b.dataset.jeu);
+      b.hidden = !visibles.includes(b.dataset.jeu);
+      b.setAttribute('aria-pressed', String(b.dataset.jeu === jeu));
+      let marque = b.querySelector('.etat-jeu');
+      if (e === 'maintenance' || e === 'test') { if (!marque) { marque = el('span', 'etat-jeu'); b.append(marque); } marque.textContent = e === 'test' ? 'test' : 'maintenance'; marque.classList.toggle('maint', e === 'maintenance'); }
+      else if (marque) marque.remove();
+    });
     for (const [id, t] of Object.entries(textesModes[jeu])) { const s = $(id) && $(id).querySelector('small'); if (s) s.textContent = t; }
     const r = $('btnRegles'); if (r && r.lastChild) r.lastChild.textContent = jeu === 'inter8' ? 'Règles Inter' : 'Règles';
   }
   $('choixJeu').querySelectorAll('button').forEach((b) => (b.onclick = () => { stock.ecrire('kopo-jeu', b.dataset.jeu); majChoixJeu(); }));
+  // Jeu en maintenance (tableau de bord) : on le voit, mais on ne peut pas y jouer.
+  const jeuEnMaintenance = (e) => {
+    if (etatJeu(jeuChoisi()) !== 'maintenance') return;
+    const cible = e.target.closest('#modes .mode');
+    if (!cible || cible.classList.contains('mode-bientot')) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    toast(`${jeuChoisi() === 'inter8' ? 'Inter (8)' : 'Kopo'} est en maintenance. On revient très vite !`);
+  };
+  $('modes').addEventListener('click', jeuEnMaintenance, true);
   const interBientot = (e) => {
     if (jeuChoisi() !== 'inter8') return;
     const cible = e.target.closest('#modes .mode, #btnRegles');
