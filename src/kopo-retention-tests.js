@@ -53,30 +53,48 @@ test('XP : victoire à 5 = 5 + 4×10 + 20 + 50, divisée par deux avec des robot
 });
 
 console.log('\nFace-à-face');
+const duel = (devant, o = {}) => partie(Object.assign({ nbJoueurs: 2, adversaires: [{ id: 'k', nom: 'Kevin', devant }] }, o));
 test('Toi 1 – 0, puis 1 – 1 ; rien contre des robots', () => {
   const p = profil();
-  let r = R.enregistrerPartie(p, partie({ adversaires: [{ id: 'k', nom: 'Kevin', devant: false }] }), '2026-10-31');
-  assert.deepStrictEqual(r.faceAFace, { id: 'k', nom: 'Kevin', gagnes: 1, perdus: 0, gagne: true });
-  r = R.enregistrerPartie(p, partie({ adversaires: [{ id: 'k', nom: 'Kevin', devant: true }] }), '2026-10-31');
-  assert.deepStrictEqual(r.faceAFace, { id: 'k', nom: 'Kevin', gagnes: 1, perdus: 1, gagne: false });
-  r = R.enregistrerPartie(p, partie({ avecRobots: true, adversaires: [{ id: 'k', nom: 'Kevin', devant: true }] }), '2026-10-31');
+  let r = R.enregistrerPartie(p, duel(false), '2026-10-31');
+  assert.deepStrictEqual(r.faceAFace, { id: 'k', nom: 'Kevin', gagnes: 1, perdus: 0, gagne: true, taquinerie: 'Première victoire contre Kevin. Ça commence !' });
+  r = R.enregistrerPartie(p, duel(true), '2026-10-31');
+  assert.deepStrictEqual(r.faceAFace, { id: 'k', nom: 'Kevin', gagnes: 1, perdus: 1, gagne: false, taquinerie: 'Kevin revient à égalité. Revanche ?' });
+  r = R.enregistrerPartie(p, duel(true, { avecRobots: true }), '2026-10-31');
   assert.strictEqual(r.faceAFace, null);
   assert.strictEqual(p.rivaux.k.perdus, 1);
 });
-test('On montre le rival avec la plus longue histoire', () => {
+test('Seul un duel à deux compte : une partie à 3 ou plus ne touche pas aux face-à-face', () => {
   const p = profil();
-  R.enregistrerPartie(p, partie({ adversaires: [{ id: 'k', nom: 'Kevin', devant: false }] }), '2026-10-31');
-  const r = R.enregistrerPartie(p, partie({ adversaires: [{ id: 'n', nom: 'Nadia', devant: true }, { id: 'k', nom: 'Kevin', devant: false }] }), '2026-10-31');
-  assert.strictEqual(r.faceAFace.nom, 'Kevin');
-  assert.strictEqual(r.faceAFace.gagnes, 2);
+  const r = R.enregistrerPartie(p, partie({ nbJoueurs: 3, adversaires: [{ id: 'n', nom: 'Nadia', devant: true }, { id: 'k', nom: 'Kevin', devant: false }] }), '2026-10-31');
+  assert.strictEqual(r.faceAFace, null);
+  assert.deepStrictEqual(p.rivaux || {}, {});
+  assert.strictEqual(R.estDuel(partie({ nbJoueurs: 2, adversaires: [{ id: 'k', nom: 'Kevin', devant: false }] })), true);
+  assert.strictEqual(R.estDuel(partie({ nbJoueurs: 5, adversaires: [{ id: 'k', nom: 'Kevin', devant: false }] })), false, 'à 5 avec un seul autre humain : pas un duel');
+});
+test('Taquineries selon le score', () => {
+  const t = (gagne, g, p) => R.taquinerie({ nom: 'Kevin', gagne, gagnes: g, perdus: p });
+  assert.strictEqual(t(true, 10, 4), 'Tu deviens le Cauchemar de Kevin !');
+  assert.strictEqual(t(true, 11, 4), 'Toujours le Cauchemar de Kevin.');
+  assert.strictEqual(t(true, 3, 3), 'Égalité ! Kevin n\'est plus tranquille.');
+  assert.strictEqual(t(true, 4, 3), 'Tu repasses devant Kevin !');
+  assert.strictEqual(t(true, 4, 0), '4 – 0 : Kevin cherche encore sa première victoire.');
+  assert.strictEqual(t(true, 7, 2), 'Kevin devient ton client préféré.');
+  assert.strictEqual(t(true, 2, 5), 'Tu reviens : plus que 3 victoires de retard sur Kevin.');
+  assert.strictEqual(t(false, 10, 10), 'Kevin t\'a repris le titre de Cauchemar !');
+  assert.strictEqual(t(false, 3, 10), 'Kevin a fait de toi son client préféré… Réagis !');
+  assert.strictEqual(t(false, 2, 3), 'Kevin passe devant toi.');
+  assert.strictEqual(t(false, 0, 4), '0 – 4 : Kevin te connaît par cœur.');
+  assert.strictEqual(t(false, 5, 3), 'Kevin se rapproche, attention !');
+  assert.strictEqual(R.taquinerie(null), null);
 });
 test('Titre « Le Cauchemar de Kevin » à 10 victoires, perdu s\'il reprend l\'avantage', () => {
   const p = profil();
-  for (let i = 0; i < 9; i++) R.enregistrerPartie(p, partie({ adversaires: [{ id: 'k', nom: 'Kevin', devant: false }] }), '2026-10-31');
+  for (let i = 0; i < 9; i++) R.enregistrerPartie(p, duel(false), '2026-10-31');
   assert.strictEqual(R.titre(p), null);
-  const r = R.enregistrerPartie(p, partie({ adversaires: [{ id: 'k', nom: 'Kevin', devant: false }] }), '2026-10-31');
+  const r = R.enregistrerPartie(p, duel(false), '2026-10-31');
   assert.strictEqual(r.titre, 'Le Cauchemar de Kevin');
-  for (let i = 0; i < 10; i++) R.enregistrerPartie(p, partie({ adversaires: [{ id: 'k', nom: 'Kevin', devant: true }] }), '2026-10-31');
+  for (let i = 0; i < 10; i++) R.enregistrerPartie(p, duel(true), '2026-10-31');
   assert.strictEqual(R.titre(p), null);
 });
 
@@ -271,16 +289,16 @@ test('Place, manches survécues, adversaires humains devant ou derrière', () =>
 });
 
 console.log('\nRéunir deux profils (changement d\'adresse, sauvegarde du serveur)');
-// Ancien profil : 30 parties, 10 contre Yvn. Profil neuf : 4 parties contre Yvn, le jour du déménagement.
+// Ancien profil : 30 parties, dont 10 duels contre Yvn. Profil neuf : 4 duels contre Yvn, le jour du déménagement.
 const ancienProfil = () => {
   const p = profil();
-  for (let i = 0; i < 30; i++) R.enregistrerPartie(p, partie({ place: i % 3 ? 2 : 1, nbJoueurs: 3, victoire: !(i % 3), finale: true, adversaires: i < 10 ? [{ id: 'yvn', nom: 'Yvn', devant: false }] : [] }), '2026-10-0' + (1 + (i % 9)));
+  for (let i = 0; i < 30; i++) R.enregistrerPartie(p, partie({ place: i % 3 ? 2 : 1, nbJoueurs: i < 10 ? 2 : 3, victoire: !(i % 3), finale: true, adversaires: i < 10 ? [{ id: 'yvn', nom: 'Yvn', devant: false }] : [] }), '2026-10-0' + (1 + (i % 9)));
   R.donnerObjet(p, 'cadre-dakar');
   return p;
 };
 const neufProfil = () => {
   const p = profil();
-  for (let i = 0; i < 4; i++) R.enregistrerPartie(p, partie({ place: 2, nbJoueurs: 3, finale: true, adversaires: [{ id: 'yvn', nom: 'Yvn', devant: true }] }), '2026-11-01');
+  for (let i = 0; i < 4; i++) R.enregistrerPartie(p, partie({ place: 2, nbJoueurs: 2, finale: true, adversaires: [{ id: 'yvn', nom: 'Yvn', devant: true }] }), '2026-11-01');
   return p;
 };
 test('déménagement : les deux profils sont additionnés, rien n\'est perdu', () => {

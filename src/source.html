@@ -678,6 +678,7 @@ body.dos-kinshasa { --dos-motif: linear-gradient(135deg, transparent 38%, #f7d03
 .face-a-face .score { font-family: var(--display); font-size: 30px; letter-spacing: 2px; color: var(--ink); line-height: 1; }
 .face-a-face .score b { color: var(--brass); font-weight: 400; display: inline-block; }
 .recap-titre { text-align: center; font-style: italic; color: var(--brass); }
+.recap-taquinerie { text-align: center; font-style: italic; color: var(--muted); margin-top: -2px; }
 .recap-boutons { display: grid; gap: 8px; }
 .recap-boutons .rangee { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .btn-revanche { display: flex; align-items: center; justify-content: center; gap: 8px; position: relative; overflow: hidden; }
@@ -3369,6 +3370,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
         const score = el('span', 'score'); score.append(moiB, ' – ', luiB);
         ff.append(el('span', null, 'Toi'), score, el('span', null, f.nom));
         prog.append(ff);
+        if (f.taquinerie) { const tq = el('div', 'recap-taquinerie', f.taquinerie); if (f.id) tq.dataset.rival = f.id; prog.append(tq); }
         plus(() => pop(f.gagne ? moiB : luiB, 1.8, 600), delai + 200);
       }
       for (const id of r.objets) {
@@ -3386,6 +3388,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
     gauche.append(extra);
     remplirRecapLigue(extra);
     remplirRecapParcours(extra);
+    remplirRecapDuel(extra);
     // Boutons : revanche, partie suivante, partager, quitter
     const boutons = el('div', 'recap-boutons');
     const btnRev = el('button', 'btn principal large btn-revanche');
@@ -3663,22 +3666,43 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   window.addEventListener('kopo-classee', (e) => { if (e.detail && e.detail.classee) toast('Partie classée : tes points de ligue sont en jeu.'); });
   // Fin de partie en ligne : le serveur donne le face-à-face qu'il tient pour toute la table. C'est lui qui fait foi
   // (chaque téléphone ne compte que les parties qu'il a vues) : on le recopie dans le profil et dans le récap affiché.
+  // Le serveur ne l'envoie qu'après un vrai duel (deux joueurs seuls à la table), en Kopo comme en Inter (8).
+  let dernierDuel = null; // { recu, x: { id, pseudo, moi, lui }, gagne, taquinerie }
   window.addEventListener('kopo-face-a-face', (e) => {
     const duels = Array.isArray(e.detail) ? e.detail : [];
     if (!duels.length) return;
     const p = lireProfil(), rv = p.rivaux || (p.rivaux = {});
+    const w = vueActuelle;
     for (const x of duels) {
-      const r = rv[x.id] || (rv[x.id] = { pseudo: x.pseudo, gagnes: 0, perdus: 0, vuLe: jourLocal() });
-      r.pseudo = x.pseudo; r.gagnes = x.moi; r.perdus = x.lui;
+      const r = rv[x.id] || (rv[x.id] = { pseudo: x.pseudo, gagnes: 0, perdus: 0 });
+      r.pseudo = x.pseudo; r.gagnes = x.moi; r.perdus = x.lui; r.vuLe = jourLocal();
       const f = suivi && suivi.recap && suivi.recap.faceAFace;
-      if (f && f.id === x.id) { f.gagnes = x.moi; f.perdus = x.lui; }
+      const gagne = f && f.id === x.id ? f.gagne : !!(w && w.vainqueur && w.vainqueur === w.moi);
+      const tq = R.taquinerie({ nom: x.pseudo, gagnes: x.moi, perdus: x.lui, gagne });
+      if (f && f.id === x.id) { f.gagnes = x.moi; f.perdus = x.lui; f.taquinerie = tq; }
+      dernierDuel = { recu: Date.now(), x, gagne, taquinerie: tq };
       for (const ff of document.querySelectorAll('.face-a-face[data-rival="' + CSS.escape(x.id) + '"]')) {
         const bs = ff.querySelectorAll('.score b');
         if (bs.length === 2) { bs[0].textContent = String(x.moi); bs[1].textContent = String(x.lui); }
       }
+      for (const t of document.querySelectorAll('.recap-taquinerie[data-rival="' + CSS.escape(x.id) + '"]')) t.textContent = tq || '';
     }
     ecrireProfil(p); sauvegarderProfil();
+    const z = document.getElementById('recapExtra');
+    if (z) remplirRecapDuel(z);
   });
+  // Face-à-face et taquinerie dans #recapExtra, quand le récap ne les montre pas déjà (Inter (8), page rechargée…).
+  function remplirRecapDuel(z) {
+    if (!dernierDuel || Date.now() - dernierDuel.recu > 60000) return;
+    const { x, taquinerie } = dernierDuel;
+    if (document.querySelector('.face-a-face[data-rival="' + CSS.escape(x.id) + '"]')) return;
+    const ff = el('div', 'face-a-face');
+    ff.dataset.rival = x.id;
+    const score = el('span', 'score'); score.append(el('b', null, String(x.moi)), ' – ', el('b', null, String(x.lui)));
+    ff.append(el('span', null, 'Toi'), score, el('span', null, x.pseudo));
+    z.append(ff);
+    if (taquinerie) { const tq = el('div', 'recap-taquinerie', taquinerie); tq.dataset.rival = x.id; z.append(tq); }
+  }
 
   window.addEventListener('kopo-ligue', (e) => {
     derniereLigue = { recu: Date.now(), detail: e.detail };

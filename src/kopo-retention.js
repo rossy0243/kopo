@@ -292,9 +292,9 @@
       s.manchesSurvecues += e.manches; s.katapss += e.katapss;
       if (e.place === e.nbJoueurs) s.eliminePremier++;
     }
-    // Face-à-face : seulement entre humains, sans robot à la table.
+    // Face-à-face : seulement un vrai duel, deux humains seuls à la table (pas une partie à 3 ou plus, pas de robot).
     let faceAFace = null;
-    if (!e.avecRobots && e.adversaires.length) {
+    if (estDuel(e)) {
       const rv = p.rivaux || (p.rivaux = {});
       for (const a of e.adversaires) {
         const r = rv[a.id] || (rv[a.id] = { pseudo: a.nom, gagnes: 0, perdus: 0 });
@@ -305,6 +305,7 @@
       const choisi = e.adversaires.slice().sort((a, b) => (rv[b.id].gagnes + rv[b.id].perdus) - (rv[a.id].gagnes + rv[a.id].perdus) || (b.devant - a.devant))[0];
       const r = rv[choisi.id];
       faceAFace = { id: choisi.id, nom: r.pseudo, gagnes: r.gagnes, perdus: r.perdus, gagne: !choisi.devant };
+      faceAFace.taquinerie = taquinerie(faceAFace);
       // Les 200 plus récents seulement.
       const ids = Object.keys(rv);
       if (ids.length > 200) ids.sort((a, b) => (rv[a].vuLe < rv[b].vuLe ? -1 : 1)).slice(0, ids.length - 200).forEach((id) => delete rv[id]);
@@ -345,6 +346,39 @@
       missions, defi, piecesGagnees, faceAFace, objets, premiere,
       titre: titre(p),
     };
+  }
+
+  // Un duel : deux joueurs humains seuls à la table. Seul un duel compte dans les face-à-face.
+  function estDuel(e) {
+    return !!e && !e.avecRobots && e.nbJoueurs === 2 && Array.isArray(e.adversaires) && e.adversaires.length === 1;
+  }
+
+  // Taquinerie de fin de duel, d'après le face-à-face après la partie (Kopo et Inter (8)).
+  // f : { nom, gagnes, perdus, gagne } (gagnes/perdus : vus de mon côté, partie comprise).
+  function taquinerie(f) {
+    if (!f || !f.nom) return null;
+    const n = f.nom, g = f.gagnes | 0, p = f.perdus | 0;
+    const pl = (k) => (k > 1 ? 's' : '');
+    if (f.gagne) {
+      if (g === 1 && p === 0) return `Première victoire contre ${n}. Ça commence !`;
+      if (g >= 10 && g > p && (g - 1 < 10 || g - 1 <= p)) return `Tu deviens le Cauchemar de ${n} !`;
+      if (g >= 10 && g > p) return `Toujours le Cauchemar de ${n}.`;
+      if (g === p) return `Égalité ! ${n} n'est plus tranquille.`;
+      if (g === p + 1) return `Tu repasses devant ${n} !`;
+      if (p === 0 && g >= 3) return `${g} – 0 : ${n} cherche encore sa première victoire.`;
+      if (g - p >= 5) return `${n} devient ton client préféré.`;
+      if (p > g) return `Tu reviens : plus que ${p - g} victoire${pl(p - g)} de retard sur ${n}.`;
+      return `Encore une pour toi contre ${n}.`;
+    }
+    if (p === 1 && g === 0) return `${n} ouvre le score. Revanche ?`;
+    if (g >= 10 && g === p) return `${n} t'a repris le titre de Cauchemar !`;
+    if (p >= 10 && p > g && (p - 1 < 10 || p - 1 <= g)) return `${n} a fait de toi son client préféré… Réagis !`;
+    if (g === p) return `${n} revient à égalité. Revanche ?`;
+    if (p === g + 1) return `${n} passe devant toi.`;
+    if (g === 0 && p >= 3) return `0 – ${p} : ${n} te connaît par cœur.`;
+    if (p - g >= 5) return `${n} devient ta bête noire.`;
+    if (g > p) return `${n} se rapproche, attention !`;
+    return `${n} creuse l'écart.`;
   }
 
   // « Le Cauchemar de Kevin » : battre le même adversaire 10 fois, et rester devant (profil-joueur §6).
@@ -413,7 +447,7 @@
     DEFIS, defiSemaine,
     BIENVENUE, bienvenue, recevoirBienvenue,
     gainBonus, bonusDuJour, jokerLibre, pieces,
-    bilanPartie, enregistrerPartie, titre,
+    bilanPartie, enregistrerPartie, titre, estDuel, taquinerie,
     fusionnerProfils, signatureProfil,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = KopoRetention;
