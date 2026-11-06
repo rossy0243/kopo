@@ -140,6 +140,39 @@ test('Pas plusieurs cartes juste parce qu\'elles ont la même couleur', () => {
   interdit(() => J(m, 'A', ['7C', '9C']), 'même valeur');
 });
 
+test('Plusieurs cartes : la dernière doit changer la couleur du centre', () => {
+  // Centre 4♥ : 7♥ puis 7♠ change la couleur ; 7♠ puis 7♥ la garde, c'est refusé.
+  const m = manche({ A: ['7C', '7P', '7T', '9K'], B: ['3P', '4P', '5P', '6P'] }, remplir('4C'), 'A');
+  interdit(() => J(m, 'A', ['7T', '7P', '7C']), 'même couleur ou de même valeur');
+  const m2 = manche({ A: ['7C', '7P', '7T', '9K'], B: ['3P', '4P', '5P', '6P'] }, remplir('7C*'), 'A');
+  interdit(() => J(m2, 'A', ['7P', '7C']), 'Avec plusieurs cartes, la dernière doit changer la couleur \\(pas de cœur');
+  interdit(() => J(m2, 'A', ['7T', '7P', '7C']), 'Avec plusieurs cartes');
+  J(m2, 'A', ['7C', '7P']);
+  assert.strictEqual(I.couleur(m2.defausse[m2.defausse.length - 1]), 'P');
+});
+
+test('Plusieurs cartes : on peut en garder une partie en main', () => {
+  const m = manche({ A: ['7C', '7P', '7T', '9K'], B: ['3P', '4P', '5P', '6P'] }, remplir('4C'), 'A');
+  const coups = I.actionsPossibles(m, 'A').filter((a) => a.type === 'jouer').map((a) => a.cartes.join(' '));
+  assert.ok(coups.includes('7C 7P'), coups.join(' | '));
+  assert.ok(coups.includes('7C 7T 7P'), coups.join(' | '));
+  assert.ok(!coups.some((c) => c.endsWith('C') && c.includes(' ')), 'jamais un cœur en dernier sur du cœur');
+});
+
+test('Deux paquets : les doublons de la couleur du centre passent ensemble (deux 5♦ sur du carreau)', () => {
+  const m = manche({ A: ['5K', '5K*', '5P', '9C'], B: ['3P', '4P', '5P*', '6P'] }, remplir('9K'), 'A');
+  interdit(() => J(m, 'A', ['5K', '5P', '5K*']), 'Avec plusieurs cartes');
+  J(m, 'A', ['5K', '5K*']);
+  assert.strictEqual(m.mains.A.length, 2);
+});
+
+test('Plusieurs jokers ou plusieurs 8 pour sortir : pas de couleur à changer', () => {
+  const m = manche({ A: ['8C', '8C*'], B: ['3P', '4P', '5P', '6P'], C: ['3T', '9T', '5T', '6T'] }, remplir('DC'), 'A');
+  AN(m, 'A');
+  J(m, 'A', ['8C*', '8C']);
+  assert.ok(m.qualifies.includes('A'));
+});
+
 console.log('\nPénalités');
 
 test('2 : le suivant pioche 2 cartes et passe son tour', () => {
