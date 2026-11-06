@@ -1085,7 +1085,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       <div class="bienvenue-ou" id="ouGoogle" hidden><span>ou</span></div>
       <label class="bienvenue-pseudo"><small>Ton pseudo</small><input id="pseudoEntree" maxlength="16" autocomplete="nickname" placeholder="Ex. As_de_Pique"></label>
       <button class="btn principal large" id="btnEntreeInvite">Jouer en invité</button>
-      <small class="bienvenue-aide">Tu pourras te connecter avec Google plus tard, dans les Paramètres.</small>
+      <small class="bienvenue-aide" id="aideInvite">Tu pourras te connecter avec Google plus tard, dans les Paramètres.</small>
     </div>
   </section>
   <section class="hub" id="ecranAccueil" hidden>
@@ -6494,7 +6494,7 @@ var qrcode = function() {
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = '008a86e4cd8f'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = '64695a9a952c'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
@@ -6840,6 +6840,7 @@ var qrcode = function() {
   // facon : { creer: true } | { code } | { taille } (salle publique) | { reconnexion: jeton de reconnexion }
   async function entrerServeur(nom, facon) {
     clearTimeout(rechercheEnCours);
+    if (!facon.reconnexion && !facon.matchJour && await exigerGoogle()) return; // reprendre sa place reste permis
     afficherConnexion(facon.matchJour ? 'Préparation du Match du jour…' : facon.taille ? `Recherche d'une ${facon.mise ? 'table ' + (NIVEAUX_MISE.find((x) => x[0] === facon.mise) || [])[1] : 'salle'} de ${facon.taille}…` : facon.code ? 'Connexion à la partie ' + facon.code + '…' : 'Ouverture de la partie…');
     let room;
     // L'hébergeur gratuit endort le serveur après un moment sans joueurs : le réveil prend jusqu'à une minute.
@@ -6861,6 +6862,7 @@ var qrcode = function() {
       if (facon.reconnexion && facon.code) return entrerServeur(nom, { code: facon.code, taille: facon.taille });
       const m = String((e && e.message) || e);
       const texte = /no rooms found|not found/i.test(m) ? 'Partie introuvable, ou elle a déjà commencé.' : m.includes('locked') ? 'La partie a déjà commencé.' : m || 'Connexion impossible.';
+      if (/Connecte-toi avec Google/.test(m)) { quitter(); return fenetreJouerEnLigne(); }
       if (/Compte inconnu|Connexion requise/.test(m)) {
         stock.effacer('kopo-compte-serveur');
         // Compte gardé sur l'appareil mais inconnu du serveur : on en recrée un, une seule fois.
@@ -8843,15 +8845,31 @@ var qrcode = function() {
   }
 
   // Sans Google : on explique pourquoi, et on propose de se connecter.
-  async function fenetreGoogle(titre, texte) {
+  async function fenetreGoogle(titre, texte, extra = []) {
     const cfg = await lireConfig();
     const z = el('div', 'mj');
     z.append(icone('i-cadenas'), el('h2', null, titre), el('p', null, texte));
     const boutons = [];
     if (cfg && cfg.google) { const b = el('button', 'btn principal large', 'Se connecter avec Google'); b.onclick = () => connexionGoogle(cfg.google); boutons.push(b); }
     else z.append(el('small', 'muted', 'La connexion Google arrive très bientôt.'));
-    const f = el('button', 'btn large', 'Plus tard'); f.onclick = fermerFenetre; boutons.push(f);
+    const f = el('button', 'btn large', 'Plus tard'); f.onclick = fermerFenetre; boutons.push(...extra, f);
     ouvrirFenetre([z, ...boutons]);
+  }
+
+  // En ligne, Créer et Rejoindre (Kopo et Inter (8)) : compte Google obligatoire dès que la connexion
+  // Google est active. Sans compte, on joue contre les robots (sur le téléphone). Le serveur vérifie aussi.
+  async function exigerGoogle() {
+    if (!MODE_SERVEUR || avecGoogle()) return false;
+    const cfg = await lireConfig();
+    if (!(cfg && cfg.google)) return false;
+    fenetreJouerEnLigne();
+    return true;
+  }
+  function fenetreJouerEnLigne() {
+    $('voileRejoindre').hidden = $('voileSalles').hidden = true;
+    const robots = el('button', 'btn large', 'Jouer contre les robots');
+    robots.onclick = () => { fermerFenetre(); $('btnModeRobots').click(); };
+    fenetreGoogle('Jouer en ligne', 'Pour jouer en ligne ou entre amis, connecte-toi avec Google : c\'est gratuit, et tes pièces et ton niveau te suivent sur tous tes téléphones. Sans compte, tu peux jouer contre les robots.', [robots]);
   }
 
   // Les 3 bulles de la première fois (competition-amis.md §5.2). Une autre fenêtre d'annonce peut la remplacer.
@@ -10024,6 +10042,7 @@ var qrcode = function() {
       const ok = !!(cfg && cfg.google);
       $('btnEntreeGoogle').hidden = $('aideGoogle').hidden = $('ouGoogle').hidden = !ok;
       if (ok) $('btnEntreeGoogle').onclick = () => connexionGoogle(cfg.google);
+      if (ok) $('aideInvite').textContent = 'En invité, tu joues contre les robots. Pour jouer en ligne ou entre amis, connecte-toi avec Google (ici ou plus tard).';
     });
     return true;
   }
@@ -10325,7 +10344,7 @@ var qrcode = function() {
       carte('simple', '8', 'Simple', 'Les règles de base, de 2 à 8 joueurs.', ["1 paquet jusqu'à 4", '2 paquets (108) dès 5']),
       carte('delire', 'J', 'Délire', 'Tout le mode simple, plus le J retour : le valet change le sens du jeu.'), annuler], 'styleInter');
   }
-  $('btnCreer').onclick = () => { const p = lirePseudo(); if (!p) return; if (jeuChoisi() === 'inter8') choisirStyleInter(p); else creerPartie(p, 'kopo'); };
+  $('btnCreer').onclick = async () => { const p = lirePseudo(); if (!p || await exigerGoogle()) return; if (jeuChoisi() === 'inter8') choisirStyleInter(p); else creerPartie(p, 'kopo'); };
   $('btnRejoindre').onclick = () => {
     const p = lirePseudo(); if (!p) return;
     const code = $('codeRejoindre').value.trim().toUpperCase();
@@ -10643,9 +10662,9 @@ var qrcode = function() {
   function majAvatar() { const p = $('pseudo').value.trim(); $('avatarLettre').textContent = p ? p[0].toUpperCase() : '?'; }
   $('pseudo').addEventListener('input', () => { const v = nettoyerPseudo($('pseudo').value, true); if (v !== $('pseudo').value) $('pseudo').value = v; majAvatar(); });
   $('profil').addEventListener('click', (e) => { if ($('pseudo').readOnly) { e.preventDefault(); ouvrirProfil(); } });
-  $('btnInconnus').onclick = () => { if (!lirePseudo()) return; dessinerSalles(); afficherEnLigne(); $('voileSalles').hidden = false; };
+  $('btnInconnus').onclick = async () => { if (!lirePseudo() || await exigerGoogle()) return; dessinerSalles(); afficherEnLigne(); $('voileSalles').hidden = false; };
   $('btnFermerSalles').onclick = () => ($('voileSalles').hidden = true);
-  $('btnModeRejoindre').onclick = () => { $('voileRejoindre').hidden = false; setTimeout(() => $('codeRejoindre').focus(), 50); };
+  $('btnModeRejoindre').onclick = async () => { if (await exigerGoogle()) return; $('voileRejoindre').hidden = false; setTimeout(() => $('codeRejoindre').focus(), 50); };
   $('btnFermerRejoindre').onclick = () => ($('voileRejoindre').hidden = true);
   // Niveau des robots : choisi ici (gardé sur le téléphone), et renforcé peu à peu avec le niveau du joueur.
   const AIDES_NIVEAU_ROBOTS = { faciles: 'Ils font des erreurs.', normaux: 'Ils jouent simplement.', forts: 'Ils comptent les cartes déjà sorties, comme un bon joueur. Ils ne voient jamais ta main.' };

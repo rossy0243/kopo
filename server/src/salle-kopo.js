@@ -16,6 +16,7 @@ const LETTRES = 'ABCDEFGHJKMNPQRSTUVWXYZ';
 // Tables à mise (strategie-pieces §4.1) : un niveau se débloque quand on a 10 fois la mise.
 const DEBLOCAGE = 10;
 const NOMS_TABLES = { bronze: 'Bronze', argent: 'Argent', or: 'Or', diamant: 'Diamant' };
+const ERREUR_GOOGLE = 'Connecte-toi avec Google pour jouer en ligne ou entre amis. Sans compte, tu peux jouer contre les robots.';
 const nouveauCode = () => Array.from({ length: 4 }, () => LETTRES[Math.floor(Math.random() * LETTRES.length)]).join('');
 
 class SalleKopo extends Room {
@@ -93,6 +94,9 @@ class SalleKopo extends Room {
     const assis = this.salle && this.salle.joueurs.some((j) => j.id === c.id);
     if (!assis && etat === 'maintenance') throw new Error(`${NOMS_JEUX[this.jeu]} est en maintenance. On revient très vite !`);
     if (!assis && etat === 'ferme') throw new Error(`${NOMS_JEUX[this.jeu]} n'est pas encore ouvert.`);
+    // En ligne et entre amis : compte Google obligatoire (quand la connexion Google est active).
+    // Sans compte, on joue contre les robots, sur le téléphone. On laisse revenir un joueur déjà assis.
+    if (!assis && !this.jour && SalleKopo.services.googleObligatoire && !c.auth_id) throw new Error(ERREUR_GOOGLE);
     if (this.jour) {
       // Une seule personne par salle du jour : son retour après une coupure, ou rien.
       if (this.jour.compteId) { if (this.jour.compteId !== c.id) throw new Error('Cette partie n\'est pas la tienne.'); }

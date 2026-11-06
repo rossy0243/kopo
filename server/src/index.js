@@ -39,7 +39,9 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
   // Chaque minute : semaines de Bande finies (pot partagé), mises automatiques du lundi, rappel du soir.
   const minuteurBande = setInterval(() => bande.tic().catch((e) => console.error('Bande :', e.message)), 60e3);
   minuteurBande.unref();
-  SalleKopo.services = { base, auth, comptes, reglages, ligue, social, parcours, parrainage, matchJour, bande };
+  // Jouer en ligne ou entre amis demande un compte Google dès que la connexion Google est active.
+  const googleObligatoire = env.CONNEXION_GOOGLE === '1' && !!env.SUPABASE_URL;
+  SalleKopo.services = { base, auth, comptes, reglages, ligue, social, parcours, parrainage, matchJour, bande, googleObligatoire };
 
   const app = express();
   app.set('trust proxy', 1);
