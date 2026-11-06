@@ -617,13 +617,27 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
   });
 
   console.log('Rivalités, notifications, invitations');
-  await test('face-à-face : une partie à 3 crée les 3 duels', async () => {
+  await test('face-à-face : une partie à 3 ne compte pas, seul un duel à deux compte', async () => {
     const js = [await invite('Fa1' + Date.now() % 1000), await invite('Fa2' + Date.now() % 1000), await invite('Fa3' + Date.now() % 1000)];
     const fin = await jouerPartie(js);
     const ordre = [fin.vainqueur, ...fin.elimines.slice().reverse()];
+    await new Promise((ok) => setTimeout(ok, 300));
     const r = await api('/api/rivaux', { jeton: js.find((j) => j.compte.id === ordre[0]).jeton });
-    assert.strictEqual(r.json.length, 2);
-    assert.ok(r.json.every((x) => x.moi === 1 && x.lui === 0), JSON.stringify(r.json));
+    assert.deepStrictEqual(r.json, [], 'même salon à 3 : pas de face-à-face');
+    assert.deepStrictEqual(await srv.social.apresPartie([{ id: js[0].compte.id, place: 1 }, { id: js[1].compte.id, place: 2 }, { id: js[2].compte.id, place: 3 }]), []);
+    assert.deepStrictEqual(await srv.social.duels(js[0].compte.id, [js[1].compte.id, js[2].compte.id]), []);
+  });
+  for (const jeu of ['kopo', 'inter8']) await test(`face-à-face : un duel à deux compte (${jeu}), le même score des deux côtés`, async () => {
+    const js = [await invite('Du1' + jeu.slice(0, 2) + Date.now() % 1000), await invite('Du2' + jeu.slice(0, 2) + Date.now() % 1000)];
+    const fin = await jouerPartie(js, { jeu });
+    await new Promise((ok) => setTimeout(ok, 300));
+    const v = js.find((j) => j.compte.id === fin.vainqueur), autre = js.find((j) => j.compte.id !== fin.vainqueur);
+    const [d1] = await srv.social.duels(v.compte.id, [autre.compte.id]);
+    const [d2] = await srv.social.duels(autre.compte.id, [v.compte.id]);
+    assert.deepStrictEqual([d1.moi, d1.lui], [1, 0]);
+    assert.deepStrictEqual([d2.moi, d2.lui], [0, 1]);
+    assert.strictEqual((await api('/api/rivaux', { jeton: v.jeton })).json.length, 1);
+    assert.deepStrictEqual(await srv.social.duels(v.compte.id, []), []);
   });
   await test('statistiques du compte et copie du profil : gardées par le serveur', async () => {
     const js = [await invite('Sta' + Date.now() % 1000), await invite('Stb' + Date.now() % 1000), await invite('Stc' + Date.now() % 1000)];
@@ -633,14 +647,7 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.strictEqual(st.statut, 200);
     assert.deepStrictEqual(st.json.stats, { parties: 1, victoires: 1, finales: 1, eliminePremier: 0 });
     assert.deepStrictEqual(st.json.entrainement, { parties: 0, victoires: 0 });
-    assert.strictEqual(st.json.rivaux.length, 2);
-    // Même duel, vu des deux côtés : les scores sont le miroir l'un de l'autre.
-    const autre = js.find((j) => j.compte.id !== v.compte.id);
-    const [d1] = await srv.social.duels(v.compte.id, [autre.compte.id]);
-    const [d2] = await srv.social.duels(autre.compte.id, [v.compte.id]);
-    assert.deepStrictEqual([d1.moi, d1.lui], [1, 0]);
-    assert.deepStrictEqual([d2.moi, d2.lui], [0, 1]);
-    assert.deepStrictEqual(await srv.social.duels(v.compte.id, []), []);
+    assert.strictEqual(st.json.rivaux.length, 0, 'partie à 3 : pas de face-à-face');
     const premier = js.find((j) => j.compte.id === fin.elimines[0]);
     assert.strictEqual((await api('/api/statistiques', { jeton: premier.jeton })).json.stats.eliminePremier, 1);
     // Copie du profil du téléphone.
