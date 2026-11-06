@@ -31,7 +31,7 @@ Les tables sont créées toutes seules au premier démarrage (`src/schema.sql`).
 | `SUPABASE_JWT_SECRET` | Facultatif, si le projet Supabase utilise encore l'ancien secret partagé |
 | `SUPABASE_SERVICE_ROLE_KEY` | Clé secrète *service_role* : efface aussi l'utilisateur Google dans Supabase quand un joueur supprime son compte. Sans elle, le serveur le signale dans les journaux et il faut l'effacer à la main (Authentication → Users) |
 | `ADMIN_MOT_DE_PASSE`, `ADMIN_TOTP` | Accès au tableau de bord (mot de passe + code à 6 chiffres) |
-| `CONNEXION_GOOGLE` | `1` pour afficher « Se connecter avec Google » dans le jeu (après avoir activé Google dans Supabase, avec la Site URL du jeu) |
+| `CONNEXION_GOOGLE` | `1` pour afficher « Se connecter avec Google » dans le jeu (après avoir activé Google dans Supabase, avec la Site URL du jeu). Rend aussi Google obligatoire pour jouer en ligne et entre amis (salles `kopo`, `kopo-mise`, `inter8`) ; sans compte, on joue contre les robots |
 | `SECRET_MATCH_JOUR` | Facultatif : graine secrète des donnes du Match du jour (sinon `SECRET_SERVEUR`). La changer change les donnes à venir |
 | `ORIGINES` | Pages autorisées à appeler l'API (séparées par des virgules) |
 

@@ -1391,6 +1391,27 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.strictEqual(ok.json.valeur.maison, 10);
     await api('/admin/api/reglages/bande', { methode: 'PUT', jeton: adminJeton, corps: { valeur: { ...DEFAUTS.bande } } });
   });
+  await test('Google obligatoire en ligne et entre amis (salles kopo, kopo-mise, inter8), reprise permise', async () => {
+    const { SalleKopo } = require('../src/salle-kopo');
+    const client = new Client(URL_.replace('http', 'ws'));
+    const inv = await invite('SansGoogle');
+    const g = (await api('/api/connexion', { methode: 'POST', corps: { jetonSupabase: await jetonGoogle('google-obligatoire') } })).json;
+    // Un invité déjà assis quand la règle s'allume peut reprendre sa place.
+    const assise = await client.create('kopo', { jeton: inv.jeton, code: 'GOOA' });
+    SalleKopo.services.googleObligatoire = true;
+    try {
+      await assert.rejects(client.create('kopo', { jeton: inv.jeton, code: 'GOOB' }), /Connecte-toi avec Google/);
+      await assert.rejects(client.create('inter8', { jeton: inv.jeton, code: 'GOOC' }), /Connecte-toi avec Google/);
+      await assert.rejects(client.joinOrCreate('kopo', { jeton: inv.jeton, publique: true, taille: 3 }), /Connecte-toi avec Google/);
+      await assert.rejects(client.joinOrCreate('inter8', { jeton: inv.jeton, publique: true, taille: 3 }), /Connecte-toi avec Google/);
+      await assert.rejects(client.joinOrCreate('kopo-mise', { jeton: inv.jeton, publique: true, taille: 3, mise: 'bronze' }), /Connecte-toi avec Google/);
+      const retour = await client.join('kopo', { jeton: inv.jeton, code: 'GOOA' }); // déjà assis : il revient
+      await retour.leave();
+      const s = await client.create('inter8', { jeton: g.jeton, code: 'GOOD' });
+      await s.leave();
+    } finally { SalleKopo.services.googleObligatoire = false; }
+    assert.ok(assise); // l'ancienne connexion a été écartée par le retour (même compte)
+  });
   await srv.arreter();
   console.log(`\n${reussis} tests réussis, ${echecs} en échec.`);
   process.exit(echecs ? 1 : 0);
