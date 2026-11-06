@@ -357,12 +357,14 @@ class SalleKopo extends Room {
     }
     // Parrainage : le filleul avance ; à sa dernière partie, son parrain et lui reçoivent leur cadeau.
     if (parrainage && !avecRobots && humains.length >= 2) await parrainage.apresPartie(humains).catch((e) => console.error('Parrainage :', e.message));
-    // Face-à-face et notifications de rivalité (« Kevin t'a rattrapé : 7 – 7 ! ») : entre humains seulement, comme sur le téléphone.
-    if (social && this.jeu === 'kopo' && !avecRobots) await social.apresPartie(humains.map((id) => ({ id, place: place(id), abandon: p.abandons.has(id) }))).catch((e) => console.error('Rivalités :', e.message));
+    // Face-à-face et notifications de rivalité (« Kevin t'a rattrapé : 7 – 7 ! ») : seulement un vrai duel, deux humains
+    // seuls à la table (Kopo et Inter (8), un seul score par paire). Une partie à 3 ou plus ne compte pas, comme sur le téléphone.
+    const duel = !avecRobots && ordre.length === 2 && humains.length === 2;
+    if (social && duel) await social.apresPartie(humains.map((id) => ({ id, place: place(id), abandon: p.abandons.has(id) }))).catch((e) => console.error('Rivalités :', e.message));
     for (const [id, c] of this.clientsParId) {
       const compte = await comptes.lire(id);
       // Face-à-face tenus par le serveur : les deux joueurs voient le même score (le téléphone ne compte que ce qu'il a vu).
-      if (social && this.jeu === 'kopo' && !avecRobots && humains.includes(id)) {
+      if (social && duel && humains.includes(id)) {
         const duels = await social.duels(id, humains.filter((x) => x !== id)).catch(() => []);
         if (duels.length) c.send('faceAFace', duels);
       }

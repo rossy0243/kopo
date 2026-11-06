@@ -23,10 +23,12 @@ function creerSocial(base) {
   const api = {
     TYPES,
 
-    // Fin de partie : chaque paire de joueurs met à jour son face-à-face (celui qui finit devant gagne le duel ;
-    // un abandon compte comme une défaite). Si l'un rattrape ou dépasse l'autre, l'autre est prévenu.
+    // Fin d'un duel (deux joueurs seuls à la table, Kopo ou Inter (8)) : le face-à-face de la paire est mis à jour
+    // (celui qui finit devant gagne ; un abandon compte comme une défaite). Si l'un rattrape ou dépasse l'autre, l'autre
+    // est prévenu. Une partie à 3 ou plus ne compte pas : on ne s'est pas affrontés seul à seul.
     // places : [{ id, place, abandon }]
     async apresPartie(places) {
+      if (!Array.isArray(places) || places.length !== 2) return [];
       const js = places.filter((p) => p.place || p.abandon);
       const rang = (p) => (p.abandon ? 1e6 : p.place);
       const pseudos = new Map();
