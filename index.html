@@ -642,6 +642,14 @@ body.dos-kinshasa { --dos-motif: linear-gradient(135deg, transparent 38%, #f7d03
 .choix-salles.petits { grid-template-columns: repeat(3, 1fr); }
 .btn-whatsapp { background: #1f7a4d; border-color: #2a9d63; color: #fff; display: flex; align-items: center; justify-content: center; gap: 8px; }
 .btn-whatsapp .ico { font-size: 20px; }
+/* Fenêtre Partager : inviter un ami, puis les groupes de la communauté (couleur du réseau). */
+.groupes { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.btn-groupe { width: 100%; display: flex; align-items: center; gap: 10px; text-align: left; color: #fff; border-color: transparent; background: var(--reseau, rgba(255,255,255,.07)); }
+.btn-groupe .pastille-reseau { flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: rgba(0,0,0,.22); font-weight: 800; font-size: 14px; }
+.btn-groupe span:last-child { display: grid; line-height: 1.2; min-width: 0; }
+.btn-groupe small { font-weight: 500; opacity: .85; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fenetre .titre-groupes { margin: 6px 0 0; font-size: 15px; color: var(--muted); font-weight: 600; }
+@media (orientation: landscape) and (max-height: 520px) { .fenetre[data-type="partager"] .groupes { grid-template-columns: 1fr 1fr; } .fenetre[data-type="partager"] .btn-groupe { padding: 8px 12px; } .fenetre[data-type="partager"] .btn.large { padding: 10px; } }
 
 .fenetre[data-type="recap"] { width: min(520px, 100%); gap: 10px; }
 .recap { display: grid; gap: 10px; }
@@ -6542,7 +6550,7 @@ var qrcode = function() {
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = 'd272c0c7c832'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = '6dc3f5004513'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
@@ -10867,11 +10875,36 @@ var qrcode = function() {
   // Paramètres (fil version 1) : visible dès que window.ouvrirParametres existe.
   $('btnParametresAccueil').onclick = () => window.ouvrirParametres && window.ouvrirParametres();
   setTimeout(() => ($('btnParametresAccueil').hidden = typeof window.ouvrirParametres !== 'function'), 0);
-  $('btnPartager').onclick = async () => {
+  async function partagerJeu() {
     let url = location.origin + location.pathname;
     if (MODE_SERVEUR && compteLocal()) { try { const P = await apiJoueur('/parrainage'); if (P.code) url = lienParrain(P.code); } catch (e) {} }
     try { if (navigator.share) { await navigator.share({ title: 'Masano', text: `Viens jouer ${jeuPartage(jeuChoisi()).au} avec moi sur Masano !`, url }); return; } } catch (e) { return; }
     try { await navigator.clipboard.writeText(url); toast('Lien du jeu copié.'); } catch (e) { toast(url); }
+  }
+  // Groupes de la communauté (réglés dans l'admin, onglet Pilotage) : couleur et initiale du réseau.
+  const RESEAUX = { whatsapp: ['WhatsApp', '#1f7a4d', 'W'], telegram: ['Telegram', '#1f86c4', 'T'], facebook: ['Facebook', '#1b5fd1', 'f'], instagram: ['Instagram', '#b8336a', 'I'], tiktok: ['TikTok', '#202024', '♪'], youtube: ['YouTube', '#c4302b', '▶'], x: ['X', '#202024', 'X'], discord: ['Discord', '#5865f2', 'D'], autre: ['Lien', '#5a4a2a', '↗'] };
+  const groupesCommunaute = () => (configServeur && Array.isArray(configServeur.communautes) ? configServeur.communautes : []).filter((g) => g && /^https:\/\//.test(g.url || ''));
+  // Partager : sans groupe réglé, on partage directement comme avant ; sinon une fenêtre propose les deux.
+  $('btnPartager').onclick = async () => {
+    if (MODE_SERVEUR) await lireConfig();
+    const groupes = groupesCommunaute();
+    if (!groupes.length) return partagerJeu();
+    const inviter = el('button', 'btn principal large', 'Inviter un ami à jouer');
+    inviter.prepend(icone('i-partager'));
+    inviter.onclick = () => { fermerFenetre(); partagerJeu(); };
+    const ul = el('ul', 'groupes');
+    for (const g of groupes) {
+      const [nomReseau, couleur, lettre] = RESEAUX[g.reseau] || RESEAUX.autre;
+      const b = el('button', 'btn btn-groupe');
+      b.style.setProperty('--reseau', couleur);
+      const txt = el('span');
+      txt.append(el('b', null, g.libelle || nomReseau), el('small', null, 'Rejoindre sur ' + nomReseau));
+      b.append(el('span', 'pastille-reseau', lettre), txt);
+      b.onclick = () => window.open(g.url, '_blank', 'noopener');
+      const li = el('li'); li.append(b); ul.append(li);
+    }
+    const f = el('button', 'btn large', 'Fermer'); f.onclick = fermerFenetre;
+    ouvrirFenetre([el('h2', null, 'Partager'), inviter, el('p', 'titre-groupes', 'Rejoins nos groupes'), ul, f], 'partager');
   };
   $('btnLancer').onclick = () => envoyer({ type: 'lancer' });
   $('btnPleinEcran').onclick = pleinEcran;

@@ -40,6 +40,8 @@ const DEFAUTS = {
   bande: { actif: true, maison: 15, miseMin: 500, miseMax: 10000, inscritsMin: 2, membresMax: 20, bandesMax: 3, matchsMin: 5, penaliteRetard: 10, joursCompte: 7, partiesMin: 10 },
   // Nom et thème de la prochaine saison (sinon : une ville, thème validé le 31/10).
   prochaineSaison: { nom: '', theme: '' },
+  // Groupes de la communauté (bouton Partager) : réseau, nom, lien, visible. Dans l'ordre de la liste ; sans lien, pas affiché.
+  communautes: [],
   messagesRapides: ['👏', '😂', '😮', '🔥', '😡', '👍', '😭', '🙏', 'Bien joué !', 'Bravo !', 'Joli coup !', 'Belle carte !', 'Bien vu !', 'Trop fort !', 'Merci !', 'Désolé !', 'Oups !', 'Aïe !', 'Pas de chance !', 'Je ramasse…', 'Je t’ai eu !', 'Katapss !', 'Vite !', 'Prends ton temps', 'À toi !', 'Encore une !', 'Bonne chance !', 'Bonne partie !', 'GG !', 'Revanche ?', 'On en refait une ?', 'Je reviens', 'Salut tout le monde !', 'À la prochaine !'],
 };
 // Version actuelle de l'appli (const VERSION dans src/source.html). La version minimale demandée
@@ -66,6 +68,34 @@ function verifierMessages(v) {
   if (l.some((m) => /[<>]/.test(m))) return { ok: false, erreur: 'Les signes < et > ne sont pas acceptés.' };
   return { ok: true, liste: l };
 }
+
+// Groupes de la communauté : réseaux connus, liens https seulement (pas de javascript: ni de lien interne).
+const RESEAUX = { whatsapp: 'WhatsApp', telegram: 'Telegram', facebook: 'Facebook', instagram: 'Instagram', tiktok: 'TikTok', youtube: 'YouTube', x: 'X', discord: 'Discord', autre: 'Autre' };
+const COMMUNAUTES_MAX = 12;
+function verifierCommunautes(v) {
+  const err = (m) => { throw Object.assign(new Error(m), { statut: 400 }); };
+  if (!Array.isArray(v)) err('Il faut une liste de groupes.');
+  if (v.length > COMMUNAUTES_MAX) err(`Au plus ${COMMUNAUTES_MAX} groupes.`);
+  return v.map((g, i) => {
+    g = g || {};
+    const reseau = String(g.reseau || '');
+    if (!(reseau in RESEAUX)) err(`Groupe ${i + 1} : réseau inconnu.`);
+    const libelle = String(g.libelle == null ? '' : g.libelle).replace(/\s+/g, ' ').trim();
+    if (libelle.length > 40) err(`Groupe ${i + 1} : nom de 40 caractères au plus.`);
+    if (/[<>]/.test(libelle)) err(`Groupe ${i + 1} : les signes < et > ne sont pas acceptés.`);
+    let url = String(g.url == null ? '' : g.url).trim();
+    if (url) {
+      if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+      let u = null;
+      try { u = new URL(url); } catch (e) {}
+      if (!u || u.protocol !== 'https:' || !u.hostname.includes('.') || url.length > 300) err(`Groupe ${i + 1} : lien invalide (il doit commencer par https://).`);
+      url = u.href;
+    }
+    return { reseau, libelle, url, visible: g.visible !== false && g.visible !== 0 };
+  });
+}
+// Ce que voient les joueurs : les groupes visibles qui ont un lien, dans l'ordre.
+const communautesPubliques = (l) => (Array.isArray(l) ? l : []).filter((g) => g && g.visible && g.url).map((g) => ({ reseau: g.reseau, libelle: g.libelle || RESEAUX[g.reseau] || '', url: g.url }));
 
 const DIVISIONS = ['bois', 'bronze', 'argent', 'or', 'diamant', 'legende'];
 const entier = (x) => Number.isInteger(Number(x)) && x !== '' && x !== null ? Number(x) : NaN;
@@ -164,6 +194,7 @@ function creerReglages(base) {
         valeur = v.liste;
       }
       if (cle === 'ligue') valeur = verifierLigue(valeur);
+      if (cle === 'communautes') valeur = verifierCommunautes(valeur);
       if (cle === 'versionMin') {
         valeur = String(valeur || '').trim();
         if (!/^\d{1,3}(\.\d{1,3}){0,3}$/.test(valeur)) throw Object.assign(new Error('Version invalide (exemple : 1.1).'), { statut: 400 });
@@ -211,4 +242,4 @@ function creerReglages(base) {
   };
 }
 
-module.exports = { verifierJeux, etatJeuPour, NOMS_JEUX, creerReglages, DEFAUTS, VERSION_APPLI, versionPlusRecente, verifierMessages, verifierLigue, verifierBande, DIVISIONS, MESSAGE_MAX };
+module.exports = { verifierCommunautes, communautesPubliques, RESEAUX, verifierJeux, etatJeuPour, NOMS_JEUX, creerReglages, DEFAUTS, VERSION_APPLI, versionPlusRecente, verifierMessages, verifierLigue, verifierBande, DIVISIONS, MESSAGE_MAX };
