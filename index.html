@@ -113,6 +113,15 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
 .style-corps b { font-family: var(--display); font-size: 24px; letter-spacing: 1px; color: var(--brass); font-weight: 400; text-transform: uppercase; }
 .style-puces { display: flex; flex-wrap: wrap; gap: 5px; }
 .style-puces i { font-style: normal; background: var(--brass); color: #1d1606; border-radius: 6px; padding: 1px 6px; font-size: 12px; font-weight: 700; }
+.carte-inter.figure .centre, .carte-inter.joker .centre { display: grid; place-items: center; align-content: center; gap: 0; margin: 1px 0 2px; border: 1.5px solid currentColor; border-radius: 5px; opacity: .95; }
+.carte-inter.figure .centre svg { width: 62%; height: auto; fill: currentColor; }
+.carte-inter.figure .centre b { font-family: var(--display); font-size: .62em; line-height: 1; font-weight: 400; }
+.carte-inter.as .centre { transform: scale(1.55); } /* l'As : un grand symbole */
+.carte-inter.joker { background: linear-gradient(150deg, #fff7df 0%, #f5dc98 100%); color: #1b1b22; }
+.carte-inter.joker.rouge { background: linear-gradient(150deg, #fff1ea 0%, #f6c3a4 100%); color: var(--red); }
+.carte-inter.joker .coin { font-family: var(--display); font-size: 12px; letter-spacing: 1px; font-weight: 400; }
+.carte-inter.joker .centre { border-style: dashed; }
+.carte-inter.joker .centre svg { width: 74%; height: auto; fill: currentColor; }
 .chip.demande { border-color: var(--brass); color: var(--brass); }
 .btn.katapss.contester { background: var(--brass); border-color: var(--brass); color: #1d1606; font-size: 22px; }
 .choix-demande { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
@@ -1126,6 +1135,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
         <small class="muted" id="niveauRobotsAide"></small>
         <p>Combien de robots autour de la table ?</p>
         <div class="choix-robots" id="choixRobots"></div>
+        <small class="muted style-inter" hidden>Tu joues avec eux : 3 robots = 4 joueurs, 1 paquet. Dès 4 robots (5 joueurs), on joue avec 2 paquets.</small>
         <button class="btn principal large" id="btnGuidee" hidden>Première partie guidée (2 robots gentils)</button>
         <button class="btn large" id="btnFermerRobots">Annuler</button>
       </div>
@@ -4627,7 +4637,7 @@ var qrcode = function() {
   const brut = (carte) => carte.replace('*', '');
   const valeur = (carte) => (brut(carte)[0] === JOKER ? JOKER : brut(carte).slice(0, -1));
   const couleur = (carte) => (valeur(carte) === JOKER ? null : brut(carte).slice(-1));
-  const NOMS_VALEURS = { A: 'A', V: 'V', D: 'D', R: 'R' };
+  const NOMS_VALEURS = { A: 'A', V: 'J', D: 'Q', R: 'K' }; // à l'écran : J (valet), Q (dame), K (roi), comme sur les cartes
   function afficher(carte) {
     if (valeur(carte) === JOKER) return 'Joker';
     return (NOMS_VALEURS[valeur(carte)] || valeur(carte)) + SYMBOLES[couleur(carte)];
@@ -4965,9 +4975,10 @@ var qrcode = function() {
     for (const c of cartes) m.mains[j].splice(m.mains[j].indexOf(c), 1);
     m.defausse.push(...cartes);
     m.vu.posees.push(...cartes);
+    m.vu.dernier = j; // qui a posé la carte du centre (affichage)
     m.libre = false;
     const finit = m.mains[j].length === 0;
-    noter(m, `${j} pose ${cartes.map(afficher).join(' ')}${v === '8' && !finit ? ` : « Inter demande ${action.demande} »` : ''}.`);
+    noter(m, `${j} pose ${cartes.map(afficher).join(' ')}${v === '8' && !finit ? ` : « Inter demande ${NOMS_VALEURS[action.demande] || action.demande} »` : ''}.`);
 
     // La demande en cours s'arrête dès que la valeur demandée est posée, ou qu'un joker la coupe.
     if (m.demande && (v === m.demande.valeur || v === JOKER)) m.demande = null;
@@ -5018,6 +5029,7 @@ var qrcode = function() {
       qualifies: m.qualifies.slice(),
       phase: m.phase,
       posees: m.vu.posees.slice(),
+      dernier: m.vu.dernier || null,
       piochesDemande: m.vu.piochesDemande.map((p) => ({ ...p })),
     };
   }
@@ -5274,7 +5286,7 @@ var qrcode = function() {
   const MIN = 2, MAX = I.MAX_JOUEURS; // 8 joueurs au plus
   const MODES = ['simple', 'delire'];
   const DELAIS = [0, 5, 10, 15, 20]; // secondes par tour (0 = sans chrono)
-  const PAUSE_ROBOT = 1200; // un robot réfléchit 1,2 s avant de jouer
+  const PAUSE_ROBOT = 1800; // un robot réfléchit 1,8 s avant de jouer : le temps de voir chaque coup
   const DUREES = { depart: 5000, mancheAuto: 10000, revanche: 15000 };
   const DELAI_ABSENT = 5;
   const DELAI_ANNONCE = 3000; // temps laissé pour annoncer avant qu'un robot ne conteste
@@ -5707,6 +5719,10 @@ var qrcode = function() {
         elimine: m.elimine,
         journal: journalLisible(s, m),
         main: p.main,
+        posees: p.posees.slice(-8), // dernières cartes posées (animations côté téléphone)
+        nbPosees: p.posees.length,
+        dernier: p.dernier, // qui a posé la carte du centre
+        paquets: p.paquets,
         pause: s.pause ? { type: s.pause.type, resteMs: Math.max(0, s.pause.jusqua - s.horloge()), totalMs: s.pause.total } : null,
         actions: s.pause ? [] : I.actionsPossibles(m, id).map((a) => {
           const r = { type: a.type };
@@ -6438,7 +6454,7 @@ var qrcode = function() {
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = '8a86d08a3ee4'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = 'b4d719b7233e'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
@@ -7128,8 +7144,12 @@ var qrcode = function() {
     if (v.etat !== 'finPartie') arreterSuiteAuto();
     if (v.etat === 'salon') { if (!chatOuvert()) fermerFenetre(); return afficherSalon(v); } // le chat reste ouvert quand quelqu'un arrive ou se dit prêt
     if (v.etat === 'manche' && client && !v.joueurs.some((j) => j.id === v.moi)) { quitter(); toast('La revanche est partie sans toi.'); return; }
-    if (v.jeu === 'inter8') afficherPartieInter(v); // Inter (8) : pas encore d'animations
-    else {
+    if (v.jeu === 'inter8') {
+      const avant = positionsAvant();
+      afficherPartieInter(v);
+      try { animerInter(ancienne, v, avant); } catch (e) { console.error(e); }
+      try { sonnerInter(ancienne, v); } catch (e) { console.error(e); }
+    } else {
       const avant = positionsAvant();
       afficherPartie(v);
       try { animer(ancienne, v, avant, finAvant); } catch (e) { console.error(e); }
@@ -7183,7 +7203,7 @@ var qrcode = function() {
   // Fait voler une carte (face visible, ou de dos si c est null) d'un rectangle à un autre.
   function voler(c, de, vers, o = {}) {
     if (sansAnim || !visible(de) || !visible(vers)) return;
-    const e = c ? carteEl(c) : el('div', 'carte dos-carte');
+    const e = c ? (vueActuelle && vueActuelle.jeu === 'inter8' ? carteInterEl(c) : carteEl(c)) : el('div', 'carte dos-carte');
     e.classList.add('volante');
     if (o.verso) e.classList.add('verso');
     Object.assign(e.style, { left: vers.left + 'px', top: vers.top + 'px', width: vers.width + 'px', height: vers.height + 'px' });
@@ -7618,18 +7638,36 @@ var qrcode = function() {
   // Même écran que Kopo (sièges, table, main, actions), avec les règles d'Inter (8) :
   // une carte de référence au centre, la pioche, plusieurs cartes de même valeur posées ensemble,
   // la valeur demandée avec le 8, et les boutons J'annonce et Contester.
+  // Cartes : J (valet), Q (dame), K (roi), As ; les figures ont un petit dessin, le joker est décoré (rouge ou noir).
   const NOMS_VALEURS_INTER = { A: 'As', V: 'Valet', D: 'Dame', R: 'Roi', X: 'Joker' };
+  const LETTRES_INTER = { V: 'J', D: 'Q', R: 'K' };
+  const nomValeur = (v) => (v === 'A' ? 'As' : v === 'X' ? 'Joker' : LETTRES_INTER[v] || v);
   const estRougeInter = (c) => c.replace('*', '') === 'XR' || ['C', 'K'].includes(I8.couleur(c));
+  const svgInter = (corps, vb) => { const t = document.createElement('template'); t.innerHTML = `<svg viewBox="${vb || '0 0 24 24'}" aria-hidden="true">${corps}</svg>`; return t.content.firstChild; };
+  const DESSINS_INTER = {
+    // Roi : couronne
+    R: '<path d="M3 18 3 7l5 5 4-8 4 8 5-5v11z"/><rect x="3" y="19" width="18" height="2.5" rx="1"/><circle cx="12" cy="4" r="1.6"/>',
+    // Dame : diadème et perles
+    D: '<path d="M4 18c0-6 4-9 8-11 4 2 8 5 8 11z"/><rect x="4" y="19" width="16" height="2.5" rx="1"/><circle cx="12" cy="5" r="2"/><circle cx="6" cy="10" r="1.3"/><circle cx="18" cy="10" r="1.3"/>',
+    // Valet : chapeau à plume
+    V: '<path d="M4 16c1-6 5-9 9-9s6 3 7 9z"/><rect x="3" y="16.5" width="18" height="3" rx="1.4"/><path d="M15 8c2-5 5-6 7-6-1 3-3 6-6 7z"/>',
+  };
+  // Joker : bonnet de bouffon à trois pointes, avec ses grelots.
+  const DESSIN_JOKER = '<path d="M3 20 6 7l4 7 2-11 2 11 4-7 3 13z"/><circle cx="6" cy="6" r="1.8"/><circle cx="12" cy="2.6" r="1.8"/><circle cx="18" cy="6" r="1.8"/><rect x="2.5" y="19.5" width="19" height="2.8" rx="1.2"/>';
   function carteInterEl(c, tag) {
-    const e = el(tag || 'div', 'carte' + (estRougeInter(c) ? ' rouge' : ''));
-    const v = I8.valeur(c);
+    const v = I8.valeur(c), rouge = estRougeInter(c);
+    const e = el(tag || 'div', 'carte carte-inter' + (rouge ? ' rouge' : ''));
     if (v === 'X') {
       e.classList.add('joker');
-      e.append(el('span', 'coin', 'JK'), el('span', 'centre', '★'));
-      e.setAttribute('aria-label', 'Joker ' + (estRougeInter(c) ? 'rouge' : 'noir'));
+      const centre = el('span', 'centre'); centre.append(svgInter(DESSIN_JOKER));
+      e.append(el('span', 'coin', 'JOKER'), centre);
+      e.setAttribute('aria-label', 'Joker ' + (rouge ? 'rouge' : 'noir'));
     } else {
-      const sy = I8.SYMBOLES[I8.couleur(c)];
-      e.append(el('span', 'coin', v + sy), el('span', 'centre', ['V', 'D', 'R'].includes(v) ? v : sy));
+      const sy = I8.SYMBOLES[I8.couleur(c)], lettre = LETTRES_INTER[v] || v;
+      const centre = el('span', 'centre');
+      if (DESSINS_INTER[v]) { e.classList.add('figure'); centre.append(svgInter(DESSINS_INTER[v]), el('b', null, lettre)); }
+      else { if (v === 'A') e.classList.add('as'); centre.textContent = sy; }
+      e.append(el('span', 'coin', lettre + sy), centre);
       e.setAttribute('aria-label', (NOMS_VALEURS_INTER[v] || v) + ' de ' + I8.NOMS_COULEURS[I8.couleur(c)]);
     }
     e.dataset.carte = c;
@@ -7638,7 +7676,6 @@ var qrcode = function() {
   const rangInter = (c) => (I8.valeur(c) === 'X' ? 99 : I8.VALEURS.indexOf(I8.valeur(c)));
   const coulInter = (c) => (I8.valeur(c) === 'X' ? 9 : I8.COULEURS.indexOf(I8.couleur(c)));
   const trierMainInter = (main) => main.slice().sort(prefs.tri === 'valeur' ? (a, b) => rangInter(a) - rangInter(b) || coulInter(a) - coulInter(b) : (a, b) => coulInter(a) - coulInter(b) || rangInter(a) - rangInter(b));
-  const nomValeur = (v) => NOMS_VALEURS_INTER[v] || v;
 
   let choixInter = []; // cartes touchées, dans l'ordre (la dernière donne la couleur)
   // Coups « jouer » qui correspondent exactement aux cartes choisies (même première, même dernière).
@@ -7699,11 +7736,11 @@ var qrcode = function() {
     } else {
       const t = el('div', 'table-inter');
       const ref = el('div', 'pile');
-      if (m.reference) ref.append(carteInterEl(m.reference));
-      ref.append(el('span', 'legende', 'Au centre'));
+      if (m.reference) { const r = carteInterEl(m.reference); r.id = 'centreInter'; ref.append(r); }
+      ref.append(el('span', 'legende', m.dernier ? 'Posée par ' + qui(m.dernier) : 'Au centre'));
       const pioche = el('div', 'pile');
-      const dos = el('div', 'carte dos-carte');
-      pioche.append(dos, el('span', 'legende', `Pioche · ${m.pioche}`));
+      const dos = el('div', 'carte dos-carte'); dos.id = 'piocheInter';
+      pioche.append(dos, el('span', 'legende', `Pioche · ${m.pioche}`), el('span', 'legende paquets', m.paquets > 1 ? '2 paquets (108)' : '1 paquet (54)'));
       t.append(ref, pioche);
       poses.append(t);
       const fil = el('div', 'fil-inter');
@@ -7792,6 +7829,77 @@ var qrcode = function() {
       b.onclick = () => { b.disabled = true; choixInter = []; envoyer({ type: 'action', action: { type: 'passer' } }); };
       act.append(b);
     }
+  }
+
+  // ------------------------------------------------------------------ Inter (8) : animations et sons
+  // Comme pour Kopo, chaque nouvelle vue est comparée à la précédente : carte posée (du joueur vers
+  // le centre), cartes piochées (de la pioche vers le joueur), annonce, J retour, demande du 8.
+  const rectPioche = () => rectCarte('#piocheInter') || rectTas();
+  function animerInter(A, N, avant) {
+    if (sansAnim || !N.manche || !document.body.classList.contains('en-jeu')) return;
+    const m = N.manche, moi = N.moi, a = A && A.manche;
+    const memeManche = a && (A.etat === 'manche' || A.etat === 'finManche') && A.numeroManche === N.numeroManche;
+    if (m.pause && m.pause.type === 'depart' && !(memeManche && a.pause && a.pause.type === 'depart')) distribuer(N);
+    if (!memeManche || m.pause) return;
+    // Cartes posées : de la main (ou du siège du joueur) vers le centre, retournées pour les adversaires.
+    const nouvelles = Math.max(0, (m.nbPosees || 0) - (a.nbPosees || 0));
+    let delai = 0;
+    if (nouvelles && m.dernier) {
+      const cartes = (m.posees || []).slice(-Math.min(nouvelles, 8));
+      const vers = rectCarte('#centreInter');
+      cartes.forEach((c, i) => {
+        const de = m.dernier === moi ? (avant.main[c] || rectSiege(moi)) : rectCentre(rectSiege(m.dernier), vers ? vers.width * 0.6 : 40, vers ? vers.height * 0.6 : 58);
+        const derniere = i === cartes.length - 1;
+        voler(c, de, vers, { retourner: m.dernier !== moi, verso: m.dernier !== moi, delai: i * 160, duree: 560, cible: derniere ? '#centreInter' : null, disparaitre: !derniere });
+      });
+      delai = cartes.length * 160 + 300;
+    }
+    // Cartes piochées : de la pioche vers le joueur (ta main : faces visibles).
+    const tas = rectPioche();
+    for (const id of m.sieges) {
+      const plus = (m.nbCartes[id] || 0) - (a.nbCartes[id] || 0);
+      if (plus <= 0) continue;
+      if (id === moi) {
+        const nouvellesMain = m.main.filter((c) => !a.main.includes(c));
+        nouvellesMain.forEach((c, i) => {
+          const sel = `#main [data-carte="${c}"]`;
+          cartesRecues.add(c);
+          voler(c, tas, rectCarte(sel), { delai: delai + i * 120, retourner: true, verso: true, duree: 560, cible: sel });
+        });
+      } else for (let i = 0; i < Math.min(plus, 8); i++) voler(null, tas, rectCentre(rectSiege(id), 30, 44), { delai: delai + i * 120, disparaitre: true, duree: 560 });
+      if (plus > 1) bulle(id, '+' + plus, { cls: 'ko', delai: delai + 200 });
+    }
+    // J'annonce : un tampon pour toute la table.
+    m.annonces.filter((id) => !a.annonces.includes(id)).forEach((id) => { tampon("J'ANNONCE !", id === moi ? 'Toi' : nom(N, id)); retardFenetre = Date.now() + 1500; });
+    // Contestation : le joueur pris en faute pioche 1 carte d'amende.
+    const fil = m.journal[m.journal.length - 1] || '';
+    if (fil !== (a.journal[a.journal.length - 1] || '') && / conteste : /.test(fil) && a.contestable) bulle(a.contestable, '!', { cls: 'ko', delai: 100 });
+    // J retour, demande du 8 : on montre ce qui change.
+    if (m.sens !== a.sens) { pop(document.querySelector('#entete .chip:last-child'), 1.5, 600); if (m.dernier) bulle(m.dernier, '↺', { delai: 300 }); }
+    if (m.demande && (!a.demande || a.demande.valeur !== m.demande.valeur)) pop(document.querySelector('#entete .chip.demande'), 1.5, 600);
+    // Changement de tour.
+    if (m.joueurCourant && m.joueurCourant !== a.joueurCourant) {
+      const s = siegeEl(m.joueurCourant); pop(s && (s.querySelector('.ligne') || s), 1.2, 450);
+      if (m.joueurCourant === moi) pop($('main'), 1.06, 500);
+    }
+    // Qualifiés et éliminé, comme pour Kopo.
+    m.qualifies.forEach((q, rang) => { if (!a.qualifies.some((x) => x.joueur === q.joueur)) bulle(q.joueur, rang === 0 ? '✓ 1er' : `✓ ${rang + 1}e`, { cls: 'texte', delai: 300 }); });
+    if (m.elimine && !a.elimine) { secouer(m.elimine); bulle(m.elimine, '✕', { cls: 'ko', delai: 200, duree: 1800 }); retardFenetre = Math.max(retardFenetre, Date.now() + 1900); }
+  }
+  function sonnerInter(A, N) {
+    if (N.etat === 'finPartie' && A && A.etat !== 'finPartie') Sons.jouer(N.vainqueur === N.moi ? 'victoire' : 'defaite', { delai: 1300 });
+    if (!N.manche) return;
+    const m = N.manche, moi = N.moi, a = A && A.manche;
+    const memeManche = a && (A.etat === 'manche' || A.etat === 'finManche') && A.numeroManche === N.numeroManche;
+    if (m.pause && m.pause.type === 'depart' && !(memeManche && a.pause && a.pause.type === 'depart'))
+      Sons.jouer('distribution', { nb: m.sieges.reduce((t, id) => t + (m.nbCartes[id] || 0), 0) });
+    if (!memeManche) return;
+    const nouvelles = Math.max(0, (m.nbPosees || 0) - (a.nbPosees || 0));
+    for (let i = 0; i < Math.min(nouvelles, 4); i++) Sons.jouer('carte', { delai: i * 160 });
+    if (m.sieges.some((id) => (m.nbCartes[id] || 0) > (a.nbCartes[id] || 0))) Sons.jouer('ramasse', { delai: nouvelles ? 350 : 0 });
+    if (m.annonces.some((id) => !a.annonces.includes(id))) Sons.jouer('katapss');
+    m.qualifies.forEach((q) => { if (!a.qualifies.some((x) => x.joueur === q.joueur)) Sons.jouer('qualifie', { moi: q.joueur === moi, delai: 250 }); });
+    if (m.elimine && !a.elimine) Sons.jouer('elimine', { moi: m.elimine === moi, delai: 200 });
   }
 
   // Ta main sur une seule ligne : si les cartes ne tiennent pas, elles se chevauchent
