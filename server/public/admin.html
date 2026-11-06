@@ -356,7 +356,7 @@ const afficher = {
         <h3>État des jeux</h3>
         <p class="muted">« Testeurs seulement » : le jeu est caché aux autres joueurs, seuls les pseudos de la liste le voient et y jouent. « Maintenance » : le jeu reste visible mais on ne peut plus y entrer ; les parties en cours vont au bout. L'autre jeu continue normalement.</p>
         ${[['kopo', 'Kopo'], ['inter8', 'Inter (8)']].map(([j, nom]) => `<label class="ligne"><span style="min-width:120px">${nom}</span><select id="jeu_${j}">${[['ouvert', 'Ouvert à tous'], ['testeurs', 'Testeurs seulement'], ['maintenance', 'En maintenance']].map(([v, t]) => `<option value="${v}" ${(r.jeux || {})[j] === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>`).join('')}
-        <div class="ligne"><input id="testeurs" value="${esc(((r.jeux || {}).testeurs || []).join(', '))}" placeholder="Pseudos des testeurs, séparés par des virgules" style="flex:1;min-width:260px"><button class="btn principal" id="btnJeux">Enregistrer</button></div>
+        <div class="ligne"><input id="testeurs" list="suggestionsTesteurs" autocomplete="off" value="${esc(((r.jeux || {}).testeurs || []).join(', '))}" placeholder="Pseudos des testeurs, séparés par des virgules" style="flex:1;min-width:260px"><datalist id="suggestionsTesteurs"></datalist><button class="btn principal" id="btnJeux">Enregistrer</button></div>
         <h3>Cadeau de fondateur</h3>
         <div class="ligne"><label><input type="checkbox" id="fondateurActif" ${r.cadeauFondateur && r.cadeauFondateur.active !== false && r.cadeauFondateur.actif ? 'checked' : ''}> distribuer le dos « Les Fondateurs » aux joueurs qui avaient des pièces d'essai</label><button class="btn" id="btnFondateur">Enregistrer</button></div>
         <h3>Version minimale de l'application</h3>
@@ -388,6 +388,22 @@ const afficher = {
     }));
     $('#btnAnnonce').onclick = () => ecrire('annonce', { texte: $('#annonce').value, active: $('#annonceActive').checked });
     $('#btnMaint').onclick = () => { if (!$('#maintActive').checked || confirm('Fermer le jeu pour maintenance ?')) ecrire('maintenance', { message: $('#maint').value, active: $('#maintActive').checked }); };
+    // Pseudos des testeurs : suggestions des joueurs qui existent, pendant qu'on tape (après la dernière virgule).
+    let minuteurTesteurs = null;
+    $('#testeurs').oninput = () => {
+      clearTimeout(minuteurTesteurs);
+      minuteurTesteurs = setTimeout(async () => {
+        const val = $('#testeurs').value, i = val.lastIndexOf(',');
+        const debut = i >= 0 ? val.slice(0, i + 1) + ' ' : '', mot = val.slice(i + 1).trim();
+        const liste = $('#suggestionsTesteurs');
+        if (mot.length < 2) return liste.replaceChildren();
+        try {
+          const r2 = await api('/joueurs?q=' + encodeURIComponent(mot));
+          const pseudos = [...new Set(r2.joueurs.map((j) => j.pseudo))].slice(0, 12);
+          liste.replaceChildren(...pseudos.map((ps) => { const o = document.createElement('option'); o.value = debut + ps; return o; }));
+        } catch (e) {}
+      }, 250);
+    };
     $('#btnJeux').onclick = () => ecrire('jeux', { kopo: $('#jeu_kopo').value, inter8: $('#jeu_inter8').value, testeurs: $('#testeurs').value });
     $('#btnMessages').onclick = () => ecrire('messagesRapides', $('#messagesRapides').value.split('\n'));
     $('#btnFondateur').onclick = () => ecrire('cadeauFondateur', { actif: $('#fondateurActif').checked });
