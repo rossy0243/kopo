@@ -97,13 +97,16 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
 .chip { border: 1px solid var(--line); border-radius: 99px; padding: 2px 10px; font-size: 13px; display: inline-flex; gap: 6px; align-items: center; }
 .chip b { font-size: 17px; line-height: 1; }
 .chip.interdit { border-color: var(--bad); color: var(--bad); }
-.table-inter { display: flex; gap: 22px; align-items: flex-end; justify-content: center; }
+.table-inter { position: relative; display: flex; justify-content: center; align-items: center; width: 100%; min-height: 128px; }
+.table-inter .pioche-inter { position: absolute; right: 4px; top: 0; gap: 2px; }
+.table-inter .pioche-inter .carte { width: 40px; height: 58px; }
+.table-inter .pioche-inter .legende { font-weight: 700; color: var(--ink); }
+#poses:has(.table-inter) { width: 100%; }
+@media (orientation: landscape) { body.en-jeu .main.defile { justify-content: flex-start; overflow-x: auto; overflow-y: hidden; padding-top: 26px; scrollbar-width: none; } body.en-jeu .main.defile .carte { flex: none; transform: none; } body.en-jeu .main.defile .carte.choisie { transform: translateY(-20px); } body.en-jeu .main.defile { -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%); mask-image: linear-gradient(90deg, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%); } }
 .table-inter .pile { display: grid; justify-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
 .table-inter .carte { width: 66px; height: 96px; }
 .carte.joker .coin { font-size: 12px; letter-spacing: .5px; }
 .carte .ordre { position: absolute; top: -7px; right: -7px; width: 20px; height: 20px; border-radius: 99px; background: var(--brass); color: #1d1606; font-size: 12px; font-weight: 700; display: grid; place-items: center; }
-.fil-inter { display: grid; gap: 2px; justify-items: center; font-size: 12px; color: var(--muted); text-align: center; margin-top: 8px; }
-.fil-inter div:last-child { color: var(--ink); }
 #logoJeu span { white-space: nowrap; }
 #logoJeu.long { font-size: .8em; }
 .style-partie { display: grid; grid-template-columns: 46px 1fr; gap: 14px; align-items: center; text-align: left; width: 100%; padding: 14px; border-radius: 16px; border: 1px solid rgba(226,176,74,.45); background: var(--table-2); color: var(--ink); font: inherit; cursor: pointer; }
@@ -6454,7 +6457,7 @@ var qrcode = function() {
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = 'b4d719b7233e'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = 'b966b01f86eb'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
@@ -7740,12 +7743,11 @@ var qrcode = function() {
       ref.append(el('span', 'legende', m.dernier ? 'Posée par ' + qui(m.dernier) : 'Au centre'));
       const pioche = el('div', 'pile');
       const dos = el('div', 'carte dos-carte'); dos.id = 'piocheInter';
-      pioche.append(dos, el('span', 'legende', `Pioche · ${m.pioche}`), el('span', 'legende paquets', m.paquets > 1 ? '2 paquets (108)' : '1 paquet (54)'));
-      t.append(ref, pioche);
+      pioche.classList.add('pioche-inter');
+      pioche.append(dos, el('span', 'legende', String(m.pioche)));
+      pioche.setAttribute('aria-label', `Pioche : ${m.pioche} carte${m.pioche > 1 ? 's' : ''}`);
+      t.append(ref, pioche); // la carte posée au milieu, la pioche dans un coin
       poses.append(t);
-      const fil = el('div', 'fil-inter');
-      m.journal.slice(-3).forEach((ligne) => fil.append(el('div', null, ligne)));
-      poses.append(fil);
     }
 
     // Consigne
@@ -7906,14 +7908,19 @@ var qrcode = function() {
   // (le coin de chaque carte reste visible). Au-delà, elles passent sur deux lignes.
   function ajusterMain() {
     const main = $('main'), n = main.children.length;
-    main.classList.remove('serree');
+    main.classList.remove('serree', 'defile');
     if (n < 2 || main.offsetParent === null) return;
     const w = main.children[0].offsetWidth, W = main.clientWidth;
     if (n * w + (n - 1) * 6 <= W) return;
     let parLigne = n;
     const paysage = matchMedia('(orientation: landscape)').matches;
-    if (!paysage && (W - w) / (n - 1) < 30) parLigne = Math.ceil(n / 2);
-    const pas = Math.min(w, Math.floor((W - w) / Math.max(1, parLigne - 1))); // au plus la largeur d'une carte : sinon la dernière passe à la ligne
+    // Inter (8) : une main peut dépasser 20 cartes. Le coin de chaque carte (« 10♥ ») doit rester lisible :
+    // en portrait, jusqu'à 4 lignes ; en paysage, la main défile du doigt.
+    const inter = vueActuelle && vueActuelle.jeu === 'inter8', lisible = 34;
+    if (!paysage && inter) { let lignes = 1; while (lignes < 4 && (W - w) / Math.max(1, Math.ceil(n / lignes) - 1) < lisible) lignes++; parLigne = Math.ceil(n / lignes); }
+    else if (!paysage && (W - w) / (n - 1) < 30) parLigne = Math.ceil(n / 2);
+    let pas = Math.min(w, Math.floor((W - w) / Math.max(1, parLigne - 1))); // au plus la largeur d'une carte : sinon la dernière passe à la ligne
+    if (paysage && inter && pas < lisible) { pas = lisible; main.classList.add('defile'); }
     main.style.setProperty('--pas', pas + 'px');
     main.classList.add('serree');
   }
