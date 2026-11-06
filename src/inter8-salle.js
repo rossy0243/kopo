@@ -14,6 +14,7 @@
   const MODES = ['simple', 'delire'];
   const DELAIS = [0, 5, 10, 15, 20]; // secondes par tour (0 = sans chrono)
   const PAUSE_ROBOT = 1800; // un robot réfléchit 1,8 s avant de jouer : le temps de voir chaque coup
+  const PAUSE_EVENTAIL = 1400; // en plus, après plusieurs cartes posées d'un coup (l'éventail se voit)
   const DUREES = { depart: 5000, mancheAuto: 10000, revanche: 15000 };
   const DELAI_ABSENT = 5;
   const DELAI_ANNONCE = 3000; // temps laissé pour annoncer avant qu'un robot ne conteste
@@ -94,6 +95,8 @@
     // Un joueur (humain) peut être contesté : on lui laisse le temps de toucher « J'annonce »
     // avant que les robots ne jouent ou ne contestent.
     const m = s.manche;
+    // Plusieurs cartes posées d'un coup : elles sont d'abord montrées en éventail à toute la table.
+    if (action.type === 'jouer' && action.cartes.length > 1 && s.robotPret && !(s.pauseRobot >= 0)) s.robotPret += PAUSE_EVENTAIL;
     if (m && m.contestable && m.contestable !== contestableAvant && !estRobot(s, m.contestable) && s.robotPret) {
       s.robotPret = Math.max(s.robotPret, s.horloge() + DELAI_ANNONCE);
     }

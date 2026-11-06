@@ -410,6 +410,12 @@ body.salon:has(#voile:not([hidden])) #filChat { display: none; } /* fenêtre du 
 .bulle.texte { font-size: 16px; padding: 5px 10px; border-radius: 99px; background: var(--good); color: #062014; }
 .bulle.ko { font-size: 46px; color: var(--bad); }
 .tampon { position: fixed; left: 50%; top: 45%; font-family: var(--display); font-size: min(17vw, 26vh, 120px); line-height: 1; color: #fff; background: var(--red); padding: .05em .3em; border: 6px solid #fff; border-radius: 18px; letter-spacing: 3px; box-shadow: 0 12px 34px rgba(0,0,0,.6); text-align: center; white-space: nowrap; }
+.choix-couleur .btn { font-size: 26px; line-height: 1; padding: 12px 4px; }
+.choix-couleur .btn.rouge { color: var(--red); }
+.choix-couleur .btn:disabled { opacity: .3; filter: grayscale(1); text-decoration: line-through; }
+.consigne-centre { margin-top: 4px; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--brass); color: var(--brass); font: 600 12px/1.4 var(--body); white-space: nowrap; }
+.consigne-centre.demande { background: var(--brass); color: #1d1606; }
+.eventail-titre { position: fixed; z-index: 30; padding: 4px 12px; border-radius: 999px; background: rgba(10,8,4,.82); color: #f3e3bd; font: 700 14px/1.3 var(--body); white-space: nowrap; pointer-events: none; box-shadow: 0 6px 16px rgba(0,0,0,.4); }
 .tampon small { display: block; font-family: var(--body); font-weight: 700; font-size: .2em; letter-spacing: 0; padding-bottom: .2em; }
 .siege.courant .ligne, .siege.courant:not(.vous) { animation: battement 1.2s ease-in-out infinite; }
 @keyframes battement { 50% { box-shadow: 0 0 0 7px rgba(226,176,74,.22); } }
@@ -2111,7 +2117,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       } else if (v.etat === 'finManche') afficherFinManche(v);
       else afficherFinPartie(v);
     } else if (!($('fenetre').dataset.type === 'chat' && !$('voile').hidden && !(v.manche && v.manche.joueurCourant === v.moi))
-      && !($('fenetre').dataset.type === 'demande8' && !$('voile').hidden && v.manche && v.manche.joueurCourant === v.moi)) fermerFenetre();
+      && !(['demande8', 'couleur8'].includes($('fenetre').dataset.type) && !$('voile').hidden && v.manche && v.manche.joueurCourant === v.moi)) fermerFenetre();
     // (le chat reste ouvert pendant que les autres jouent, et se ferme quand c'est à toi)
   }
 
@@ -2206,6 +2212,59 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       { transform: 'translate(-50%, -50%) rotate(-8deg) scale(1)', opacity: 1, offset: 0.85 },
       { transform: 'translate(-50%, -50%) rotate(-8deg) scale(1.1)', opacity: 0 },
     ], { duration: 1900, easing: 'ease-out' }).onfinish = () => t.remove();
+  }
+  // Inter (8) : plusieurs cartes posées d'un coup. Elles s'ouvrent d'abord en éventail au-dessus
+  // du centre, face visible pour toute la table, puis tombent une à une sur le centre (la dernière
+  // devient la carte du centre). Renvoie la durée totale (ms).
+  function eventail(cartes, depuis, vers, auteur) {
+    if (sansAnim || !visible(vers)) return 0;
+    const n = cartes.length, w = vers.width, h = vers.height;
+    const pas = Math.min(w * 0.62, (Math.min(innerWidth, 560) - 40 - w * 1.2) / Math.max(1, n - 1));
+    const cx = vers.left + w / 2, cy = vers.top + h / 2 + h * 0.15; // l'éventail s'ouvre sur la carte du centre
+    const ARRIVEE = 480, TENUE = 1000, CHUTE = 180, DESCENTE = 380;
+    const total = ARRIVEE + TENUE + (n - 1) * CHUTE + DESCENTE;
+    const titre = el('div', 'eventail-titre', `${auteur} ${auteur === 'Tu' ? 'poses' : 'pose'} ${n} cartes`);
+    titre.style.left = cx + 'px'; titre.style.top = cy + h * 0.68 + 6 + 'px'; // sous l'éventail
+    calque.append(titre);
+    titre.animate([{ opacity: 0, transform: 'translate(-50%, 8px)' }, { opacity: 1, transform: 'translate(-50%, 0)', offset: 0.2 }, { opacity: 1, transform: 'translate(-50%, 0)', offset: 0.85 }, { opacity: 0, transform: 'translate(-50%, 0)' }],
+      { duration: ARRIVEE + TENUE + 200, easing: 'ease-out' }).onfinish = () => titre.remove();
+    enVol.set('#centreInter', (enVol.get('#centreInter') || 0) + 1);
+    document.querySelectorAll('#centreInter').forEach((x) => (x.style.visibility = 'hidden'));
+    cartes.forEach((c, i) => {
+      const r = depuis(c, i) || vers;
+      const de = { left: r.left, top: r.top, width: r.width, height: r.height, verso: !!r.verso };
+      const e = carteInterEl(c);
+      e.classList.add('volante');
+      if (de.verso) e.classList.add('verso');
+      Object.assign(e.style, { left: vers.left + 'px', top: vers.top + 'px', width: w + 'px', height: h + 'px', zIndex: 17 + i });
+      const ecart = i - (n - 1) / 2;
+      const fx = cx + ecart * pas - cx, fy = cy + Math.abs(ecart) * 6 - (vers.top + h / 2);
+      const dx = de.left + de.width / 2 - cx, dy = de.top + de.height / 2 - (vers.top + h / 2);
+      const s0 = Math.min(1.6, Math.max(0.35, de.width / w));
+      const T = total;
+      const arrivee = (ARRIVEE + i * 60) / T, depart = (ARRIVEE + TENUE + i * CHUTE) / T, fin = Math.min(1, depart + DESCENTE / T);
+      const kf = [
+        { transform: `translate(${dx}px, ${dy}px) scale(${s0}) rotate(-12deg)`, offset: 0 },
+        { transform: `translate(${fx}px, ${fy}px) scale(1.18) rotate(${ecart * 7}deg)`, offset: Math.min(arrivee, depart) },
+        { transform: `translate(${fx}px, ${fy}px) scale(1.18) rotate(${ecart * 7}deg)`, offset: depart },
+        { transform: 'translate(0px, 0px) scale(1) rotate(0deg)', offset: fin },
+      ];
+      if (fin < 1) kf.push({ transform: 'translate(0px, 0px) scale(1) rotate(0deg)', offset: 1 });
+      calque.append(e);
+      if (de.verso) setTimeout(() => e.classList.remove('verso'), (ARRIVEE + i * 60) / 2);
+      const a = e.animate(kf, { duration: T, easing: 'cubic-bezier(.25,.8,.3,1)', fill: 'both' });
+      // Une carte arrivée au centre disparaît sous la suivante ; la dernière laisse place à la vraie.
+      setTimeout(() => { if (i < n - 1) e.style.opacity = '0'; }, (ARRIVEE + TENUE + (i + 1) * CHUTE + DESCENTE * 0.6));
+      const fini = () => {
+        e.remove();
+        if (i !== n - 1) return;
+        const k = (enVol.get('#centreInter') || 1) - 1;
+        if (k > 0) enVol.set('#centreInter', k);
+        else { enVol.delete('#centreInter'); document.querySelectorAll('#centreInter').forEach((x) => { x.style.visibility = ''; x.animate([{ scale: '1.12' }, { scale: '1' }], { duration: 220 }); }); }
+      };
+      a.onfinish = fini; a.oncancel = fini;
+    });
+    return total;
   }
   function pop(e, ampleur = 1.25, duree = 400) { if (e && !sansAnim) e.animate([{ scale: String(ampleur) }, { scale: '1' }], { duration: duree, easing: 'cubic-bezier(.3,1.6,.5,1)' }); }
 
@@ -2621,23 +2680,44 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   }
   const rangInter = (c) => (I8.valeur(c) === 'X' ? 99 : I8.VALEURS.indexOf(I8.valeur(c)));
   const coulInter = (c) => (I8.valeur(c) === 'X' ? 9 : I8.COULEURS.indexOf(I8.couleur(c)));
-  const trierMainInter = (main) => main.slice().sort(prefs.tri === 'valeur' ? (a, b) => rangInter(a) - rangInter(b) || coulInter(a) - coulInter(b) : (a, b) => coulInter(a) - coulInter(b) || rangInter(a) - rangInter(b));
+  // Inter : la main est toujours rangée par valeur (les cartes qui se posent ensemble sont côte à côte).
+  const trierMainInter = (main) => main.slice().sort((a, b) => rangInter(a) - rangInter(b) || coulInter(a) - coulInter(b));
 
-  let choixInter = []; // cartes touchées, dans l'ordre (la dernière donne la couleur)
-  // Coups « jouer » qui correspondent exactement aux cartes choisies (même première, même dernière).
+  let choixInter = []; // cartes touchées (l'ordre ne compte pas : l'appli le choisit)
+  // Coups « jouer » faits exactement des cartes choisies, dans n'importe quel ordre.
   function coupsPour(actions, choix) {
     if (!choix.length) return [];
-    return actions.filter((a) => a.type === 'jouer' && a.cartes.length === choix.length && a.cartes[0] === choix[0]
-      && a.cartes[a.cartes.length - 1] === choix[choix.length - 1] && choix.every((c) => a.cartes.includes(c)));
+    return actions.filter((a) => a.type === 'jouer' && a.cartes.length === choix.length && choix.every((c) => a.cartes.includes(c)));
   }
   // Une carte peut-elle rejoindre les cartes déjà choisies ?
   function ajoutable(actions, choix, c) {
-    return actions.some((a) => a.type === 'jouer' && a.cartes.includes(c) && (!choix.length ? a.cartes[0] === c : a.cartes[0] === choix[0] && choix.every((x) => a.cartes.includes(x))));
+    return actions.some((a) => a.type === 'jouer' && a.cartes.includes(c) && choix.every((x) => a.cartes.includes(x)));
   }
+  const couleurFinale = (a) => I8.couleur(a.cartes[a.cartes.length - 1]);
   function poserInter(coups) {
     if (!coups.length) return;
     const demandes = [...new Set(coups.map((a) => a.demande).filter(Boolean))];
     const envoyerCoup = (a) => { choixInter = []; envoyer({ type: 'action', action: { type: 'jouer', cartes: a.cartes, demande: a.demande } }); };
+    // Plusieurs cartes : à 2, l'ordre qui change la couleur est pris tout seul ; à 3 ou plus,
+    // on choisit la nouvelle couleur (celle du centre est grisée).
+    const couleurs = [...new Set(coups.map(couleurFinale).filter(Boolean))];
+    if (!demandes.length && coups[0].cartes.length > 2 && couleurs.length > 1 && I8.valeur(coups[0].cartes[0]) !== '8') {
+      const m = vueActuelle && vueActuelle.manche;
+      const auCentre = m && m.reference && I8.couleur(m.reference);
+      const presentes = I8.COULEURS.filter((k) => coups[0].cartes.some((c) => I8.couleur(c) === k));
+      const grille = el('div', 'choix-demande choix-couleur');
+      for (const k of presentes) {
+        const b = el('button', 'btn large' + (['C', 'K'].includes(k) ? ' rouge' : ''), I8.SYMBOLES[k]);
+        b.setAttribute('aria-label', I8.NOMS_COULEURS[k]);
+        const coup = coups.find((a) => couleurFinale(a) === k);
+        if (!coup) { b.disabled = true; if (k === auCentre) b.title = 'Couleur du centre'; }
+        else b.onclick = () => { fermerFenetre(); envoyerCoup(coup); };
+        grille.append(b);
+      }
+      const annuler = el('button', 'btn large', 'Annuler');
+      annuler.onclick = fermerFenetre;
+      return ouvrirFenetre([el('h2', null, 'Quelle couleur ensuite ?'), el('p', 'muted', 'Ta dernière carte donne la nouvelle couleur. Celle du centre n\'est pas permise.'), grille, annuler], 'couleur8');
+    }
     if (!demandes.length) return envoyerCoup(coups[0]);
     // Le 8 : on choisit la valeur demandée parmi celles qu'on a encore en main.
     const grille = el('div', 'choix-demande');
@@ -2684,6 +2764,9 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       const ref = el('div', 'pile');
       if (m.reference) { const r = carteInterEl(m.reference); r.id = 'centreInter'; ref.append(r); }
       ref.append(el('span', 'legende', m.dernier ? 'Posée par ' + qui(m.dernier) : 'Au centre'));
+      // Ce que la carte du centre impose, juste à côté d'elle (en plus de l'en-tête).
+      if (!pause && m.phase === 'jeu' && m.demande) { const b = el('span', 'consigne-centre demande'); b.append('Demande ', el('b', null, nomValeur(m.demande.valeur))); ref.append(b); }
+      else if (!pause && m.phase === 'jeu' && m.libre) ref.append(el('span', 'consigne-centre', 'Jeu libre'));
       const pioche = el('div', 'pile');
       const dos = el('div', 'carte dos-carte'); dos.id = 'piocheInter';
       pioche.classList.add('pioche-inter');
@@ -2725,10 +2808,10 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       zk.append(b);
     }
 
-    // Main : on touche une ou plusieurs cartes de même valeur, dans l'ordre (la dernière donne la couleur).
+    // Main : on touche une ou plusieurs cartes de même valeur ; l'appli met dans l'ordre qui change la couleur.
     $('zoneMain').hidden = !jeJoue;
     choixInter = choixInter.filter((c) => m.main.includes(c));
-    if (!coups.length || (choixInter.length && !coups.some((a) => a.cartes[0] === choixInter[0] && choixInter.every((x) => a.cartes.includes(x))))) choixInter = [];
+    if (!coups.length || (choixInter.length && !coups.some((a) => choixInter.every((x) => a.cartes.includes(x))))) choixInter = [];
     const choisis = coupsPour(actions, choixInter);
     $('titreMain').textContent = `Ta main (${m.main.length} carte${m.main.length > 1 ? 's' : ''})` + (coups.length && !choixInter.length ? ' · touche une carte' : '');
     const main = $('main'); main.replaceChildren();
@@ -2742,7 +2825,6 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       const k = choixInter.indexOf(c);
       if (k >= 0) {
         b.classList.add('jouable', 'choisie');
-        if (choixInter.length > 1) b.append(el('span', 'ordre', String(k + 1)));
         b.onclick = () => {
           if (choixInter.length === 1 && choisis.length) return poserInter(choisis); // deuxième touche : on pose
           choixInter.splice(k, 1); afficherPartieInter(vueActuelle);
@@ -2762,7 +2844,8 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       const b = el('button', 'btn principal large', texte);
       b.onclick = () => poserInter(choisis);
       act.append(b);
-      if (choixInter.length > 1) act.append(el('small', 'muted', 'La dernière carte touchée donne la couleur.'));
+      if (choixInter.length === 2) act.append(el('small', 'muted', 'Plusieurs cartes : la couleur change toute seule.'));
+      else if (choixInter.length > 2) act.append(el('small', 'muted', 'Tu choisiras la nouvelle couleur.'));
     }
     if (actions.some((a) => a.type === 'piocher')) {
       const b = el('button', 'btn principal large', 'Piocher une carte');
@@ -2792,12 +2875,17 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
     if (nouvelles && m.dernier) {
       const cartes = (m.posees || []).slice(-Math.min(nouvelles, 8));
       const vers = rectCarte('#centreInter');
-      cartes.forEach((c, i) => {
+      const deSiege = () => rectCentre(rectSiege(m.dernier), vers ? vers.width * 0.6 : 40, vers ? vers.height * 0.6 : 58);
+      const duree = cartes.length > 1 && vers
+        ? eventail(cartes, (c) => (m.dernier === moi ? avant.main[c] || rectSiege(moi) : Object.assign({ verso: true }, deSiege())), vers, m.dernier === moi ? 'Tu' : nom(N, m.dernier))
+        : 0;
+      if (duree) { delai = duree + 200; retardFenetre = Math.max(retardFenetre, Date.now() + duree + 300); }
+      else cartes.forEach((c, i) => {
         const de = m.dernier === moi ? (avant.main[c] || rectSiege(moi)) : rectCentre(rectSiege(m.dernier), vers ? vers.width * 0.6 : 40, vers ? vers.height * 0.6 : 58);
         const derniere = i === cartes.length - 1;
         voler(c, de, vers, { retourner: m.dernier !== moi, verso: m.dernier !== moi, delai: i * 160, duree: 560, cible: derniere ? '#centreInter' : null, disparaitre: !derniere });
       });
-      delai = cartes.length * 160 + 300;
+      if (!duree) delai = cartes.length * 160 + 300;
     }
     // Cartes piochées : de la pioche vers le joueur (ta main : faces visibles).
     const tas = rectPioche();

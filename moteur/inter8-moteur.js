@@ -249,17 +249,28 @@
       } else if (v !== m.demande.valeur && v !== '8' && v !== JOKER) {
         return `Inter demande ${m.demande.valeur} : pose ce ${m.demande.valeur}, un 8 ou un joker, sinon pioche.`;
       }
-      return null;
+      return changeCouleur(m, cartes);
     }
-    if (v === '8' || v === JOKER || m.libre) return null;
+    if (v === '8' || v === JOKER || m.libre) return changeCouleur(m, cartes);
     const ref = m.defausse[m.defausse.length - 1];
-    if (v === valeur(ref) || couleur(cartes[0]) === couleur(ref)) return null;
+    if (v === valeur(ref) || couleur(cartes[0]) === couleur(ref)) return changeCouleur(m, cartes);
     return 'Pose une carte de même couleur ou de même valeur.';
   }
 
+  // Plusieurs cartes ensemble : la dernière doit changer la couleur du centre. Exceptions : les
+  // doublons du 2e paquet de la couleur du centre (deux 5♦ sur du carreau), et les derniers 8
+  // posés pour sortir (le suivant joue de toute façon la carte de son choix).
+  function changeCouleur(m, cartes) {
+    if (cartes.length < 2 || valeur(cartes[0]) === '8') return null;
+    const coul = couleur(m.defausse[m.defausse.length - 1]);
+    if (coul && couleur(cartes[cartes.length - 1]) === coul && !cartes.every((c) => couleur(c) === coul)) {
+      return `Avec plusieurs cartes, la dernière doit changer la couleur (pas de ${NOMS_COULEURS[coul]} en dernier).`;
+    }
+    return null;
+  }
+
   // Coups « jouer » proposés (pour les robots et pour savoir si le joueur peut jouer) :
-  // chaque carte seule, et toutes les cartes d'une même valeur ensemble (avec chaque
-  // carte possible en dernier, puisque c'est elle qui donne la couleur).
+  // chaque carte seule, et chaque groupe de cartes d'une même valeur.
   function coupsJouer(m, joueur) {
     const main = m.mains[joueur];
     const coups = [];
@@ -280,12 +291,16 @@
     const groupes = {};
     for (const c of main) (groupes[valeur(c)] = groupes[valeur(c)] || []).push(c);
     for (const groupe of Object.values(groupes)) {
-      for (const premiere of groupe) {
-        ajouter([premiere]);
-        if (groupe.length < 2) continue;
-        for (const derniere of groupe) {
-          if (derniere === premiere) continue;
-          ajouter([premiere, ...groupe.filter((c) => c !== premiere && c !== derniere), derniere]);
+      // Chaque sous-ensemble de la valeur (on peut garder des cartes en main), avec chaque
+      // première carte possible et chaque dernière (c'est elle qui donne la couleur).
+      for (let masque = 1; masque < 1 << groupe.length; masque++) {
+        const sous = groupe.filter((_, i) => masque & (1 << i));
+        if (sous.length === 1) { ajouter(sous); continue; }
+        for (const premiere of sous) {
+          for (const derniere of sous) {
+            if (derniere === premiere) continue;
+            ajouter([premiere, ...sous.filter((c) => c !== premiere && c !== derniere), derniere]);
+          }
         }
       }
     }
