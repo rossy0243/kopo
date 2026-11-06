@@ -5396,7 +5396,12 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   // Pièces d'essai (stratégie des pièces v1.0, phase 0) : cadeau de bienvenue + bonus du jour, dans kopo-profil.
   // Le calcul (série, joker, missions, XP…) est dans src/kopo-retention.js.
   const jourLocal = (d) => R.jourDe(d || new Date());
-  function lireProfil() { const p = stock.lire('kopo-profil'); return p && typeof p === 'object' ? p : { version: 1 }; }
+  function lireProfil() {
+    const p = stock.lire('kopo-profil');
+    if (!p || typeof p !== 'object') return { version: 1, bareme: R.BAREME };
+    if (R.convertirXp(p)) stock.ecrire('kopo-profil', p); // passage au barème 2 : le niveau est gardé
+    return p;
+  }
   function ecrireProfil(p) { stock.ecrire('kopo-profil', p); }
   // Copie du profil sur le serveur (compte en ligne) : il revient sur un autre téléphone, une autre adresse
   // du site ou après un nettoyage du navigateur. Les rivaux les plus anciens ne sont pas copiés au-delà de 150.

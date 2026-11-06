@@ -48,7 +48,7 @@ const publicSaison = (s) => s && { numero: s.numero, nom: s.nom, theme: s.theme,
 function creerLigue(base, reglages, comptes) {
   const cfg = () => reglages.get('ligue');
 
-  let planUtilise = false;
+  let planUtilise = false, durcir = false;
   async function saisonCourante(q = base) {
     return (await q.query("SELECT * FROM saisons WHERE statut = 'en_cours' LIMIT 1")).rows[0] || null;
   }
@@ -87,7 +87,10 @@ function creerLigue(base, reglages, comptes) {
     await q.query("UPDATE saisons SET statut = 'terminee', cloturee_le = now() WHERE numero = $1", [s.numero]);
     const suivante = await ouvrirSaison(q, new Date(Math.max(Date.now(), new Date(s.fin).getTime())));
     const descente = DIVISIONS.map((d) => c.descente[d]);
-    const seuils = DIVISIONS.map((d) => c.seuils[d]);
+    // Seuils durcis en attente : la nouvelle saison part déjà avec eux (enregistrés après la transaction).
+    const durci = reglages.get('durcissement');
+    if (durci && durci.enAttente) durcir = true;
+    const seuils = DIVISIONS.map((d) => (durcir ? durci.seuils : c.seuils)[d]);
     // Départ de la nouvelle saison, avec la protection de début (on ne retombe pas tout de suite).
     await q.query(`INSERT INTO ligue (saison, compte_id, points, division, meilleure, protection)
       SELECT $2, l.compte_id, ($4::int[])[x.i], ($5::text[])[x.i], ($5::text[])[x.i], $6
@@ -98,14 +101,23 @@ function creerLigue(base, reglages, comptes) {
     return suivante;
   }
 
+  // Seuils des divisions et XP par palier plus durs, gardés pour la saison suivante (décision du 06/11).
+  async function appliquerDurcissement() {
+    const d = reglages.get('durcissement');
+    if (!d || !d.enAttente) return;
+    await reglages.ecrire('ligue', { ...cfg(), seuils: d.seuils });
+    await reglages.ecrire('parcours', { ...reglages.get('parcours'), xpPalier: d.xpPalier });
+    await reglages.ecrire('durcissement', { enAttente: false });
+  }
+
   // Appelé au démarrage puis chaque minute : ouvre la première saison, clôture celle qui est finie.
   // Le verrou évite une double clôture si deux serveurs tournent en même temps.
   async function assurerSaison({ forcer = false } = {}) {
-    planUtilise = false;
+    planUtilise = false; durcir = false;
     const r = await base.transaction(async (q) => {
       await q.query('SELECT pg_advisory_xact_lock(4242)');
       const s = await saisonCourante(q);
-      if (!s) return { ouverte: await ouvrirSaison(q) };
+      if (!s) { durcir = !!(reglages.get('durcissement') || {}).enAttente; return { ouverte: await ouvrirSaison(q) }; }
       if (forcer || new Date(s.fin) <= new Date()) {
         if (forcer) await q.query('UPDATE saisons SET fin = now() WHERE numero = $1', [s.numero]);
         const fin = forcer ? new Date() : s.fin;
@@ -114,6 +126,7 @@ function creerLigue(base, reglages, comptes) {
       return {};
     });
     if (planUtilise) await reglages.ecrire('prochaineSaison', { nom: '', theme: '' });
+    if (durcir) await appliquerDurcissement();
     return r;
   }
 

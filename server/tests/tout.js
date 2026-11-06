@@ -494,11 +494,13 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
   const ligneLigue = async (id) => (await srv.base.query("SELECT l.* FROM ligue l JOIN saisons s ON s.numero = l.saison AND s.statut = 'en_cours' WHERE l.compte_id = $1", [id])).rows[0];
   await test('points selon la place : 9 joueurs, 4 joueurs, 3 joueurs, abandon, coupure', () => {
     const t = (n) => Array.from({ length: n }, (_, i) => calculerPoints({ place: i + 1, n }, P));
-    assert.deepStrictEqual(t(9), [30, 15, 5, 0, 0, 0, 0, -5, -10]);
-    assert.deepStrictEqual(t(5), [30, 15, 5, 0, -10]);
-    assert.deepStrictEqual(t(4), [24, 12, 0, -10]);
-    assert.deepStrictEqual(t(3), [18, 9, 0]);
-    assert.strictEqual(calculerPoints({ place: 1, n: 9, abandon: true }, P), -15);
+    assert.deepStrictEqual(t(9), [20, 8, 2, 0, 0, 0, 0, -8, -12]);
+    assert.deepStrictEqual(t(5), [20, 8, 2, 0, -12]);
+    assert.deepStrictEqual(t(4), [16, 6, 0, -12]);
+    assert.deepStrictEqual(t(3), [12, 5, 0]);
+    assert.strictEqual(calculerPoints({ place: 1, n: 9, abandon: true }, P), -20);
+    // Un joueur moyen avance peu : +3,6 en moyenne à 5 joueurs, +1,1 à 9 (avant : +8 et +3,9).
+    assert.ok(t(5).reduce((a, b) => a + b) / 5 < 4 && t(9).reduce((a, b) => a + b) / 9 < 2);
     assert.strictEqual(calculerPoints({ place: 9, n: 9, coupure: true }, P), 0);
   });
   await test('fin de saison : un dimanche à 19 h UTC, 4 semaines pile ensuite', () => {
@@ -522,6 +524,10 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.deepStrictEqual([l.json.moi.points, l.json.moi.division, l.json.moi.rangMondial, l.json.moi.prochaine.manque], [0, 'bois', null, 100]);
     assert.strictEqual(l.json.recompense, null);
     assert.strictEqual((await api('/api/ligue')).statut, 401);
+    // Toute première saison : elle part directement avec les seuils et paliers durcis.
+    assert.deepStrictEqual(srv.reglages.get('ligue').seuils, DEFAUTS.durcissement.seuils);
+    assert.strictEqual(srv.reglages.get('parcours').xpPalier, DEFAUTS.durcissement.xpPalier);
+    assert.deepStrictEqual(srv.reglages.get('durcissement'), { enAttente: false });
   });
   const classes = [];
   await test('partie publique à 4 : classée, points selon la place, message « ligue » à chacun', async () => {
@@ -531,7 +537,7 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     const r = await jouerPublique(js);
     assert.ok([...r.classee.values()].every(Boolean), 'annoncée classée au départ');
     assert.strictEqual(r.ligue.size, 4);
-    const attendus = [24, 12, 0, 0]; // le dernier perd 10, mais pas sous 0
+    const attendus = [16, 6, 0, 0]; // le dernier perd 12, mais pas sous 0
     r.ordre.forEach((id, i) => {
       const m = r.ligue.get(id);
       assert.strictEqual(m.points, attendus[i], 'place ' + (i + 1) + ' ' + JSON.stringify(m));
@@ -539,7 +545,7 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
       assert.strictEqual(m.saison.numero, 1);
     });
     const l = await ligneLigue(r.ordre[0]);
-    assert.deepStrictEqual([l.points, l.parties, l.victoires], [24, 1, 1]);
+    assert.deepStrictEqual([l.points, l.parties, l.victoires], [16, 1, 1]);
     const p = (await srv.base.query('SELECT classee FROM parties ORDER BY fin DESC LIMIT 1')).rows[0];
     assert.strictEqual(p.classee, true);
   });
@@ -561,7 +567,7 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     await srv.base.query('UPDATE ligue SET points = 95, division = $3, protection = 0 WHERE saison = $1 AND compte_id = $2', [saison, a.compte.id, 'bois']);
     let r = await srv.ligue.enregistrerPartie({ partieId: 'p_test1', n: 9, joueurs: [{ id: a.compte.id, place: 1 }] });
     let m = r.get(a.compte.id);
-    assert.deepStrictEqual([m.points, m.division, m.divisionAvant, m.promu, m.protection], [125, 'bronze', 'bois', true, 3]);
+    assert.deepStrictEqual([m.points, m.division, m.divisionAvant, m.promu, m.protection], [115, 'bronze', 'bois', true, 3]);
     // Protégé : une défaite ne le fait pas redescendre sous 100.
     await srv.base.query('UPDATE ligue SET points = 104 WHERE saison = $1 AND compte_id = $2', [saison, a.compte.id]);
     r = await srv.ligue.enregistrerPartie({ partieId: 'p_test2', n: 9, joueurs: [{ id: a.compte.id, place: 9 }] });
@@ -571,11 +577,11 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     await srv.base.query('UPDATE ligue SET protection = 0 WHERE saison = $1 AND compte_id = $2', [saison, a.compte.id]);
     r = await srv.ligue.enregistrerPartie({ partieId: 'p_test3', n: 9, joueurs: [{ id: a.compte.id, place: 9 }] });
     m = r.get(a.compte.id);
-    assert.deepStrictEqual([m.points, m.division, m.relegue, m.delta], [90, 'bois', true, -10]);
+    assert.deepStrictEqual([m.points, m.division, m.relegue, m.delta], [88, 'bois', true, -12]);
     // Une même partie n'est jamais comptée deux fois.
     r = await srv.ligue.enregistrerPartie({ partieId: 'p_test3', n: 9, joueurs: [{ id: a.compte.id, place: 1 }] });
     assert.strictEqual(r.size, 0);
-    assert.strictEqual((await ligneLigue(a.compte.id)).points, 90);
+    assert.strictEqual((await ligneLigue(a.compte.id)).points, 88);
     // Coupure réseau : rien de perdu.
     r = await srv.ligue.enregistrerPartie({ partieId: 'p_test4', n: 9, joueurs: [{ id: b.compte.id, place: 9, coupure: true }, { id: c.compte.id, place: 1 }] });
     assert.strictEqual(r.get(b.compte.id).delta, 0);
@@ -856,8 +862,16 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     const [a, b, , d] = classes;
     const soldeA = (await srv.comptes.lire(a.compte.id)).solde, soldeD = (await srv.comptes.lire(d.compte.id)).solde;
     await api('/admin/api/reglages/prochaineSaison', { methode: 'PUT', jeton: adminJeton, corps: { valeur: { nom: 'Kinshasa la belle', theme: 'ville' } } });
+    // Durcissement en attente : appliqué à l'ouverture de la saison 2 (rien ne change pour la saison 1 en cours).
+    const durci = { enAttente: true, seuils: { bois: 0, bronze: 100, argent: 350, or: 600, diamant: 1000, legende: 1500 }, xpPalier: 120 };
+    assert.strictEqual((await api('/admin/api/reglages/durcissement', { methode: 'PUT', jeton: adminJeton, corps: { valeur: { ...durci, seuils: { ...durci.seuils, or: 200 } } } })).statut, 400);
+    assert.strictEqual((await api('/admin/api/reglages/durcissement', { methode: 'PUT', jeton: adminJeton, corps: { valeur: durci } })).statut, 200);
+    await api('/admin/api/reglages/parcours', { methode: 'PUT', jeton: adminJeton, corps: { valeur: { ...DEFAUTS.parcours, xpPalier: 100 } } });
     const r = await api('/admin/api/ligue/cloturer', { methode: 'POST', jeton: adminJeton, corps: { confirmation: 'CLOTURER' } });
     assert.deepStrictEqual([r.json.cloturee, r.json.ouverte], [1, 2]);
+    assert.deepStrictEqual(srv.reglages.get('ligue').seuils, durci.seuils);
+    assert.strictEqual(srv.reglages.get('parcours').xpPalier, 120);
+    assert.deepStrictEqual(srv.reglages.get('durcissement'), { enAttente: false });
     // a a atteint Bronze (redescendu en Bois) : récompense Bronze. d a fini en Or.
     assert.strictEqual((await srv.comptes.lire(a.compte.id)).solde, soldeA + DEFAUTS.ligue.recompenses.bronze);
     assert.strictEqual((await srv.comptes.lire(d.compte.id)).solde, soldeD + DEFAUTS.ligue.recompenses.or);
@@ -866,7 +880,7 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.deepStrictEqual([l.json.recompense.titre, l.json.recompense.rang, l.json.recompense.pieces], ['Or S1', 1, DEFAUTS.ligue.recompenses.or]);
     assert.deepStrictEqual(l.json.titres.map((t) => t.titre), ['Or S1']);
     // Or → Argent (une division de moins), avec la protection de début de saison.
-    assert.deepStrictEqual([l.json.moi.division, l.json.moi.points, l.json.moi.protection], ['argent', 250, DEFAUTS.ligue.protection]);
+    assert.deepStrictEqual([l.json.moi.division, l.json.moi.points, l.json.moi.protection], ['argent', 350, DEFAUTS.ligue.protection]);
     // Bois et Bronze repartent de zéro.
     assert.strictEqual((await api('/api/ligue', { jeton: a.jeton })).json.moi.points, 0);
     await api('/api/ligue/vu', { methode: 'POST', jeton: d.jeton });
@@ -886,13 +900,14 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
 
   console.log('Parcours de saison, collection, boutique');
   await test('XP de saison : base, manches survécues, victoire ; une partie entre humains en donne', async () => {
-    assert.strictEqual(srv.parcours.xpPartie({ place: 1, manchesSurvecues: 3 }), 30 + 15 + 15);
-    assert.strictEqual(srv.parcours.xpPartie({ place: 4, manchesSurvecues: 1 }), 35);
+    assert.strictEqual(srv.parcours.xpPartie({ place: 1, manchesSurvecues: 3 }), 10 + 9 + 10);
+    assert.strictEqual(srv.parcours.xpPartie({ place: 4, manchesSurvecues: 1 }), 13);
     assert.strictEqual(srv.parcours.xpPartie({ place: 2, abandon: true }), 0);
     const js = [await invite('Xp1' + Date.now() % 1000), await invite('Xp2' + Date.now() % 1000)];
     await jouerPartie(js);
     const e = await api('/api/parcours', { jeton: js[0].jeton });
-    assert.ok(e.json.xp >= 30, JSON.stringify({ xp: e.json.xp }));
+    assert.ok(e.json.xp >= 10, JSON.stringify({ xp: e.json.xp }));
+    assert.strictEqual(e.json.xpPalier, 120, 'paliers durcis depuis la saison 2');
     assert.strictEqual(e.json.paliers.length, 30);
     const contenu = require('../src/catalogue').contenuParcours(30, (await srv.ligue.saisonCourante()).numero);
     assert.strictEqual(e.json.paliers[29].gratuit.objet, contenu[29].gratuit.objet);
@@ -913,7 +928,7 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
   let plusRecu;
   await test('récupérer les paliers : pièces, objet, pas deux fois, pas avant de l\'avoir atteint, Kopo+ réservé', async () => {
     const s = (await srv.ligue.saisonCourante()).numero;
-    await srv.base.query('INSERT INTO parcours (saison, compte_id, xp) VALUES ($1,$2,1050)', [s, pj.compte.id]);
+    await srv.base.query('INSERT INTO parcours (saison, compte_id, xp) VALUES ($1,$2,1250)', [s, pj.compte.id]);
     const solde = (await srv.comptes.lire(pj.compte.id)).solde;
     const r1 = await api('/api/parcours/recuperer', { methode: 'POST', jeton: pj.jeton, corps: { palier: 1 } });
     assert.deepStrictEqual([r1.json.pieces, r1.json.solde], [60, solde + 60]);
