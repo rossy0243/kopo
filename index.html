@@ -2,9 +2,9 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#10233a">
-<meta name="description" content="Le Kopo, jeu de cartes de 2 à 9 joueurs, entre amis ou en ligne.">
+<meta name="description" content="Masano : Kopo et Inter (8), jeux de cartes entre amis ou en ligne.">
 <link rel="icon" href="icons/masano-logo.svg" type="image/svg+xml">
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -39,6 +39,7 @@ body {
 button { font: inherit; cursor: pointer; }
 button:focus-visible, input:focus-visible { outline: 3px solid var(--brass); outline-offset: 2px; }
 [hidden] { display: none !important; }
+html, body { touch-action: manipulation; } /* pas de zoom au double toucher (on touche souvent deux fois une carte) */
 .app { max-width: 720px; margin: 0 auto; padding: 10px 12px 24px; display: grid; gap: 12px; }
 header { display: flex; align-items: center; gap: 10px; }
 .logo { font-family: var(--display); font-size: 36px; letter-spacing: 3px; color: var(--brass); line-height: 1; display: flex; align-items: center; gap: .22em; }
@@ -230,6 +231,8 @@ header .vocal .btn { padding: 5px 9px; font-size: 15px; line-height: 1.2; }
 .main { padding-top: 12px; margin-top: -12px; }
 .main.serree { gap: 6px 0; padding-right: calc(66px - var(--pas, 66px)); }
 .main.serree .carte { margin-right: calc(var(--pas, 66px) - 66px); }
+/* Main serrée : une carte choisie monte sans passer devant sa voisine (son coin reste à toucher). */
+.main.serree .carte.choisie { z-index: auto; }
 .actions { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
 .actions .btn.large { font-size: 16px; padding: 13px 8px; }
 body.en-jeu .app { height: 100vh; height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 8px; padding: 6px 8px 8px; }
@@ -423,6 +426,13 @@ body.salon:has(#voile:not([hidden])) #filChat { display: none; } /* fenêtre du 
 .choix-couleur .btn { font-size: 26px; line-height: 1; padding: 12px 4px; }
 .choix-couleur .btn.rouge { color: var(--red); }
 .choix-couleur .btn:disabled { opacity: .3; filter: grayscale(1); text-decoration: line-through; }
+.roue-sens { position: absolute; left: 50%; top: calc(50% - 12px); width: 150px; height: 150px; margin: -75px 0 0 -75px; color: rgba(226,176,74,.55); pointer-events: none; z-index: 0; }
+.roue-sens svg { width: 100%; height: 100%; animation: roue 9s linear infinite; }
+.roue-sens.antihoraire svg { animation-direction: reverse; }
+@keyframes roue { to { transform: rotate(360deg); } }
+.table-inter > .pile:not(.pioche-inter) { position: relative; z-index: 1; }
+@media (orientation: landscape) and (max-height: 430px) { body.en-jeu .roue-sens { width: 124px; height: 124px; margin: -62px 0 0 -62px; } }
+@media (prefers-reduced-motion: reduce) { .roue-sens svg { animation: none; } }
 .consigne-centre { margin-top: 4px; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--brass); color: var(--brass); font: 600 12px/1.4 var(--body); white-space: nowrap; }
 .consigne-centre.demande { background: var(--brass); color: #1d1606; }
 .eventail-titre { position: fixed; z-index: 30; padding: 4px 12px; border-radius: 999px; background: rgba(10,8,4,.82); color: #f3e3bd; font: 700 14px/1.3 var(--body); white-space: nowrap; pointer-events: none; box-shadow: 0 6px 16px rgba(0,0,0,.4); }
@@ -1209,7 +1219,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
     <div class="salon-invite">
       <button class="btn large btn-whatsapp" id="btnWhatsappSalon"><svg class="ico"><use href="#i-partager"/></svg> <span><span class="sauf-paysage">Inviter sur </span>WhatsApp</span></button>
       <button class="btn" id="btnCopier" aria-label="Copier le lien de la partie">Copier</button>
-      <button class="btn" id="btnInviterAmi" aria-label="Inviter un ami du Kopo" hidden>Amis</button>
+      <button class="btn" id="btnInviterAmi" aria-label="Inviter un ami" hidden>Amis</button>
     </div>
     <input class="texte" id="lienSalon" readonly hidden>
     <div class="bandeau info-hote" id="noteHote" hidden>Tu es l'hôte : garde cette page ouverte jusqu'à la fin.</div>
@@ -1313,7 +1323,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       </g>
     </svg>
     <h2 id="titreTourner">Passe en paysage</h2>
-    <p>Mets ton téléphone à l'horizontale : Kopo se joue mieux comme ça, avec la table en grand, les joueurs autour de toi et ta main en éventail.</p>
+    <p>Mets ton téléphone à l'horizontale : le jeu est plus agréable comme ça, avec la table en grand, les joueurs autour de toi et ta main en éventail.</p>
     <button class="btn principal large" id="btnTournerPleinEcran" hidden>Plein écran en paysage</button>
     <button class="btn large" id="btnTournerPortrait">Continuer en portrait</button>
   </div>
@@ -5407,6 +5417,9 @@ var qrcode = function() {
     const m = s.manche;
     // Plusieurs cartes posées d'un coup : elles sont d'abord montrées en éventail à toute la table.
     if (action.type === 'jouer' && action.cartes.length > 1 && s.robotPret && !(s.pauseRobot >= 0)) s.robotPret += PAUSE_EVENTAIL;
+    // Pendant ces 3 s, personne (humain ou robot) ne peut contester ; ensuite, tout le monde peut.
+    if (m && m.contestable && m.contestable !== contestableAvant) s.annonceJusqua = estRobot(s, m.contestable) ? null : s.horloge() + DELAI_ANNONCE;
+    if (!m || !m.contestable) s.annonceJusqua = null;
     if (m && m.contestable && m.contestable !== contestableAvant && !estRobot(s, m.contestable) && s.robotPret) {
       s.robotPret = Math.max(s.robotPret, s.horloge() + DELAI_ANNONCE);
     }
@@ -5424,6 +5437,12 @@ var qrcode = function() {
   }
 
   function tic(s) {
+    // Fin des 3 s pour annoncer : le bouton « Contester » apparaît chez les autres (la vue change).
+    const finAnnonce = !!(s.annonceJusqua && s.horloge() >= s.annonceJusqua);
+    if (finAnnonce) s.annonceJusqua = null;
+    return avancer(s) || finAnnonce;
+  }
+  function avancer(s) {
     if (s.etat === 'salon' && s.publique) {
       if (s.joueurs.length >= s.taille) { lancer(s); return true; }
       return false;
@@ -5483,6 +5502,7 @@ var qrcode = function() {
     const premier = choisirPremier(s, sieges);
     s.numeroManche++;
     s.suiteA = null;
+    s.annonceJusqua = null;
     s.manche = I.nouvelleManche(sieges, mains, pioche, premier, { mode: s.mode, graine: Math.floor(s.rng() * 4294967296) });
     s.etat = 'manche';
     s.pause = s.durees.depart > 0 ? { type: 'depart', jusqua: s.horloge() + s.durees.depart, total: s.durees.depart } : null;
@@ -5684,6 +5704,7 @@ var qrcode = function() {
         // Le joueur ne peut agir que pour lui-même : on impose son id.
         const action = actionDe(id, msg.action || {});
         if (!action) return { ok: false, erreur: 'Action impossible maintenant.' };
+        if (action.type === 'contester' && enGraceAnnonce(s)) return { ok: false, erreur: 'Laisse-lui 3 secondes pour annoncer.' };
         try {
           appliquer(s, action);
           revenu(s, id);
@@ -5713,6 +5734,8 @@ var qrcode = function() {
       return t.replace('mode delire', 'mode délire (J retour)');
     });
   }
+
+  const enGraceAnnonce = (s) => !!(s.annonceJusqua && s.horloge() < s.annonceJusqua);
 
   // Vue envoyée à un joueur : uniquement ce qu'il a le droit de voir.
   function vue(s, id) {
@@ -5764,7 +5787,8 @@ var qrcode = function() {
         dernier: p.dernier, // qui a posé la carte du centre
         paquets: p.paquets,
         pause: s.pause ? { type: s.pause.type, resteMs: Math.max(0, s.pause.jusqua - s.horloge()), totalMs: s.pause.total } : null,
-        actions: s.pause ? [] : I.actionsPossibles(m, id).map((a) => {
+        annonce: enGraceAnnonce(s) ? { resteMs: s.annonceJusqua - s.horloge(), totalMs: DELAI_ANNONCE } : null,
+        actions: s.pause ? [] : I.actionsPossibles(m, id).filter((a) => !(a.type === 'contester' && enGraceAnnonce(s))).map((a) => {
           const r = { type: a.type };
           if (a.cartes) r.cartes = a.cartes.slice();
           if (a.demande) r.demande = a.demande;
@@ -6494,7 +6518,7 @@ var qrcode = function() {
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = '64695a9a952c'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = 'd0dbc2ac268c'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
@@ -7822,6 +7846,15 @@ var qrcode = function() {
     ouvrirFenetre([el('h2', null, 'Quelle valeur demandes-tu ?'), el('p', 'muted', 'Le joueur suivant doit poser cette valeur, un 8 ou un joker. Sinon il pioche.'), grille, annuler], 'demande8');
   }
 
+  // Deux flèches en cercle qui tournent dans le sens du jeu (↻ : sens des aiguilles d'une montre).
+  function roueSens(sens) {
+    const r = el('div', 'roue-sens ' + (sens === 1 ? 'horaire' : 'antihoraire'));
+    r.id = 'roueSens';
+    r.setAttribute('aria-label', 'Sens du jeu : ' + (sens === 1 ? 'sens des aiguilles d\'une montre' : 'sens inverse'));
+    const fleche = (a) => `<g transform="rotate(${a} 50 50)"><path d="M50 6 A44 44 0 0 1 91 36" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"/><path d="M95 27 L92 41 L80 33 Z" fill="currentColor"/></g>`;
+    r.append(svgInter(sens === 1 ? fleche(0) + fleche(180) : `<g transform="scale(-1 1) translate(-100 0)">${fleche(0) + fleche(180)}</g>`, '0 0 100 100'));
+    return r;
+  }
   function afficherPartieInter(v) {
     montrerEcran('ecranPartie');
     if (!(v.manche && v.manche.joueurCourant === v.moi)) inviterPaysage();
@@ -7864,6 +7897,8 @@ var qrcode = function() {
       pioche.append(dos, el('span', 'legende', String(m.pioche)));
       pioche.setAttribute('aria-label', `Pioche : ${m.pioche} carte${m.pioche > 1 ? 's' : ''}`);
       t.append(ref, pioche); // la carte posée au milieu, la pioche dans un coin
+      // Mode délire : le sens du jeu tourne en permanence autour de la carte du centre.
+      if (v.mode === 'delire' && m.enJeu.length > 2) t.prepend(roueSens(m.sens));
       poses.append(t);
     }
 
@@ -7897,6 +7932,11 @@ var qrcode = function() {
       const b = el('button', 'btn katapss inter contester', `CONTESTER ${nom(v, contester.cible).toUpperCase()}`);
       b.onclick = () => { b.disabled = true; envoyer({ type: 'action', action: { type: 'contester' } }); };
       zk.append(b);
+    } else if (m.annonce && m.contestable && m.contestable !== v.moi && jeJoue) {
+      // Les 3 premières secondes sont pour lui : il peut encore toucher « J'annonce ».
+      const b = el('button', 'btn katapss inter contester', `CONTESTER ${nom(v, m.contestable).toUpperCase()} (dans 3 s)`);
+      b.disabled = true;
+      zk.append(b);
     }
 
     // Main : on touche une ou plusieurs cartes de même valeur ; l'appli met dans l'ordre qui change la couleur.
@@ -7904,6 +7944,8 @@ var qrcode = function() {
     choixInter = choixInter.filter((c) => m.main.includes(c));
     if (!coups.length || (choixInter.length && !coups.some((a) => choixInter.every((x) => a.cartes.includes(x))))) choixInter = [];
     const choisis = coupsPour(actions, choixInter);
+    // Cartes de même valeur qu'on peut encore ajouter aux cartes choisies.
+    const encore = choixInter.length ? m.main.filter((c) => !choixInter.includes(c) && ajoutable(actions, choixInter, c)) : [];
     $('titreMain').textContent = `Ta main (${m.main.length} carte${m.main.length > 1 ? 's' : ''})` + (coups.length && !choixInter.length ? ' · touche une carte' : '');
     const main = $('main'); main.replaceChildren();
     const triee = trierMainInter(m.main);
@@ -7918,27 +7960,44 @@ var qrcode = function() {
       if (k >= 0) {
         b.classList.add('jouable', 'choisie');
         b.onclick = () => {
-          if (choixInter.length === 1 && choisis.length) return poserInter(choisis); // deuxième touche : on pose
+          // Deuxième touche : on pose, sauf s'il reste des cartes de même valeur à ajouter
+          // (une main serrée : on retouche souvent la même carte en visant sa voisine).
+          if (choixInter.length === 1 && choisis.length && !encore.length) return poserInter(choisis);
           choixInter.splice(k, 1); afficherPartieInter(vueActuelle);
         };
       } else if (ajoutable(actions, choixInter, c)) {
         b.classList.add('jouable');
         b.onclick = () => { choixInter.push(c); afficherPartieInter(vueActuelle); };
+      } else if (choixInter.length && ajoutable(actions, [], c)) {
+        // Une autre carte jouable (d'une autre valeur) : elle remplace la sélection.
+        b.classList.add('jouable');
+        b.onclick = () => { choixInter = [c]; afficherPartieInter(vueActuelle); };
       } else if (monTour) b.disabled = true;
       main.append(b);
     });
     ajusterMain();
 
     const act = $('actions'); act.replaceChildren();
+    if (encore.length) {
+      // Un seul geste pour prendre toutes les cartes de cette valeur (la plus grande pose possible).
+      const plusGrand = actions.filter((a) => a.type === 'jouer' && choixInter.every((x) => a.cartes.includes(x))).reduce((g, a) => (a.cartes.length > g.cartes.length ? a : g));
+      const tous = el('button', 'btn large' + (choisis.length ? '' : ' principal'), `Prendre les ${plusGrand.cartes.length} cartes (${nomValeur(I8.valeur(choixInter[0]))})`);
+      tous.onclick = () => { choixInter = plusGrand.cartes.slice(); afficherPartieInter(vueActuelle); };
+      act.append(tous);
+    }
     if (choisis.length) {
       const val = I8.valeur(choixInter[0]);
       const texte = choixInter.length === 1 ? `Poser le ${I8.afficher(choixInter[0])}` : `Poser ${choixInter.length} cartes (${nomValeur(val)})`;
       const b = el('button', 'btn principal large', texte);
       b.onclick = () => poserInter(choisis);
       act.append(b);
+      const annuler = el('button', 'btn large', 'Reprendre ' + (choixInter.length > 1 ? 'les cartes' : 'la carte'));
+      annuler.onclick = () => { choixInter = []; afficherPartieInter(vueActuelle); };
+      act.append(annuler);
       if (choixInter.length === 2) act.append(el('small', 'muted', 'Plusieurs cartes : la couleur change toute seule.'));
       else if (choixInter.length > 2) act.append(el('small', 'muted', 'Tu choisiras la nouvelle couleur.'));
     }
+    else if (choixInter.length) { const annuler = el('button', 'btn large', 'Reprendre les cartes'); annuler.onclick = () => { choixInter = []; afficherPartieInter(vueActuelle); }; act.append(annuler); }
     if (actions.some((a) => a.type === 'piocher')) {
       const b = el('button', 'btn principal large', 'Piocher une carte');
       b.onclick = () => { b.disabled = true; envoyer({ type: 'action', action: { type: 'piocher' } }); };
@@ -8000,7 +8059,15 @@ var qrcode = function() {
     const fil = m.journal[m.journal.length - 1] || '';
     if (fil !== (a.journal[a.journal.length - 1] || '') && / conteste : /.test(fil) && a.contestable) bulle(a.contestable, '!', { cls: 'ko', delai: 100 });
     // J retour, demande du 8 : on montre ce qui change.
-    if (m.sens !== a.sens) { pop(document.querySelector('#entete .chip:last-child'), 1.5, 600); if (m.dernier) bulle(m.dernier, '↺', { delai: 300 }); }
+    if (m.sens !== a.sens) {
+      pop(document.querySelector('#entete .chip:last-child'), 1.5, 600);
+      // J retour : un tampon pour toute la table, et la roue du sens fait un tour rapide dans le nouveau sens.
+      tampon('J RETOUR', m.sens === 1 ? 'Le jeu tourne ↻' : 'Le jeu tourne ↺');
+      retardFenetre = Math.max(retardFenetre, Date.now() + 1500);
+      const roue = document.querySelector('#roueSens svg');
+      if (roue && !sansAnim) roue.animate([{ transform: 'rotate(0deg) scale(1.25)' }, { transform: `rotate(${m.sens === 1 ? 720 : -720}deg) scale(1)` }], { duration: 1400, easing: 'cubic-bezier(.2,.8,.3,1)' });
+      if (m.dernier) bulle(m.dernier, m.sens === 1 ? '↻' : '↺', { delai: 300 });
+    }
     if (m.demande && (!a.demande || a.demande.valeur !== m.demande.valeur)) pop(document.querySelector('#entete .chip.demande'), 1.5, 600);
     // Changement de tour.
     if (m.joueurCourant && m.joueurCourant !== a.joueurCourant) {
@@ -8486,11 +8553,11 @@ var qrcode = function() {
     g.beginPath(); g.roundRect(48, 48, W - 96, H - 96, 40); g.stroke();
     g.fillStyle = 'rgba(226,176,74,.75)'; g.font = '64px serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
     g.fillText('♠', 110, 120); g.save(); g.translate(W - 110, H - 120); g.rotate(Math.PI); g.fillText('♠', 0, 0); g.restore();
-    await new Promise((ok) => { const im = new Image(); im.onload = () => { g.drawImage(im, W / 2 - 80, 110, 160, 160); ok(); }; im.onerror = ok; im.src = 'icons/kopo-logo.svg'; setTimeout(ok, 1500); });
+    await new Promise((ok) => { const im = new Image(); im.onload = () => { g.drawImage(im, W / 2 - 80, 110, 160, 160); ok(); }; im.onerror = ok; im.src = jeuPartage(v.jeu).logo; setTimeout(ok, 1500); });
     const texte = (t, y, police, couleur) => { g.font = police; g.fillStyle = couleur; g.fillText(t, W / 2, y, W - 160); };
     const moi = nom(v, v.moi);
     const gagne = v.vainqueur === v.moi;
-    texte('KOPO', 320, '90px "Bebas Neue", Impact, sans-serif', '#e2b04a');
+    texte(jeuPartage(v.jeu).nom.toUpperCase(), 320, '90px "Bebas Neue", Impact, sans-serif', '#e2b04a');
     texte(gagne ? 'VICTOIRE !' : (r && r.titre ? 'TITRE' : 'BIEN JOUÉ'), 500, '230px "Bebas Neue", Impact, sans-serif', '#ffffff');
     texte(moi, 650, '600 70px Outfit, sans-serif', '#e2b04a');
     texte(gagne ? `gagne une partie à ${v.joueurs.length} joueurs` : '', 730, '500 44px Outfit, sans-serif', '#c9d6e6');
@@ -8500,13 +8567,17 @@ var qrcode = function() {
     texte('Viens me battre : ' + (location.host + location.pathname).replace(/index\.html$/, '').replace(/\/$/, ''), 975, '500 38px Outfit, sans-serif', '#9fb2c8');
     return new Promise((ok) => c.toBlob(ok, 'image/png'));
   }
+  // Nom du jeu dans les textes partagés (« jouer au Kopo », « une partie d'Inter (8) »). Masano = l'appli.
+  const NOMS_PARTAGE = { kopo: { nom: 'Kopo', au: 'au Kopo', de: 'de Kopo', logo: 'icons/kopo-logo.svg' }, inter8: { nom: 'Inter (8)', au: 'à Inter (8)', de: 'd\'Inter (8)', logo: 'icons/masano-logo.svg' } };
+  const jeuPartage = (jeu) => NOMS_PARTAGE[jeu] || NOMS_PARTAGE.kopo;
   function ouvrirWhatsApp(texte) { window.open('https://wa.me/?text=' + encodeURIComponent(texte), '_blank', 'noopener'); }
   async function partagerVictoire(v, r) {
     const url = location.origin + location.pathname;
-    const texte = v.vainqueur === v.moi ? 'Je viens de gagner une partie de Kopo ! Viens me battre :' : (r && r.titre ? `Mon nouveau titre au Kopo : « ${r.titre} ». Viens jouer :` : 'Viens jouer au Kopo avec moi :');
+    const J = jeuPartage(v.jeu);
+    const texte = v.vainqueur === v.moi ? `Je viens de gagner une partie ${J.de} sur Masano ! Viens me battre :` : (r && r.titre ? `Mon nouveau titre ${J.au} : « ${r.titre} ». Viens jouer sur Masano :` : `Viens jouer ${J.au} avec moi sur Masano :`);
     try {
       const blob = await imageVictoire(v, r);
-      const f = blob && new File([blob], 'kopo.png', { type: 'image/png' });
+      const f = blob && new File([blob], (v.jeu === 'inter8' ? 'inter8' : 'kopo') + '.png', { type: 'image/png' });
       if (f && navigator.canShare && navigator.canShare({ files: [f] })) { await navigator.share({ files: [f], text: texte + ' ' + url }); return; }
     } catch (e) { if (e && e.name === 'AbortError') return; }
     ouvrirWhatsApp(texte + ' ' + url);
@@ -8623,7 +8694,7 @@ var qrcode = function() {
     z.append(tuto, liens);
     const reinit = el('button', 'btn', 'Remettre les réglages par défaut');
     reinit.onclick = () => { Object.assign(prefs, PREFS_DEFAUT); enregistrerPrefs(); ouvrirParametres(); if (vueActuelle) afficher(vueActuelle); };
-    z.append(reinit, el('p', 'version', 'Kopo · version ' + VERSION));
+    z.append(reinit, el('p', 'version', 'Masano · version ' + VERSION));
     const fermer = el('button', 'btn principal large', 'Fermer');
     fermer.onclick = () => { fermerFenetre(); if (vueActuelle) afficher(vueActuelle); };
     ouvrirFenetre([el('h2', null, 'Paramètres'), z, fermer]);
@@ -8888,7 +8959,7 @@ var qrcode = function() {
   // Les cases à partager : une verte par manche passée, rouge à l'élimination, 🏆 pour la victoire.
   const casesMatch = (r) => '🟩'.repeat(Math.min(7, r.manches)) + (r.victoire ? '🏆' : r.parti ? '⬜' : '🟥');
   function partagerMatchJour(r) {
-    ouvrirWhatsApp(`Kopo — Match du jour n°${r.numero}\n${casesMatch(r)} ${r.score} / 100\nTu fais mieux ? 👉 ${LIEN_SITE()}`);
+    ouvrirWhatsApp(`Masano · Kopo, Match du jour n°${r.numero}\n${casesMatch(r)} ${r.score} / 100\nTu fais mieux ? 👉 ${LIEN_SITE()}`);
   }
 
   async function ouvrirMatchJour() {
@@ -9171,7 +9242,7 @@ var qrcode = function() {
     let parrain = null;
     try { parrain = (await apiJoueur('/parrainage')).code; } catch (e) {} // le lien sert aussi de lien de parrainage
     const lien = lienBande(x) + (parrain ? '&parrain=' + parrain : '');
-    ouvrirWhatsApp(`Rejoins ma Bande « ${x.nom} » au Kopo ! Chaque jour un Match, chaque semaine on mise, et le meilleur rafle le pot 👑 ${lien}`);
+    ouvrirWhatsApp(`Rejoins ma Bande « ${x.nom} » sur Masano (Kopo) ! Chaque jour un Match, chaque semaine on mise, et le meilleur rafle le pot 👑 ${lien}`);
   }
 
   function afficherBande(x) {
@@ -9728,7 +9799,7 @@ var qrcode = function() {
     const moi = el('p', null, 'Ton identifiant à donner à tes amis : ');
     moi.append(el('b', null, c.compte.pseudo + '#' + c.compte.numero));
     const inviter = el('button', 'btn large', 'Inviter sur WhatsApp');
-    inviter.onclick = () => { const t = `Viens jouer au Kopo avec moi ! Ajoute-moi : ${c.compte.pseudo}#${c.compte.numero}\n${location.origin + location.pathname}`; window.open('https://wa.me/?text=' + encodeURIComponent(t), '_blank', 'noopener'); };
+    inviter.onclick = () => { const t = `Viens jouer avec moi sur Masano (Kopo et Inter (8)) ! Ajoute-moi : ${c.compte.pseudo}#${c.compte.numero}\n${location.origin + location.pathname}`; window.open('https://wa.me/?text=' + encodeURIComponent(t), '_blank', 'noopener'); };
     const f = el('button', 'btn large', 'Fermer'); f.onclick = () => ouvrirParametres();
     const parrainer = el('button', 'btn principal large', 'Inviter et gagner des pièces');
     parrainer.onclick = () => ouvrirParrainage(ouvrirAmis);
@@ -9764,7 +9835,7 @@ var qrcode = function() {
       const ligne = el('div', 'lien'); ligne.append(champ, copier);
       const wa = el('button', 'btn large btn-whatsapp', 'Inviter sur WhatsApp');
       wa.prepend(icone('i-partager'));
-      wa.onclick = () => ouvrirWhatsApp(`Viens jouer au Kopo avec moi ! Crée ton compte avec ce lien, on gagne des pièces tous les deux :\n${lien}`);
+      wa.onclick = () => ouvrirWhatsApp(`Viens jouer avec moi sur Masano (Kopo et Inter (8)) ! Crée ton compte avec ce lien, on gagne des pièces tous les deux :\n${lien}`);
       zone.append(ligne, wa);
       // Progression et paliers (les gros parrains sont récompensés).
       const prochain = P.paliers.find((x) => !x.atteint);
@@ -10305,7 +10376,7 @@ var qrcode = function() {
       btn.onclick = fermerFenetre;
     };
     z.append(el('p', null, 'Un cadeau chaque jour où tu joues, pendant ta première semaine.'), rangee, gain);
-    ouvrirFenetre([el('h2', null, 'Bienvenue au Kopo'), z, btn], 'bienvenue7');
+    ouvrirFenetre([el('h2', null, 'Bienvenue sur Masano'), z, btn], 'bienvenue7');
     return true;
   }
 
@@ -10525,7 +10596,7 @@ var qrcode = function() {
       R.donnerObjet(q, 'dos-fondateurs'); ecrireProfil(q); appliquerCollection(q);
       const corps = el('div', 'bonus-jour');
       corps.append(el('h2', null, 'Merci, fondateur !'), apercuObjet('dos-fondateurs'),
-        el('p', null, (avaitEssai ? 'Le Kopo passe aux vraies pièces : tes pièces d\'essai s\'arrêtent ici. Pour te remercier d\'avoir été là dès le début, voici' : 'Le Kopo passe aux vraies pièces. Pour fêter ça avec ceux qui sont là dès le début, voici') + ' le dos de cartes « Les Fondateurs ». Il ne sera plus distribué après le lancement.'));
+        el('p', null, (avaitEssai ? 'Masano passe aux vraies pièces : tes pièces d\'essai s\'arrêtent ici. Pour te remercier d\'avoir été là dès le début, voici' : 'Masano passe aux vraies pièces. Pour fêter ça avec ceux qui sont là dès le début, voici') + ' le dos de cartes « Les Fondateurs ». Il ne sera plus distribué après le lancement.'));
       const ok = el('button', 'btn principal large', 'Merci !');
       await new Promise((fin) => { ok.onclick = () => { fermerFenetre(); fin(); }; ouvrirFenetre([corps, ok]); });
     } catch (e) {}
@@ -10557,7 +10628,7 @@ var qrcode = function() {
   });
   addEventListener('appinstalled', () => {
     stock.ecrire('kopo-installe', true); inviteInstallation = null; majBoutonInstaller();
-    toast('Kopo est installé ! Ouvre-le depuis ton écran d\'accueil' + (CADEAU_INSTALLATION ? ' pour recevoir ton cadeau.' : '.'));
+    toast('Masano est installé ! Ouvre-le depuis ton écran d\'accueil' + (CADEAU_INSTALLATION ? ' pour recevoir ton cadeau.' : '.'));
   });
   majBoutonInstaller();
   async function installer() {
@@ -10574,7 +10645,7 @@ var qrcode = function() {
     guideInstallation();
   }
   $('btnInstaller').onclick = installer;
-  const texteCadeauInstallation = () => 'Cadeau : ' + CADEAU_INSTALLATION + ' pièces la première fois que tu ouvres Kopo depuis son icône.';
+  const texteCadeauInstallation = () => 'Cadeau : ' + CADEAU_INSTALLATION + ' pièces la première fois que tu ouvres Masano depuis son icône.';
   function guideInstallation() {
     const etapes = el('ol', 'guide-ios');
     const etape = (morceaux, ico) => { const li = el('li'), t = el('span'); t.append(...morceaux); li.append(t, icone(ico)); return li; };
@@ -10582,11 +10653,11 @@ var qrcode = function() {
     if (IOS) etapes.append(
       etape(['Touche ', el('b', null, 'Partager'), ' dans la barre de Safari'], 'i-ios-partage'),
       etape(['Choisis ', el('b', null, 'Sur l\'écran d\'accueil'), ' (fais défiler la liste si besoin)'], 'i-ios-ajouter'),
-      etape(['Touche ', el('b', null, 'Ajouter'), ', puis ouvre Kopo depuis sa nouvelle icône'], 'i-installer'));
+      etape(['Touche ', el('b', null, 'Ajouter'), ', puis ouvre Masano depuis sa nouvelle icône'], 'i-installer'));
     else etapes.append(
       etape(['Touche le menu ', el('b', null, '⋮'), ' du navigateur (en haut ou en bas à droite)'], 'i-menu'),
       etape(['Choisis ', el('b', null, 'Installer l\'application'), ' ou ', el('b', null, 'Ajouter à l\'écran d\'accueil')], 'i-ios-ajouter'),
-      etape(['Confirme, puis ouvre Kopo depuis sa nouvelle icône'], 'i-installer'));
+      etape(['Confirme, puis ouvre Masano depuis sa nouvelle icône'], 'i-installer'));
     const aide = el('p', null, 'Tu ne trouves pas ? Tu es sans doute dans WhatsApp, Facebook ou une autre appli : ouvre ce lien dans ' + nav + '.');
     const copier = el('button', 'btn large', 'Copier le lien du jeu');
     copier.onclick = () => {
@@ -10622,7 +10693,7 @@ var qrcode = function() {
     const tard = el('button', 'btn large', 'Plus tard'); tard.onclick = fermerFenetre;
     const non = el('button', 'btn large', 'Non merci');
     non.onclick = () => { stock.ecrire('kopo-rappel-installation', Object.assign(stock.lire('kopo-rappel-installation') || {}, { non: true })); fermerFenetre(); };
-    ouvrirFenetre([el('h2', null, 'Installer Kopo'), el('p', null, 'Mets Kopo sur ton écran d\'accueil : il s\'ouvre d\'un geste, en plein écran, comme une appli.'), el('p', null, texteCadeauInstallation()), oui, tard, non]);
+    ouvrirFenetre([el('h2', null, 'Installer Masano'), el('p', null, 'Mets Masano sur ton écran d\'accueil : il s\'ouvre d\'un geste, en plein écran, comme une appli.'), el('p', null, texteCadeauInstallation()), oui, tard, non]);
     return true;
   }
   // Première ouverture depuis l'icône : le cadeau d'installation (une fois par compte, le serveur refuse les doublons).
@@ -10631,7 +10702,7 @@ var qrcode = function() {
     const g = el('div', 'cadeau-installation'); g.append(pieceEl(), '+' + n);
     const ok = el('button', 'btn principal large', 'Merci !');
     ok.onclick = () => { fermerFenetre(); suiteAccueil(); };
-    ouvrirFenetre([el('h2', null, 'Kopo est installé'), el('p', null, 'Merci d\'avoir mis Kopo sur ton écran d\'accueil. Voici ton cadeau :'), g, ok]);
+    ouvrirFenetre([el('h2', null, 'Masano est installé'), el('p', null, 'Merci d\'avoir mis Masano sur ton écran d\'accueil. Voici ton cadeau :'), g, ok]);
     vibrer(40); pop(g, 1.4); pop($('btnBourse'), 1.2);
   }
   function cadeauInstallation() {
@@ -10774,7 +10845,7 @@ var qrcode = function() {
   $('btnPartager').onclick = async () => {
     let url = location.origin + location.pathname;
     if (MODE_SERVEUR && compteLocal()) { try { const P = await apiJoueur('/parrainage'); if (P.code) url = lienParrain(P.code); } catch (e) {} }
-    try { if (navigator.share) { await navigator.share({ title: 'Kopo', text: 'Viens jouer au Kopo avec moi !', url }); return; } } catch (e) { return; }
+    try { if (navigator.share) { await navigator.share({ title: 'Masano', text: `Viens jouer ${jeuPartage(jeuChoisi()).au} avec moi sur Masano !`, url }); return; } } catch (e) { return; }
     try { await navigator.clipboard.writeText(url); toast('Lien du jeu copié.'); } catch (e) { toast(url); }
   };
   $('btnLancer').onclick = () => envoyer({ type: 'lancer' });
@@ -10787,7 +10858,7 @@ var qrcode = function() {
     () => { if (client && vueActuelle && vueActuelle.etat === 'salon') {} quitter(); });
   $('btnWhatsappSalon').onclick = () => {
     const v = vueActuelle; if (!v) return;
-    ouvrirWhatsApp(`Viens jouer au Kopo avec moi ! Code de la partie : ${v.code}\n${lienPartie(v.code)}`);
+    ouvrirWhatsApp(`Viens jouer ${jeuPartage(v.jeu).au} avec moi sur Masano ! Code de la partie : ${v.code}\n${lienPartie(v.code)}`);
   };
   // QR code du salon : le bouton QR (portrait) ou le petit QR (paysage) l'ouvre en grand par-dessus l'écran, toucher le referme.
   const basculerQr = () => $('ecranSalon').classList.toggle('qr-ouvert');
