@@ -356,7 +356,7 @@ const afficher = {
         <h3>Cadeau de fondateur</h3>
         <div class="ligne"><label><input type="checkbox" id="fondateurActif" ${r.cadeauFondateur && r.cadeauFondateur.active !== false && r.cadeauFondateur.actif ? 'checked' : ''}> distribuer le dos « Les Fondateurs » aux joueurs qui avaient des pièces d'essai</label><button class="btn" id="btnFondateur">Enregistrer</button></div>
         <h3>Version minimale de l'application</h3>
-        <div class="ligne"><input id="version" value="${esc(r.versionMin)}" style="width:110px"><button class="btn" id="btnVersion">Enregistrer</button><span class="muted">Les versions plus anciennes devront se mettre à jour.</span></div>
+        <div class="ligne"><input id="version" value="${esc(r.versionMin)}" style="width:110px"><button class="btn" id="btnVersion">Enregistrer</button><span class="muted">Version actuelle de l'appli : <b>${esc(r.versionAppli || '?')}</b>. Les versions plus anciennes devront se mettre à jour (pas plus haut que la version actuelle).</span></div>
       </div>
       <div class="carte"><h3 style="margin-top:0">Gains (tables gratuites)</h3>${champs('gains', { bienvenue: 'Cadeau de bienvenue', manche: 'Par manche survécue', katapss: 'Katapss', victoire: 'Victoire', deuxieme: '2e place' })}<button class="btn principal" data-enregistrer="gains">Enregistrer les gains</button>
         <h3>Bonus du jour</h3>${champs('bonusJour', { depart: 'Premier jour', pas: 'En plus chaque jour', plafond: 'Plafond' })}<button class="btn principal" data-enregistrer="bonusJour">Enregistrer le bonus</button>

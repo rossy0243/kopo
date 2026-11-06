@@ -238,7 +238,7 @@ function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainag
   }));
 
   // --- Pilotage : gains, bonus, tables, pot, annonce, maintenance
-  r.get('/reglages', (req, res) => res.json(reglages.tout()));
+  r.get('/reglages', (req, res) => res.json({ ...reglages.tout(), versionAppli: require('./reglages').VERSION_APPLI }));
   r.put('/reglages/:cle', enveloppe(async (req, res) => {
     const avant = reglages.get(req.params.cle);
     const v = await reglages.ecrire(req.params.cle, req.body.valeur);

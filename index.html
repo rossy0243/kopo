@@ -1247,7 +1247,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
 <div class="voile voile-maintenance" id="voileVersion" hidden>
   <div class="fenetre fenetre-serveur" role="alertdialog" aria-modal="true" aria-labelledby="titreVersion">
     <h2 id="titreVersion">Mise à jour</h2>
-    <p>Une nouvelle version du Kopo est obligatoire pour continuer à jouer.</p>
+    <p>Une nouvelle version de Masano est obligatoire pour continuer à jouer.</p>
     <button class="btn principal" id="btnVersionMaj">Mettre à jour</button>
   </div>
 </div>
@@ -1260,7 +1260,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   </div>
 </div>
 <div class="toast" id="toast" hidden role="status"></div>
-<div class="maj-dispo" id="majDispo" hidden role="status"><span>Nouvelle version de Kopo disponible.</span><button class="btn principal" id="btnMajDispo">Mettre à jour</button><button class="btn" id="btnMajPlusTard" aria-label="Plus tard">✕</button></div>
+<div class="maj-dispo" id="majDispo" hidden role="status"><span>Nouvelle version de Masano disponible.</span><button class="btn principal" id="btnMajDispo">Mettre à jour</button><button class="btn" id="btnMajPlusTard" aria-label="Plus tard">✕</button></div>
 <div class="tirer-actualiser" id="tirerActualiser" hidden aria-hidden="true"><span>↻</span></div>
 <div class="voile voile-tourner" id="voileTourner" hidden>
   <div class="fenetre fenetre-tourner" role="dialog" aria-modal="true" aria-labelledby="titreTourner">
@@ -6431,7 +6431,7 @@ var qrcode = function() {
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = '7ea9a2a7f598'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = '384431997a98'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).

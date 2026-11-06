@@ -40,6 +40,17 @@ const DEFAUTS = {
   prochaineSaison: { nom: '', theme: '' },
   messagesRapides: ['👏', '😂', '😮', '🔥', '😡', '👍', '😭', '🙏', 'Bien joué !', 'Bravo !', 'Joli coup !', 'Belle carte !', 'Bien vu !', 'Trop fort !', 'Merci !', 'Désolé !', 'Oups !', 'Aïe !', 'Pas de chance !', 'Je ramasse…', 'Je t’ai eu !', 'Katapss !', 'Vite !', 'Prends ton temps', 'À toi !', 'Encore une !', 'Bonne chance !', 'Bonne partie !', 'GG !', 'Revanche ?', 'On en refait une ?', 'Je reviens', 'Salut tout le monde !', 'À la prochaine !'],
 };
+// Version actuelle de l'appli (const VERSION dans src/source.html). La version minimale demandée
+// aux joueurs ne peut pas la dépasser : sinon même l'appli à jour demande une mise à jour, en boucle.
+const VERSION_APPLI = (() => {
+  try { return /const VERSION = '([0-9.]+)'/.exec(require('fs').readFileSync(require('path').join(__dirname, '../../src/source.html'), 'utf8'))[1]; } catch (e) { return null; }
+})();
+// a est-elle plus récente que b ? ('1.10' > '1.9')
+function versionPlusRecente(a, b) {
+  const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d > 0; }
+  return false;
+}
 const ANCIEN_MESSAGE_MAINTENANCE = 'Le Kopo est en maintenance. On revient très vite !';
 const MESSAGE_MAX = 40, MESSAGES_MAX = 40;
 // Nettoie une liste de messages : texte seul, sans doublon, ni trop long ni trop nombreux.
@@ -111,6 +122,8 @@ function creerReglages(base) {
       for (const l of r.rows) if (l.cle in cache) cache[l.cle] = typeof l.valeur === 'string' ? JSON.parse(l.valeur) : l.valeur;
       // L'appli s'appelle maintenant Masano : l'ancien message par défaut, enregistré tel quel, prend le nouveau nom.
       if (cache.maintenance && cache.maintenance.message === ANCIEN_MESSAGE_MAINTENANCE) cache.maintenance = { ...cache.maintenance, message: DEFAUTS.maintenance.message };
+      // Une version minimale plus haute que l'appli bloquerait tout le monde : on la ramène à la version actuelle.
+      if (VERSION_APPLI && versionPlusRecente(cache.versionMin, VERSION_APPLI)) cache.versionMin = VERSION_APPLI;
       return cache;
     },
     tout: () => cache,
@@ -124,6 +137,11 @@ function creerReglages(base) {
         valeur = v.liste;
       }
       if (cle === 'ligue') valeur = verifierLigue(valeur);
+      if (cle === 'versionMin') {
+        valeur = String(valeur || '').trim();
+        if (!/^\d{1,3}(\.\d{1,3}){0,3}$/.test(valeur)) throw Object.assign(new Error('Version invalide (exemple : 1.1).'), { statut: 400 });
+        if (VERSION_APPLI && versionPlusRecente(valeur, VERSION_APPLI)) throw Object.assign(new Error(`La version actuelle de l'appli est ${VERSION_APPLI} : la version minimale ne peut pas être plus haute, sinon même l'appli à jour demanderait une mise à jour.`), { statut: 400 });
+      }
       if (cle === 'parcours') {
         const v = {};
         for (const k of Object.keys(DEFAUTS.parcours)) {
@@ -165,4 +183,4 @@ function creerReglages(base) {
   };
 }
 
-module.exports = { creerReglages, DEFAUTS, verifierMessages, verifierLigue, verifierBande, DIVISIONS, MESSAGE_MAX };
+module.exports = { creerReglages, DEFAUTS, VERSION_APPLI, versionPlusRecente, verifierMessages, verifierLigue, verifierBande, DIVISIONS, MESSAGE_MAX };
