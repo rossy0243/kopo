@@ -97,6 +97,19 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
 .chip { border: 1px solid var(--line); border-radius: 99px; padding: 2px 10px; font-size: 13px; display: inline-flex; gap: 6px; align-items: center; }
 .chip b { font-size: 17px; line-height: 1; }
 .chip.interdit { border-color: var(--bad); color: var(--bad); }
+.table-inter { display: flex; gap: 22px; align-items: flex-end; justify-content: center; }
+.table-inter .pile { display: grid; justify-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
+.table-inter .carte { width: 66px; height: 96px; }
+.carte.joker .coin { font-size: 12px; letter-spacing: .5px; }
+.carte .ordre { position: absolute; top: -7px; right: -7px; width: 20px; height: 20px; border-radius: 99px; background: var(--brass); color: #1d1606; font-size: 12px; font-weight: 700; display: grid; place-items: center; }
+.fil-inter { display: grid; gap: 2px; justify-items: center; font-size: 12px; color: var(--muted); text-align: center; margin-top: 8px; }
+.fil-inter div:last-child { color: var(--ink); }
+#logoJeu span { white-space: nowrap; }
+#logoJeu.long { font-size: .8em; }
+.chip.demande { border-color: var(--brass); color: var(--brass); }
+.btn.katapss.contester { background: var(--brass); border-color: var(--brass); color: #1d1606; font-size: 22px; }
+.choix-demande { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.choix-demande .btn { padding: 10px 4px; }
 .chip.interdit b { text-decoration: line-through; }
 .poses { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; min-height: 100px; }
 .pose { display: grid; justify-items: center; gap: 3px; font-size: 12px; color: var(--muted); max-width: 90px; }
@@ -121,7 +134,7 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
 .main .carte .coin { font-size: 18px; }
 .main .carte .centre { font-size: 36px; }
 .main .carte.jouable { cursor: pointer; }
-.main .carte.choisie { transform: translateY(-12px); box-shadow: 0 0 0 3px var(--brass), 0 10px 18px rgba(0,0,0,.4); }
+.main .carte.choisie { z-index: 1; transform: translateY(-12px); box-shadow: 0 0 0 3px var(--brass), 0 10px 18px rgba(0,0,0,.4); }
 .main .carte:disabled { opacity: .4; filter: grayscale(.4); }
 .actions { display: grid; gap: 8px; }
 @media (prefers-reduced-motion: reduce) { .main .carte, .btn.katapss { transition: none; animation: none; } }
@@ -283,6 +296,9 @@ details.rappel summary { cursor: pointer; font-weight: 600; }
   body.en-jeu .main .carte.choisie { transform: translateY(calc(var(--dy, 0px) - 22px)) rotate(var(--r, 0deg)); }
   body.en-jeu .actions { position: absolute; right: max(10px, env(safe-area-inset-right)); bottom: max(10px, env(safe-area-inset-bottom)); width: 150px; grid-template-columns: 1fr; gap: 6px; z-index: 2; }
   body.en-jeu .actions .btn.large { padding: 10px 8px; font-size: 15px; border-radius: 14px; box-shadow: 0 4px 12px rgba(0,0,0,.4); }
+  body.en-jeu .btn.katapss.inter { font-size: 18px; padding: 0 8px; }
+  body.en-jeu #zoneKatapss:has(.inter + .inter) { display: grid; gap: 10px; }
+  body.en-jeu .actions small.muted { display: none; }
   body.en-jeu #zoneKatapss { position: absolute; right: max(14px, env(safe-area-inset-right)); top: 50%; transform: translateY(-50%); z-index: 2; }
   body.en-jeu .btn.katapss { width: 112px; height: 112px; border-radius: 50%; padding: 0; font-size: 24px; letter-spacing: 1px; line-height: 1; border: 4px solid #ff8f86; box-shadow: 0 8px 0 #7d1d18, 0 12px 24px rgba(0,0,0,.5); }
 }
@@ -970,7 +986,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
 <body>
 <div class="app">
   <header>
-    <div class="logo"><img class="marque" src="icons/kopo-logo.svg" alt="">KOPO</div>
+    <div class="logo" id="logoJeu"><img class="marque" src="icons/kopo-logo.svg" alt=""><span>KOPO</span></div>
     <div class="info" id="info"></div>
     <div class="vocal" id="vocal" hidden></div>
     <button class="btn" id="btnPleinEcranEntete" hidden title="Plein écran" aria-label="Plein écran">⛶</button>
@@ -1089,6 +1105,11 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
     <div class="voile" id="voileRobots" hidden>
       <div class="fenetre">
         <h2>Contre les robots</h2>
+        <p class="style-inter" hidden>Quel style ?</p>
+        <div class="choix choix-niveau-robots style-inter" id="styleRobots" role="group" aria-label="Style de la partie" hidden>
+          <button type="button" data-v="simple">Simple</button>
+          <button type="button" data-v="delire">Délire (J retour)</button>
+        </div>
         <p>Quel niveau ?</p>
         <div class="choix choix-niveau-robots" id="niveauRobots" role="group" aria-label="Niveau des robots">
           <button type="button" data-v="faciles">Facile</button>
@@ -1156,6 +1177,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
     </div>
     <div class="colonne">
     <div class="reglage" id="reglage"></div>
+    <div class="reglage" id="reglageStyle" hidden></div>
     <h3 id="titreJoueurs"></h3>
     <ul class="liste-joueurs" id="listeJoueurs"></ul>
     <p id="attenteHote" hidden>En attente du lancement par l'hôte…</p>
@@ -1225,7 +1247,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
 <div class="voile voile-maintenance" id="voileVersion" hidden>
   <div class="fenetre fenetre-serveur" role="alertdialog" aria-modal="true" aria-labelledby="titreVersion">
     <h2 id="titreVersion">Mise à jour</h2>
-    <p>Une nouvelle version du Kopo est obligatoire pour continuer à jouer.</p>
+    <p>Une nouvelle version de Masano est obligatoire pour continuer à jouer.</p>
     <button class="btn principal" id="btnVersionMaj">Mettre à jour</button>
   </div>
 </div>
@@ -1238,7 +1260,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   </div>
 </div>
 <div class="toast" id="toast" hidden role="status"></div>
-<div class="maj-dispo" id="majDispo" hidden role="status"><span>Nouvelle version de Kopo disponible.</span><button class="btn principal" id="btnMajDispo">Mettre à jour</button><button class="btn" id="btnMajPlusTard" aria-label="Plus tard">✕</button></div>
+<div class="maj-dispo" id="majDispo" hidden role="status"><span>Nouvelle version de Masano disponible.</span><button class="btn principal" id="btnMajDispo">Mettre à jour</button><button class="btn" id="btnMajPlusTard" aria-label="Plus tard">✕</button></div>
 <div class="tirer-actualiser" id="tirerActualiser" hidden aria-hidden="true"><span>↻</span></div>
 <div class="voile voile-tourner" id="voileTourner" hidden>
   <div class="fenetre fenetre-tourner" role="dialog" aria-modal="true" aria-labelledby="titreTourner">
@@ -1272,6 +1294,9 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
 <script>/*MOTEUR*/</script>
 <script>kopoChargement(59, 0, 61)</script>
 <script>/*SALLE*/</script>
+<script>/*MOTEUR_INTER8*/</script>
+<script>/*ROBOTS_INTER8*/</script>
+<script>/*SALLE_INTER8*/</script>
 <script>kopoChargement(61, 0, 63)</script>
 <script>/*RETENTION*/</script>
 <script>kopoChargement(63, 0, 64)</script>
@@ -1281,6 +1306,9 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
 (function () {
   'use strict';
   const K = window.Kopo, S = window.KopoSalle, R = window.KopoRetention, Sons = window.KopoSons;
+  // Inter (8) : son moteur et sa salle ont la même forme que ceux de Kopo. La salle dit à quel jeu elle sert.
+  const I8 = window.Inter8, SI = window.Inter8Salle;
+  const modSalle = (s) => (s && s.jeu === 'inter8' ? SI : S);
   const $ = (id) => document.getElementById(id);
   const PREFIXE = 'kopo-mj-v1-';
   const LETTRES = 'ABCDEFGHJKMNPQRSTUVWXYZ';
@@ -1798,14 +1826,17 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   let vueActuelle = null;
   let session = stock.lire(cleSession);
 
-  function demarrerHote(code, nom, reprise, taille) {
+  function demarrerHote(code, nom, reprise, taille, jeu) {
     const sauvee = reprise && stock.lire(PREFIXE + 'salle-' + code);
-    const salle = sauvee ? S.importer(sauvee) : S.creerSalle(code);
-    if (taille && !sauvee) S.rendrePublique(salle, taille);
+    let jeuSalle = jeu === 'inter8' ? 'inter8' : 'kopo';
+    if (sauvee) { try { jeuSalle = JSON.parse(sauvee).jeu === 'inter8' ? 'inter8' : 'kopo'; } catch (e) {} }
+    const M = jeuSalle === 'inter8' ? SI : S;
+    const salle = sauvee ? M.importer(sauvee) : M.creerSalle(code);
+    if (taille && !sauvee) M.rendrePublique(salle, taille);
     hote = { salle, vus: new Map(), reseau: null };
     session = { code, role: 'hote', nom };
     stock.ecrire(cleSession, session);
-    S.recevoir(salle, monId, { type: 'rejoindre', nom });
+    M.recevoir(salle, monId, { type: 'rejoindre', nom });
     salle.joueurs.forEach((j) => { if (!j.robot) j.voix = j.id === monId ? vocal.actif : false; });
     afficherConnexion("Ouverture de la partie…");
     hote.reseau = reseauHote(code, {
@@ -1814,7 +1845,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
         hote.vus.set(id, Date.now());
         if (msg && msg.type === 'ping') {
           const j = salle.joueurs.find((x) => x.id === id);
-          if (j && !j.connecte && !j.robot) { S.reconnecter(salle, id); diffuser(); }
+          if (j && !j.connecte && !j.robot) { M.reconnecter(salle, id); diffuser(); }
           else hote.reseau.envoyer(id, { type: 'pong' });
           return;
         }
@@ -1825,7 +1856,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   }
 
   function traiter(id, msg) {
-    const r = S.recevoir(hote.salle, id, msg);
+    const r = modSalle(hote.salle).recevoir(hote.salle, id, msg);
     if (r.ok && r.evenement) {
       // Émoji rapide : relayé à toute la table, sans changer la partie.
       for (const j of hote.salle.joueurs) if (j.id !== monId) hote.reseau.envoyer(j.id, r.evenement);
@@ -1840,14 +1871,14 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   }
 
   function diffuser() {
-    const s = hote.salle;
-    stock.ecrire(PREFIXE + 'salle-' + s.code, S.exporter(s));
-    for (const j of s.joueurs) if (j.id !== monId) hote.reseau.envoyer(j.id, { type: 'vue', vue: S.vue(s, j.id) });
-    afficher(S.vue(s, monId));
+    const s = hote.salle, M = modSalle(s);
+    stock.ecrire(PREFIXE + 'salle-' + s.code, M.exporter(s));
+    for (const j of s.joueurs) if (j.id !== monId) hote.reseau.envoyer(j.id, { type: 'vue', vue: M.vue(s, j.id) });
+    afficher(M.vue(s, monId));
   }
 
   // Chrono : l'hôte vérifie 4 fois par seconde si le joueur courant a épuisé son temps.
-  setInterval(() => { if (hote && S.tic(hote.salle)) diffuser(); }, 250);
+  setInterval(() => { if (hote && modSalle(hote.salle).tic(hote.salle)) diffuser(); }, 250);
 
   // Un joueur silencieux depuis 8 s est marqué déconnecté.
   setInterval(() => {
@@ -2023,19 +2054,25 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   function afficher(v) {
     const ancienne = vueActuelle;
     vueActuelle = v;
+    // En-tête : le nom du jeu de la table (Kopo ou Inter (8)).
+    const logo = $('logoJeu'), nomJeu = v.jeu === 'inter8' ? 'INTER (8)' : 'KOPO';
+    if (logo.lastChild.textContent !== nomJeu) { logo.lastChild.textContent = nomJeu; logo.classList.toggle('long', v.jeu === 'inter8'); logo.firstChild.src = v.jeu === 'inter8' ? 'icons/masano-logo.svg' : 'icons/kopo-logo.svg'; }
     garderEcranAllume();
     vocal.maj(v);
     const finAvant = finChrono;
     demarrerChrono(v);
-    if (!ancienne || ancienne.etat !== v.etat || ancienne.numeroManche !== v.numeroManche) { carteChoisie = null; cartesRecues.clear(); }
-    suivrePartie(v);
+    if (!ancienne || ancienne.etat !== v.etat || ancienne.numeroManche !== v.numeroManche) { carteChoisie = null; choixInter = []; cartesRecues.clear(); }
+    if (v.jeu !== 'inter8') suivrePartie(v); // Inter (8) : l'XP et les missions viendront à l'étape de la progression
     if (v.etat !== 'finPartie') arreterSuiteAuto();
     if (v.etat === 'salon') { if (!chatOuvert()) fermerFenetre(); return afficherSalon(v); } // le chat reste ouvert quand quelqu'un arrive ou se dit prêt
     if (v.etat === 'manche' && client && !v.joueurs.some((j) => j.id === v.moi)) { quitter(); toast('La revanche est partie sans toi.'); return; }
-    const avant = positionsAvant();
-    afficherPartie(v);
-    try { animer(ancienne, v, avant, finAvant); } catch (e) { console.error(e); }
-    try { sonner(ancienne, v); } catch (e) { console.error(e); }
+    if (v.jeu === 'inter8') afficherPartieInter(v); // Inter (8) : pas encore d'animations
+    else {
+      const avant = positionsAvant();
+      afficherPartie(v);
+      try { animer(ancienne, v, avant, finAvant); } catch (e) { console.error(e); }
+      try { sonner(ancienne, v); } catch (e) { console.error(e); }
+    }
     if (v.etat === 'finManche' || v.etat === 'finPartie') {
       // On laisse le temps de voir l'élimination avant d'ouvrir le bilan.
       const attente = retardFenetre - Date.now();
@@ -2045,7 +2082,8 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
         minuteurFenetre = setTimeout(() => { const w = vueActuelle; if (w && w.etat === 'finManche') afficherFinManche(w); else if (w && w.etat === 'finPartie') afficherFinPartie(w); }, attente);
       } else if (v.etat === 'finManche') afficherFinManche(v);
       else afficherFinPartie(v);
-    } else if (!($('fenetre').dataset.type === 'chat' && !$('voile').hidden && !(v.manche && v.manche.joueurCourant === v.moi))) fermerFenetre();
+    } else if (!($('fenetre').dataset.type === 'chat' && !$('voile').hidden && !(v.manche && v.manche.joueurCourant === v.moi))
+      && !($('fenetre').dataset.type === 'demande8' && !$('voile').hidden && v.manche && v.manche.joueurCourant === v.moi)) fermerFenetre();
     // (le chat reste ouvert pendant que les autres jouent, et se ferme quand c'est à toi)
   }
 
@@ -2286,7 +2324,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
     const jeSuisHote = v.hote === v.moi;
     $('noteHote').hidden = !jeSuisHote || MODE_SERVEUR; // avec le serveur Kopo, la partie ne tourne pas sur le téléphone de l'hôte
     const rg = $('reglage'); rg.replaceChildren(el('span', null, 'Chrono'));
-    for (const d of S.DELAIS) {
+    for (const d of modSalle(v).DELAIS) {
       const libelle = d ? d + ' s' : 'sans';
       if (jeSuisHote && !v.publique) {
         const b = el('button', 'btn' + (v.delai === d ? ' actif' : ''), libelle);
@@ -2294,9 +2332,22 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
         rg.append(b);
       } else if (v.delai === d) rg.append(el('strong', null, d ? d + ' secondes par joueur' : 'sans chrono'));
     }
+    // Inter (8) : le style de la partie (simple, ou délire avec le J retour), choisi par l'hôte.
+    const rs = $('reglageStyle'); rs.hidden = v.jeu !== 'inter8'; rs.replaceChildren();
+    if (v.jeu === 'inter8') {
+      rs.append(el('span', null, 'Style'));
+      for (const [mode, libelle] of [['simple', 'Simple'], ['delire', 'Délire (J retour)']]) {
+        if (jeSuisHote && !v.publique) {
+          const b = el('button', 'btn' + (v.mode === mode ? ' actif' : ''), libelle);
+          b.onclick = () => envoyer({ type: 'reglages', mode });
+          rs.append(b);
+        } else if (v.mode === mode) rs.append(el('strong', null, libelle));
+      }
+    }
+    const maxJoueurs = v.jeu === 'inter8' ? SI.MAX : 9;
     // « Prêt » : seulement indicatif (l'hôte lance quand il veut). On compte les invités humains, pas les robots.
     const invites = v.joueurs.filter((j) => j.id !== v.hote && !j.robot), prets = invites.filter((j) => j.pret).length;
-    $('titreJoueurs').textContent = `Joueurs (${v.joueurs.length}/${v.publique ? v.taille : 9})` + (invites.length && !v.publique ? ` · ${prets}/${invites.length} prêt${prets > 1 ? 's' : ''}` : '');
+    $('titreJoueurs').textContent = `Joueurs (${v.joueurs.length}/${v.publique ? v.taille : maxJoueurs})` + (invites.length && !v.publique ? ` · ${prets}/${invites.length} prêt${prets > 1 ? 's' : ''}` : '');
     const ul = $('listeJoueurs'); ul.replaceChildren();
     for (const j of v.joueurs) {
       const li = el('li');
@@ -2315,7 +2366,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       }
       ul.append(li);
     }
-    $('btnRobot').hidden = !jeSuisHote || v.joueurs.length >= 9 || v.publique;
+    $('btnRobot').hidden = !jeSuisHote || v.joueurs.length >= maxJoueurs || v.publique;
     $('btnLancer').hidden = !jeSuisHote || v.publique;
     $('btnLancer').disabled = v.joueurs.length < 2;
     $('btnLancer').textContent = v.joueurs.length < 2 ? 'En attente d\'au moins 2 joueurs' : `Lancer · ${v.joueurs.length} joueurs`;
@@ -2331,18 +2382,12 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
     $('attenteHote').textContent = moi.pret ? 'Tu es prêt. La partie part dès que l\'hôte lance.' : 'L\'hôte peut lancer à tout moment.';
   }
 
-  function afficherPartie(v) {
-    montrerEcran('ecranPartie');
-    if (!(v.manche && v.manche.joueurCourant === v.moi)) inviterPaysage();
-    const m = v.manche;
-    const finale = v.restants.length === 2;
-    $('info').innerHTML = '';
-    $('info').append(el('strong', null, finale ? 'Finale' : 'Manche ' + v.numeroManche), document.createTextNode(` · ${v.code}`));
-
-    // Sièges, en partant de moi, dans le sens des aiguilles d'une montre.
+  // Sièges autour de la table (Kopo et Inter (8)).
+  function dessinerSieges(v) {
+    const m = v.manche, pause = m.pause;
+    // En partant de moi, dans le sens des aiguilles d'une montre.
     const i0 = Math.max(0, m.sieges.indexOf(v.moi));
     const ordre = m.sieges.slice(i0).concat(m.sieges.slice(0, i0));
-    const pause = m.pause;
     const box = $('sieges'); box.replaceChildren();
     // En paysage, les adversaires sont placés sur le bord de la table, de ta gauche à ta droite.
     const autres = ordre.filter((id) => id !== v.moi);
@@ -2387,6 +2432,19 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       else if (joueur.absent && m.enJeu.includes(id)) d.append(el('span', 'pastille ko', 'absent · 5 s'));
       box.append(d);
     });
+
+  }
+
+  function afficherPartie(v) {
+    montrerEcran('ecranPartie');
+    if (!(v.manche && v.manche.joueurCourant === v.moi)) inviterPaysage();
+    const m = v.manche;
+    const finale = v.restants.length === 2;
+    $('info').innerHTML = '';
+    $('info').append(el('strong', null, finale ? 'Finale' : 'Manche ' + v.numeroManche), document.createTextNode(` · ${v.code}`));
+
+    const pause = m.pause;
+    dessinerSieges(v);
 
     // Table
     const ent = $('entete'); ent.replaceChildren();
@@ -2494,6 +2552,186 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
 
   }
 
+  // ------------------------------------------------------------------ Inter (8) : la table
+  // Même écran que Kopo (sièges, table, main, actions), avec les règles d'Inter (8) :
+  // une carte de référence au centre, la pioche, plusieurs cartes de même valeur posées ensemble,
+  // la valeur demandée avec le 8, et les boutons J'annonce et Contester.
+  const NOMS_VALEURS_INTER = { A: 'As', V: 'Valet', D: 'Dame', R: 'Roi', X: 'Joker' };
+  const estRougeInter = (c) => c.replace('*', '') === 'XR' || ['C', 'K'].includes(I8.couleur(c));
+  function carteInterEl(c, tag) {
+    const e = el(tag || 'div', 'carte' + (estRougeInter(c) ? ' rouge' : ''));
+    const v = I8.valeur(c);
+    if (v === 'X') {
+      e.classList.add('joker');
+      e.append(el('span', 'coin', 'JK'), el('span', 'centre', '★'));
+      e.setAttribute('aria-label', 'Joker ' + (estRougeInter(c) ? 'rouge' : 'noir'));
+    } else {
+      const sy = I8.SYMBOLES[I8.couleur(c)];
+      e.append(el('span', 'coin', v + sy), el('span', 'centre', ['V', 'D', 'R'].includes(v) ? v : sy));
+      e.setAttribute('aria-label', (NOMS_VALEURS_INTER[v] || v) + ' de ' + I8.NOMS_COULEURS[I8.couleur(c)]);
+    }
+    e.dataset.carte = c;
+    return e;
+  }
+  const rangInter = (c) => (I8.valeur(c) === 'X' ? 99 : I8.VALEURS.indexOf(I8.valeur(c)));
+  const coulInter = (c) => (I8.valeur(c) === 'X' ? 9 : I8.COULEURS.indexOf(I8.couleur(c)));
+  const trierMainInter = (main) => main.slice().sort(prefs.tri === 'valeur' ? (a, b) => rangInter(a) - rangInter(b) || coulInter(a) - coulInter(b) : (a, b) => coulInter(a) - coulInter(b) || rangInter(a) - rangInter(b));
+  const nomValeur = (v) => NOMS_VALEURS_INTER[v] || v;
+
+  let choixInter = []; // cartes touchées, dans l'ordre (la dernière donne la couleur)
+  // Coups « jouer » qui correspondent exactement aux cartes choisies (même première, même dernière).
+  function coupsPour(actions, choix) {
+    if (!choix.length) return [];
+    return actions.filter((a) => a.type === 'jouer' && a.cartes.length === choix.length && a.cartes[0] === choix[0]
+      && a.cartes[a.cartes.length - 1] === choix[choix.length - 1] && choix.every((c) => a.cartes.includes(c)));
+  }
+  // Une carte peut-elle rejoindre les cartes déjà choisies ?
+  function ajoutable(actions, choix, c) {
+    return actions.some((a) => a.type === 'jouer' && a.cartes.includes(c) && (!choix.length ? a.cartes[0] === c : a.cartes[0] === choix[0] && choix.every((x) => a.cartes.includes(x))));
+  }
+  function poserInter(coups) {
+    if (!coups.length) return;
+    const demandes = [...new Set(coups.map((a) => a.demande).filter(Boolean))];
+    const envoyerCoup = (a) => { choixInter = []; envoyer({ type: 'action', action: { type: 'jouer', cartes: a.cartes, demande: a.demande } }); };
+    if (!demandes.length) return envoyerCoup(coups[0]);
+    // Le 8 : on choisit la valeur demandée parmi celles qu'on a encore en main.
+    const grille = el('div', 'choix-demande');
+    for (const d of demandes) {
+      const b = el('button', 'btn large', nomValeur(d));
+      b.onclick = () => { fermerFenetre(); envoyerCoup(coups.find((a) => a.demande === d)); };
+      grille.append(b);
+    }
+    const annuler = el('button', 'btn large', 'Annuler');
+    annuler.onclick = fermerFenetre;
+    ouvrirFenetre([el('h2', null, 'Quelle valeur demandes-tu ?'), el('p', 'muted', 'Le joueur suivant doit poser cette valeur, un 8 ou un joker. Sinon il pioche.'), grille, annuler], 'demande8');
+  }
+
+  function afficherPartieInter(v) {
+    montrerEcran('ecranPartie');
+    if (!(v.manche && v.manche.joueurCourant === v.moi)) inviterPaysage();
+    const m = v.manche;
+    const finale = v.restants.length === 2;
+    $('info').innerHTML = '';
+    $('info').append(el('strong', null, finale ? 'Finale' : 'Manche ' + v.numeroManche), document.createTextNode(` · ${v.mode === 'delire' ? 'Délire' : 'Simple'} · ${v.code}`));
+    const pause = m.pause;
+    dessinerSieges(v);
+    // Qui a annoncé, et le sens du jeu (mode délire).
+    for (const id of m.annonces) { const d = siegeEl(id); if (d && !m.qualifies.some((q) => q.joueur === id)) d.append(el('span', 'pastille tour', 'annonce')); }
+    const qui = (id) => (id === v.moi ? 'Toi' : nom(v, id));
+
+    // En-tête : ce que la carte du centre impose.
+    const ent = $('entete'); ent.replaceChildren();
+    if (!pause && m.phase === 'jeu') {
+      if (m.demande) { const c = el('span', 'chip demande'); c.append('Demande ', el('b', null, nomValeur(m.demande.valeur)), ` · ${qui(m.demande.par)}`); ent.append(c); }
+      else if (m.libre) ent.append(el('span', 'chip', 'Jeu libre : pose la carte de ton choix'));
+      if (v.mode === 'delire' && m.enJeu.length > 2) { const c = el('span', 'chip'); c.append('Sens ', el('b', null, m.sens === 1 ? '↻' : '↺')); ent.append(c); }
+    }
+
+    // Table : compte à rebours de départ, ou la carte du centre et la pioche.
+    const poses = $('poses'); poses.replaceChildren(); poses.classList.remove('serre');
+    if (pause && pause.type === 'depart') {
+      const d = el('div', 'depart');
+      d.append(el('div', 'depart-titre', finale ? 'Finale' : 'Manche ' + v.numeroManche), el('div', 'decompte', ''),
+        avecIco(el('div', 'depart-qui'), 'depart', qui(m.joueurCourant)));
+      poses.append(d);
+    } else {
+      const t = el('div', 'table-inter');
+      const ref = el('div', 'pile');
+      if (m.reference) ref.append(carteInterEl(m.reference));
+      ref.append(el('span', 'legende', 'Au centre'));
+      const pioche = el('div', 'pile');
+      const dos = el('div', 'carte dos-carte');
+      pioche.append(dos, el('span', 'legende', `Pioche · ${m.pioche}`));
+      t.append(ref, pioche);
+      poses.append(t);
+      const fil = el('div', 'fil-inter');
+      m.journal.slice(-3).forEach((ligne) => fil.append(el('div', null, ligne)));
+      poses.append(fil);
+    }
+
+    // Consigne
+    const cons = $('consigne'); cons.replaceChildren();
+    const monTour = m.joueurCourant === v.moi;
+    const jeJoue = m.enJeu.includes(v.moi);
+    const actions = m.actions;
+    const coups = actions.filter((a) => a.type === 'jouer');
+    if (pause || m.phase !== 'jeu') {}
+    else if (!v.restants.includes(v.moi) || !jeJoue) cons.append(ico('oeil'), ' Tu regardes la partie.');
+    else if (monTour) {
+      if (v.chrono) cons.append(el('span', 'secondes', ''), ' ');
+      cons.append(el('em', null, 'À toi !'));
+      if (!coups.length) cons.append(m.aPioche ? ' Tu ne peux pas jouer la carte piochée : passe.' : ' Aucune carte ne va : pioche.');
+    }
+    $('barreChrono').hidden = !(v.chrono && monTour) && !pause;
+    $('barreChrono').classList.toggle('barre-pause', !!pause);
+    if (monTour && !pause && !etaitMonTour) { vibrer(120); Sons.jouer('tour'); fermerInvitationPaysage(); }
+    etaitMonTour = monTour && !pause;
+
+    // J'annonce et Contester : possibles à tout moment, même hors de son tour.
+    const zk = $('zoneKatapss'); zk.replaceChildren();
+    if (actions.some((a) => a.type === 'annoncer')) {
+      const b = el('button', 'btn katapss inter', "J'ANNONCE\u00a0!");
+      b.onclick = () => { b.disabled = true; envoyer({ type: 'action', action: { type: 'annoncer' } }); };
+      zk.append(b);
+    }
+    const contester = actions.find((a) => a.type === 'contester');
+    if (contester) {
+      const b = el('button', 'btn katapss inter contester', `CONTESTER ${nom(v, contester.cible).toUpperCase()}`);
+      b.onclick = () => { b.disabled = true; envoyer({ type: 'action', action: { type: 'contester' } }); };
+      zk.append(b);
+    }
+
+    // Main : on touche une ou plusieurs cartes de même valeur, dans l'ordre (la dernière donne la couleur).
+    $('zoneMain').hidden = !jeJoue;
+    choixInter = choixInter.filter((c) => m.main.includes(c));
+    if (!coups.length || (choixInter.length && !coups.some((a) => a.cartes[0] === choixInter[0] && choixInter.every((x) => a.cartes.includes(x))))) choixInter = [];
+    const choisis = coupsPour(actions, choixInter);
+    $('titreMain').textContent = `Ta main (${m.main.length} carte${m.main.length > 1 ? 's' : ''})` + (coups.length && !choixInter.length ? ' · touche une carte' : '');
+    const main = $('main'); main.replaceChildren();
+    const triee = trierMainInter(m.main);
+    triee.forEach((c, i) => {
+      const b = carteInterEl(c, 'button');
+      b.type = 'button';
+      const ecart = i - (triee.length - 1) / 2;
+      b.style.setProperty('--r', (ecart * Math.min(2.5, 16 / triee.length)).toFixed(1) + 'deg');
+      b.style.setProperty('--dy', (ecart * ecart * Math.min(1, 8 / triee.length)).toFixed(1) + 'px');
+      const k = choixInter.indexOf(c);
+      if (k >= 0) {
+        b.classList.add('jouable', 'choisie');
+        if (choixInter.length > 1) b.append(el('span', 'ordre', String(k + 1)));
+        b.onclick = () => {
+          if (choixInter.length === 1 && choisis.length) return poserInter(choisis); // deuxième touche : on pose
+          choixInter.splice(k, 1); afficherPartieInter(vueActuelle);
+        };
+      } else if (ajoutable(actions, choixInter, c)) {
+        b.classList.add('jouable');
+        b.onclick = () => { choixInter.push(c); afficherPartieInter(vueActuelle); };
+      } else if (monTour) b.disabled = true;
+      main.append(b);
+    });
+    ajusterMain();
+
+    const act = $('actions'); act.replaceChildren();
+    if (choisis.length) {
+      const val = I8.valeur(choixInter[0]);
+      const texte = choixInter.length === 1 ? `Poser le ${I8.afficher(choixInter[0])}` : `Poser ${choixInter.length} cartes (${nomValeur(val)})`;
+      const b = el('button', 'btn principal large', texte);
+      b.onclick = () => poserInter(choisis);
+      act.append(b);
+      if (choixInter.length > 1) act.append(el('small', 'muted', 'La dernière carte touchée donne la couleur.'));
+    }
+    if (actions.some((a) => a.type === 'piocher')) {
+      const b = el('button', 'btn principal large', 'Piocher une carte');
+      b.onclick = () => { b.disabled = true; envoyer({ type: 'action', action: { type: 'piocher' } }); };
+      act.append(b);
+    }
+    if (actions.some((a) => a.type === 'passer')) {
+      const b = el('button', 'btn large' + (coups.length ? '' : ' principal'), 'Passer');
+      b.onclick = () => { b.disabled = true; choixInter = []; envoyer({ type: 'action', action: { type: 'passer' } }); };
+      act.append(b);
+    }
+  }
+
   // Ta main sur une seule ligne : si les cartes ne tiennent pas, elles se chevauchent
   // (le coin de chaque carte reste visible). Au-delà, elles passent sur deux lignes.
   function ajusterMain() {
@@ -2505,7 +2743,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
     let parLigne = n;
     const paysage = matchMedia('(orientation: landscape)').matches;
     if (!paysage && (W - w) / (n - 1) < 30) parLigne = Math.ceil(n / 2);
-    const pas = Math.min(w + 6, Math.floor((W - w) / Math.max(1, parLigne - 1)));
+    const pas = Math.min(w, Math.floor((W - w) / Math.max(1, parLigne - 1))); // au plus la largeur d'une carte : sinon la dernière passe à la ligne
     main.style.setProperty('--pas', pas + 'px');
     main.classList.add('serree');
   }
@@ -5090,10 +5328,19 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
     $('niveauRobotsAide').textContent = AIDES_NIVEAU_ROBOTS[n] + ' Ils deviennent un peu plus forts à chaque niveau que tu gagnes (tu es niveau ' + monNiveau() + ').';
   }
   $('niveauRobots').querySelectorAll('button').forEach((b) => (b.onclick = () => { stock.ecrire('kopo-niveau-robots', b.dataset.v); majNiveauRobots(); }));
+  // Inter (8) : le style de la partie (gardé sur le téléphone), et 7 robots au plus (8 joueurs).
+  const styleInter = () => (stock.lire('kopo-inter8-style') === 'delire' ? 'delire' : 'simple');
+  function majStyleRobots() {
+    const inter = jeuChoisi() === 'inter8';
+    document.querySelectorAll('#voileRobots .style-inter').forEach((e) => (e.hidden = !inter));
+    $('styleRobots').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === styleInter())));
+    $('choixRobots').querySelectorAll('button').forEach((b) => (b.hidden = inter && +b.textContent > SI.MAX - 1));
+  }
+  $('styleRobots').querySelectorAll('button').forEach((b) => (b.onclick = () => { stock.ecrire('kopo-inter8-style', b.dataset.v); majStyleRobots(); }));
   $('btnModeRobots').onclick = () => {
     if (!lirePseudo()) return;
-    $('btnGuidee').hidden = !!lireProfil().premierePartie;
-    majNiveauRobots();
+    $('btnGuidee').hidden = !!lireProfil().premierePartie || jeuChoisi() === 'inter8';
+    majNiveauRobots(); majStyleRobots();
     $('voileRobots').hidden = false;
   };
   $('btnFermerRobots').onclick = () => ($('voileRobots').hidden = true);
@@ -5105,8 +5352,9 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       const p = lirePseudo(); if (!p) return;
       $('voileRobots').hidden = true;
       // Partie avec des robots : on crée la salle, on ajoute les robots et on lance tout de suite.
-      demarrerHote(nouveauCode(), p, false);
-      envoyer({ type: 'reglages', robots: niveauRobots(), niveau: monNiveau() });
+      const inter = jeuChoisi() === 'inter8';
+      demarrerHote(nouveauCode(), p, false, null, inter ? 'inter8' : 'kopo');
+      envoyer(Object.assign({ type: 'reglages', robots: niveauRobots(), niveau: monNiveau() }, inter ? { mode: styleInter() } : {}));
       for (let i = 0; i < n; i++) envoyer({ type: 'ajouterRobot' });
       envoyer({ type: 'lancer' });
     };
@@ -5125,7 +5373,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
 
   // ------------------------------------------------------------------ Masano : choix du jeu
   // L'accueil propose Kopo ou Inter (8). Le choix est gardé sur le téléphone. Tant que la table
-  // d'Inter (8) n'est pas prête dans l'appli, ses modes affichent « bientôt » (sauf Rejoindre).
+  // d'Inter (8) n'est pas prête en ligne, ses autres modes affichent « bientôt » (sauf Rejoindre et Contre les robots).
   const JEUX = ['kopo', 'inter8'];
   const textesModes = {
     kopo: { btnCreer: 'Entre amis, de 2 à 9', btnModeRobots: 'Partie rapide, seul' },
@@ -5142,9 +5390,9 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   const interBientot = (e) => {
     if (jeuChoisi() !== 'inter8') return;
     const cible = e.target.closest('#modes .mode, #btnRegles');
-    if (!cible || cible.id === 'btnModeRejoindre') return;
+    if (!cible || cible.id === 'btnModeRejoindre' || cible.id === 'btnModeRobots') return; // Rejoindre et Contre les robots sont ouverts
     e.preventDefault(); e.stopImmediatePropagation();
-    toast("Inter (8) arrive très bientôt : sa table est en préparation. En attendant, joue à Kopo !");
+    toast("Inter (8) entre amis et en ligne arrive très bientôt. En attendant, essaie-le contre les robots !");
   };
   $('modes').addEventListener('click', interBientot, true);
   $('btnRegles').addEventListener('click', interBientot, true);

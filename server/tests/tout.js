@@ -703,6 +703,15 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     await api('/admin/api/reglages/annonce', { methode: 'PUT', jeton: adminJeton, corps: { valeur: { texte: 'Tournoi samedi !', active: true } } });
     assert.strictEqual((await api('/api/config')).json.annonce, 'Tournoi samedi !');
   });
+  await test('réglages : la version minimale ne dépasse jamais la version actuelle de l\'appli', async () => {
+    const actuelle = (await api('/admin/api/reglages', { jeton: adminJeton })).json.versionAppli;
+    assert.ok(/^[0-9.]+$/.test(actuelle));
+    assert.strictEqual((await api('/admin/api/reglages/versionMin', { methode: 'PUT', jeton: adminJeton, corps: { valeur: '99.0' } })).statut, 400);
+    assert.strictEqual((await api('/admin/api/reglages/versionMin', { methode: 'PUT', jeton: adminJeton, corps: { valeur: 'abc' } })).statut, 400);
+    await api('/admin/api/reglages/versionMin', { methode: 'PUT', jeton: adminJeton, corps: { valeur: actuelle } });
+    assert.strictEqual((await api('/api/config')).json.versionMin, actuelle);
+    await api('/admin/api/reglages/versionMin', { methode: 'PUT', jeton: adminJeton, corps: { valeur: '1.0' } });
+  });
   await test('réglages : fenêtre « Nouveau » de la compétition, éteinte par défaut', async () => {
     assert.strictEqual((await api('/api/config')).json.nouveaute, null);
     await api('/admin/api/reglages/nouveaute', { methode: 'PUT', jeton: adminJeton, corps: { valeur: { bande: true, autre: '<b>' } } });
