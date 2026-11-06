@@ -128,11 +128,13 @@
     return choix.map((m) => ({ id: m.id, jour, avance: 0, finie: false }));
   }
   // Prépare les missions du jour : 3 nouvelles chaque jour, celles d'hier restent si pas finies.
+  // Une mission finie attend qu'on l'encaisse (aEncaisser), puis disparaît de la liste.
   function missionsDuJour(p, jour) {
     const ms = p.missions && typeof p.missions === 'object' ? p.missions : (p.missions = {});
     if (!Array.isArray(ms.liste)) ms.liste = [];
-    // On garde les missions encore valables (2 jours) et pas terminées ; les terminées du jour restent affichées.
-    ms.liste = ms.liste.filter((m) => modele(m.id) && ecart(m.jour, jour) >= 0 && ecart(m.jour, jour) < DUREE_MISSION && (!m.finie || m.jour === jour || m.finieLe === jour));
+    // On garde les missions pas finies encore valables (2 jours), et les finies tant qu'elles ne sont pas encaissées
+    // (une finie sans aEncaisser date d'avant l'encaissement : déjà payée, on la retire).
+    ms.liste = ms.liste.filter((m) => modele(m.id) && (m.finie ? !!m.aEncaisser : ecart(m.jour, jour) >= 0 && ecart(m.jour, jour) < DUREE_MISSION));
     if (ms.tire !== jour) {
       ms.tire = jour;
       ms.changeLe = null;
@@ -143,8 +145,22 @@
   }
   function vueMission(m, jour) {
     const md = modele(m.id);
-    return { id: m.id, texte: md.texte, cible: md.cible, avance: Math.min(m.avance, md.cible), finie: !!m.finie, pieces: md.pieces, xp: xpMission(md), hier: m.jour !== jour };
+    return { id: m.id, texte: md.texte, cible: md.cible, avance: Math.min(m.avance, md.cible), finie: !!m.finie, aEncaisser: !!(m.finie && m.aEncaisser), pieces: md.pieces, xp: xpMission(md), hier: m.jour !== jour, finieLe: m.finieLe || null };
   }
+  // Encaisser une mission finie : ses pièces et son XP, puis elle disparaît de la liste.
+  // Renvoie { id, texte, pieces, xp, finieLe, niveauAvant, niveauApres, objets } ou null (pas finie, déjà encaissée).
+  function encaisserMission(p, jour, id) {
+    missionsDuJour(p, jour);
+    const ms = p.missions;
+    const i = ms.liste.findIndex((m) => m.id === id && m.finie && m.aEncaisser);
+    if (i < 0) return null;
+    const m = ms.liste[i], md = modele(m.id);
+    ms.liste.splice(i, 1);
+    crediter(p, md.pieces);
+    const n = ajouterXp(p, xpMission(md));
+    return Object.assign({ id: m.id, texte: md.texte, pieces: md.pieces, xp: xpMission(md), finieLe: m.finieLe || jour }, n);
+  }
+  const aEncaisser = (p, jour) => missionsDuJour(p, jour).filter((m) => m.aEncaisser).length;
   // 1 bouton « Changer » par jour pour remplacer une mission pas commencée qui ne plaît pas.
   function peutChanger(p, jour) { return !!(p.missions && p.missions.tire === jour && p.missions.changeLe !== jour); }
   function changerMission(p, jour, id) {
@@ -248,6 +264,15 @@
   }
 
   const STATS0 = { parties: 0, victoires: 0, finales: 0, manchesSurvecues: 0, katapss: 0, eliminePremier: 0 };
+  // Ajoute de l'XP ; les objets des niveaux franchis sont donnés (et équipés).
+  function ajouterXp(p, n) {
+    const avant = p.xp || 0;
+    p.xp = avant + n;
+    const niveauAvant = niveauDe(avant), niveauApres = niveauDe(p.xp);
+    const objets = [];
+    for (let k = niveauAvant.niveau + 1; k <= niveauApres.niveau; k++) if (OBJETS_NIVEAU[k] && donnerObjet(p, OBJETS_NIVEAU[k])) objets.push(OBJETS_NIVEAU[k]);
+    return { niveauAvant, niveauApres, objets };
+  }
   // Enregistre une partie terminée. Renvoie le récap à montrer (XP, missions, défi, face-à-face).
   function enregistrerPartie(p, e, jour) {
     if (e.place < 1) return null;
@@ -296,8 +321,9 @@
       if (!n) continue;
       const avant = m.avance;
       m.avance = Math.min(md.cible, m.avance + n);
-      if (m.avance >= md.cible) { m.finie = true; m.finieLe = jour; piecesGagnees += md.pieces; xpMissions += xpMission(md); }
-      missions.push({ texte: md.texte, avant, apres: m.avance, cible: md.cible, finie: m.finie, pieces: md.pieces });
+      // Finie : les pièces et l'XP attendent que le joueur encaisse la mission (fenêtre Missions).
+      if (m.avance >= md.cible) { m.finie = true; m.finieLe = jour; m.aEncaisser = true; }
+      missions.push({ texte: md.texte, avant, apres: m.avance, cible: md.cible, finie: m.finie, aEncaisser: m.finie, pieces: md.pieces });
     }
     // Défi de la semaine
     defiSemaine(p, jour);
@@ -313,10 +339,8 @@
       }
     }
     if (piecesGagnees) crediter(p, piecesGagnees);
-    p.xp = xpAvant + xp + xpMissions;
-    const nAvant = niveauDe(xpAvant), nApres = niveauDe(p.xp);
-    const objets = [];
-    for (let n = nAvant.niveau + 1; n <= nApres.niveau; n++) if (OBJETS_NIVEAU[n] && donnerObjet(p, OBJETS_NIVEAU[n])) objets.push(OBJETS_NIVEAU[n]);
+    p.xp = xpAvant;
+    const { niveauAvant: nAvant, niveauApres: nApres, objets } = ajouterXp(p, xp + xpMissions);
     return {
       xpPartie: xp, xpMissions, xpAvant, xpApres: p.xp, niveauAvant: nAvant, niveauApres: nApres,
       missions, defi, piecesGagnees, faceAFace, objets, premiere,
@@ -419,7 +443,7 @@
     jourDe, decaler, ecart, semaineDe, hasard,
     XP, xpPourNiveau, niveauDe,
     OBJETS, OBJETS_NIVEAU, CATEGORIES, parCategorie, collection, donnerObjet, equiper,
-    MODELES, missionsDuJour, peutChanger, changerMission,
+    MODELES, missionsDuJour, peutChanger, changerMission, encaisserMission, aEncaisser,
     DEFIS, defiSemaine,
     BIENVENUE, bienvenue, recevoirBienvenue,
     gainBonus, bonusDuJour, jokerLibre, pieces,

@@ -112,7 +112,7 @@ test('Les jours suivants donnent d\'autres tirages', () => {
   for (let i = 0; i < 10; i++) tirages.add(R.missionsDuJour(profil(), R.decaler('2026-10-31', i)).map((m) => m.id).sort().join());
   assert.ok(tirages.size >= 6);
 });
-test('Une mission finie rapporte ses pièces et son XP une seule fois', () => {
+test('Une mission finie attend d\'être encaissée, rapporte une seule fois, puis disparaît', () => {
   const p = profil(); p.premierePartie = 'x';
   const ms = R.missionsDuJour(p, '2026-10-31');
   const jouer = ms.find((m) => /^jouer/.test(m.id));
@@ -120,8 +120,38 @@ test('Une mission finie rapporte ses pièces et son XP une seule fois', () => {
   let gagne = 0;
   for (let i = 0; i < jouer.cible + 2; i++) gagne += R.enregistrerPartie(p, partie({ manches: 0 }), '2026-10-31').missions.filter((m) => m.texte === jouer.texte && m.finie && m.apres > m.avant).length;
   assert.strictEqual(gagne, 1);
-  assert.ok(R.pieces(p).solde - solde0 >= jouer.pieces);
-  assert.ok(R.missionsDuJour(p, '2026-10-31').find((m) => m.id === jouer.id).finie);
+  // Rien n'est versé tant qu'on n'encaisse pas.
+  assert.strictEqual(R.pieces(p).solde, solde0);
+  const vue = R.missionsDuJour(p, '2026-10-31').find((m) => m.id === jouer.id);
+  assert.ok(vue.finie && vue.aEncaisser);
+  assert.strictEqual(R.aEncaisser(p, '2026-10-31'), 1);
+  const xp0 = p.xp;
+  const e = R.encaisserMission(p, '2026-10-31', jouer.id);
+  assert.strictEqual(e.pieces, jouer.pieces);
+  assert.strictEqual(R.pieces(p).solde - solde0, jouer.pieces);
+  assert.strictEqual(p.xp - xp0, jouer.xp);
+  assert.ok(!R.missionsDuJour(p, '2026-10-31').some((m) => m.id === jouer.id));
+  assert.strictEqual(R.encaisserMission(p, '2026-10-31', jouer.id), null);
+  assert.strictEqual(R.pieces(p).solde - solde0, jouer.pieces);
+  assert.strictEqual(R.aEncaisser(p, '2026-10-31'), 0);
+});
+test('Une mission finie pas encaissée reste là les jours suivants ; une pas finie ne s\'encaisse pas', () => {
+  const p = profil(); p.premierePartie = 'x';
+  const jouer = R.missionsDuJour(p, '2026-10-31').find((m) => /^jouer/.test(m.id));
+  const autre = R.missionsDuJour(p, '2026-10-31').find((m) => m.id !== jouer.id);
+  assert.strictEqual(R.encaisserMission(p, '2026-10-31', autre.id), null);
+  for (let i = 0; i < jouer.cible; i++) R.enregistrerPartie(p, partie({ manches: 0 }), '2026-10-31');
+  const plusTard = R.missionsDuJour(p, '2026-11-04');
+  assert.ok(plusTard.find((m) => m.id === jouer.id && m.aEncaisser));
+  assert.ok(R.encaisserMission(p, '2026-11-04', jouer.id));
+});
+test('Les missions finies d\'avant l\'encaissement (déjà payées) disparaissent', () => {
+  const p = profil();
+  R.missionsDuJour(p, '2026-10-31');
+  p.missions.liste[0].finie = true; p.missions.liste[0].finieLe = '2026-10-31';
+  const solde0 = R.pieces(p).solde;
+  assert.strictEqual(R.missionsDuJour(p, '2026-10-31').length, 2);
+  assert.strictEqual(R.pieces(p).solde, solde0);
 });
 test('Les missions pas finies restent un jour de plus (on peut rater un jour)', () => {
   const p = profil();
