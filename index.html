@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#10233a">
 <meta name="description" content="Le Kopo, jeu de cartes de 2 à 9 joueurs, entre amis ou en ligne.">
 <link rel="icon" href="icons/masano-logo.svg" type="image/svg+xml">
@@ -39,6 +39,7 @@ body {
 button { font: inherit; cursor: pointer; }
 button:focus-visible, input:focus-visible { outline: 3px solid var(--brass); outline-offset: 2px; }
 [hidden] { display: none !important; }
+html, body { touch-action: manipulation; } /* pas de zoom au double toucher (on touche souvent deux fois une carte) */
 .app { max-width: 720px; margin: 0 auto; padding: 10px 12px 24px; display: grid; gap: 12px; }
 header { display: flex; align-items: center; gap: 10px; }
 .logo { font-family: var(--display); font-size: 36px; letter-spacing: 3px; color: var(--brass); line-height: 1; display: flex; align-items: center; gap: .22em; }
@@ -6494,7 +6495,7 @@ var qrcode = function() {
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = '008a86e4cd8f'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = '9d1626846193'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
@@ -7922,6 +7923,10 @@ var qrcode = function() {
       } else if (ajoutable(actions, choixInter, c)) {
         b.classList.add('jouable');
         b.onclick = () => { choixInter.push(c); afficherPartieInter(vueActuelle); };
+      } else if (choixInter.length && ajoutable(actions, [], c)) {
+        // Une autre carte jouable (d'une autre valeur) : elle remplace la sélection.
+        b.classList.add('jouable');
+        b.onclick = () => { choixInter = [c]; afficherPartieInter(vueActuelle); };
       } else if (monTour) b.disabled = true;
       main.append(b);
     });
@@ -7934,9 +7939,13 @@ var qrcode = function() {
       const b = el('button', 'btn principal large', texte);
       b.onclick = () => poserInter(choisis);
       act.append(b);
+      const annuler = el('button', 'btn large', 'Reprendre ' + (choixInter.length > 1 ? 'les cartes' : 'la carte'));
+      annuler.onclick = () => { choixInter = []; afficherPartieInter(vueActuelle); };
+      act.append(annuler);
       if (choixInter.length === 2) act.append(el('small', 'muted', 'Plusieurs cartes : la couleur change toute seule.'));
       else if (choixInter.length > 2) act.append(el('small', 'muted', 'Tu choisiras la nouvelle couleur.'));
     }
+    else if (choixInter.length) { const annuler = el('button', 'btn large', 'Reprendre les cartes'); annuler.onclick = () => { choixInter = []; afficherPartieInter(vueActuelle); }; act.append(annuler); }
     if (actions.some((a) => a.type === 'piocher')) {
       const b = el('button', 'btn principal large', 'Piocher une carte');
       b.onclick = () => { b.disabled = true; envoyer({ type: 'action', action: { type: 'piocher' } }); };
