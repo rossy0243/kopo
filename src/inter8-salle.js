@@ -97,6 +97,9 @@
     const m = s.manche;
     // Plusieurs cartes posées d'un coup : elles sont d'abord montrées en éventail à toute la table.
     if (action.type === 'jouer' && action.cartes.length > 1 && s.robotPret && !(s.pauseRobot >= 0)) s.robotPret += PAUSE_EVENTAIL;
+    // Pendant ces 3 s, personne (humain ou robot) ne peut contester ; ensuite, tout le monde peut.
+    if (m && m.contestable && m.contestable !== contestableAvant) s.annonceJusqua = estRobot(s, m.contestable) ? null : s.horloge() + DELAI_ANNONCE;
+    if (!m || !m.contestable) s.annonceJusqua = null;
     if (m && m.contestable && m.contestable !== contestableAvant && !estRobot(s, m.contestable) && s.robotPret) {
       s.robotPret = Math.max(s.robotPret, s.horloge() + DELAI_ANNONCE);
     }
@@ -114,6 +117,12 @@
   }
 
   function tic(s) {
+    // Fin des 3 s pour annoncer : le bouton « Contester » apparaît chez les autres (la vue change).
+    const finAnnonce = !!(s.annonceJusqua && s.horloge() >= s.annonceJusqua);
+    if (finAnnonce) s.annonceJusqua = null;
+    return avancer(s) || finAnnonce;
+  }
+  function avancer(s) {
     if (s.etat === 'salon' && s.publique) {
       if (s.joueurs.length >= s.taille) { lancer(s); return true; }
       return false;
@@ -173,6 +182,7 @@
     const premier = choisirPremier(s, sieges);
     s.numeroManche++;
     s.suiteA = null;
+    s.annonceJusqua = null;
     s.manche = I.nouvelleManche(sieges, mains, pioche, premier, { mode: s.mode, graine: Math.floor(s.rng() * 4294967296) });
     s.etat = 'manche';
     s.pause = s.durees.depart > 0 ? { type: 'depart', jusqua: s.horloge() + s.durees.depart, total: s.durees.depart } : null;
@@ -374,6 +384,7 @@
         // Le joueur ne peut agir que pour lui-même : on impose son id.
         const action = actionDe(id, msg.action || {});
         if (!action) return { ok: false, erreur: 'Action impossible maintenant.' };
+        if (action.type === 'contester' && enGraceAnnonce(s)) return { ok: false, erreur: 'Laisse-lui 3 secondes pour annoncer.' };
         try {
           appliquer(s, action);
           revenu(s, id);
@@ -403,6 +414,8 @@
       return t.replace('mode delire', 'mode délire (J retour)');
     });
   }
+
+  const enGraceAnnonce = (s) => !!(s.annonceJusqua && s.horloge() < s.annonceJusqua);
 
   // Vue envoyée à un joueur : uniquement ce qu'il a le droit de voir.
   function vue(s, id) {
@@ -454,7 +467,8 @@
         dernier: p.dernier, // qui a posé la carte du centre
         paquets: p.paquets,
         pause: s.pause ? { type: s.pause.type, resteMs: Math.max(0, s.pause.jusqua - s.horloge()), totalMs: s.pause.total } : null,
-        actions: s.pause ? [] : I.actionsPossibles(m, id).map((a) => {
+        annonce: enGraceAnnonce(s) ? { resteMs: s.annonceJusqua - s.horloge(), totalMs: DELAI_ANNONCE } : null,
+        actions: s.pause ? [] : I.actionsPossibles(m, id).filter((a) => !(a.type === 'contester' && enGraceAnnonce(s))).map((a) => {
           const r = { type: a.type };
           if (a.cartes) r.cartes = a.cartes.slice();
           if (a.demande) r.demande = a.demande;

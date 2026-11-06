@@ -231,6 +231,8 @@ header .vocal .btn { padding: 5px 9px; font-size: 15px; line-height: 1.2; }
 .main { padding-top: 12px; margin-top: -12px; }
 .main.serree { gap: 6px 0; padding-right: calc(66px - var(--pas, 66px)); }
 .main.serree .carte { margin-right: calc(var(--pas, 66px) - 66px); }
+/* Main serrée : une carte choisie monte sans passer devant sa voisine (son coin reste à toucher). */
+.main.serree .carte.choisie { z-index: auto; }
 .actions { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
 .actions .btn.large { font-size: 16px; padding: 13px 8px; }
 body.en-jeu .app { height: 100vh; height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 8px; padding: 6px 8px 8px; }
@@ -2839,6 +2841,11 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       const b = el('button', 'btn katapss inter contester', `CONTESTER ${nom(v, contester.cible).toUpperCase()}`);
       b.onclick = () => { b.disabled = true; envoyer({ type: 'action', action: { type: 'contester' } }); };
       zk.append(b);
+    } else if (m.annonce && m.contestable && m.contestable !== v.moi && jeJoue) {
+      // Les 3 premières secondes sont pour lui : il peut encore toucher « J'annonce ».
+      const b = el('button', 'btn katapss inter contester', `CONTESTER ${nom(v, m.contestable).toUpperCase()} (dans 3 s)`);
+      b.disabled = true;
+      zk.append(b);
     }
 
     // Main : on touche une ou plusieurs cartes de même valeur ; l'appli met dans l'ordre qui change la couleur.
@@ -2846,6 +2853,8 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
     choixInter = choixInter.filter((c) => m.main.includes(c));
     if (!coups.length || (choixInter.length && !coups.some((a) => choixInter.every((x) => a.cartes.includes(x))))) choixInter = [];
     const choisis = coupsPour(actions, choixInter);
+    // Cartes de même valeur qu'on peut encore ajouter aux cartes choisies.
+    const encore = choixInter.length ? m.main.filter((c) => !choixInter.includes(c) && ajoutable(actions, choixInter, c)) : [];
     $('titreMain').textContent = `Ta main (${m.main.length} carte${m.main.length > 1 ? 's' : ''})` + (coups.length && !choixInter.length ? ' · touche une carte' : '');
     const main = $('main'); main.replaceChildren();
     const triee = trierMainInter(m.main);
@@ -2860,7 +2869,9 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       if (k >= 0) {
         b.classList.add('jouable', 'choisie');
         b.onclick = () => {
-          if (choixInter.length === 1 && choisis.length) return poserInter(choisis); // deuxième touche : on pose
+          // Deuxième touche : on pose, sauf s'il reste des cartes de même valeur à ajouter
+          // (une main serrée : on retouche souvent la même carte en visant sa voisine).
+          if (choixInter.length === 1 && choisis.length && !encore.length) return poserInter(choisis);
           choixInter.splice(k, 1); afficherPartieInter(vueActuelle);
         };
       } else if (ajoutable(actions, choixInter, c)) {
@@ -2876,6 +2887,13 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
     ajusterMain();
 
     const act = $('actions'); act.replaceChildren();
+    if (encore.length) {
+      // Un seul geste pour prendre toutes les cartes de cette valeur (la plus grande pose possible).
+      const plusGrand = actions.filter((a) => a.type === 'jouer' && choixInter.every((x) => a.cartes.includes(x))).reduce((g, a) => (a.cartes.length > g.cartes.length ? a : g));
+      const tous = el('button', 'btn large' + (choisis.length ? '' : ' principal'), `Prendre les ${plusGrand.cartes.length} cartes (${nomValeur(I8.valeur(choixInter[0]))})`);
+      tous.onclick = () => { choixInter = plusGrand.cartes.slice(); afficherPartieInter(vueActuelle); };
+      act.append(tous);
+    }
     if (choisis.length) {
       const val = I8.valeur(choixInter[0]);
       const texte = choixInter.length === 1 ? `Poser le ${I8.afficher(choixInter[0])}` : `Poser ${choixInter.length} cartes (${nomValeur(val)})`;
