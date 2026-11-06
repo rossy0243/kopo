@@ -95,7 +95,7 @@
       joueurCourant: premier,
       aPioche: null, // carte piochée par le joueur courant pendant ce tour
       annonces: [], // joueurs qui ont annoncé
-      contestable: null, // joueur qui n'a pas annoncé et peut être contesté
+      contestables: [], // joueurs qui n'ont pas annoncé et peuvent être contestés
       qualifies: [],
       elimine: null,
       phase: 'jeu', // 'jeu' | 'terminee' | 'nulle'
@@ -175,11 +175,23 @@
     return false;
   }
 
+  // Joueurs qu'on peut contester : ils peuvent finir au prochain coup sans avoir annoncé.
+  // (Une partie sauvegardée avant les listes avait un seul « contestable ».)
+  function contestables(m) {
+    const liste = m.contestables || (m.contestable ? [m.contestable] : []);
+    return liste.filter((j) => m.enJeu.includes(j) && !m.annonces.includes(j) && finissable(m.mains[j]));
+  }
+  function majContestables(m) {
+    m.contestables = contestables(m);
+    delete m.contestable;
+  }
+
   // Fin du tour de « joueur » : s'il peut finir au prochain coup sans avoir annoncé,
-  // les autres peuvent le contester jusqu'à ce que le joueur suivant ait joué.
+  // les autres peuvent le contester jusqu'à son prochain tour (même si d'autres ont joué entre-temps).
   function finDeTour(m, joueur, prochain) {
     m.aPioche = null;
-    if (m.enJeu.includes(joueur) && !m.annonces.includes(joueur) && finissable(m.mains[joueur])) m.contestable = joueur;
+    majContestables(m);
+    if (m.enJeu.includes(joueur) && !m.annonces.includes(joueur) && finissable(m.mains[joueur]) && !m.contestables.includes(joueur)) m.contestables.push(joueur);
     m.joueurCourant = prochain;
   }
 
@@ -312,7 +324,7 @@
     const actions = [];
     if (m.phase !== 'jeu' || !m.enJeu.includes(joueur)) return actions;
     if (!m.annonces.includes(joueur) && finissable(m.mains[joueur])) actions.push({ type: 'annoncer', joueur });
-    if (m.contestable && m.contestable !== joueur) actions.push({ type: 'contester', joueur, cible: m.contestable });
+    for (const c of contestables(m)) if (c !== joueur) actions.push({ type: 'contester', joueur, cible: c });
     if (joueur !== m.joueurCourant) return actions;
     const coups = coupsJouer(m, joueur);
     actions.push(...coups);
@@ -328,22 +340,26 @@
     if (action.type === 'annoncer') {
       if (m.annonces.includes(j) || !finissable(m.mains[j])) throw new Error(`Action interdite : ${JSON.stringify(action)}`);
       m.annonces.push(j);
-      if (m.contestable === j) m.contestable = null;
+      majContestables(m);
       noter(m, `${j} annonce : il peut sortir au prochain coup.`);
       return m;
     }
     if (action.type === 'contester') {
-      const cible = m.contestable;
-      if (!cible || cible === j || (action.cible && action.cible !== cible)) throw new Error(`Action interdite : ${JSON.stringify(action)}`);
-      m.contestable = null;
+      const liste = contestables(m).filter((c) => c !== j);
+      const cible = action.cible || liste[0];
+      if (!cible || !liste.includes(cible)) throw new Error(`Action interdite : ${JSON.stringify(action)}`);
       piocherCartes(m, cible, 1);
+      // Une seule amende par oubli, même s'il peut encore finir avec la carte piochée.
+      m.contestables = contestables(m).filter((c) => c !== cible);
+      delete m.contestable;
       noter(m, `${j} conteste : ${cible} n'avait pas annoncé et pioche 1 carte d'amende.`);
       return m;
     }
 
     if (j !== m.joueurCourant) throw new Error(`Action interdite : ${JSON.stringify(action)}`);
-    // Le joueur suivant agit : on ne peut plus contester le joueur précédent.
-    if (m.contestable !== j) m.contestable = null;
+    // Son propre tour revient : on ne peut plus le contester pour l'oubli précédent.
+    m.contestables = contestables(m).filter((c) => c !== j);
+    delete m.contestable;
 
     if (action.type === 'piocher') {
       if (m.aPioche || coupsJouer(m, j).length) throw new Error(`Action interdite : ${JSON.stringify(action)}`);
@@ -425,7 +441,7 @@
       joueurCourant: m.joueurCourant,
       aPioche: m.joueurCourant === joueur ? m.aPioche : null,
       annonces: m.annonces.slice(),
-      contestable: m.contestable,
+      contestables: contestables(m),
       qualifies: m.qualifies.slice(),
       phase: m.phase,
       posees: m.vu.posees.slice(),

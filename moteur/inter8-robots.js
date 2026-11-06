@@ -35,7 +35,7 @@
     return prochain({ ...v, sens: -v.sens });
   }
   // Le prochain joueur est dangereux : il a annoncé ou n'a presque plus de cartes.
-  const menace = (v, j) => !!j && (v.annonces.includes(j) || v.contestable === j || v.nbCartes[j] <= 2);
+  const menace = (v, j) => !!j && (v.annonces.includes(j) || (v.contestables || []).includes(j) || v.nbCartes[j] <= 2);
 
   // Annonces et contestations (hors de son tour aussi).
   function horsTour(actions, annonce, conteste, rng) {

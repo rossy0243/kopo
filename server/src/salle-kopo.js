@@ -349,7 +349,7 @@ class SalleKopo extends Room {
     }
     // Parcours de saison : XP pour les parties entre humains (pas de robots, comme pour les pièces).
     let xps = new Map();
-    if (parcours && this.jeu === 'kopo' && !avecRobots && humains.length >= 2) { // Inter (8) : à l'étape de la progression
+    if (parcours && !avecRobots && humains.length >= 2) { // Kopo et Inter (8) : un seul parcours de saison, partagé
       xps = await parcours.enregistrerPartie(p.id, humains.map((id) => {
         const pl = place(id);
         return { id, place: pl, abandon: p.abandons.has(id), manchesSurvecues: !pl ? 0 : pl === 1 ? s.numeroManche : s.elimines.indexOf(id) };

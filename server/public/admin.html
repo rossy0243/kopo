@@ -174,8 +174,8 @@ const afficher = {
         <div class="tuiles">${tuile(nb(d.joueursConnectes), 'joueurs connectés')}${tuile(nb(d.salles), 'tables ouvertes')}${tuile(nb(d.sallesParEtat.manche || 0), 'parties en cours')}${tuile(nb(d.enAttenteAdversaires), "en attente d'adversaires")}</div>
         <h3>Serveur</h3><p class="muted">En marche depuis ${Math.floor(d.serveur.demarreIl / 3600)} h ${Math.floor((d.serveur.demarreIl % 3600) / 60)} min · mémoire ${d.serveur.memoireMo} Mo · base : ${d.serveur.base === 'postgres' ? 'Supabase' : '<span class="ko">en mémoire (essai, rien n\'est gardé)</span>'}</p>
         <h3>Tables</h3>
-        <div class="carte"><table><tr><th>Code</th><th>Type</th><th>État</th><th class="n">Manche</th><th>Joueurs</th></tr>
-        ${lignes('tables', d.tables, (t) => `<tr><td>${esc(t.code)}</td><td>${t.publique ? 'Inconnus' : 'Entre amis'}</td><td>${esc(t.etat)}</td><td class="n">${t.manche}</td><td>${t.joueurs.map((j) => j.robot ? `<span class="muted">${esc(j.nom)}</span>` : `<button class="lien" data-joueur="${esc(j.id)}">${esc(j.nom)}</button>${j.connecte ? '' : ' <span class="ko">(coupé)</span>'}`).join(', ')}</td></tr>`, { par: 20, colonnes: 5, vide: '<tr><td colspan="5" class="muted">Aucune table ouverte.</td></tr>' })}
+        <div class="carte"><table><tr><th>Code</th><th>Jeu</th><th>Type</th><th>État</th><th class="n">Manche</th><th>Joueurs</th></tr>
+        ${lignes('tables', d.tables, (t) => `<tr><td>${esc(t.code)}</td><td>${t.jeu === 'inter8' ? 'Inter (8)' : 'Kopo'}</td><td>${t.publique ? 'Inconnus' : 'Entre amis'}</td><td>${esc(t.etat)}</td><td class="n">${t.manche}</td><td>${t.joueurs.map((j) => j.robot ? `<span class="muted">${esc(j.nom)}</span>` : `<button class="lien" data-joueur="${esc(j.id)}">${esc(j.nom)}</button>${j.connecte ? '' : ' <span class="ko">(coupé)</span>'}`).join(', ')}</td></tr>`, { par: 20, colonnes: 6, vide: '<tr><td colspan="5" class="muted">Aucune table ouverte.</td></tr>' })}
         </table></div><p class="muted">Mis à jour toutes les 5 secondes.</p>`;
       lierJoueurs();
     };
@@ -193,8 +193,8 @@ const afficher = {
       <p class="muted">Repères pour un jeu mobile : J1 autour de 30 à 40 %, J7 autour de 10 à 15 %, J30 autour de 5 %.</p>
       <h3>30 derniers jours</h3>
       <div class="carte">${graphe(a.parJour, [{ cle: 'actifs', nom: 'Joueurs actifs', couleur: '#e2b04a' }, { cle: 'nouveaux', nom: 'Nouveaux', couleur: '#9fb2c8' }])}</div>
-      <div class="carte">${graphe(a.parJour, [{ cle: 'parties', nom: 'Parties jouées', couleur: '#e2b04a' }, { cle: 'parties_robots', nom: 'dont avec robots', couleur: '#9fb2c8' }])}</div>
-      <div class="tuiles">${tuile(a.parties.duree_min + ' min', 'durée moyenne d\'une partie')}${tuile(a.parties.joueurs_moyens, 'joueurs par partie')}${tuile(nb(a.parties.abandons), 'abandons en cours de partie')}</div>`;
+      <div class="carte">${graphe(a.parJour, [{ cle: 'parties', nom: 'Parties jouées', couleur: '#e2b04a' }, { cle: 'parties_robots', nom: 'dont avec robots', couleur: '#9fb2c8' }, { cle: 'parties_inter8', nom: 'dont Inter (8)', couleur: '#6fbf8f' }])}</div>
+      <div class="tuiles">${tuile(a.parties.duree_min + ' min', 'durée moyenne d\'une partie')}${tuile(a.parties.joueurs_moyens, 'joueurs par partie')}${tuile(nb(a.parties.abandons), 'abandons en cours de partie')}${tuile(nb(a.parties.kopo || 0), 'parties de Kopo', 'sur 30 jours')}${tuile(nb(a.parties.inter8 || 0), "parties d'Inter (8)", 'sur 30 jours')}</div>`;
   },
 
   async economie() {
@@ -310,7 +310,7 @@ const afficher = {
       <h3>Sanctions${sur(f.sanctions.length, f.stats.sanctions)}</h3>
       <div class="carte"><table>${lignes('sanctions', f.sanctions, (s) => `<tr><td>${date(s.cree_le)}</td><td>${esc(s.type)}</td><td>${esc(s.motif)}</td><td>${s.jusqu ? "jusqu'au " + date(s.jusqu) : ''}</td></tr>`, { par: 5, colonnes: 4, vide: '<tr><td class="muted">Aucune.</td></tr>' })}</table></div>
       <h3>Dernières parties${sur(f.parties.length, f.stats.parties)}</h3>
-      <div class="carte"><table><tr><th>Date</th><th>Code</th><th class="n">Joueurs</th><th class="n">Place</th><th></th></tr>${lignes('parties', f.parties, (p) => `<tr><td>${date(p.debut)}</td><td>${esc(p.code)}</td><td class="n">${p.nb_joueurs}</td><td class="n">${p.place ?? '—'}</td><td>${p.avec_robots ? '<span class="muted">robots</span>' : ''}${p.abandon ? ' <span class="ko">abandon</span>' : ''}</td></tr>`, { colonnes: 5, vide: '<tr><td class="muted">Aucune.</td></tr>' })}</table></div>
+      <div class="carte"><table><tr><th>Date</th><th>Jeu</th><th>Code</th><th class="n">Joueurs</th><th class="n">Place</th><th></th></tr>${lignes('parties', f.parties, (p) => `<tr><td>${date(p.debut)}</td><td>${p.jeu === 'inter8' ? 'Inter (8)' : 'Kopo'}</td><td>${esc(p.code)}</td><td class="n">${p.nb_joueurs}</td><td class="n">${p.place ?? '—'}</td><td>${p.avec_robots ? '<span class="muted">robots</span>' : ''}${p.abandon ? ' <span class="ko">abandon</span>' : ''}</td></tr>`, { colonnes: 6, vide: '<tr><td class="muted">Aucune.</td></tr>' })}</table></div>
       <h3>Registre des pièces${sur(f.pieces.length, f.stats.operations)}</h3>
       <div class="carte"><table><tr><th>Date</th><th>Motif</th><th class="n">Montant</th><th></th></tr>${lignes('pieces', f.pieces, (p) => `<tr><td>${date(p.cree_le)}</td><td>${esc(MOTIFS[p.motif] || p.motif)}</td><td class="n ${p.montant < 0 ? 'ko' : 'ok'}">${p.montant > 0 ? '+' : ''}${nb(p.montant)}</td><td class="muted">${p.par_admin ? 'admin · ' + esc(p.ref || '') : ''}</td></tr>`, { colonnes: 4, vide: '<tr><td class="muted">Aucune opération.</td></tr>' })}</table></div>`;
     $('#retour').onclick = () => aller('joueurs');

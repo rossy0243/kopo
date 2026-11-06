@@ -338,7 +338,7 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
   });
 
   console.log('Inter (8) sur le serveur');
-  await test('Inter (8) entre amis : partie complète en délire, gains, partie notée « inter8 », pas de parcours', async () => {
+  await test('Inter (8) entre amis : partie complète en délire, gains, partie notée « inter8 », XP du parcours de saison', async () => {
     const js = [await invite('Inter_A'), await invite('Inter_B'), await invite('Inter_C')];
     const fin = await jouerPartie(js, { jeu: 'inter8', reglages: { mode: 'delire' } });
     assert.strictEqual(fin.jeu, 'inter8');
@@ -348,8 +348,9 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.strictEqual((await srv.comptes.lire(ordre[1])).solde, 500 + 5 + 15, '2e');
     const r = (await srv.base.query('SELECT jeu FROM parties ORDER BY debut DESC LIMIT 1')).rows[0];
     assert.strictEqual(r.jeu, 'inter8');
-    const xp = (await srv.base.query('SELECT count(*)::int AS n FROM parcours_parties WHERE compte_id = $1', [ordre[0]])).rows[0].n;
-    assert.strictEqual(xp, 0);
+    const xp = (await srv.base.query('SELECT xp FROM parcours_parties WHERE compte_id = $1', [ordre[0]])).rows;
+    assert.strictEqual(xp.length, 1, 'la partie compte pour le parcours');
+    assert.strictEqual(xp[0].xp, srv.parcours.xpPartie({ place: 1, manchesSurvecues: 2 }));
   });
   await test('Inter (8) en ligne : salle publique listée avec son jeu, jamais mélangée avec Kopo', async () => {
     const [x, y] = [await invite('Inter_Pub'), await invite('Autre_Pub')];

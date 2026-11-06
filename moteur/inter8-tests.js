@@ -336,20 +336,36 @@ test('Le valet est une carte ordinaire en mode simple et à 2 joueurs', () => {
 
 console.log('\nAnnonce et sortie');
 
-test("Oubli d'annonce : contesté jusqu'à ce que le suivant joue, amende d'1 carte", () => {
+test("Oubli d'annonce : contesté, amende d'1 carte", () => {
   const m = manche({ A: ['3C', '4C'], B: ['3P', '4P', '5P', '6P'], C: ['3T', '4T', '5T', '6T'] }, remplir('5C'), 'A');
   J(m, 'A', ['3C']);
-  assert.strictEqual(m.contestable, 'A');
+  assert.deepStrictEqual(m.contestables, ['A']);
   CO(m, 'C');
   assert.strictEqual(m.mains.A.length, 2);
-  assert.strictEqual(m.contestable, null);
+  assert.deepStrictEqual(m.contestables, []);
 });
 
-test("Après l'action du joueur suivant, on ne peut plus contester", () => {
-  const m = manche({ A: ['3C', '4C'], B: ['3P', '4P', '5P', '6P'], C: ['3T', '4T', '5T', '6T'] }, remplir('5C'), 'A');
+test("Le joueur suivant a joué : on peut toujours contester, jusqu'au prochain tour de l'oublieux", () => {
+  const m = manche({ A: ['3C', '4T'], B: ['3P', '4P', '5P', '6P'], C: ['3T', '4T', '5T', '6T'] }, remplir('5C'), 'A');
   J(m, 'A', ['3C']);
   J(m, 'B', ['3P']);
-  assert.ok(!peut(m, 'C', 'contester'));
+  assert.ok(peut(m, 'C', 'contester'));
+  J(m, 'C', ['3T']);
+  assert.ok(peut(m, 'B', 'contester'), 'toujours contestable avant que A ne rejoue');
+  J(m, 'A', ['4T']);
+  assert.deepStrictEqual(m.contestables, []);
+});
+
+test("Deux oublis à la suite : chacun peut être contesté", () => {
+  const m = manche({ A: ['3C', '4C'], B: ['3P', '4P'], C: ['3T', '4T', '5T', '6T'] }, remplir('5C'), 'A');
+  J(m, 'A', ['3C']);
+  J(m, 'B', ['3P']);
+  assert.deepStrictEqual(m.contestables, ['A', 'B']);
+  const cibles = I.actionsPossibles(m, 'C').filter((a) => a.type === 'contester').map((a) => a.cible);
+  assert.deepStrictEqual(cibles, ['A', 'B']);
+  I.jouer(m, { type: 'contester', joueur: 'C', cible: 'B' });
+  assert.strictEqual(m.mains.B.length, 2);
+  assert.deepStrictEqual(m.contestables, ['A']);
 });
 
 test("Qui a annoncé ne peut pas être contesté ; piocher annule l'annonce", () => {

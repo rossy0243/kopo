@@ -175,12 +175,12 @@ test("Un robot laisse 3 s à un humain pour annoncer avant de le contester", () 
   s.manche = I.nouvelleManche(['p1', robot], { p1: ['3C', '4C'], [robot]: ['3P', '4P', '5P', '6P'] },
     Array.from({ length: 20 }, (_, i) => '9' + 'PCKT'[i % 4] + '*').concat('5C'), 'p1', { graine: 1 });
   assert.ok(S.recevoir(s, 'p1', { type: 'action', action: { type: 'jouer', cartes: ['3C'] } }).ok);
-  assert.strictEqual(s.manche.contestable, 'p1');
+  assert.deepStrictEqual(s.manche.contestables, ['p1']);
   h.avancer(1000);
   S.tic(s);
-  assert.strictEqual(s.manche.contestable, 'p1', 'le robot attend');
+  assert.deepStrictEqual(s.manche.contestables, ['p1'], 'le robot attend');
   assert.ok(S.recevoir(s, 'p1', { type: 'action', action: { type: 'annoncer' } }).ok);
-  assert.strictEqual(s.manche.contestable, null);
+  assert.deepStrictEqual(s.manche.contestables, []);
   assert.strictEqual(s.manche.mains.p1.length, 1, 'pas d\'amende');
 });
 
@@ -191,9 +191,9 @@ test("Un humain ne peut contester qu'après les 3 s laissées pour annoncer", ()
   s.manche = I.nouvelleManche(['p1', 'p2'], { p1: ['3C', '4C'], p2: ['3P', '4P', '5P', '6P'] },
     Array.from({ length: 20 }, (_, i) => '9' + 'PCKT'[i % 4] + '*').concat('5C'), 'p1', { graine: 1 });
   assert.ok(S.recevoir(s, 'p1', { type: 'action', action: { type: 'jouer', cartes: ['3C'] } }).ok);
-  assert.strictEqual(s.manche.contestable, 'p1');
+  assert.deepStrictEqual(s.manche.contestables, ['p1']);
   assert.ok(!S.vue(s, 'p2').manche.actions.some((a) => a.type === 'contester'), 'pas encore de bouton');
-  assert.ok(S.vue(s, 'p2').manche.annonce);
+  assert.deepStrictEqual(S.vue(s, 'p2').manche.enGrace, ['p1']);
   assert.ok(!S.recevoir(s, 'p2', { type: 'action', action: { type: 'contester' } }).ok);
   h.avancer(S.DELAI_ANNONCE + 1);
   assert.ok(S.tic(s), 'la vue change à la fin des 3 s');
