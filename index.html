@@ -105,6 +105,16 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
 @media (orientation: landscape) { body.en-jeu .main.defile { justify-content: flex-start; overflow-x: auto; overflow-y: hidden; padding-top: 26px; scrollbar-width: none; } body.en-jeu .main.defile .carte { flex: none; transform: none; } body.en-jeu .main.defile .carte.choisie { transform: translateY(-20px); } body.en-jeu .main.defile { -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%); mask-image: linear-gradient(90deg, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%); } }
 .table-inter .pile { display: grid; justify-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
 .table-inter .carte { width: 66px; height: 96px; }
+@media (orientation: landscape) and (max-height: 430px) { /* téléphone couché : table plus petite, tout reste visible */
+  body.en-jeu .table-inter { min-height: 96px; }
+  body.en-jeu #poses .table-inter .carte { width: 54px; height: 78px; }
+  body.en-jeu #poses .table-inter .pioche-inter .carte { width: 34px; height: 50px; }
+  body.en-jeu #main .carte-inter { width: 52px; height: 76px; }
+  body.en-jeu #main:has(.carte-inter) { width: min(calc(100% - 360px), 640px); } /* plus de place pour une grande main, entre ton siège et les boutons */
+  body.en-jeu #main:has(.carte-inter):not(.defile) { bottom: max(14px, env(safe-area-inset-bottom)); } /* l'arc des cartes du bord reste dans l'écran */
+  body.en-jeu #main .carte-inter .coin { font-size: 15px; }
+  body.en-jeu #main .carte-inter .centre { font-size: 26px; }
+}
 .carte.joker .coin { font-size: 12px; letter-spacing: .5px; }
 .carte .ordre { position: absolute; top: -7px; right: -7px; width: 20px; height: 20px; border-radius: 99px; background: var(--brass); color: #1d1606; font-size: 12px; font-weight: 700; display: grid; place-items: center; }
 #logoJeu span { white-space: nowrap; }
@@ -469,7 +479,8 @@ body.accueil .app { max-width: none; min-height: 100vh; min-height: 100dvh; padd
 .serie span { width: 22px; height: 6px; border-radius: 3px; background: var(--line); }
 .serie span.ok { background: var(--brass); }
 .note-essai { color: var(--muted); font-size: 12px; }
-@media (max-width: 420px) { .bourse-txt small, .profil-champ small { display: none; } .profil-champ input { width: 96px; max-width: 100%; } .hub-haut .logo { font-size: 30px; } .hub-haut { gap: 8px; } .profil, .profil-champ { min-width: 0; } } /* le pseudo rétrécit plutôt que de dépasser à droite */
+@media (max-width: 420px) { .bourse-txt small, .profil-champ small { display: none; } .profil-champ input { width: 96px; max-width: 100%; } .hub-haut .logo { font-size: 30px; } .hub-haut { gap: 8px; } .profil, .profil-champ { min-width: 0; } .profil { flex: 0 1 auto; overflow: hidden; } .profil-champ { flex: 1 1 auto; } .profil-champ input { width: 100%; max-width: 96px; } }
+@media (max-width: 380px) { .hub-haut .logo { font-size: 25px; } .hub-haut { gap: 6px; } } /* petits téléphones : le pseudo garde sa place */ /* le pseudo rétrécit plutôt que de dépasser à droite */
 .modes { flex: 1; min-width: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-content: center; }
 .mode { position: relative; border: 0; border-radius: 14px; padding: 10px 8px; min-height: 0; aspect-ratio: 5 / 7; display: grid; justify-items: center; align-content: center; gap: 6px; text-align: center; color: #fff; font: inherit;
   background: radial-gradient(ellipse at 50% 30%, var(--table-2), var(--table) 80%); border: 1.5px solid rgba(226,176,74,.6); box-shadow: inset 0 0 0 4px var(--table), inset 0 0 0 5px rgba(226,176,74,.22), 0 8px 18px rgba(0,0,0,.45); transition: transform .12s ease, box-shadow .12s ease; }
@@ -6483,7 +6494,7 @@ var qrcode = function() {
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = 'd383e2424176'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = '008a86e4cd8f'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
@@ -7899,7 +7910,8 @@ var qrcode = function() {
       b.type = 'button';
       const ecart = i - (triee.length - 1) / 2;
       b.style.setProperty('--r', (ecart * Math.min(2.5, 16 / triee.length)).toFixed(1) + 'deg');
-      b.style.setProperty('--dy', (ecart * ecart * Math.min(1, 8 / triee.length)).toFixed(1) + 'px');
+      // Arc léger : les cartes du bord descendent de 8 px au plus (une grande main ne sort pas de l'écran).
+      b.style.setProperty('--dy', (8 * (ecart / Math.max(1, (triee.length - 1) / 2)) ** 2).toFixed(1) + 'px');
       const k = choixInter.indexOf(c);
       if (k >= 0) {
         b.classList.add('jouable', 'choisie');
