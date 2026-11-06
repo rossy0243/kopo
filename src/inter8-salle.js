@@ -397,7 +397,7 @@
     const ids = s.joueurs.map((j) => j.id).sort((a, b) => b.length - a.length);
     return m.journal.slice(-8).map((t) => {
       for (const id of ids) t = t.split(id).join(nomDe(s, id));
-      return t;
+      return t.replace('mode delire', 'mode délire (J retour)');
     });
   }
 
@@ -442,7 +442,7 @@
         phase: m.phase,
         nulle: m.phase === 'nulle',
         joueurCourant: m.joueurCourant,
-        qualifies: m.qualifies.slice(),
+        qualifies: m.qualifies.map((j) => ({ joueur: j, raison: 'main vide' })), // même forme que Kopo
         elimine: m.elimine,
         journal: journalLisible(s, m),
         main: p.main,

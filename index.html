@@ -97,6 +97,19 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
 .chip { border: 1px solid var(--line); border-radius: 99px; padding: 2px 10px; font-size: 13px; display: inline-flex; gap: 6px; align-items: center; }
 .chip b { font-size: 17px; line-height: 1; }
 .chip.interdit { border-color: var(--bad); color: var(--bad); }
+.table-inter { display: flex; gap: 22px; align-items: flex-end; justify-content: center; }
+.table-inter .pile { display: grid; justify-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
+.table-inter .carte { width: 66px; height: 96px; }
+.carte.joker .coin { font-size: 12px; letter-spacing: .5px; }
+.carte .ordre { position: absolute; top: -7px; right: -7px; width: 20px; height: 20px; border-radius: 99px; background: var(--brass); color: #1d1606; font-size: 12px; font-weight: 700; display: grid; place-items: center; }
+.fil-inter { display: grid; gap: 2px; justify-items: center; font-size: 12px; color: var(--muted); text-align: center; margin-top: 8px; }
+.fil-inter div:last-child { color: var(--ink); }
+#logoJeu span { white-space: nowrap; }
+#logoJeu.long { font-size: .8em; }
+.chip.demande { border-color: var(--brass); color: var(--brass); }
+.btn.katapss.contester { background: var(--brass); border-color: var(--brass); color: #1d1606; font-size: 22px; }
+.choix-demande { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.choix-demande .btn { padding: 10px 4px; }
 .chip.interdit b { text-decoration: line-through; }
 .poses { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; min-height: 100px; }
 .pose { display: grid; justify-items: center; gap: 3px; font-size: 12px; color: var(--muted); max-width: 90px; }
@@ -121,7 +134,7 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
 .main .carte .coin { font-size: 18px; }
 .main .carte .centre { font-size: 36px; }
 .main .carte.jouable { cursor: pointer; }
-.main .carte.choisie { transform: translateY(-12px); box-shadow: 0 0 0 3px var(--brass), 0 10px 18px rgba(0,0,0,.4); }
+.main .carte.choisie { z-index: 1; transform: translateY(-12px); box-shadow: 0 0 0 3px var(--brass), 0 10px 18px rgba(0,0,0,.4); }
 .main .carte:disabled { opacity: .4; filter: grayscale(.4); }
 .actions { display: grid; gap: 8px; }
 @media (prefers-reduced-motion: reduce) { .main .carte, .btn.katapss { transition: none; animation: none; } }
@@ -283,6 +296,9 @@ details.rappel summary { cursor: pointer; font-weight: 600; }
   body.en-jeu .main .carte.choisie { transform: translateY(calc(var(--dy, 0px) - 22px)) rotate(var(--r, 0deg)); }
   body.en-jeu .actions { position: absolute; right: max(10px, env(safe-area-inset-right)); bottom: max(10px, env(safe-area-inset-bottom)); width: 150px; grid-template-columns: 1fr; gap: 6px; z-index: 2; }
   body.en-jeu .actions .btn.large { padding: 10px 8px; font-size: 15px; border-radius: 14px; box-shadow: 0 4px 12px rgba(0,0,0,.4); }
+  body.en-jeu .btn.katapss.inter { font-size: 18px; padding: 0 8px; }
+  body.en-jeu #zoneKatapss:has(.inter + .inter) { display: grid; gap: 10px; }
+  body.en-jeu .actions small.muted { display: none; }
   body.en-jeu #zoneKatapss { position: absolute; right: max(14px, env(safe-area-inset-right)); top: 50%; transform: translateY(-50%); z-index: 2; }
   body.en-jeu .btn.katapss { width: 112px; height: 112px; border-radius: 50%; padding: 0; font-size: 24px; letter-spacing: 1px; line-height: 1; border: 4px solid #ff8f86; box-shadow: 0 8px 0 #7d1d18, 0 12px 24px rgba(0,0,0,.5); }
 }
@@ -970,7 +986,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
 <body>
 <div class="app">
   <header>
-    <div class="logo"><img class="marque" src="icons/kopo-logo.svg" alt="">KOPO</div>
+    <div class="logo" id="logoJeu"><img class="marque" src="icons/kopo-logo.svg" alt=""><span>KOPO</span></div>
     <div class="info" id="info"></div>
     <div class="vocal" id="vocal" hidden></div>
     <button class="btn" id="btnPleinEcranEntete" hidden title="Plein écran" aria-label="Plein écran">⛶</button>
@@ -1089,6 +1105,11 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
     <div class="voile" id="voileRobots" hidden>
       <div class="fenetre">
         <h2>Contre les robots</h2>
+        <p class="style-inter" hidden>Quel style ?</p>
+        <div class="choix choix-niveau-robots style-inter" id="styleRobots" role="group" aria-label="Style de la partie" hidden>
+          <button type="button" data-v="simple">Simple</button>
+          <button type="button" data-v="delire">Délire (J retour)</button>
+        </div>
         <p>Quel niveau ?</p>
         <div class="choix choix-niveau-robots" id="niveauRobots" role="group" aria-label="Niveau des robots">
           <button type="button" data-v="faciles">Facile</button>
@@ -1156,6 +1177,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
     </div>
     <div class="colonne">
     <div class="reglage" id="reglage"></div>
+    <div class="reglage" id="reglageStyle" hidden></div>
     <h3 id="titreJoueurs"></h3>
     <ul class="liste-joueurs" id="listeJoueurs"></ul>
     <p id="attenteHote" hidden>En attente du lancement par l'hôte…</p>
@@ -4574,6 +4596,1140 @@ var qrcode = function() {
   else root.KopoSalle = KopoSalle;
 })(typeof window !== 'undefined' ? window : globalThis);
 </script>
+<script>// Inter (8) — moteur de règles (règlement v1.0 du 06/11/2026)
+// Utilisable dans le navigateur (window.Inter8) et avec Node (require).
+// Indépendant du moteur de Kopo : aucun fichier de Kopo n'est touché.
+//
+// Une carte est une chaîne "valeur+couleur" : "7C" = 7 de cœur, "AP" = as de pique,
+// "VK" = valet de carreau, "DT" = dame de trèfle, "RC" = roi de cœur.
+// Couleurs : P = pique, C = cœur, K = carreau, T = trèfle.
+// Jokers : "XR" (rouge) et "XN" (noir).
+// Avec deux paquets, les cartes du second paquet finissent par "*" : "7C*", "XR*".
+(function (root) {
+  'use strict';
+
+  const COULEURS = ['P', 'C', 'K', 'T'];
+  const NOMS_COULEURS = { P: 'pique', C: 'cœur', K: 'carreau', T: 'trèfle' };
+  const SYMBOLES = { P: '♠', C: '♥', K: '♦', T: '♣' };
+  const VALEURS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'V', 'D', 'R'];
+  const JOKER = 'X';
+  // Cartes de pénalité : nombre de cartes que le joueur suivant pioche, par carte posée.
+  const PENALITES = { 2: 2, 10: 4, X: 5 };
+  const MAX_JOUEURS = 8;
+
+  const brut = (carte) => carte.replace('*', '');
+  const valeur = (carte) => (brut(carte)[0] === JOKER ? JOKER : brut(carte).slice(0, -1));
+  const couleur = (carte) => (valeur(carte) === JOKER ? null : brut(carte).slice(-1));
+  const NOMS_VALEURS = { A: 'A', V: 'V', D: 'D', R: 'R' };
+  function afficher(carte) {
+    if (valeur(carte) === JOKER) return 'Joker';
+    return (NOMS_VALEURS[valeur(carte)] || valeur(carte)) + SYMBOLES[couleur(carte)];
+  }
+
+  // 1 paquet de 54 cartes de 2 à 4 joueurs, 2 paquets (108 cartes) de 5 à 8 joueurs.
+  const nombrePaquets = (nbJoueurs) => (nbJoueurs >= 5 ? 2 : 1);
+
+  function nouveauPaquet(nbPaquets) {
+    const paquet = [];
+    for (let p = 0; p < (nbPaquets || 1); p++) {
+      const suffixe = p === 0 ? '' : '*';
+      for (const c of COULEURS) for (const v of VALEURS) paquet.push(v + c + suffixe);
+      paquet.push('XR' + suffixe, 'XN' + suffixe);
+    }
+    return paquet;
+  }
+
+  // Générateur pseudo-aléatoire reproductible (mulberry32), comme pour Kopo.
+  function hasard(graine) {
+    let a = graine >>> 0;
+    return function () {
+      a = (a + 0x6d2b79f5) >>> 0;
+      let t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function melanger(liste, rng) {
+    const l = liste.slice();
+    for (let i = l.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [l[i], l[j]] = [l[j], l[i]];
+    }
+    return l;
+  }
+
+  // La main peut partir en un seul coup : une carte, ou des cartes toutes de même valeur.
+  const finissable = (main) => main.length > 0 && main.every((c) => valeur(c) === valeur(main[0]));
+
+  // ---------------------------------------------------------------------------
+  // Manche
+  // ---------------------------------------------------------------------------
+
+  // Distribue 4 cartes à chacun. Renvoie { mains, pioche } (la pioche se tire par la fin).
+  function distribuer(sieges, nbPaquets, rng) {
+    const paquet = melanger(nouveauPaquet(nbPaquets), rng);
+    const mains = {};
+    sieges.forEach((j) => (mains[j] = paquet.splice(paquet.length - 4, 4)));
+    return { mains, pioche: paquet };
+  }
+
+  // sieges : joueurs dans le sens des aiguilles d'une montre. mains : { joueur: [cartes] }.
+  // pioche : cartes restantes (on tire par la fin). premier : joueur qui commence.
+  // options : { mode: 'simple' | 'delire', graine } (la graine sert à remélanger la défausse).
+  function nouvelleManche(sieges, mains, pioche, premier, options) {
+    const o = options || {};
+    const m = {
+      sieges: sieges.slice(),
+      enJeu: sieges.slice(),
+      mains: {},
+      pioche: pioche.slice(),
+      defausse: [], // la dernière carte est la carte de référence
+      mode: o.mode === 'delire' ? 'delire' : 'simple',
+      sens: 1, // 1 = aiguilles d'une montre, -1 = sens inverse (J retour, mode délire)
+      libre: false, // le joueur courant pose la carte de son choix
+      demande: null, // { valeur, par } : « Inter demande »
+      joueurCourant: premier,
+      aPioche: null, // carte piochée par le joueur courant pendant ce tour
+      annonces: [], // joueurs qui ont annoncé
+      contestable: null, // joueur qui n'a pas annoncé et peut être contesté
+      qualifies: [],
+      elimine: null,
+      phase: 'jeu', // 'jeu' | 'terminee' | 'nulle'
+      graine: (o.graine >>> 0) || 1,
+      journal: [],
+      // Ce que toute la table a vu : cartes posées, et qui a pioché pendant une demande.
+      vu: { posees: [], piochesDemande: [] },
+    };
+    for (const j of sieges) m.mains[j] = mains[j].slice();
+    // Carte de départ : jamais un 8 (on le remet sous la pioche et on prend la suivante).
+    let depart = m.pioche.pop();
+    for (let n = 0; valeur(depart) === '8' && n < 20; n++) {
+      m.pioche.unshift(depart);
+      depart = m.pioche.pop();
+    }
+    m.defausse.push(depart);
+    m.vu.posees.push(depart);
+    noter(m, `Début de la manche : ${sieges.length} joueurs, mode ${m.mode}. Carte de départ : ${afficher(depart)}. ${premier} commence.`);
+    // Une carte de départ spéciale agit sur le premier joueur, comme si elle venait d'être jouée.
+    effetsDepart(m, depart, premier);
+    return m;
+  }
+
+  function noter(m, texte) {
+    m.journal.push(texte);
+  }
+
+  // Joueurs encore en jeu, autres que « joueur », dans le sens du jeu en partant du suivant.
+  // « joueur » peut ne plus être en jeu (il vient de sortir).
+  function ordreDepuis(m, joueur) {
+    const n = m.sieges.length;
+    const i = m.sieges.indexOf(joueur);
+    const ordre = [];
+    for (let k = 1; k < n; k++) {
+      const j = m.sieges[(((i + k * m.sens) % n) + n) % n];
+      if (m.enJeu.includes(j) && j !== joueur) ordre.push(j);
+    }
+    return ordre;
+  }
+  const suivant = (m, joueur) => ordreDepuis(m, joueur)[0];
+
+  function remelanger(m) {
+    if (m.defausse.length <= 1) return false;
+    const dessus = m.defausse.pop();
+    const rng = hasard(m.graine);
+    m.pioche = melanger(m.defausse, rng).concat(m.pioche);
+    m.graine = Math.floor(rng() * 4294967296) >>> 0 || 1;
+    m.defausse = [dessus];
+    noter(m, 'La pioche est vide : on remélange la défausse.');
+    return true;
+  }
+
+  // Pioche n cartes (moins s'il n'en reste pas assez). Piocher annule l'annonce.
+  function piocherCartes(m, joueur, n) {
+    const tirees = [];
+    for (let k = 0; k < n; k++) {
+      if (!m.pioche.length && !remelanger(m)) break;
+      tirees.push(m.pioche.pop());
+    }
+    m.mains[joueur].push(...tirees);
+    if (tirees.length) m.annonces = m.annonces.filter((j) => j !== joueur);
+    return tirees;
+  }
+
+  function sortir(m, joueur) {
+    m.enJeu = m.enJeu.filter((j) => j !== joueur);
+    m.annonces = m.annonces.filter((j) => j !== joueur);
+    m.qualifies.push(joueur);
+    noter(m, `${joueur} pose sa dernière carte : qualifié !`);
+    if (m.enJeu.length === 1) {
+      m.elimine = m.enJeu[0];
+      m.phase = 'terminee';
+      m.joueurCourant = null;
+      noter(m, `${m.elimine} est le dernier à garder des cartes : éliminé.`);
+      return true;
+    }
+    return false;
+  }
+
+  // Fin du tour de « joueur » : s'il peut finir au prochain coup sans avoir annoncé,
+  // les autres peuvent le contester jusqu'à ce que le joueur suivant ait joué.
+  function finDeTour(m, joueur, prochain) {
+    m.aPioche = null;
+    if (m.enJeu.includes(joueur) && !m.annonces.includes(joueur) && finissable(m.mains[joueur])) m.contestable = joueur;
+    m.joueurCourant = prochain;
+  }
+
+  // Le joueur « cible » pioche une pénalité et passe son tour. Renvoie le joueur d'après.
+  function penaliser(m, cible, n) {
+    const tirees = piocherCartes(m, cible, n);
+    noter(m, `${cible} pioche ${tirees.length} carte${tirees.length > 1 ? 's' : ''} et passe son tour.`);
+    return suivant(m, cible);
+  }
+
+  // As : chaque As fait passer le tour d'un joueur, en boucle, sans jamais sauter le poseur.
+  function apresAs(m, poseur, n) {
+    const autres = ordreDepuis(m, poseur);
+    const cycle = m.enJeu.includes(poseur) ? autres.concat(poseur) : autres;
+    const sautes = [];
+    for (let k = 0; k < n; k++) sautes.push(autres[k % autres.length]);
+    noter(m, `Tour${n > 1 ? 's' : ''} sauté${n > 1 ? 's' : ''} : ${sautes.join(', ')}.`);
+    const dernier = sautes[sautes.length - 1];
+    return cycle[(cycle.indexOf(dernier) + 1) % cycle.length];
+  }
+
+  function effetsDepart(m, carte, premier) {
+    const v = valeur(carte);
+    if (PENALITES[v]) {
+      if (v === JOKER) m.libre = true;
+      m.joueurCourant = penaliser(m, premier, PENALITES[v]);
+    } else if (v === 'A') {
+      // Le premier joueur passe son tour.
+      noter(m, `Tour sauté : ${premier}.`);
+      m.joueurCourant = suivant(m, premier);
+    } else if (v === 'V' && m.mode === 'delire' && m.enJeu.length > 2) {
+      m.sens = -m.sens;
+      noter(m, 'J retour : le sens du jeu change.');
+    }
+  }
+
+  // Valeurs qu'un joueur peut demander avec un 8 : toutes sauf le 8 (et pas le joker),
+  // à condition d'en garder au moins une en main.
+  function valeursDemandables(resteMain) {
+    const vs = new Set(resteMain.map(valeur));
+    return VALEURS.filter((v) => v !== '8' && vs.has(v));
+  }
+
+  // Vérifie un coup « jouer ». Renvoie null s'il est permis, sinon la raison.
+  function refus(m, joueur, cartes, demande) {
+    if (m.phase !== 'jeu') return 'La manche est finie.';
+    if (joueur !== m.joueurCourant) return "Ce n'est pas ton tour.";
+    if (!Array.isArray(cartes) || !cartes.length) return 'Aucune carte.';
+    const reste = m.mains[joueur].slice();
+    for (const c of cartes) {
+      const i = reste.indexOf(c);
+      if (i < 0) return "Tu n'as pas cette carte.";
+      reste.splice(i, 1);
+    }
+    const v = valeur(cartes[0]);
+    if (!cartes.every((c) => valeur(c) === v)) return 'Plusieurs cartes ensemble doivent avoir la même valeur.';
+    if (m.aPioche && !cartes.includes(m.aPioche)) return 'Après avoir pioché, tu ne peux poser que la carte piochée.';
+    if (v === '8') {
+      if (cartes.length > 1 && reste.length) return 'Un seul 8 à la fois, sauf pour sortir avec tes derniers 8.';
+      if (reste.length && !valeursDemandables(reste).includes(demande)) return 'Demande une valeur que tu as en main (pas le 8).';
+    }
+    if (m.demande) {
+      if (joueur === m.demande.par) {
+        if (v !== m.demande.valeur) return `Pose la valeur que tu as demandée (${m.demande.valeur}).`;
+      } else if (m.aPioche) {
+        if (v !== m.demande.valeur) return `Seule la valeur demandée (${m.demande.valeur}) peut être posée.`;
+      } else if (v !== m.demande.valeur && v !== '8' && v !== JOKER) {
+        return `Inter demande ${m.demande.valeur} : pose ce ${m.demande.valeur}, un 8 ou un joker, sinon pioche.`;
+      }
+      return null;
+    }
+    if (v === '8' || v === JOKER || m.libre) return null;
+    const ref = m.defausse[m.defausse.length - 1];
+    if (v === valeur(ref) || couleur(cartes[0]) === couleur(ref)) return null;
+    return 'Pose une carte de même couleur ou de même valeur.';
+  }
+
+  // Coups « jouer » proposés (pour les robots et pour savoir si le joueur peut jouer) :
+  // chaque carte seule, et toutes les cartes d'une même valeur ensemble (avec chaque
+  // carte possible en dernier, puisque c'est elle qui donne la couleur).
+  function coupsJouer(m, joueur) {
+    const main = m.mains[joueur];
+    const coups = [];
+    const vus = new Set();
+    const ajouter = (cartes) => {
+      const reste = main.slice();
+      cartes.forEach((c) => reste.splice(reste.indexOf(c), 1));
+      const demandes = valeur(cartes[0]) === '8' && reste.length ? valeursDemandables(reste) : [undefined];
+      for (const d of demandes) {
+        const cle = cartes.join(',') + '|' + d;
+        if (vus.has(cle) || refus(m, joueur, cartes, d)) continue;
+        vus.add(cle);
+        const a = { type: 'jouer', joueur, cartes: cartes.slice() };
+        if (d) a.demande = d;
+        coups.push(a);
+      }
+    };
+    const groupes = {};
+    for (const c of main) (groupes[valeur(c)] = groupes[valeur(c)] || []).push(c);
+    for (const groupe of Object.values(groupes)) {
+      for (const premiere of groupe) {
+        ajouter([premiere]);
+        if (groupe.length < 2) continue;
+        for (const derniere of groupe) {
+          if (derniere === premiere) continue;
+          ajouter([premiere, ...groupe.filter((c) => c !== premiere && c !== derniere), derniere]);
+        }
+      }
+    }
+    return coups;
+  }
+
+  // Actions possibles pour un joueur, dans l'état actuel.
+  function actionsPossibles(m, joueur) {
+    const actions = [];
+    if (m.phase !== 'jeu' || !m.enJeu.includes(joueur)) return actions;
+    if (!m.annonces.includes(joueur) && finissable(m.mains[joueur])) actions.push({ type: 'annoncer', joueur });
+    if (m.contestable && m.contestable !== joueur) actions.push({ type: 'contester', joueur, cible: m.contestable });
+    if (joueur !== m.joueurCourant) return actions;
+    const coups = coupsJouer(m, joueur);
+    actions.push(...coups);
+    if (m.aPioche) actions.push({ type: 'passer', joueur });
+    else if (!coups.length) actions.push({ type: 'piocher', joueur });
+    return actions;
+  }
+
+  function jouer(m, action) {
+    const j = action.joueur;
+    if (m.phase !== 'jeu' || !m.enJeu.includes(j)) throw new Error(`Action interdite : ${JSON.stringify(action)}`);
+
+    if (action.type === 'annoncer') {
+      if (m.annonces.includes(j) || !finissable(m.mains[j])) throw new Error(`Action interdite : ${JSON.stringify(action)}`);
+      m.annonces.push(j);
+      if (m.contestable === j) m.contestable = null;
+      noter(m, `${j} annonce : il peut sortir au prochain coup.`);
+      return m;
+    }
+    if (action.type === 'contester') {
+      const cible = m.contestable;
+      if (!cible || cible === j || (action.cible && action.cible !== cible)) throw new Error(`Action interdite : ${JSON.stringify(action)}`);
+      m.contestable = null;
+      piocherCartes(m, cible, 1);
+      noter(m, `${j} conteste : ${cible} n'avait pas annoncé et pioche 1 carte d'amende.`);
+      return m;
+    }
+
+    if (j !== m.joueurCourant) throw new Error(`Action interdite : ${JSON.stringify(action)}`);
+    // Le joueur suivant agit : on ne peut plus contester le joueur précédent.
+    if (m.contestable !== j) m.contestable = null;
+
+    if (action.type === 'piocher') {
+      if (m.aPioche || coupsJouer(m, j).length) throw new Error(`Action interdite : ${JSON.stringify(action)}`);
+      const tirees = piocherCartes(m, j, 1);
+      if (!tirees.length) {
+        m.phase = 'nulle';
+        m.joueurCourant = null;
+        noter(m, 'Plus de pioche ni de défausse : match nul, la manche est rejouée.');
+        return m;
+      }
+      if (m.demande) m.vu.piochesDemande.push({ joueur: j, valeur: m.demande.valeur });
+      m.aPioche = tirees[0];
+      noter(m, `${j} pioche une carte.`);
+      if (!coupsJouer(m, j).length) finDeTour(m, j, suivant(m, j));
+      return m;
+    }
+    if (action.type === 'passer') {
+      if (!m.aPioche) throw new Error(`Action interdite : ${JSON.stringify(action)}`);
+      noter(m, `${j} garde sa carte et passe.`);
+      finDeTour(m, j, suivant(m, j));
+      return m;
+    }
+    if (action.type !== 'jouer') throw new Error(`Action inconnue : ${JSON.stringify(action)}`);
+
+    const cartes = action.cartes;
+    const pourquoi = refus(m, j, cartes, action.demande);
+    if (pourquoi) throw new Error(pourquoi);
+    const v = valeur(cartes[0]);
+    for (const c of cartes) m.mains[j].splice(m.mains[j].indexOf(c), 1);
+    m.defausse.push(...cartes);
+    m.vu.posees.push(...cartes);
+    m.libre = false;
+    const finit = m.mains[j].length === 0;
+    noter(m, `${j} pose ${cartes.map(afficher).join(' ')}${v === '8' && !finit ? ` : « Inter demande ${action.demande} »` : ''}.`);
+
+    // La demande en cours s'arrête dès que la valeur demandée est posée, ou qu'un joker la coupe.
+    if (m.demande && (v === m.demande.valeur || v === JOKER)) m.demande = null;
+    if (v === '8') {
+      m.demande = finit ? null : { valeur: action.demande, par: j };
+      if (finit) m.libre = true; // finir sur un 8 : le suivant pose la carte de son choix
+    }
+    if (v === JOKER) m.libre = true;
+
+    if (finit && sortir(m, j)) return m;
+
+    let prochain;
+    if (PENALITES[v]) {
+      const total = PENALITES[v] * cartes.length;
+      prochain = penaliser(m, suivant(m, j), total);
+    } else if (v === 'A') {
+      prochain = apresAs(m, j, cartes.length);
+    } else {
+      if (v === 'V' && m.mode === 'delire' && m.enJeu.length > 2 && cartes.length % 2 === 1) {
+        m.sens = -m.sens;
+        noter(m, 'J retour : le sens du jeu change.');
+      }
+      prochain = suivant(m, j);
+    }
+    finDeTour(m, j, prochain);
+    return m;
+  }
+
+  // Ce qu'un joueur a le droit de connaître. Jamais les mains des autres.
+  function vuePublique(m, joueur) {
+    return {
+      moi: joueur,
+      main: (m.mains[joueur] || []).slice(),
+      nbCartes: Object.fromEntries(m.sieges.map((k) => [k, m.mains[k].length])),
+      sieges: m.sieges.slice(),
+      enJeu: m.enJeu.slice(),
+      reference: m.defausse[m.defausse.length - 1] || null,
+      libre: m.libre,
+      demande: m.demande ? { ...m.demande } : null,
+      sens: m.sens,
+      mode: m.mode,
+      paquets: Math.round((m.pioche.length + m.defausse.length + Object.values(m.mains).reduce((t, l) => t + l.length, 0)) / 54),
+      pioche: m.pioche.length,
+      joueurCourant: m.joueurCourant,
+      aPioche: m.joueurCourant === joueur ? m.aPioche : null,
+      annonces: m.annonces.slice(),
+      contestable: m.contestable,
+      qualifies: m.qualifies.slice(),
+      phase: m.phase,
+      posees: m.vu.posees.slice(),
+      piochesDemande: m.vu.piochesDemande.map((p) => ({ ...p })),
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Partie complète (manches successives)
+  // ---------------------------------------------------------------------------
+
+  // strategie(manche, joueur, actions) -> une action parmi « actions », ou null.
+  // options : { mode: 'simple' | 'delire' }. Le nombre de paquets est fixé au début de la partie.
+  function jouerPartie(joueurs, strategie, rng, options) {
+    const mode = (options && options.mode) || 'simple';
+    const nbPaquets = nombrePaquets(joueurs.length);
+    let restants = joueurs.slice();
+    const manches = [];
+    let nulles = 0;
+    while (restants.length > 1) {
+      const sieges = melanger(restants, rng);
+      const { mains, pioche } = distribuer(sieges, nbPaquets, rng);
+      const premier = sieges[Math.floor(rng() * sieges.length)];
+      const m = nouvelleManche(sieges, mains, pioche, premier, { mode, graine: Math.floor(rng() * 4294967296) });
+      let coups = 0;
+      while (m.phase === 'jeu') {
+        if (++coups > 20000) throw new Error('Manche bloquée');
+        // Annonces et contestations éventuelles, puis le joueur courant agit.
+        const candidats = m.enJeu.filter((j) => j !== m.joueurCourant).concat(m.joueurCourant);
+        let fait = false;
+        for (const j of candidats) {
+          const choix = strategie(m, j, actionsPossibles(m, j));
+          if (choix) {
+            jouer(m, choix);
+            fait = true;
+            break;
+          }
+        }
+        if (!fait) throw new Error(`Le joueur ${m.joueurCourant} n'a pas agi`);
+      }
+      manches.push(m);
+      if (m.phase === 'nulle') {
+        if (++nulles > 50) throw new Error('Trop de manches nulles');
+        continue;
+      }
+      restants = restants.filter((j) => j !== m.elimine);
+    }
+    return { vainqueur: restants[0], manches };
+  }
+
+  // Stratégie simple : annonce et conteste toujours, sort dès que possible,
+  // sinon pose le plus de cartes possible, sinon pioche, sinon passe.
+  function strategieSimple(m, joueur, actions) {
+    const autre = actions.find((a) => a.type === 'annoncer' || a.type === 'contester');
+    if (autre) return autre;
+    if (joueur !== m.joueurCourant) return null;
+    const coups = actions.filter((a) => a.type === 'jouer');
+    if (coups.length) return coups.reduce((a, b) => (b.cartes.length > a.cartes.length ? b : a));
+    return actions.find((a) => a.type === 'piocher') || actions.find((a) => a.type === 'passer');
+  }
+
+  // Stratégie au hasard (utile pour vérifier que le moteur ne bloque jamais).
+  function strategieHasard(rng) {
+    return function (m, joueur, actions) {
+      if (joueur !== m.joueurCourant) return actions.length && rng() < 0.3 ? actions[Math.floor(rng() * actions.length)] : null;
+      return actions[Math.floor(rng() * actions.length)];
+    };
+  }
+
+  const Inter8 = {
+    COULEURS, NOMS_COULEURS, SYMBOLES, VALEURS, PENALITES, MAX_JOUEURS,
+    valeur, couleur, afficher, finissable, nombrePaquets, nouveauPaquet, hasard, melanger, distribuer,
+    nouvelleManche, actionsPossibles, refus, jouer, jouerPartie, vuePublique,
+    strategieSimple, strategieHasard,
+  };
+  if (typeof module !== 'undefined' && module.exports) module.exports = Inter8;
+  else root.Inter8 = Inter8;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script>// Inter (8) — robots (niveaux validés le 06/11/2026, voir robots-inter8.md)
+// Chaque robot ne voit que ce qu'un joueur voit (Inter8.vuePublique) : sa main, la carte de
+// référence, le nombre de cartes de chacun, les cartes déjà posées. Jamais les mains des autres.
+// Même principe que les robots de Kopo : 3 niveaux, et une force qui monte avec le niveau du joueur.
+(function (root) {
+  'use strict';
+  const I = typeof module !== 'undefined' && module.exports ? require('./inter8-moteur.js') : root.Inter8;
+
+  const NIVEAUX_ROBOTS = ['faciles', 'normaux', 'forts'];
+  // Force de 0 (gentil) à 2 (fort). Niveau 1 du joueur : bas de la plage ; niveau 20 et plus : haut.
+  const PLAGES_FORCE = { faciles: [0, 0.7], normaux: [1, 1.5], forts: [1.6, 2] };
+  function forceRobots(niveauRobots, niveauJoueur) {
+    if (niveauRobots === 'gentils') return 0;
+    const plage = PLAGES_FORCE[niveauRobots] || PLAGES_FORCE.normaux;
+    const n = niveauJoueur > 1 ? niveauJoueur : 1;
+    return plage[0] + (plage[1] - plage[0]) * Math.min(1, (n - 1) / 19);
+  }
+
+  const SPECIALES = new Set(['2', '10', 'X', 'A', '8']);
+  const coups = (actions) => actions.filter((a) => a.type === 'jouer');
+  const sort = (v, a) => a.cartes.length === v.main.length;
+  const valeurDe = (a) => I.valeur(a.cartes[0]);
+
+  // Joueur qui jouera après moi (dans le sens actuel).
+  function prochain(v) {
+    const n = v.sieges.length, i = v.sieges.indexOf(v.moi);
+    for (let k = 1; k < n; k++) {
+      const j = v.sieges[(((i + k * v.sens) % n) + n) % n];
+      if (v.enJeu.includes(j) && j !== v.moi) return j;
+    }
+    return null;
+  }
+  // Joueur qui jouerait après moi si le sens changeait.
+  function precedent(v) {
+    return prochain({ ...v, sens: -v.sens });
+  }
+  // Le prochain joueur est dangereux : il a annoncé ou n'a presque plus de cartes.
+  const menace = (v, j) => !!j && (v.annonces.includes(j) || v.contestable === j || v.nbCartes[j] <= 2);
+
+  // Annonces et contestations (hors de son tour aussi).
+  function horsTour(actions, annonce, conteste, rng) {
+    const an = actions.find((a) => a.type === 'annoncer');
+    if (an && rng() < annonce) return an;
+    const co = actions.find((a) => a.type === 'contester');
+    if (co && rng() < conteste) return co;
+    return null;
+  }
+
+  // Robot gentil (première partie guidée, et robots faciles) : il pose une carte au hasard,
+  // lâche ses pénalités sans viser, oublie parfois d'annoncer et ne conteste presque jamais.
+  function robotGentil(v, actions, rng) {
+    const h = horsTour(actions, 0.5, 0.1, rng);
+    if (h) return h;
+    if (v.moi !== v.joueurCourant) return null;
+    const c = coups(actions);
+    if (c.length) {
+      if (v.aPioche && rng() < 0.3) return actions.find((a) => a.type === 'passer');
+      const seules = c.filter((a) => a.cartes.length === 1);
+      const liste = seules.length && rng() < 0.8 ? seules : c;
+      return liste[Math.floor(rng() * liste.length)];
+    }
+    return actions.find((a) => a.type === 'piocher') || actions.find((a) => a.type === 'passer') || null;
+  }
+
+  // Robot normal : annonce toujours, conteste quand il le voit, sort dès qu'il peut, pose ensemble
+  // ses cartes de même valeur, garde ses pénalités pour le joueur qui va sortir,
+  // et demande avec le 8 la valeur qu'il a en plus grand nombre.
+  function robotNormal(v, actions) {
+    const h = horsTour(actions, 1, 1, () => 0);
+    if (h) return h;
+    if (v.moi !== v.joueurCourant) return null;
+    const c = coups(actions);
+    if (!c.length) return actions.find((a) => a.type === 'piocher') || actions.find((a) => a.type === 'passer') || null;
+    const sortie = c.find((a) => sort(v, a));
+    if (sortie) return sortie;
+    const danger = menace(v, prochain(v));
+    const nb = (val) => v.main.filter((x) => I.valeur(x) === val).length;
+    let choix = null, meilleur = -Infinity;
+    for (const a of c) {
+      const val = valeurDe(a);
+      let score = a.cartes.length * 10;
+      if (SPECIALES.has(val)) score += danger && val !== '8' ? 40 : -30;
+      if (val === '8') score += (a.demande ? nb(a.demande) : 0) * 3 - 10;
+      if (!SPECIALES.has(val) && a.cartes.length === nb(val)) score += 5; // vide toute la valeur
+      if (score > meilleur) { meilleur = score; choix = a; }
+    }
+    return choix;
+  }
+
+  // Robot fort : il compte les cartes déjà posées, demande avec le 8 une valeur que les autres
+  // n'ont probablement plus, vise le joueur qui va sortir, prépare sa sortie et conteste toujours.
+  // En mode délire, il se sert du J retour pour éloigner le tour d'un joueur qui va sortir.
+  function robotFort(v, actions) {
+    const h = horsTour(actions, 1, 1, () => 0);
+    if (h) return h;
+    if (v.moi !== v.joueurCourant) return null;
+    const c = coups(actions);
+    if (!c.length) return actions.find((a) => a.type === 'piocher') || actions.find((a) => a.type === 'passer') || null;
+    const sortie = c.find((a) => sort(v, a));
+    if (sortie) return sortie;
+
+    // Cartes que je ne connais pas : chez les autres ou dans la pioche.
+    const connues = {};
+    for (const x of v.main.concat(v.posees)) connues[x] = true;
+    const inconnues = I.nouveauPaquet(v.paquets || 1).filter((x) => !connues[x]);
+    const restantes = (val) => inconnues.filter((x) => I.valeur(x) === val).length;
+    const manquees = (val) => v.piochesDemande.filter((p) => p.valeur === val).length;
+    const nb = (val) => v.main.filter((x) => I.valeur(x) === val).length;
+
+    const suivantJ = prochain(v);
+    const danger = menace(v, suivantJ);
+    const dangerDerriere = menace(v, precedent(v));
+    let choix = null, meilleur = -Infinity;
+    for (const a of c) {
+      const val = valeurDe(a);
+      const reste = v.main.slice();
+      a.cartes.forEach((x) => reste.splice(reste.indexOf(x), 1));
+      let score = a.cartes.length * 8;
+      // Préparer la sortie : une main qui pourra partir en un seul coup.
+      if (I.finissable(reste)) score += 60;
+      if (val === '2' || val === '10' || val === 'X' || val === 'A') {
+        score += danger ? 70 + a.cartes.length * 10 : 20; // une carte de moins, et le suivant pioche ou passe
+        if (val === 'X' && reste.length > 2) score -= 15; // garde un joker en sécurité
+      } else if (val === '8') {
+        // Le 8 se garde pour ne jamais devoir piocher. Quand il part, il demande une valeur
+        // rare chez les autres, que d'autres ont déjà manquée.
+        score += -40 + manquees(a.demande) * 12 - restantes(a.demande) * 6 + nb(a.demande) * 4;
+      } else if (val === 'V' && v.mode === 'delire' && v.enJeu.length > 2) {
+        score += danger && !dangerDerriere && a.cartes.length % 2 === 1 ? 60 : 0;
+      } else {
+        // Carte ordinaire : se débarrasser des valeurs que les autres peuvent encore suivre le moins.
+        score += 4 - restantes(val) * 0.5;
+        if (a.cartes.length === nb(val)) score += 4;
+        // Laisser au suivant une couleur qu'il a peu de chances de suivre.
+        const fin = a.cartes[a.cartes.length - 1];
+        score -= inconnues.filter((x) => I.couleur(x) === I.couleur(fin)).length * 1;
+      }
+      if (score > meilleur) { meilleur = score; choix = a; }
+    }
+    return choix;
+  }
+
+  // À chaque coup, le robot joue comme le niveau du dessous ou du dessus de sa force :
+  // force 1,3 = coup normal 7 fois sur 10, coup fort 3 fois sur 10.
+  function choixRobot(m, j, niveauRobots, niveauJoueur, rng) {
+    const v = I.vuePublique(m, j);
+    const actions = I.actionsPossibles(m, j);
+    const f = forceRobots(niveauRobots, niveauJoueur);
+    const cerveau = f < 1 ? (rng() < f ? robotNormal : robotGentil) : (rng() < f - 1 ? robotFort : robotNormal);
+    return cerveau(v, actions, rng);
+  }
+
+  // Coup joué automatiquement quand le temps est écoulé (ou le joueur hors ligne) :
+  // il pioche, ou passe après avoir pioché, sinon pose le coup le plus simple.
+  function coupAutomatique(m, joueur) {
+    if (joueur !== m.joueurCourant) return null;
+    const actions = I.actionsPossibles(m, joueur);
+    return actions.find((a) => a.type === 'piocher') || actions.find((a) => a.type === 'passer') || coups(actions)[0] || null;
+  }
+
+  const Inter8Robots = { NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, robotGentil, robotNormal, robotFort, choixRobot, coupAutomatique };
+  if (typeof module !== 'undefined' && module.exports) module.exports = Inter8Robots;
+  else root.Inter8Robots = Inter8Robots;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script>// Inter (8) — salle de jeu multijoueur (tourne sur le téléphone de l'hôte, ou sur le serveur).
+// Même interface que la salle de Kopo (src/kopo-salle.js) : creerSalle, recevoir, tic, vue,
+// exporter, importer… pour que l'appli et le serveur puissent brancher l'un ou l'autre jeu.
+// L'hôte est la seule autorité : il applique le moteur de règles, puis envoie à chaque joueur
+// une vue où seule SA main est visible. Indépendant du transport réseau.
+(function (root) {
+  'use strict';
+  const enNode = typeof module !== 'undefined' && module.exports;
+  const I = enNode ? require('../moteur/inter8-moteur.js') : root.Inter8;
+  const R = enNode ? require('../moteur/inter8-robots.js') : root.Inter8Robots;
+
+  const JEU = 'inter8';
+  const MIN = 2, MAX = I.MAX_JOUEURS; // 8 joueurs au plus
+  const MODES = ['simple', 'delire'];
+  const DELAIS = [0, 5, 10, 15, 20]; // secondes par tour (0 = sans chrono)
+  const PAUSE_ROBOT = 1200; // un robot réfléchit 1,2 s avant de jouer
+  const DUREES = { depart: 5000, mancheAuto: 10000, revanche: 15000 };
+  const DELAI_ABSENT = 5;
+  const DELAI_ANNONCE = 3000; // temps laissé pour annoncer avant qu'un robot ne conteste
+  const { NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, coupAutomatique } = R;
+
+  function hasardFort() {
+    const c = typeof crypto !== 'undefined' && crypto.getRandomValues ? crypto : null;
+    if (!c) return Math.random;
+    const t = new Uint32Array(1);
+    return () => (c.getRandomValues(t), t[0] / 4294967296);
+  }
+
+  function creerSalle(code, rng) {
+    return {
+      jeu: JEU,
+      code,
+      etat: 'salon', // 'salon' | 'manche' | 'finManche' | 'finPartie'
+      mode: 'simple', // 'simple' | 'delire' (J retour), choisi par l'hôte dans le salon
+      paquets: 1, // fixé au lancement selon le nombre de joueurs
+      joueurs: [],
+      hote: null,
+      restants: [],
+      elimines: [],
+      numeroManche: 0,
+      nulles: 0, // manches nulles rejouées (pioche et défausse vides)
+      manche: null,
+      vainqueur: null,
+      delai: 10,
+      echeance: null,
+      robotPret: null,
+      pause: null, // { type: 'depart', jusqua, total }
+      durees: Object.assign({}, DUREES),
+      expirations: {},
+      chronoTotal: 0,
+      suiteA: null,
+      publique: false,
+      taille: null,
+      robots: 'normaux',
+      niveauJoueur: 1,
+      revanche: null,
+      revancheRatee: false,
+      dernierDuel: null,
+      horloge: Date.now,
+      rng: rng || hasardFort(),
+    };
+  }
+
+  const estRobot = (s, id) => !!(s.joueurs.find((j) => j.id === id) || {}).robot;
+  const choixRobot = (s, j) => R.choixRobot(s.manche, j, s.robots, s.niveauJoueur, s.rng);
+
+  function estAbsent(s, id) {
+    const j = s.joueurs.find((x) => x.id === id);
+    return !!j && !j.robot && (!j.connecte || (s.expirations[id] || 0) >= 2);
+  }
+  function delaiPour(s, id) {
+    if (!estAbsent(s, id)) return s.delai;
+    return s.delai ? Math.min(s.delai, DELAI_ABSENT) : DELAI_ABSENT;
+  }
+  function revenu(s, id) { s.expirations[id] = 0; }
+
+  function armerChrono(s) {
+    const m = s.manche;
+    const enCours = s.etat === 'manche' && m && m.phase === 'jeu' && !s.pause;
+    const d = enCours ? delaiPour(s, m.joueurCourant) : 0;
+    s.echeance = d ? s.horloge() + d * 1000 : null;
+    s.chronoTotal = d * 1000;
+    s.robotPret = enCours ? s.horloge() + (s.pauseRobot >= 0 ? s.pauseRobot : PAUSE_ROBOT) : null;
+  }
+
+  // Applique une action du moteur, puis fait suivre la salle (fin de manche, chrono).
+  function appliquer(s, action) {
+    const courantAvant = s.manche.joueurCourant;
+    const contestableAvant = s.manche.contestable;
+    I.jouer(s.manche, action);
+    finirMancheSiBesoin(s);
+    // Annoncer ou contester ne change pas le joueur courant : on ne relance pas son chrono.
+    if (s.manche && (s.manche.joueurCourant !== courantAvant || action.type === 'jouer' || action.type === 'piocher' || s.etat !== 'manche')) armerChrono(s);
+    // Un joueur (humain) peut être contesté : on lui laisse le temps de toucher « J'annonce »
+    // avant que les robots ne jouent ou ne contestent.
+    const m = s.manche;
+    if (m && m.contestable && m.contestable !== contestableAvant && !estRobot(s, m.contestable) && s.robotPret) {
+      s.robotPret = Math.max(s.robotPret, s.horloge() + DELAI_ANNONCE);
+    }
+  }
+
+  function lancer(s) {
+    s.restants = s.joueurs.map((j) => j.id);
+    s.paquets = I.nombrePaquets(s.restants.length);
+    demarrerManche(s);
+  }
+  function rendrePublique(s, taille) {
+    if (!(taille >= MIN && taille <= MAX)) throw new Error('Taille de salle invalide');
+    s.publique = true;
+    s.taille = taille;
+  }
+
+  function tic(s) {
+    if (s.etat === 'salon' && s.publique) {
+      if (s.joueurs.length >= s.taille) { lancer(s); return true; }
+      return false;
+    }
+    if (s.etat === 'finManche' && s.suiteA && s.horloge() >= s.suiteA) { demarrerManche(s); return true; }
+    if (s.etat === 'finPartie') return verifierRevanche(s);
+    if (s.etat !== 'manche') return false;
+    const m = s.manche;
+    if (s.pause) {
+      if (s.horloge() < s.pause.jusqua) return false;
+      s.pause = null;
+      armerChrono(s);
+      return true;
+    }
+    // Les robots d'abord : annonces et contestations, puis le robot dont c'est le tour.
+    if (s.robotPret && s.horloge() >= s.robotPret) {
+      const candidats = m.enJeu.filter((j) => j !== m.joueurCourant && estRobot(s, j));
+      if (estRobot(s, m.joueurCourant)) candidats.push(m.joueurCourant);
+      for (const j of candidats) {
+        const a = choixRobot(s, j);
+        if (a) { appliquer(s, a); return true; }
+      }
+    }
+    if (m.joueurCourant && estAbsent(s, m.joueurCourant)) {
+      const limite = s.horloge() + delaiPour(s, m.joueurCourant) * 1000;
+      if (!s.echeance || s.echeance > limite) { s.echeance = limite; s.chronoTotal = delaiPour(s, m.joueurCourant) * 1000; }
+    }
+    if (!s.echeance || s.horloge() < s.echeance) return false;
+    const j = m.joueurCourant;
+    s.expirations[j] = (s.expirations[j] || 0) + 1;
+    const action = coupAutomatique(m, j);
+    if (!action) { armerChrono(s); return false; }
+    m.journal.push(`Temps écoulé pour ${j} : coup automatique.`);
+    appliquer(s, action);
+    return true;
+  }
+
+  const nomDe = (s, id) => (s.joueurs.find((j) => j.id === id) || {}).nom || '?';
+  function nettoyerNom(nom) {
+    return String(nom || '').replace(/[<>]/g, '').trim().slice(0, 16) || 'Joueur';
+  }
+
+  // Premier joueur : au hasard, sauf en duel où les deux mêmes joueurs commencent à tour de rôle.
+  function choisirPremier(s, sieges) {
+    const auHasard = sieges[Math.floor(s.rng() * sieges.length)];
+    if (sieges.length !== 2 || s.numeroManche !== 0) return auHasard;
+    const paire = sieges.slice().sort().join('|');
+    const d = s.dernierDuel;
+    const premier = d && d.paire === paire && sieges.includes(d.ouvreur) ? sieges.find((j) => j !== d.ouvreur) : auHasard;
+    s.dernierDuel = { paire, ouvreur: premier };
+    return premier;
+  }
+
+  function demarrerManche(s) {
+    const sieges = I.melanger(s.restants, s.rng);
+    const { mains, pioche } = I.distribuer(sieges, s.paquets, s.rng);
+    const premier = choisirPremier(s, sieges);
+    s.numeroManche++;
+    s.suiteA = null;
+    s.manche = I.nouvelleManche(sieges, mains, pioche, premier, { mode: s.mode, graine: Math.floor(s.rng() * 4294967296) });
+    s.etat = 'manche';
+    s.pause = s.durees.depart > 0 ? { type: 'depart', jusqua: s.horloge() + s.durees.depart, total: s.durees.depart } : null;
+    armerChrono(s);
+  }
+
+  function reinitialiser(s) {
+    s.restants = [];
+    s.elimines = [];
+    s.numeroManche = 0;
+    s.nulles = 0;
+    s.manche = null;
+    s.vainqueur = null;
+    s.echeance = null;
+    s.pause = null;
+    s.suiteA = null;
+    s.revanche = null;
+    s.revancheRatee = false;
+    s.expirations = {};
+    s.joueurs.forEach((j) => delete j.pret);
+  }
+
+  const humainsPresents = (s) => s.joueurs.filter((j) => !j.robot && j.connecte);
+  function verifierRevanche(s) {
+    const r = s.revanche;
+    if (!r) return false;
+    const presents = humainsPresents(s);
+    const tousOntRepondu = presents.every((j) => r.oui.includes(j.id) || r.non.includes(j.id));
+    const finTemps = r.jusqua && s.horloge() >= r.jusqua;
+    if (!tousOntRepondu && !finTemps) return false;
+    const partants = s.joueurs.filter((j) => (j.robot && !j.remplace) || (r.oui.includes(j.id) && j.connecte && !j.robot));
+    if (partants.length < MIN || !partants.some((j) => !j.robot)) {
+      s.revanche = null;
+      s.revancheRatee = true;
+      return true;
+    }
+    s.joueurs = partants;
+    if (!partants.some((j) => j.id === s.hote)) s.hote = partants.find((j) => !j.robot).id;
+    reinitialiser(s);
+    lancer(s);
+    return true;
+  }
+
+  function finirMancheSiBesoin(s) {
+    const m = s.manche;
+    if (!m || s.etat !== 'manche') return;
+    if (m.phase === 'nulle') {
+      // Match nul : la manche est rejouée avec les mêmes joueurs.
+      s.nulles++;
+      s.numeroManche--;
+      s.etat = 'finManche';
+      s.suiteA = s.durees.mancheAuto > 0 ? s.horloge() + s.durees.mancheAuto : null;
+      return;
+    }
+    if (m.phase !== 'terminee') return;
+    s.elimines.push(m.elimine);
+    s.restants = s.restants.filter((j) => j !== m.elimine);
+    if (s.restants.length === 1) {
+      s.vainqueur = s.restants[0];
+      s.etat = 'finPartie';
+      s.revanche = null;
+      s.revancheRatee = false;
+    } else {
+      s.etat = 'finManche';
+      s.suiteA = s.durees.mancheAuto > 0 ? s.horloge() + s.durees.mancheAuto : null;
+    }
+  }
+
+  // Ne garde d'une action envoyée par un joueur que ce que le moteur attend.
+  function actionDe(id, a) {
+    const action = { type: a.type, joueur: id };
+    if (a.type === 'jouer') {
+      if (!Array.isArray(a.cartes) || a.cartes.length > 16 || !a.cartes.every((c) => typeof c === 'string' && c.length <= 4)) return null;
+      action.cartes = a.cartes.slice();
+      if (typeof a.demande === 'string') action.demande = a.demande.slice(0, 2);
+    } else if (!['piocher', 'passer', 'annoncer', 'contester'].includes(a.type)) return null;
+    return action;
+  }
+
+  // Traite un message d'un joueur. Renvoie { ok, erreur? }. Mêmes messages que la salle de Kopo,
+  // plus le style de partie dans les réglages : { type: 'reglages', mode: 'simple' | 'delire' }.
+  function recevoir(s, id, msg) {
+    const joueur = s.joueurs.find((j) => j.id === id);
+    switch (msg && msg.type) {
+      case 'rejoindre': {
+        if (joueur) {
+          revenu(s, id);
+          if (joueur.robot && joueur.remplace) { joueur.robot = false; joueur.remplace = false; }
+          joueur.connecte = true;
+          if (typeof msg.peerId === 'string') joueur.peerId = msg.peerId.slice(0, 64);
+          if (msg.nom && s.etat === 'salon') joueur.nom = nettoyerNom(msg.nom);
+          return { ok: true };
+        }
+        if (s.etat !== 'salon') return { ok: false, erreur: 'La partie a déjà commencé.' };
+        if (s.joueurs.length >= (s.publique ? s.taille : MAX)) return { ok: false, erreur: 'La table est pleine.' };
+        s.joueurs.push({ id, nom: nettoyerNom(msg.nom), connecte: true, peerId: typeof msg.peerId === 'string' ? msg.peerId.slice(0, 64) : null, voix: false, muet: true });
+        if (!s.hote) s.hote = id;
+        return { ok: true };
+      }
+      case 'retirer': {
+        if (id !== s.hote || s.etat !== 'salon' || msg.cible === s.hote) return { ok: false, erreur: 'Impossible.' };
+        s.joueurs = s.joueurs.filter((j) => j.id !== msg.cible);
+        return { ok: true };
+      }
+      case 'ajouterRobot': {
+        if (id !== s.hote || s.etat !== 'salon' || s.publique) return { ok: false, erreur: 'Impossible.' };
+        if (s.joueurs.length >= MAX) return { ok: false, erreur: `La table est pleine (${MAX} joueurs).` };
+        let n = 1;
+        while (s.joueurs.some((j) => j.nom === 'Robot ' + n)) n++;
+        s.joueurs.push({ id: 'robot-' + n + '-' + Math.floor(s.rng() * 1e6), nom: 'Robot ' + n, connecte: true, robot: true, voix: false, muet: true });
+        return { ok: true };
+      }
+      case 'remplacerParRobot': {
+        const cible = s.joueurs.find((j) => j.id === msg.cible);
+        if (id !== s.hote || !cible || cible.id === s.hote || cible.robot) return { ok: false, erreur: 'Impossible.' };
+        if (s.etat === 'salon') return { ok: false, erreur: 'Retire-le plutôt, puis ajoute un robot.' };
+        cible.robot = true;
+        cible.remplace = true;
+        cible.connecte = true;
+        armerChrono(s);
+        return { ok: true };
+      }
+      case 'reaction': {
+        if (!joueur) return { ok: false, erreur: 'Inconnu.' };
+        const emoji = typeof msg.emoji === 'string' ? msg.emoji.trim() : '';
+        if (!emoji || emoji.length > 40 || /[<>]/.test(emoji)) return { ok: false, erreur: 'Réaction invalide.' };
+        s.reactions = s.reactions || {};
+        const t = s.horloge();
+        if (id in s.reactions && t - s.reactions[id] < 1000) return { ok: false, erreur: 'Doucement !' };
+        s.reactions[id] = t;
+        return { ok: true, evenement: { type: 'reaction', joueur: id, emoji } };
+      }
+      case 'pret': {
+        if (!joueur || joueur.robot || s.etat !== 'salon') return { ok: false, erreur: 'Impossible.' };
+        joueur.pret = !!msg.pret;
+        return { ok: true };
+      }
+      case 'reglages': {
+        if (id !== s.hote || s.etat !== 'salon') return { ok: false, erreur: 'Impossible.' };
+        if (msg.mode !== undefined) {
+          if (!MODES.includes(msg.mode)) return { ok: false, erreur: 'Impossible.' };
+          s.mode = msg.mode;
+        }
+        if (msg.robots !== undefined) {
+          if (s.publique || !NIVEAUX_ROBOTS.concat('gentils').includes(msg.robots)) return { ok: false, erreur: 'Impossible.' };
+          s.robots = msg.robots;
+          if (msg.niveau !== undefined) {
+            if (!Number.isInteger(msg.niveau) || msg.niveau < 1 || msg.niveau > 1000) return { ok: false, erreur: 'Impossible.' };
+            s.niveauJoueur = msg.niveau;
+          }
+        }
+        if (msg.delai !== undefined) {
+          if (!DELAIS.includes(msg.delai)) return { ok: false, erreur: 'Impossible.' };
+          s.delai = msg.delai;
+        }
+        return { ok: true };
+      }
+      case 'micro': {
+        if (!joueur) return { ok: false, erreur: 'Inconnu.' };
+        joueur.voix = !!msg.voix;
+        if (typeof msg.peerId === 'string') joueur.peerId = msg.peerId.slice(0, 64);
+        joueur.muet = !!msg.muet;
+        return { ok: true };
+      }
+      case 'lancer': {
+        if (id !== s.hote) return { ok: false, erreur: "Seul l'hôte peut lancer." };
+        if (s.publique) return { ok: false, erreur: 'La salle démarre seule quand elle est pleine.' };
+        if (s.etat !== 'salon') return { ok: false, erreur: 'Déjà lancée.' };
+        if (s.joueurs.length < MIN) return { ok: false, erreur: 'Il faut au moins 2 joueurs.' };
+        lancer(s);
+        return { ok: true };
+      }
+      case 'mancheSuivante': {
+        if (id !== s.hote || s.etat !== 'finManche') return { ok: false, erreur: 'Impossible.' };
+        demarrerManche(s);
+        return { ok: true };
+      }
+      case 'rejouer': {
+        if (id !== s.hote || s.etat !== 'finPartie') return { ok: false, erreur: 'Impossible.' };
+        s.etat = 'salon';
+        reinitialiser(s);
+        return { ok: true };
+      }
+      case 'revanche':
+      case 'revancheNon': {
+        if (s.etat !== 'finPartie' || !joueur || joueur.robot) return { ok: false, erreur: 'Impossible.' };
+        if (s.revancheRatee && msg.type === 'revanche') s.revancheRatee = false;
+        const duree = s.durees.revanche === undefined ? DUREES.revanche : s.durees.revanche;
+        if (!s.revanche) s.revanche = { oui: [], non: [], jusqua: duree > 0 ? s.horloge() + duree : null };
+        const r = s.revanche;
+        r.oui = r.oui.filter((x) => x !== id); r.non = r.non.filter((x) => x !== id);
+        (msg.type === 'revanche' ? r.oui : r.non).push(id);
+        verifierRevanche(s);
+        return { ok: true };
+      }
+      case 'action': {
+        if (s.etat !== 'manche' || !joueur) return { ok: false, erreur: 'Pas de manche en cours.' };
+        if (s.pause) return { ok: false, erreur: 'Attends la fin du compte à rebours.' };
+        // Le joueur ne peut agir que pour lui-même : on impose son id.
+        const action = actionDe(id, msg.action || {});
+        if (!action) return { ok: false, erreur: 'Action impossible maintenant.' };
+        try {
+          appliquer(s, action);
+          revenu(s, id);
+        } catch (e) {
+          return { ok: false, erreur: action.type === 'jouer' && e && e.message && !/^Action/.test(e.message) ? e.message : 'Action impossible maintenant.' };
+        }
+        return { ok: true };
+      }
+      default:
+        return { ok: false, erreur: 'Message inconnu.' };
+    }
+  }
+
+  function deconnecter(s, id) {
+    const j = s.joueurs.find((x) => x.id === id);
+    if (j && !j.robot) j.connecte = false;
+  }
+  function reconnecter(s, id) {
+    const j = s.joueurs.find((x) => x.id === id);
+    if (j && !j.robot) { j.connecte = true; revenu(s, id); }
+  }
+
+  function journalLisible(s, m) {
+    const ids = s.joueurs.map((j) => j.id).sort((a, b) => b.length - a.length);
+    return m.journal.slice(-8).map((t) => {
+      for (const id of ids) t = t.split(id).join(nomDe(s, id));
+      return t.replace('mode delire', 'mode délire (J retour)');
+    });
+  }
+
+  // Vue envoyée à un joueur : uniquement ce qu'il a le droit de voir.
+  function vue(s, id) {
+    const v = {
+      jeu: JEU,
+      code: s.code,
+      etat: s.etat,
+      moi: id,
+      hote: s.hote,
+      mode: s.mode,
+      joueurs: s.joueurs.map((j) => ({ id: j.id, nom: j.nom, connecte: j.connecte, peerId: j.peerId || null, voix: !!j.voix, muet: j.muet !== false, robot: !!j.robot, pret: !!j.pret || !!j.robot, remplace: !!j.remplace, absent: estAbsent(s, j.id) })),
+      delai: s.delai,
+      publique: !!s.publique,
+      taille: s.taille,
+      chrono: s.echeance && s.etat === 'manche' ? { resteMs: Math.max(0, s.echeance - s.horloge()), totalMs: s.chronoTotal || s.delai * 1000 } : null,
+      suite: s.etat === 'finManche' && s.suiteA ? { resteMs: Math.max(0, s.suiteA - s.horloge()), totalMs: s.durees.mancheAuto } : null,
+      revanche: s.etat === 'finPartie' && s.revanche ? { oui: s.revanche.oui.slice(), non: s.revanche.non.slice(), resteMs: s.revanche.jusqua ? Math.max(0, s.revanche.jusqua - s.horloge()) : null, totalMs: s.durees.revanche === undefined ? DUREES.revanche : s.durees.revanche } : null,
+      revancheRatee: s.etat === 'finPartie' && !!s.revancheRatee,
+      robots: s.robots || 'normaux',
+      restants: s.restants.slice(),
+      elimines: s.elimines.slice(),
+      numeroManche: s.numeroManche,
+      vainqueur: s.vainqueur,
+    };
+    const m = s.manche;
+    if (m && s.etat !== 'salon') {
+      const p = I.vuePublique(m, id);
+      v.manche = {
+        sieges: p.sieges,
+        enJeu: p.enJeu,
+        nbCartes: p.nbCartes,
+        reference: p.reference,
+        libre: p.libre,
+        demande: p.demande,
+        sens: p.sens,
+        pioche: p.pioche,
+        annonces: p.annonces,
+        contestable: p.contestable,
+        aPioche: p.aPioche,
+        phase: m.phase,
+        nulle: m.phase === 'nulle',
+        joueurCourant: m.joueurCourant,
+        qualifies: m.qualifies.map((j) => ({ joueur: j, raison: 'main vide' })), // même forme que Kopo
+        elimine: m.elimine,
+        journal: journalLisible(s, m),
+        main: p.main,
+        pause: s.pause ? { type: s.pause.type, resteMs: Math.max(0, s.pause.jusqua - s.horloge()), totalMs: s.pause.total } : null,
+        actions: s.pause ? [] : I.actionsPossibles(m, id).map((a) => {
+          const r = { type: a.type };
+          if (a.cartes) r.cartes = a.cartes.slice();
+          if (a.demande) r.demande = a.demande;
+          if (a.cible) r.cible = a.cible;
+          return r;
+        }),
+      };
+    }
+    return v;
+  }
+
+  function exporter(s) {
+    const { rng, horloge, ...reste } = s;
+    return JSON.stringify(reste);
+  }
+  function importer(texte, rng) {
+    const s = JSON.parse(texte);
+    s.rng = rng || hasardFort();
+    s.horloge = Date.now;
+    s.joueurs.forEach((j) => (j.connecte = !!j.robot));
+    return s;
+  }
+
+  const Inter8Salle = { JEU, MIN, MAX, MODES, DELAIS, PAUSE_ROBOT, DUREES, DELAI_ABSENT, DELAI_ANNONCE, NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, creerSalle, rendrePublique, choixRobot, reconnecter, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
+  if (enNode) module.exports = Inter8Salle;
+  else root.Inter8Salle = Inter8Salle;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
 <script>kopoChargement(61, 0, 63)</script>
 <script>// Kopo — tout ce qui donne envie de revenir, calculé sur le téléphone (retention.md v1.0, lot A).
 // XP et niveau, stats, face-à-face, missions du jour, défi de la semaine, parcours de bienvenue,
@@ -5201,6 +6357,9 @@ var qrcode = function() {
 (function () {
   'use strict';
   const K = window.Kopo, S = window.KopoSalle, R = window.KopoRetention, Sons = window.KopoSons;
+  // Inter (8) : son moteur et sa salle ont la même forme que ceux de Kopo. La salle dit à quel jeu elle sert.
+  const I8 = window.Inter8, SI = window.Inter8Salle;
+  const modSalle = (s) => (s && s.jeu === 'inter8' ? SI : S);
   const $ = (id) => document.getElementById(id);
   const PREFIXE = 'kopo-mj-v1-';
   const LETTRES = 'ABCDEFGHJKMNPQRSTUVWXYZ';
@@ -5272,7 +6431,7 @@ var qrcode = function() {
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = '953a5f269921'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = '7ea9a2a7f598'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
@@ -5718,14 +6877,17 @@ var qrcode = function() {
   let vueActuelle = null;
   let session = stock.lire(cleSession);
 
-  function demarrerHote(code, nom, reprise, taille) {
+  function demarrerHote(code, nom, reprise, taille, jeu) {
     const sauvee = reprise && stock.lire(PREFIXE + 'salle-' + code);
-    const salle = sauvee ? S.importer(sauvee) : S.creerSalle(code);
-    if (taille && !sauvee) S.rendrePublique(salle, taille);
+    let jeuSalle = jeu === 'inter8' ? 'inter8' : 'kopo';
+    if (sauvee) { try { jeuSalle = JSON.parse(sauvee).jeu === 'inter8' ? 'inter8' : 'kopo'; } catch (e) {} }
+    const M = jeuSalle === 'inter8' ? SI : S;
+    const salle = sauvee ? M.importer(sauvee) : M.creerSalle(code);
+    if (taille && !sauvee) M.rendrePublique(salle, taille);
     hote = { salle, vus: new Map(), reseau: null };
     session = { code, role: 'hote', nom };
     stock.ecrire(cleSession, session);
-    S.recevoir(salle, monId, { type: 'rejoindre', nom });
+    M.recevoir(salle, monId, { type: 'rejoindre', nom });
     salle.joueurs.forEach((j) => { if (!j.robot) j.voix = j.id === monId ? vocal.actif : false; });
     afficherConnexion("Ouverture de la partie…");
     hote.reseau = reseauHote(code, {
@@ -5734,7 +6896,7 @@ var qrcode = function() {
         hote.vus.set(id, Date.now());
         if (msg && msg.type === 'ping') {
           const j = salle.joueurs.find((x) => x.id === id);
-          if (j && !j.connecte && !j.robot) { S.reconnecter(salle, id); diffuser(); }
+          if (j && !j.connecte && !j.robot) { M.reconnecter(salle, id); diffuser(); }
           else hote.reseau.envoyer(id, { type: 'pong' });
           return;
         }
@@ -5745,7 +6907,7 @@ var qrcode = function() {
   }
 
   function traiter(id, msg) {
-    const r = S.recevoir(hote.salle, id, msg);
+    const r = modSalle(hote.salle).recevoir(hote.salle, id, msg);
     if (r.ok && r.evenement) {
       // Émoji rapide : relayé à toute la table, sans changer la partie.
       for (const j of hote.salle.joueurs) if (j.id !== monId) hote.reseau.envoyer(j.id, r.evenement);
@@ -5760,14 +6922,14 @@ var qrcode = function() {
   }
 
   function diffuser() {
-    const s = hote.salle;
-    stock.ecrire(PREFIXE + 'salle-' + s.code, S.exporter(s));
-    for (const j of s.joueurs) if (j.id !== monId) hote.reseau.envoyer(j.id, { type: 'vue', vue: S.vue(s, j.id) });
-    afficher(S.vue(s, monId));
+    const s = hote.salle, M = modSalle(s);
+    stock.ecrire(PREFIXE + 'salle-' + s.code, M.exporter(s));
+    for (const j of s.joueurs) if (j.id !== monId) hote.reseau.envoyer(j.id, { type: 'vue', vue: M.vue(s, j.id) });
+    afficher(M.vue(s, monId));
   }
 
   // Chrono : l'hôte vérifie 4 fois par seconde si le joueur courant a épuisé son temps.
-  setInterval(() => { if (hote && S.tic(hote.salle)) diffuser(); }, 250);
+  setInterval(() => { if (hote && modSalle(hote.salle).tic(hote.salle)) diffuser(); }, 250);
 
   // Un joueur silencieux depuis 8 s est marqué déconnecté.
   setInterval(() => {
@@ -5943,19 +7105,25 @@ var qrcode = function() {
   function afficher(v) {
     const ancienne = vueActuelle;
     vueActuelle = v;
+    // En-tête : le nom du jeu de la table (Kopo ou Inter (8)).
+    const logo = $('logoJeu'), nomJeu = v.jeu === 'inter8' ? 'INTER (8)' : 'KOPO';
+    if (logo.lastChild.textContent !== nomJeu) { logo.lastChild.textContent = nomJeu; logo.classList.toggle('long', v.jeu === 'inter8'); logo.firstChild.src = v.jeu === 'inter8' ? 'icons/masano-logo.svg' : 'icons/kopo-logo.svg'; }
     garderEcranAllume();
     vocal.maj(v);
     const finAvant = finChrono;
     demarrerChrono(v);
-    if (!ancienne || ancienne.etat !== v.etat || ancienne.numeroManche !== v.numeroManche) { carteChoisie = null; cartesRecues.clear(); }
-    suivrePartie(v);
+    if (!ancienne || ancienne.etat !== v.etat || ancienne.numeroManche !== v.numeroManche) { carteChoisie = null; choixInter = []; cartesRecues.clear(); }
+    if (v.jeu !== 'inter8') suivrePartie(v); // Inter (8) : l'XP et les missions viendront à l'étape de la progression
     if (v.etat !== 'finPartie') arreterSuiteAuto();
     if (v.etat === 'salon') { if (!chatOuvert()) fermerFenetre(); return afficherSalon(v); } // le chat reste ouvert quand quelqu'un arrive ou se dit prêt
     if (v.etat === 'manche' && client && !v.joueurs.some((j) => j.id === v.moi)) { quitter(); toast('La revanche est partie sans toi.'); return; }
-    const avant = positionsAvant();
-    afficherPartie(v);
-    try { animer(ancienne, v, avant, finAvant); } catch (e) { console.error(e); }
-    try { sonner(ancienne, v); } catch (e) { console.error(e); }
+    if (v.jeu === 'inter8') afficherPartieInter(v); // Inter (8) : pas encore d'animations
+    else {
+      const avant = positionsAvant();
+      afficherPartie(v);
+      try { animer(ancienne, v, avant, finAvant); } catch (e) { console.error(e); }
+      try { sonner(ancienne, v); } catch (e) { console.error(e); }
+    }
     if (v.etat === 'finManche' || v.etat === 'finPartie') {
       // On laisse le temps de voir l'élimination avant d'ouvrir le bilan.
       const attente = retardFenetre - Date.now();
@@ -5965,7 +7133,8 @@ var qrcode = function() {
         minuteurFenetre = setTimeout(() => { const w = vueActuelle; if (w && w.etat === 'finManche') afficherFinManche(w); else if (w && w.etat === 'finPartie') afficherFinPartie(w); }, attente);
       } else if (v.etat === 'finManche') afficherFinManche(v);
       else afficherFinPartie(v);
-    } else if (!($('fenetre').dataset.type === 'chat' && !$('voile').hidden && !(v.manche && v.manche.joueurCourant === v.moi))) fermerFenetre();
+    } else if (!($('fenetre').dataset.type === 'chat' && !$('voile').hidden && !(v.manche && v.manche.joueurCourant === v.moi))
+      && !($('fenetre').dataset.type === 'demande8' && !$('voile').hidden && v.manche && v.manche.joueurCourant === v.moi)) fermerFenetre();
     // (le chat reste ouvert pendant que les autres jouent, et se ferme quand c'est à toi)
   }
 
@@ -6206,7 +7375,7 @@ var qrcode = function() {
     const jeSuisHote = v.hote === v.moi;
     $('noteHote').hidden = !jeSuisHote || MODE_SERVEUR; // avec le serveur Kopo, la partie ne tourne pas sur le téléphone de l'hôte
     const rg = $('reglage'); rg.replaceChildren(el('span', null, 'Chrono'));
-    for (const d of S.DELAIS) {
+    for (const d of modSalle(v).DELAIS) {
       const libelle = d ? d + ' s' : 'sans';
       if (jeSuisHote && !v.publique) {
         const b = el('button', 'btn' + (v.delai === d ? ' actif' : ''), libelle);
@@ -6214,9 +7383,22 @@ var qrcode = function() {
         rg.append(b);
       } else if (v.delai === d) rg.append(el('strong', null, d ? d + ' secondes par joueur' : 'sans chrono'));
     }
+    // Inter (8) : le style de la partie (simple, ou délire avec le J retour), choisi par l'hôte.
+    const rs = $('reglageStyle'); rs.hidden = v.jeu !== 'inter8'; rs.replaceChildren();
+    if (v.jeu === 'inter8') {
+      rs.append(el('span', null, 'Style'));
+      for (const [mode, libelle] of [['simple', 'Simple'], ['delire', 'Délire (J retour)']]) {
+        if (jeSuisHote && !v.publique) {
+          const b = el('button', 'btn' + (v.mode === mode ? ' actif' : ''), libelle);
+          b.onclick = () => envoyer({ type: 'reglages', mode });
+          rs.append(b);
+        } else if (v.mode === mode) rs.append(el('strong', null, libelle));
+      }
+    }
+    const maxJoueurs = v.jeu === 'inter8' ? SI.MAX : 9;
     // « Prêt » : seulement indicatif (l'hôte lance quand il veut). On compte les invités humains, pas les robots.
     const invites = v.joueurs.filter((j) => j.id !== v.hote && !j.robot), prets = invites.filter((j) => j.pret).length;
-    $('titreJoueurs').textContent = `Joueurs (${v.joueurs.length}/${v.publique ? v.taille : 9})` + (invites.length && !v.publique ? ` · ${prets}/${invites.length} prêt${prets > 1 ? 's' : ''}` : '');
+    $('titreJoueurs').textContent = `Joueurs (${v.joueurs.length}/${v.publique ? v.taille : maxJoueurs})` + (invites.length && !v.publique ? ` · ${prets}/${invites.length} prêt${prets > 1 ? 's' : ''}` : '');
     const ul = $('listeJoueurs'); ul.replaceChildren();
     for (const j of v.joueurs) {
       const li = el('li');
@@ -6235,7 +7417,7 @@ var qrcode = function() {
       }
       ul.append(li);
     }
-    $('btnRobot').hidden = !jeSuisHote || v.joueurs.length >= 9 || v.publique;
+    $('btnRobot').hidden = !jeSuisHote || v.joueurs.length >= maxJoueurs || v.publique;
     $('btnLancer').hidden = !jeSuisHote || v.publique;
     $('btnLancer').disabled = v.joueurs.length < 2;
     $('btnLancer').textContent = v.joueurs.length < 2 ? 'En attente d\'au moins 2 joueurs' : `Lancer · ${v.joueurs.length} joueurs`;
@@ -6251,18 +7433,12 @@ var qrcode = function() {
     $('attenteHote').textContent = moi.pret ? 'Tu es prêt. La partie part dès que l\'hôte lance.' : 'L\'hôte peut lancer à tout moment.';
   }
 
-  function afficherPartie(v) {
-    montrerEcran('ecranPartie');
-    if (!(v.manche && v.manche.joueurCourant === v.moi)) inviterPaysage();
-    const m = v.manche;
-    const finale = v.restants.length === 2;
-    $('info').innerHTML = '';
-    $('info').append(el('strong', null, finale ? 'Finale' : 'Manche ' + v.numeroManche), document.createTextNode(` · ${v.code}`));
-
-    // Sièges, en partant de moi, dans le sens des aiguilles d'une montre.
+  // Sièges autour de la table (Kopo et Inter (8)).
+  function dessinerSieges(v) {
+    const m = v.manche, pause = m.pause;
+    // En partant de moi, dans le sens des aiguilles d'une montre.
     const i0 = Math.max(0, m.sieges.indexOf(v.moi));
     const ordre = m.sieges.slice(i0).concat(m.sieges.slice(0, i0));
-    const pause = m.pause;
     const box = $('sieges'); box.replaceChildren();
     // En paysage, les adversaires sont placés sur le bord de la table, de ta gauche à ta droite.
     const autres = ordre.filter((id) => id !== v.moi);
@@ -6307,6 +7483,19 @@ var qrcode = function() {
       else if (joueur.absent && m.enJeu.includes(id)) d.append(el('span', 'pastille ko', 'absent · 5 s'));
       box.append(d);
     });
+
+  }
+
+  function afficherPartie(v) {
+    montrerEcran('ecranPartie');
+    if (!(v.manche && v.manche.joueurCourant === v.moi)) inviterPaysage();
+    const m = v.manche;
+    const finale = v.restants.length === 2;
+    $('info').innerHTML = '';
+    $('info').append(el('strong', null, finale ? 'Finale' : 'Manche ' + v.numeroManche), document.createTextNode(` · ${v.code}`));
+
+    const pause = m.pause;
+    dessinerSieges(v);
 
     // Table
     const ent = $('entete'); ent.replaceChildren();
@@ -6414,6 +7603,186 @@ var qrcode = function() {
 
   }
 
+  // ------------------------------------------------------------------ Inter (8) : la table
+  // Même écran que Kopo (sièges, table, main, actions), avec les règles d'Inter (8) :
+  // une carte de référence au centre, la pioche, plusieurs cartes de même valeur posées ensemble,
+  // la valeur demandée avec le 8, et les boutons J'annonce et Contester.
+  const NOMS_VALEURS_INTER = { A: 'As', V: 'Valet', D: 'Dame', R: 'Roi', X: 'Joker' };
+  const estRougeInter = (c) => c.replace('*', '') === 'XR' || ['C', 'K'].includes(I8.couleur(c));
+  function carteInterEl(c, tag) {
+    const e = el(tag || 'div', 'carte' + (estRougeInter(c) ? ' rouge' : ''));
+    const v = I8.valeur(c);
+    if (v === 'X') {
+      e.classList.add('joker');
+      e.append(el('span', 'coin', 'JK'), el('span', 'centre', '★'));
+      e.setAttribute('aria-label', 'Joker ' + (estRougeInter(c) ? 'rouge' : 'noir'));
+    } else {
+      const sy = I8.SYMBOLES[I8.couleur(c)];
+      e.append(el('span', 'coin', v + sy), el('span', 'centre', ['V', 'D', 'R'].includes(v) ? v : sy));
+      e.setAttribute('aria-label', (NOMS_VALEURS_INTER[v] || v) + ' de ' + I8.NOMS_COULEURS[I8.couleur(c)]);
+    }
+    e.dataset.carte = c;
+    return e;
+  }
+  const rangInter = (c) => (I8.valeur(c) === 'X' ? 99 : I8.VALEURS.indexOf(I8.valeur(c)));
+  const coulInter = (c) => (I8.valeur(c) === 'X' ? 9 : I8.COULEURS.indexOf(I8.couleur(c)));
+  const trierMainInter = (main) => main.slice().sort(prefs.tri === 'valeur' ? (a, b) => rangInter(a) - rangInter(b) || coulInter(a) - coulInter(b) : (a, b) => coulInter(a) - coulInter(b) || rangInter(a) - rangInter(b));
+  const nomValeur = (v) => NOMS_VALEURS_INTER[v] || v;
+
+  let choixInter = []; // cartes touchées, dans l'ordre (la dernière donne la couleur)
+  // Coups « jouer » qui correspondent exactement aux cartes choisies (même première, même dernière).
+  function coupsPour(actions, choix) {
+    if (!choix.length) return [];
+    return actions.filter((a) => a.type === 'jouer' && a.cartes.length === choix.length && a.cartes[0] === choix[0]
+      && a.cartes[a.cartes.length - 1] === choix[choix.length - 1] && choix.every((c) => a.cartes.includes(c)));
+  }
+  // Une carte peut-elle rejoindre les cartes déjà choisies ?
+  function ajoutable(actions, choix, c) {
+    return actions.some((a) => a.type === 'jouer' && a.cartes.includes(c) && (!choix.length ? a.cartes[0] === c : a.cartes[0] === choix[0] && choix.every((x) => a.cartes.includes(x))));
+  }
+  function poserInter(coups) {
+    if (!coups.length) return;
+    const demandes = [...new Set(coups.map((a) => a.demande).filter(Boolean))];
+    const envoyerCoup = (a) => { choixInter = []; envoyer({ type: 'action', action: { type: 'jouer', cartes: a.cartes, demande: a.demande } }); };
+    if (!demandes.length) return envoyerCoup(coups[0]);
+    // Le 8 : on choisit la valeur demandée parmi celles qu'on a encore en main.
+    const grille = el('div', 'choix-demande');
+    for (const d of demandes) {
+      const b = el('button', 'btn large', nomValeur(d));
+      b.onclick = () => { fermerFenetre(); envoyerCoup(coups.find((a) => a.demande === d)); };
+      grille.append(b);
+    }
+    const annuler = el('button', 'btn large', 'Annuler');
+    annuler.onclick = fermerFenetre;
+    ouvrirFenetre([el('h2', null, 'Quelle valeur demandes-tu ?'), el('p', 'muted', 'Le joueur suivant doit poser cette valeur, un 8 ou un joker. Sinon il pioche.'), grille, annuler], 'demande8');
+  }
+
+  function afficherPartieInter(v) {
+    montrerEcran('ecranPartie');
+    if (!(v.manche && v.manche.joueurCourant === v.moi)) inviterPaysage();
+    const m = v.manche;
+    const finale = v.restants.length === 2;
+    $('info').innerHTML = '';
+    $('info').append(el('strong', null, finale ? 'Finale' : 'Manche ' + v.numeroManche), document.createTextNode(` · ${v.mode === 'delire' ? 'Délire' : 'Simple'} · ${v.code}`));
+    const pause = m.pause;
+    dessinerSieges(v);
+    // Qui a annoncé, et le sens du jeu (mode délire).
+    for (const id of m.annonces) { const d = siegeEl(id); if (d && !m.qualifies.some((q) => q.joueur === id)) d.append(el('span', 'pastille tour', 'annonce')); }
+    const qui = (id) => (id === v.moi ? 'Toi' : nom(v, id));
+
+    // En-tête : ce que la carte du centre impose.
+    const ent = $('entete'); ent.replaceChildren();
+    if (!pause && m.phase === 'jeu') {
+      if (m.demande) { const c = el('span', 'chip demande'); c.append('Demande ', el('b', null, nomValeur(m.demande.valeur)), ` · ${qui(m.demande.par)}`); ent.append(c); }
+      else if (m.libre) ent.append(el('span', 'chip', 'Jeu libre : pose la carte de ton choix'));
+      if (v.mode === 'delire' && m.enJeu.length > 2) { const c = el('span', 'chip'); c.append('Sens ', el('b', null, m.sens === 1 ? '↻' : '↺')); ent.append(c); }
+    }
+
+    // Table : compte à rebours de départ, ou la carte du centre et la pioche.
+    const poses = $('poses'); poses.replaceChildren(); poses.classList.remove('serre');
+    if (pause && pause.type === 'depart') {
+      const d = el('div', 'depart');
+      d.append(el('div', 'depart-titre', finale ? 'Finale' : 'Manche ' + v.numeroManche), el('div', 'decompte', ''),
+        avecIco(el('div', 'depart-qui'), 'depart', qui(m.joueurCourant)));
+      poses.append(d);
+    } else {
+      const t = el('div', 'table-inter');
+      const ref = el('div', 'pile');
+      if (m.reference) ref.append(carteInterEl(m.reference));
+      ref.append(el('span', 'legende', 'Au centre'));
+      const pioche = el('div', 'pile');
+      const dos = el('div', 'carte dos-carte');
+      pioche.append(dos, el('span', 'legende', `Pioche · ${m.pioche}`));
+      t.append(ref, pioche);
+      poses.append(t);
+      const fil = el('div', 'fil-inter');
+      m.journal.slice(-3).forEach((ligne) => fil.append(el('div', null, ligne)));
+      poses.append(fil);
+    }
+
+    // Consigne
+    const cons = $('consigne'); cons.replaceChildren();
+    const monTour = m.joueurCourant === v.moi;
+    const jeJoue = m.enJeu.includes(v.moi);
+    const actions = m.actions;
+    const coups = actions.filter((a) => a.type === 'jouer');
+    if (pause || m.phase !== 'jeu') {}
+    else if (!v.restants.includes(v.moi) || !jeJoue) cons.append(ico('oeil'), ' Tu regardes la partie.');
+    else if (monTour) {
+      if (v.chrono) cons.append(el('span', 'secondes', ''), ' ');
+      cons.append(el('em', null, 'À toi !'));
+      if (!coups.length) cons.append(m.aPioche ? ' Tu ne peux pas jouer la carte piochée : passe.' : ' Aucune carte ne va : pioche.');
+    }
+    $('barreChrono').hidden = !(v.chrono && monTour) && !pause;
+    $('barreChrono').classList.toggle('barre-pause', !!pause);
+    if (monTour && !pause && !etaitMonTour) { vibrer(120); Sons.jouer('tour'); fermerInvitationPaysage(); }
+    etaitMonTour = monTour && !pause;
+
+    // J'annonce et Contester : possibles à tout moment, même hors de son tour.
+    const zk = $('zoneKatapss'); zk.replaceChildren();
+    if (actions.some((a) => a.type === 'annoncer')) {
+      const b = el('button', 'btn katapss inter', "J'ANNONCE\u00a0!");
+      b.onclick = () => { b.disabled = true; envoyer({ type: 'action', action: { type: 'annoncer' } }); };
+      zk.append(b);
+    }
+    const contester = actions.find((a) => a.type === 'contester');
+    if (contester) {
+      const b = el('button', 'btn katapss inter contester', `CONTESTER ${nom(v, contester.cible).toUpperCase()}`);
+      b.onclick = () => { b.disabled = true; envoyer({ type: 'action', action: { type: 'contester' } }); };
+      zk.append(b);
+    }
+
+    // Main : on touche une ou plusieurs cartes de même valeur, dans l'ordre (la dernière donne la couleur).
+    $('zoneMain').hidden = !jeJoue;
+    choixInter = choixInter.filter((c) => m.main.includes(c));
+    if (!coups.length || (choixInter.length && !coups.some((a) => a.cartes[0] === choixInter[0] && choixInter.every((x) => a.cartes.includes(x))))) choixInter = [];
+    const choisis = coupsPour(actions, choixInter);
+    $('titreMain').textContent = `Ta main (${m.main.length} carte${m.main.length > 1 ? 's' : ''})` + (coups.length && !choixInter.length ? ' · touche une carte' : '');
+    const main = $('main'); main.replaceChildren();
+    const triee = trierMainInter(m.main);
+    triee.forEach((c, i) => {
+      const b = carteInterEl(c, 'button');
+      b.type = 'button';
+      const ecart = i - (triee.length - 1) / 2;
+      b.style.setProperty('--r', (ecart * Math.min(2.5, 16 / triee.length)).toFixed(1) + 'deg');
+      b.style.setProperty('--dy', (ecart * ecart * Math.min(1, 8 / triee.length)).toFixed(1) + 'px');
+      const k = choixInter.indexOf(c);
+      if (k >= 0) {
+        b.classList.add('jouable', 'choisie');
+        if (choixInter.length > 1) b.append(el('span', 'ordre', String(k + 1)));
+        b.onclick = () => {
+          if (choixInter.length === 1 && choisis.length) return poserInter(choisis); // deuxième touche : on pose
+          choixInter.splice(k, 1); afficherPartieInter(vueActuelle);
+        };
+      } else if (ajoutable(actions, choixInter, c)) {
+        b.classList.add('jouable');
+        b.onclick = () => { choixInter.push(c); afficherPartieInter(vueActuelle); };
+      } else if (monTour) b.disabled = true;
+      main.append(b);
+    });
+    ajusterMain();
+
+    const act = $('actions'); act.replaceChildren();
+    if (choisis.length) {
+      const val = I8.valeur(choixInter[0]);
+      const texte = choixInter.length === 1 ? `Poser le ${I8.afficher(choixInter[0])}` : `Poser ${choixInter.length} cartes (${nomValeur(val)})`;
+      const b = el('button', 'btn principal large', texte);
+      b.onclick = () => poserInter(choisis);
+      act.append(b);
+      if (choixInter.length > 1) act.append(el('small', 'muted', 'La dernière carte touchée donne la couleur.'));
+    }
+    if (actions.some((a) => a.type === 'piocher')) {
+      const b = el('button', 'btn principal large', 'Piocher une carte');
+      b.onclick = () => { b.disabled = true; envoyer({ type: 'action', action: { type: 'piocher' } }); };
+      act.append(b);
+    }
+    if (actions.some((a) => a.type === 'passer')) {
+      const b = el('button', 'btn large' + (coups.length ? '' : ' principal'), 'Passer');
+      b.onclick = () => { b.disabled = true; choixInter = []; envoyer({ type: 'action', action: { type: 'passer' } }); };
+      act.append(b);
+    }
+  }
+
   // Ta main sur une seule ligne : si les cartes ne tiennent pas, elles se chevauchent
   // (le coin de chaque carte reste visible). Au-delà, elles passent sur deux lignes.
   function ajusterMain() {
@@ -6425,7 +7794,7 @@ var qrcode = function() {
     let parLigne = n;
     const paysage = matchMedia('(orientation: landscape)').matches;
     if (!paysage && (W - w) / (n - 1) < 30) parLigne = Math.ceil(n / 2);
-    const pas = Math.min(w + 6, Math.floor((W - w) / Math.max(1, parLigne - 1)));
+    const pas = Math.min(w, Math.floor((W - w) / Math.max(1, parLigne - 1))); // au plus la largeur d'une carte : sinon la dernière passe à la ligne
     main.style.setProperty('--pas', pas + 'px');
     main.classList.add('serree');
   }
@@ -9010,10 +10379,19 @@ var qrcode = function() {
     $('niveauRobotsAide').textContent = AIDES_NIVEAU_ROBOTS[n] + ' Ils deviennent un peu plus forts à chaque niveau que tu gagnes (tu es niveau ' + monNiveau() + ').';
   }
   $('niveauRobots').querySelectorAll('button').forEach((b) => (b.onclick = () => { stock.ecrire('kopo-niveau-robots', b.dataset.v); majNiveauRobots(); }));
+  // Inter (8) : le style de la partie (gardé sur le téléphone), et 7 robots au plus (8 joueurs).
+  const styleInter = () => (stock.lire('kopo-inter8-style') === 'delire' ? 'delire' : 'simple');
+  function majStyleRobots() {
+    const inter = jeuChoisi() === 'inter8';
+    document.querySelectorAll('#voileRobots .style-inter').forEach((e) => (e.hidden = !inter));
+    $('styleRobots').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === styleInter())));
+    $('choixRobots').querySelectorAll('button').forEach((b) => (b.hidden = inter && +b.textContent > SI.MAX - 1));
+  }
+  $('styleRobots').querySelectorAll('button').forEach((b) => (b.onclick = () => { stock.ecrire('kopo-inter8-style', b.dataset.v); majStyleRobots(); }));
   $('btnModeRobots').onclick = () => {
     if (!lirePseudo()) return;
-    $('btnGuidee').hidden = !!lireProfil().premierePartie;
-    majNiveauRobots();
+    $('btnGuidee').hidden = !!lireProfil().premierePartie || jeuChoisi() === 'inter8';
+    majNiveauRobots(); majStyleRobots();
     $('voileRobots').hidden = false;
   };
   $('btnFermerRobots').onclick = () => ($('voileRobots').hidden = true);
@@ -9025,8 +10403,9 @@ var qrcode = function() {
       const p = lirePseudo(); if (!p) return;
       $('voileRobots').hidden = true;
       // Partie avec des robots : on crée la salle, on ajoute les robots et on lance tout de suite.
-      demarrerHote(nouveauCode(), p, false);
-      envoyer({ type: 'reglages', robots: niveauRobots(), niveau: monNiveau() });
+      const inter = jeuChoisi() === 'inter8';
+      demarrerHote(nouveauCode(), p, false, null, inter ? 'inter8' : 'kopo');
+      envoyer(Object.assign({ type: 'reglages', robots: niveauRobots(), niveau: monNiveau() }, inter ? { mode: styleInter() } : {}));
       for (let i = 0; i < n; i++) envoyer({ type: 'ajouterRobot' });
       envoyer({ type: 'lancer' });
     };
@@ -9045,7 +10424,7 @@ var qrcode = function() {
 
   // ------------------------------------------------------------------ Masano : choix du jeu
   // L'accueil propose Kopo ou Inter (8). Le choix est gardé sur le téléphone. Tant que la table
-  // d'Inter (8) n'est pas prête dans l'appli, ses modes affichent « bientôt » (sauf Rejoindre).
+  // d'Inter (8) n'est pas prête en ligne, ses autres modes affichent « bientôt » (sauf Rejoindre et Contre les robots).
   const JEUX = ['kopo', 'inter8'];
   const textesModes = {
     kopo: { btnCreer: 'Entre amis, de 2 à 9', btnModeRobots: 'Partie rapide, seul' },
@@ -9062,9 +10441,9 @@ var qrcode = function() {
   const interBientot = (e) => {
     if (jeuChoisi() !== 'inter8') return;
     const cible = e.target.closest('#modes .mode, #btnRegles');
-    if (!cible || cible.id === 'btnModeRejoindre') return;
+    if (!cible || cible.id === 'btnModeRejoindre' || cible.id === 'btnModeRobots') return; // Rejoindre et Contre les robots sont ouverts
     e.preventDefault(); e.stopImmediatePropagation();
-    toast("Inter (8) arrive très bientôt : sa table est en préparation. En attendant, joue à Kopo !");
+    toast("Inter (8) entre amis et en ligne arrive très bientôt. En attendant, essaie-le contre les robots !");
   };
   $('modes').addEventListener('click', interBientot, true);
   $('btnRegles').addEventListener('click', interBientot, true);

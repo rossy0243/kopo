@@ -13,6 +13,9 @@ const rempl = {
   SALLE: lire('src/kopo-salle.js'),
   RETENTION: lire('src/kopo-retention.js'),
   SONS: lire('src/kopo-sons.js'),
+  MOTEUR_INTER8: lire('moteur/inter8-moteur.js'),
+  ROBOTS_INTER8: lire('moteur/inter8-robots.js'),
+  SALLE_INTER8: lire('src/inter8-salle.js'),
 };
 for (const [k, v] of Object.entries(rempl)) html = html.replace(`/*${k}*/`, () => v);
 // Adresse publique du site (aperçus WhatsApp, etc.) : SITE_URL sur Render, GitHub Pages par défaut.
