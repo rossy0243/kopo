@@ -13,7 +13,7 @@
   const MIN = 2, MAX = I.MAX_JOUEURS; // 8 joueurs au plus
   const MODES = ['simple', 'delire'];
   const DELAIS = [0, 5, 10, 15, 20]; // secondes par tour (0 = sans chrono)
-  const PAUSE_ROBOT = 1200; // un robot réfléchit 1,2 s avant de jouer
+  const PAUSE_ROBOT = 1800; // un robot réfléchit 1,8 s avant de jouer : le temps de voir chaque coup
   const DUREES = { depart: 5000, mancheAuto: 10000, revanche: 15000 };
   const DELAI_ABSENT = 5;
   const DELAI_ANNONCE = 3000; // temps laissé pour annoncer avant qu'un robot ne conteste
@@ -446,6 +446,10 @@
         elimine: m.elimine,
         journal: journalLisible(s, m),
         main: p.main,
+        posees: p.posees.slice(-8), // dernières cartes posées (animations côté téléphone)
+        nbPosees: p.posees.length,
+        dernier: p.dernier, // qui a posé la carte du centre
+        paquets: p.paquets,
         pause: s.pause ? { type: s.pause.type, resteMs: Math.max(0, s.pause.jusqua - s.horloge()), totalMs: s.pause.total } : null,
         actions: s.pause ? [] : I.actionsPossibles(m, id).map((a) => {
           const r = { type: a.type };

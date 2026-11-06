@@ -30,13 +30,13 @@ async function devenirAmis(x, y) {
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Joue une partie jusqu'au bout : chaque client humain joue la première action permise.
-async function jouerPartie(joueurs, { robots = 0 } = {}) {
+async function jouerPartie(joueurs, { robots = 0, jeu = 'kopo', reglages = null } = {}) {
   const client = new Client(URL_.replace('http', 'ws'));
   const code = 'T' + Math.random().toString(36).slice(2, 5).toUpperCase().replace(/[^A-Z]/g, 'Q').padEnd(3, 'Q');
   const salles = [];
   let fin = null;
   for (const j of joueurs) {
-    const salle = salles.length ? await client.joinById(salles[0].roomId, { jeton: j.jeton }) : await client.create('kopo', { jeton: j.jeton, code, rapide: true });
+    const salle = salles.length ? await client.joinById(salles[0].roomId, { jeton: j.jeton }) : await client.create(jeu, { jeton: j.jeton, code, rapide: true });
     salle.onMessage('erreur', () => {});
     salle.onMessage('solde', () => {});
     salle.onMessage('vue', (v) => {
@@ -46,6 +46,7 @@ async function jouerPartie(joueurs, { robots = 0 } = {}) {
     });
     salles.push(salle);
   }
+  if (reglages) salles[0].send('reglages', reglages);
   for (let i = 0; i < robots; i++) salles[0].send('ajouterRobot');
   await attendre(100);
   salles[0].send('lancer');
@@ -334,6 +335,34 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     await srv.base.query("UPDATE comptes SET statut = 'banni' WHERE id = $1", [x.compte.id]);
     const c = new Client(URL_.replace('http', 'ws'));
     await assert.rejects(c.create('kopo', { jeton: x.jeton }));
+  });
+
+  console.log('Inter (8) sur le serveur');
+  await test('Inter (8) entre amis : partie complète en délire, gains, partie notée « inter8 », pas de parcours', async () => {
+    const js = [await invite('Inter_A'), await invite('Inter_B'), await invite('Inter_C')];
+    const fin = await jouerPartie(js, { jeu: 'inter8', reglages: { mode: 'delire' } });
+    assert.strictEqual(fin.jeu, 'inter8');
+    assert.strictEqual(fin.mode, 'delire');
+    const ordre = [fin.vainqueur, ...fin.elimines.slice().reverse()];
+    assert.strictEqual((await srv.comptes.lire(ordre[0])).solde, 500 + 2 * 5 + 40, 'vainqueur : 2 manches et la victoire');
+    assert.strictEqual((await srv.comptes.lire(ordre[1])).solde, 500 + 5 + 15, '2e');
+    const r = (await srv.base.query('SELECT jeu FROM parties ORDER BY debut DESC LIMIT 1')).rows[0];
+    assert.strictEqual(r.jeu, 'inter8');
+    const xp = (await srv.base.query('SELECT count(*)::int AS n FROM parcours_parties WHERE compte_id = $1', [ordre[0]])).rows[0].n;
+    assert.strictEqual(xp, 0);
+  });
+  await test('Inter (8) en ligne : salle publique listée avec son jeu, jamais mélangée avec Kopo', async () => {
+    const [x, y] = [await invite('Inter_Pub'), await invite('Autre_Pub')];
+    const client = new Client(URL_.replace('http', 'ws'));
+    const a = await client.joinOrCreate('inter8', { jeton: x.jeton, publique: true, taille: 4 });
+    const b = await client.joinOrCreate('kopo', { jeton: y.jeton, publique: true, taille: 4 });
+    a.onMessage('*', () => {}); b.onMessage('*', () => {});
+    assert.notStrictEqual(a.roomId, b.roomId);
+    await attendre(100);
+    const l = (await api('/api/en-ligne')).json.sallesOuvertes;
+    assert.strictEqual(l.find((s) => s.id === a.roomId).jeu, 'inter8');
+    assert.strictEqual(l.find((s) => s.id === b.roomId).jeu, 'kopo');
+    await a.leave(); await b.leave();
   });
 
   console.log('Salles publiques (joueurs inconnus)');

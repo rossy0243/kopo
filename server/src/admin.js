@@ -37,7 +37,7 @@ function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainag
     res.json({
       joueursConnectes: joueurs, salles: liste.length, sallesParEtat: parEtat, enAttenteAdversaires: enAttente,
       serveur: { demarreIl: Math.round((Date.now() - demarrage) / 1000), memoireMo: Math.round(m.rss / 1048576), base: base.genre },
-      tables: liste.slice(0, 100).map((s) => ({ code: s.code, publique: s.publique, etat: s.salle.etat, manche: s.salle.numeroManche, joueurs: s.salle.joueurs.map((j) => ({ id: j.id, nom: j.nom, robot: !!j.robot, connecte: j.connecte !== false })) })),
+      tables: liste.slice(0, 100).map((s) => ({ jeu: s.jeu || 'kopo', code: s.code, publique: s.publique, etat: s.salle.etat, manche: s.salle.numeroManche, joueurs: s.salle.joueurs.map((j) => ({ id: j.id, nom: j.nom, robot: !!j.robot, connecte: j.connecte !== false })) })),
     });
   });
 

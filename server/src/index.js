@@ -62,8 +62,8 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
   // Compteur en ligne et salles ouvertes (lu par l'accueil).
   app.get('/api/en-ligne', async (req, res) => {
     let joueurs = 0; for (const s of salles) joueurs += s.clientsParId.size;
-    const ouvertes = [...(await matchMaker.query({ name: 'kopo' })), ...(await matchMaker.query({ name: 'kopo-mise' }))].filter((r) => r.metadata && r.metadata.publique && r.metadata.etat === 'salon' && !r.locked);
-    res.json({ joueurs, sallesOuvertes: ouvertes.map((r) => ({ id: r.roomId, code: r.metadata.code, taille: r.metadata.taille, joueurs: r.clients, classee: !!r.metadata.classee, mise: r.metadata.mise ? r.metadata.mise.niveau : null })) });
+    const ouvertes = [...(await matchMaker.query({ name: 'kopo' })), ...(await matchMaker.query({ name: 'kopo-mise' })), ...(await matchMaker.query({ name: 'inter8' }))].filter((r) => r.metadata && r.metadata.publique && r.metadata.etat === 'salon' && !r.locked);
+    res.json({ joueurs, sallesOuvertes: ouvertes.map((r) => ({ jeu: r.metadata.jeu || 'kopo', id: r.roomId, code: r.metadata.code, taille: r.metadata.taille, joueurs: r.clients, classee: !!r.metadata.classee, mise: r.metadata.mise ? r.metadata.mise.niveau : null })) });
   });
 
   // Reprendre sa place avec le code de la salle (page fermée par erreur, réseau perdu) : la salle d'une
@@ -90,6 +90,8 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
   jeu.define('kopo-mise', SalleKopo).filterBy(['publique', 'taille', 'mise']);
   // Match du jour : une salle par joueur, jamais proposée à quelqu'un d'autre.
   jeu.define('kopo-jour', SalleKopo);
+  // Inter (8) : entre amis (code) et salles publiques gratuites, même salle que Kopo avec la logique d'Inter (8).
+  jeu.define('inter8', SalleKopo).filterBy(['code', 'publique', 'taille']);
   await new Promise((ok) => serveurHttp.listen(port, ok));
   const adresse = serveurHttp.address();
   console.log(`Kopo : serveur prêt sur le port ${adresse.port} (base : ${base.genre}).`);

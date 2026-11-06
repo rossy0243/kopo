@@ -1,9 +1,12 @@
-// Salle Colyseus : fait tourner une partie de Kopo sur le serveur.
-// Toute la logique de jeu reste dans src/kopo-salle.js (la même que sur le téléphone de l'hôte) :
-// le serveur lui passe les messages des joueurs et envoie à chacun SA vue.
+// Salle Colyseus : fait tourner une partie de Kopo, ou d'Inter (8), sur le serveur.
+// Toute la logique de jeu reste dans src/kopo-salle.js et src/inter8-salle.js (la même que sur le
+// téléphone de l'hôte) : le serveur leur passe les messages des joueurs et envoie à chacun SA vue.
+// Les salles « inter8 » sont des salles Inter (8) : entre amis (code) ou publiques gratuites.
+// Pas encore de tables à mise, de Match du jour, de ligue ni de parcours pour Inter (8).
 'use strict';
 const { Room, matchMaker } = require('colyseus');
-const S = require('../../src/kopo-salle.js');
+const SK = require('../../src/kopo-salle.js');
+const SI = require('../../src/inter8-salle.js');
 const K = require('../../moteur/kopo-moteur.js');
 const { idAleatoire } = require('./comptes');
 
@@ -19,7 +22,9 @@ class SalleKopo extends Room {
   static services = null;
 
   onCreate(options = {}) {
-    this.maxClients = S.MAX;
+    this.jeu = this.roomName === 'inter8' ? 'inter8' : 'kopo';
+    this.S = this.jeu === 'inter8' ? SI : SK;
+    this.maxClients = this.S.MAX;
     this.autoDispose = true;
     this.code = options.code && /^[A-Z]{4}$/.test(options.code) ? options.code : nouveauCode();
     this.publique = !!options.publique;
@@ -30,13 +35,15 @@ class SalleKopo extends Room {
       const d = mj.donneDu(mj.aujourdhui());
       this.publique = false;
       this.jour = { jour: d.jour, numero: d.numero, graine: d.graine, officiel: false, compteId: null, avance: 0, termine: false };
-      this.salle = S.creerSalle(this.code, K.hasard((d.graine ^ 0x5bd1e995) >>> 0)); // robots reproductibles aussi
+      this.salle = this.S.creerSalle(this.code, K.hasard((d.graine ^ 0x5bd1e995) >>> 0)); // robots reproductibles aussi
       this.salle.robots = d.robots;
       this.salle.niveauJoueur = d.niveauRobots;
-    } else this.salle = S.creerSalle(this.code);
+    } else this.salle = this.S.creerSalle(this.code);
+    // Inter (8) : le style choisi à la création (« Quelle partie ? »), modifiable ensuite dans le salon.
+    if (this.jeu === 'inter8' && SI.MODES.includes(options.mode)) this.salle.mode = options.mode;
     // Salle publique : N joueurs inconnus, elle démarre seule quand elle est pleine.
-    this.taille = this.publique ? Math.min(S.MAX, Math.max(S.MIN, Number(options.taille) || S.MAX)) : null;
-    if (this.publique) { S.rendrePublique(this.salle, this.taille); this.maxClients = this.taille; }
+    this.taille = this.publique ? Math.min(this.S.MAX, Math.max(this.S.MIN, Number(options.taille) || this.S.MAX)) : null;
+    if (this.publique) { this.S.rendrePublique(this.salle, this.taille); this.maxClients = this.taille; }
     // Table à mise : salles « kopo-mise », publiques seulement (inconnus placés au hasard, pas de code : strategie-pieces §6.3).
     // Le montant est fixé à l'ouverture de la salle (un changement dans le tableau de bord vaut pour les salles suivantes).
     this.mise = null;
@@ -56,7 +63,7 @@ class SalleKopo extends Room {
     this.partie = null; // { id, katapss: Map, abandons: Set, coupures: Set, classee, enregistree }
     // Ligue : seulement en salle publique (inconnus placés au hasard). Dès qu'un joueur entre
     // avec le code (un ami), la salle n'est plus classée : pas de complicité (strategie-pieces §6.3).
-    this.classee = this.publique && !this.jour;
+    this.classee = this.publique && !this.jour && this.jeu === 'kopo'; // ligue d'Inter (8) : plus tard, séparée
     this.setMetadata(this.meta('salon', 0));
     salles.add(this);
 
@@ -64,7 +71,7 @@ class SalleKopo extends Room {
     this.setSimulationInterval(() => {
       if (this.jour && this.jour.termine) return; // Match du jour fini pour le joueur : les robots s'arrêtent
       // Les robots jouent l'un après l'autre : en test, plusieurs coups par tour de boucle.
-      for (let i = 0; i < (rapide && this.jour ? 50 : 1); i++) { if (!S.tic(this.salle)) break; this.apresChangement(); if (this.jour && this.jour.termine) break; }
+      for (let i = 0; i < (rapide && this.jour ? 50 : 1); i++) { if (!this.S.tic(this.salle)) break; this.apresChangement(); if (this.jour && this.jour.termine) break; }
     }, rapide && this.jour ? 20 : 200);
   }
 
@@ -94,13 +101,13 @@ class SalleKopo extends Room {
     return c;
   }
 
-  meta(etat, joueurs) { return { code: this.code, publique: this.publique, taille: this.taille, etat, joueurs, classee: this.classee, mise: this.mise }; }
+  meta(etat, joueurs) { return { jeu: this.jeu, code: this.code, publique: this.publique, taille: this.taille, etat, joueurs, classee: this.classee, mise: this.mise }; }
 
   onJoin(client, options, compte) {
     const id = compte.id;
     if (this.publique && options && options.code && this.salle.etat === 'salon') this.classee = false;
     const ancien = this.clientsParId.get(id);
-    const r = S.recevoir(this.salle, id, { type: 'rejoindre', nom: compte.pseudo });
+    const r = this.S.recevoir(this.salle, id, { type: 'rejoindre', nom: compte.pseudo });
     if (!r.ok) throw new Error(r.erreur);
     client.userData = { id };
     this.clientsParId.set(id, client); // avant d'écarter l'ancien : son départ ne touche plus à la place
@@ -116,7 +123,7 @@ class SalleKopo extends Room {
     const { ROBOTS } = SalleKopo.services.matchJour;
     ROBOTS.forEach((r, i) => this.salle.joueurs.push({ id: r, nom: 'Robot ' + (i + 1), connecte: true, robot: true, voix: false, muet: true }));
     this.salle.donne = { graine: this.jour.graine, ordre: [id].concat(ROBOTS) };
-    S.recevoir(this.salle, id, { type: 'lancer' });
+    this.S.recevoir(this.salle, id, { type: 'lancer' });
     client.send('matchJour', { debut: true, numero: this.jour.numero, officiel: this.jour.officiel });
   }
 
@@ -158,7 +165,7 @@ class SalleKopo extends Room {
     if (!id) return;
     // Ancienne connexion d'un joueur revenu entre-temps (page rouverte, autre appareil) : sa place est déjà reprise.
     if (this.clientsParId.get(id) !== client) return;
-    S.deconnecter(this.salle, id);
+    this.S.deconnecter(this.salle, id);
     if (this.jour && volontaire) { this.terminerJour({ parti: true }); return; } // quitter = le score s'arrête là
     if (volontaire && this.partie && this.salle.etat !== 'salon') this.partie.abandons.add(id);
     const partie = this.partie;
@@ -171,7 +178,7 @@ class SalleKopo extends Room {
       const nouveau = await attente;
       this.clientsParId.set(id, nouveau);
       if (partie) partie.coupures.delete(id);
-      S.reconnecter(this.salle, id);
+      this.S.reconnecter(this.salle, id);
       this.apresChangement();
     } catch (e) { /* pas revenu par le jeton : il garde sa place et peut revenir avec le code (reserverRetour) */ }
     finally { if (this.attentes.get(id) === attente) this.attentes.delete(id); }
@@ -207,13 +214,13 @@ class SalleKopo extends Room {
     if (type === 'rejoindre') return; // l'entrée passe par onJoin
     // Match du jour : la table est fixée par le serveur (robots, donne), pas de revanche ni de réglages.
     if (this.jour && ['lancer', 'ajouterRobot', 'retirer', 'remplacerParRobot', 'reglages', 'revanche', 'revancheNon', 'rejouer'].includes(type)) { client.send('erreur', 'Pas pendant le Match du jour.'); return; }
-    if (type === 'sync') { client.send('vue', S.vue(this.salle, id)); return; } // la page demande sa vue dès qu'elle écoute
+    if (type === 'sync') { client.send('vue', this.S.vue(this.salle, id)); return; } // la page demande sa vue dès qu'elle écoute
     if (type === 'reaction') { // chat : seulement les messages choisis dans le tableau de bord
       const liste = SalleKopo.services.reglages.get('messagesRapides') || [];
       if (!liste.includes(typeof msg.emoji === 'string' ? msg.emoji.trim() : '')) { client.send('erreur', 'Ce message n\'est plus proposé.'); return; }
     }
     if (type === 'micro' && this.comptes.get(id) && this.comptes.get(id).micro_coupe) msg.voix = false; // sanction
-    const r = S.recevoir(this.salle, id, msg);
+    const r = this.S.recevoir(this.salle, id, msg);
     if (!r.ok) { client.send('erreur', r.erreur); return; }
     if (r.evenement) { this.broadcast(r.evenement.type, r.evenement); return; } // émoji rapide : relayé à toute la table
     if (type === 'action' && msg.action && msg.action.type === 'katapss' && this.partie) this.partie.katapss.set(id, (this.partie.katapss.get(id) || 0) + 1);
@@ -225,7 +232,7 @@ class SalleKopo extends Room {
     if (this.jour) { // pas de pièces, de ligue ni de parcours : seulement le score du jour
       this.suivreJour();
       if (s.etat !== 'salon' && !this.locked) this.lock();
-      for (const [id, c] of this.clientsParId) c.send('vue', S.vue(s, id));
+      for (const [id, c] of this.clientsParId) c.send('vue', this.S.vue(s, id));
       return;
     }
     if (s.etat === 'manche' && s.numeroManche === 1 && (!this.partie || this.partie.enregistree)) {
@@ -243,11 +250,11 @@ class SalleKopo extends Room {
     }
     // Une partie commencée ne reçoit plus de nouveaux joueurs (seulement les reconnexions).
     if (s.etat !== 'salon' && !this.locked) this.lock();
-    const places = this.publique ? this.taille : S.MAX;
+    const places = this.publique ? this.taille : this.S.MAX;
     if (s.etat === 'salon' && this.maxClients !== places) this.maxClients = places; // place ajoutée par reserverRetour
     if (s.etat === 'salon' && this.locked && s.joueurs.length < places) this.unlock();
     this.setMetadata(this.meta(s.etat, s.joueurs.filter((j) => !j.robot).length));
-    for (const [id, c] of this.clientsParId) c.send('vue', S.vue(s, id));
+    for (const [id, c] of this.clientsParId) c.send('vue', this.S.vue(s, id));
   }
 
   // Mises : prélevées au début de la partie. Un joueur qui n'a plus assez (dépensé entre-temps)
@@ -298,8 +305,8 @@ class SalleKopo extends Room {
     const g = reglages.get('gains');
     const partage = this.mise ? this.potParPlace(p, ordre) : null;
     await base.transaction(async (q) => {
-      await q.query('INSERT INTO parties (id, code, publique, nb_joueurs, avec_robots, vainqueur, debut, fin, classee) VALUES ($1,$2,$3,$4,$5,$6,$7, now(), $8)',
-        [p.id, this.code, this.publique, ordre.length, avecRobots, this.comptes.has(s.vainqueur) ? s.vainqueur : null, p.debut, p.classee && !avecRobots]);
+      await q.query('INSERT INTO parties (id, code, publique, nb_joueurs, avec_robots, vainqueur, debut, fin, classee, jeu) VALUES ($1,$2,$3,$4,$5,$6,$7, now(), $8, $9)',
+        [p.id, this.code, this.publique, ordre.length, avecRobots, this.comptes.has(s.vainqueur) ? s.vainqueur : null, p.debut, p.classee && !avecRobots, this.jeu]);
       for (const id of humains) {
         const pl = place(id);
         await q.query('INSERT INTO participations (partie_id, compte_id, place, abandon) VALUES ($1,$2,$3,$4)', [p.id, id, pl, p.abandons.has(id)]);
@@ -328,7 +335,7 @@ class SalleKopo extends Room {
     }
     // Parcours de saison : XP pour les parties entre humains (pas de robots, comme pour les pièces).
     let xps = new Map();
-    if (parcours && !avecRobots && humains.length >= 2) {
+    if (parcours && this.jeu === 'kopo' && !avecRobots && humains.length >= 2) { // Inter (8) : à l'étape de la progression
       xps = await parcours.enregistrerPartie(p.id, humains.map((id) => {
         const pl = place(id);
         return { id, place: pl, abandon: p.abandons.has(id), manchesSurvecues: !pl ? 0 : pl === 1 ? s.numeroManche : s.elimines.indexOf(id) };
@@ -337,11 +344,11 @@ class SalleKopo extends Room {
     // Parrainage : le filleul avance ; à sa dernière partie, son parrain et lui reçoivent leur cadeau.
     if (parrainage && !avecRobots && humains.length >= 2) await parrainage.apresPartie(humains).catch((e) => console.error('Parrainage :', e.message));
     // Face-à-face et notifications de rivalité (« Kevin t'a rattrapé : 7 – 7 ! ») : entre humains seulement, comme sur le téléphone.
-    if (social && !avecRobots) await social.apresPartie(humains.map((id) => ({ id, place: place(id), abandon: p.abandons.has(id) }))).catch((e) => console.error('Rivalités :', e.message));
+    if (social && this.jeu === 'kopo' && !avecRobots) await social.apresPartie(humains.map((id) => ({ id, place: place(id), abandon: p.abandons.has(id) }))).catch((e) => console.error('Rivalités :', e.message));
     for (const [id, c] of this.clientsParId) {
       const compte = await comptes.lire(id);
       // Face-à-face tenus par le serveur : les deux joueurs voient le même score (le téléphone ne compte que ce qu'il a vu).
-      if (social && !avecRobots && humains.includes(id)) {
+      if (social && this.jeu === 'kopo' && !avecRobots && humains.includes(id)) {
         const duels = await social.duels(id, humains.filter((x) => x !== id)).catch(() => []);
         if (duels.length) c.send('faceAFace', duels);
       }

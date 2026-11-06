@@ -22,7 +22,7 @@
   const brut = (carte) => carte.replace('*', '');
   const valeur = (carte) => (brut(carte)[0] === JOKER ? JOKER : brut(carte).slice(0, -1));
   const couleur = (carte) => (valeur(carte) === JOKER ? null : brut(carte).slice(-1));
-  const NOMS_VALEURS = { A: 'A', V: 'V', D: 'D', R: 'R' };
+  const NOMS_VALEURS = { A: 'A', V: 'J', D: 'Q', R: 'K' }; // à l'écran : J (valet), Q (dame), K (roi), comme sur les cartes
   function afficher(carte) {
     if (valeur(carte) === JOKER) return 'Joker';
     return (NOMS_VALEURS[valeur(carte)] || valeur(carte)) + SYMBOLES[couleur(carte)];
@@ -360,9 +360,10 @@
     for (const c of cartes) m.mains[j].splice(m.mains[j].indexOf(c), 1);
     m.defausse.push(...cartes);
     m.vu.posees.push(...cartes);
+    m.vu.dernier = j; // qui a posé la carte du centre (affichage)
     m.libre = false;
     const finit = m.mains[j].length === 0;
-    noter(m, `${j} pose ${cartes.map(afficher).join(' ')}${v === '8' && !finit ? ` : « Inter demande ${action.demande} »` : ''}.`);
+    noter(m, `${j} pose ${cartes.map(afficher).join(' ')}${v === '8' && !finit ? ` : « Inter demande ${NOMS_VALEURS[action.demande] || action.demande} »` : ''}.`);
 
     // La demande en cours s'arrête dès que la valeur demandée est posée, ou qu'un joker la coupe.
     if (m.demande && (v === m.demande.valeur || v === JOKER)) m.demande = null;
@@ -413,6 +414,7 @@
       qualifies: m.qualifies.slice(),
       phase: m.phase,
       posees: m.vu.posees.slice(),
+      dernier: m.vu.dernier || null,
       piochesDemande: m.vu.piochesDemande.map((p) => ({ ...p })),
     };
   }

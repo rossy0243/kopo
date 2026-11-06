@@ -125,6 +125,7 @@ CREATE TABLE IF NOT EXISTS journal_admin (
 
 -- ===== Ligue classée et saisons (retention.md §3.4) =====
 ALTER TABLE parties ADD COLUMN IF NOT EXISTS classee boolean NOT NULL DEFAULT false;
+ALTER TABLE parties ADD COLUMN IF NOT EXISTS jeu text NOT NULL DEFAULT 'kopo'; -- 'kopo' ou 'inter8'
 
 -- Une saison dure 4 semaines. Une seule est en cours à la fois.
 CREATE TABLE IF NOT EXISTS saisons (
