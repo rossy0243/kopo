@@ -1,4 +1,4 @@
-// Service worker du Kopo : il rend le jeu installable (« Installer le jeu », icône sur l'écran d'accueil).
+// Service worker de Masano (Kopo et Inter (8)) : il rend le jeu installable (« Installer le jeu », icône sur l'écran d'accueil).
 // Pas de hors ligne pour l'instant : rien n'est mis en cache, la page vient toujours du réseau
 // (la vérification « Nouvelle version disponible » continue de marcher comme avant).
 self.addEventListener('install', () => self.skipWaiting());

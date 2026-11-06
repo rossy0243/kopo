@@ -10,7 +10,7 @@ const DEFAUTS = {
   annonce: { texte: '', active: false },
   // Fenêtre « Nouveau » au premier lancement (annonce-competition.md) : éteinte tant qu'on n'ouvre pas la compétition.
   nouveaute: { bande: false },
-  maintenance: { active: false, message: 'Le Kopo est en maintenance. On revient très vite !' },
+  maintenance: { active: false, message: 'Masano est en maintenance. On revient très vite !' },
   versionMin: '1.0',
   // Messages du chat en partie : les joueurs ne peuvent envoyer que ceux-là (pas de texte libre, donc pas d'insultes).
   // Ligue classée (retention.md §3.4). Divisions : bois, bronze, argent, or, diamant, legende.
@@ -40,6 +40,7 @@ const DEFAUTS = {
   prochaineSaison: { nom: '', theme: '' },
   messagesRapides: ['👏', '😂', '😮', '🔥', '😡', '👍', '😭', '🙏', 'Bien joué !', 'Bravo !', 'Joli coup !', 'Belle carte !', 'Bien vu !', 'Trop fort !', 'Merci !', 'Désolé !', 'Oups !', 'Aïe !', 'Pas de chance !', 'Je ramasse…', 'Je t’ai eu !', 'Katapss !', 'Vite !', 'Prends ton temps', 'À toi !', 'Encore une !', 'Bonne chance !', 'Bonne partie !', 'GG !', 'Revanche ?', 'On en refait une ?', 'Je reviens', 'Salut tout le monde !', 'À la prochaine !'],
 };
+const ANCIEN_MESSAGE_MAINTENANCE = 'Le Kopo est en maintenance. On revient très vite !';
 const MESSAGE_MAX = 40, MESSAGES_MAX = 40;
 // Nettoie une liste de messages : texte seul, sans doublon, ni trop long ni trop nombreux.
 function verifierMessages(v) {
@@ -108,6 +109,8 @@ function creerReglages(base) {
       const r = await base.query('SELECT cle, valeur FROM reglages_jeu');
       cache = JSON.parse(JSON.stringify(DEFAUTS));
       for (const l of r.rows) if (l.cle in cache) cache[l.cle] = typeof l.valeur === 'string' ? JSON.parse(l.valeur) : l.valeur;
+      // L'appli s'appelle maintenant Masano : l'ancien message par défaut, enregistré tel quel, prend le nouveau nom.
+      if (cache.maintenance && cache.maintenance.message === ANCIEN_MESSAGE_MAINTENANCE) cache.maintenance = { ...cache.maintenance, message: DEFAUTS.maintenance.message };
       return cache;
     },
     tout: () => cache,
