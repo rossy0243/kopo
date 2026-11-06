@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#10233a">
-<meta name="description" content="Le Kopo, jeu de cartes de 2 à 9 joueurs, entre amis ou en ligne.">
+<meta name="description" content="Masano : Kopo et Inter (8), jeux de cartes entre amis ou en ligne.">
 <link rel="icon" href="icons/masano-logo.svg" type="image/svg+xml">
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -1217,7 +1217,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
     <div class="salon-invite">
       <button class="btn large btn-whatsapp" id="btnWhatsappSalon"><svg class="ico"><use href="#i-partager"/></svg> <span><span class="sauf-paysage">Inviter sur </span>WhatsApp</span></button>
       <button class="btn" id="btnCopier" aria-label="Copier le lien de la partie">Copier</button>
-      <button class="btn" id="btnInviterAmi" aria-label="Inviter un ami du Kopo" hidden>Amis</button>
+      <button class="btn" id="btnInviterAmi" aria-label="Inviter un ami" hidden>Amis</button>
     </div>
     <input class="texte" id="lienSalon" readonly hidden>
     <div class="bandeau info-hote" id="noteHote" hidden>Tu es l'hôte : garde cette page ouverte jusqu'à la fin.</div>
@@ -1321,7 +1321,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       </g>
     </svg>
     <h2 id="titreTourner">Passe en paysage</h2>
-    <p>Mets ton téléphone à l'horizontale : Kopo se joue mieux comme ça, avec la table en grand, les joueurs autour de toi et ta main en éventail.</p>
+    <p>Mets ton téléphone à l'horizontale : le jeu est plus agréable comme ça, avec la table en grand, les joueurs autour de toi et ta main en éventail.</p>
     <button class="btn principal large" id="btnTournerPleinEcran" hidden>Plein écran en paysage</button>
     <button class="btn large" id="btnTournerPortrait">Continuer en portrait</button>
   </div>
@@ -6502,7 +6502,7 @@ var qrcode = function() {
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = '33410382f5b3'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = 'c9b87a9b7ab7'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
@@ -8519,11 +8519,11 @@ var qrcode = function() {
     g.beginPath(); g.roundRect(48, 48, W - 96, H - 96, 40); g.stroke();
     g.fillStyle = 'rgba(226,176,74,.75)'; g.font = '64px serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
     g.fillText('♠', 110, 120); g.save(); g.translate(W - 110, H - 120); g.rotate(Math.PI); g.fillText('♠', 0, 0); g.restore();
-    await new Promise((ok) => { const im = new Image(); im.onload = () => { g.drawImage(im, W / 2 - 80, 110, 160, 160); ok(); }; im.onerror = ok; im.src = 'icons/kopo-logo.svg'; setTimeout(ok, 1500); });
+    await new Promise((ok) => { const im = new Image(); im.onload = () => { g.drawImage(im, W / 2 - 80, 110, 160, 160); ok(); }; im.onerror = ok; im.src = jeuPartage(v.jeu).logo; setTimeout(ok, 1500); });
     const texte = (t, y, police, couleur) => { g.font = police; g.fillStyle = couleur; g.fillText(t, W / 2, y, W - 160); };
     const moi = nom(v, v.moi);
     const gagne = v.vainqueur === v.moi;
-    texte('KOPO', 320, '90px "Bebas Neue", Impact, sans-serif', '#e2b04a');
+    texte(jeuPartage(v.jeu).nom.toUpperCase(), 320, '90px "Bebas Neue", Impact, sans-serif', '#e2b04a');
     texte(gagne ? 'VICTOIRE !' : (r && r.titre ? 'TITRE' : 'BIEN JOUÉ'), 500, '230px "Bebas Neue", Impact, sans-serif', '#ffffff');
     texte(moi, 650, '600 70px Outfit, sans-serif', '#e2b04a');
     texte(gagne ? `gagne une partie à ${v.joueurs.length} joueurs` : '', 730, '500 44px Outfit, sans-serif', '#c9d6e6');
@@ -8533,13 +8533,17 @@ var qrcode = function() {
     texte('Viens me battre : ' + (location.host + location.pathname).replace(/index\.html$/, '').replace(/\/$/, ''), 975, '500 38px Outfit, sans-serif', '#9fb2c8');
     return new Promise((ok) => c.toBlob(ok, 'image/png'));
   }
+  // Nom du jeu dans les textes partagés (« jouer au Kopo », « une partie d'Inter (8) »). Masano = l'appli.
+  const NOMS_PARTAGE = { kopo: { nom: 'Kopo', au: 'au Kopo', de: 'de Kopo', logo: 'icons/kopo-logo.svg' }, inter8: { nom: 'Inter (8)', au: 'à Inter (8)', de: 'd\'Inter (8)', logo: 'icons/masano-logo.svg' } };
+  const jeuPartage = (jeu) => NOMS_PARTAGE[jeu] || NOMS_PARTAGE.kopo;
   function ouvrirWhatsApp(texte) { window.open('https://wa.me/?text=' + encodeURIComponent(texte), '_blank', 'noopener'); }
   async function partagerVictoire(v, r) {
     const url = location.origin + location.pathname;
-    const texte = v.vainqueur === v.moi ? 'Je viens de gagner une partie de Kopo ! Viens me battre :' : (r && r.titre ? `Mon nouveau titre au Kopo : « ${r.titre} ». Viens jouer :` : 'Viens jouer au Kopo avec moi :');
+    const J = jeuPartage(v.jeu);
+    const texte = v.vainqueur === v.moi ? `Je viens de gagner une partie ${J.de} sur Masano ! Viens me battre :` : (r && r.titre ? `Mon nouveau titre ${J.au} : « ${r.titre} ». Viens jouer sur Masano :` : `Viens jouer ${J.au} avec moi sur Masano :`);
     try {
       const blob = await imageVictoire(v, r);
-      const f = blob && new File([blob], 'kopo.png', { type: 'image/png' });
+      const f = blob && new File([blob], (v.jeu === 'inter8' ? 'inter8' : 'kopo') + '.png', { type: 'image/png' });
       if (f && navigator.canShare && navigator.canShare({ files: [f] })) { await navigator.share({ files: [f], text: texte + ' ' + url }); return; }
     } catch (e) { if (e && e.name === 'AbortError') return; }
     ouvrirWhatsApp(texte + ' ' + url);
@@ -8656,7 +8660,7 @@ var qrcode = function() {
     z.append(tuto, liens);
     const reinit = el('button', 'btn', 'Remettre les réglages par défaut');
     reinit.onclick = () => { Object.assign(prefs, PREFS_DEFAUT); enregistrerPrefs(); ouvrirParametres(); if (vueActuelle) afficher(vueActuelle); };
-    z.append(reinit, el('p', 'version', 'Kopo · version ' + VERSION));
+    z.append(reinit, el('p', 'version', 'Masano · version ' + VERSION));
     const fermer = el('button', 'btn principal large', 'Fermer');
     fermer.onclick = () => { fermerFenetre(); if (vueActuelle) afficher(vueActuelle); };
     ouvrirFenetre([el('h2', null, 'Paramètres'), z, fermer]);
@@ -8905,7 +8909,7 @@ var qrcode = function() {
   // Les cases à partager : une verte par manche passée, rouge à l'élimination, 🏆 pour la victoire.
   const casesMatch = (r) => '🟩'.repeat(Math.min(7, r.manches)) + (r.victoire ? '🏆' : r.parti ? '⬜' : '🟥');
   function partagerMatchJour(r) {
-    ouvrirWhatsApp(`Kopo — Match du jour n°${r.numero}\n${casesMatch(r)} ${r.score} / 100\nTu fais mieux ? 👉 ${LIEN_SITE()}`);
+    ouvrirWhatsApp(`Masano · Kopo, Match du jour n°${r.numero}\n${casesMatch(r)} ${r.score} / 100\nTu fais mieux ? 👉 ${LIEN_SITE()}`);
   }
 
   async function ouvrirMatchJour() {
@@ -9188,7 +9192,7 @@ var qrcode = function() {
     let parrain = null;
     try { parrain = (await apiJoueur('/parrainage')).code; } catch (e) {} // le lien sert aussi de lien de parrainage
     const lien = lienBande(x) + (parrain ? '&parrain=' + parrain : '');
-    ouvrirWhatsApp(`Rejoins ma Bande « ${x.nom} » au Kopo ! Chaque jour un Match, chaque semaine on mise, et le meilleur rafle le pot 👑 ${lien}`);
+    ouvrirWhatsApp(`Rejoins ma Bande « ${x.nom} » sur Masano (Kopo) ! Chaque jour un Match, chaque semaine on mise, et le meilleur rafle le pot 👑 ${lien}`);
   }
 
   function afficherBande(x) {
@@ -9745,7 +9749,7 @@ var qrcode = function() {
     const moi = el('p', null, 'Ton identifiant à donner à tes amis : ');
     moi.append(el('b', null, c.compte.pseudo + '#' + c.compte.numero));
     const inviter = el('button', 'btn large', 'Inviter sur WhatsApp');
-    inviter.onclick = () => { const t = `Viens jouer au Kopo avec moi ! Ajoute-moi : ${c.compte.pseudo}#${c.compte.numero}\n${location.origin + location.pathname}`; window.open('https://wa.me/?text=' + encodeURIComponent(t), '_blank', 'noopener'); };
+    inviter.onclick = () => { const t = `Viens jouer avec moi sur Masano (Kopo et Inter (8)) ! Ajoute-moi : ${c.compte.pseudo}#${c.compte.numero}\n${location.origin + location.pathname}`; window.open('https://wa.me/?text=' + encodeURIComponent(t), '_blank', 'noopener'); };
     const f = el('button', 'btn large', 'Fermer'); f.onclick = () => ouvrirParametres();
     const parrainer = el('button', 'btn principal large', 'Inviter et gagner des pièces');
     parrainer.onclick = () => ouvrirParrainage(ouvrirAmis);
@@ -9781,7 +9785,7 @@ var qrcode = function() {
       const ligne = el('div', 'lien'); ligne.append(champ, copier);
       const wa = el('button', 'btn large btn-whatsapp', 'Inviter sur WhatsApp');
       wa.prepend(icone('i-partager'));
-      wa.onclick = () => ouvrirWhatsApp(`Viens jouer au Kopo avec moi ! Crée ton compte avec ce lien, on gagne des pièces tous les deux :\n${lien}`);
+      wa.onclick = () => ouvrirWhatsApp(`Viens jouer avec moi sur Masano (Kopo et Inter (8)) ! Crée ton compte avec ce lien, on gagne des pièces tous les deux :\n${lien}`);
       zone.append(ligne, wa);
       // Progression et paliers (les gros parrains sont récompensés).
       const prochain = P.paliers.find((x) => !x.atteint);
@@ -10321,7 +10325,7 @@ var qrcode = function() {
       btn.onclick = fermerFenetre;
     };
     z.append(el('p', null, 'Un cadeau chaque jour où tu joues, pendant ta première semaine.'), rangee, gain);
-    ouvrirFenetre([el('h2', null, 'Bienvenue au Kopo'), z, btn], 'bienvenue7');
+    ouvrirFenetre([el('h2', null, 'Bienvenue sur Masano'), z, btn], 'bienvenue7');
     return true;
   }
 
@@ -10541,7 +10545,7 @@ var qrcode = function() {
       R.donnerObjet(q, 'dos-fondateurs'); ecrireProfil(q); appliquerCollection(q);
       const corps = el('div', 'bonus-jour');
       corps.append(el('h2', null, 'Merci, fondateur !'), apercuObjet('dos-fondateurs'),
-        el('p', null, (avaitEssai ? 'Le Kopo passe aux vraies pièces : tes pièces d\'essai s\'arrêtent ici. Pour te remercier d\'avoir été là dès le début, voici' : 'Le Kopo passe aux vraies pièces. Pour fêter ça avec ceux qui sont là dès le début, voici') + ' le dos de cartes « Les Fondateurs ». Il ne sera plus distribué après le lancement.'));
+        el('p', null, (avaitEssai ? 'Masano passe aux vraies pièces : tes pièces d\'essai s\'arrêtent ici. Pour te remercier d\'avoir été là dès le début, voici' : 'Masano passe aux vraies pièces. Pour fêter ça avec ceux qui sont là dès le début, voici') + ' le dos de cartes « Les Fondateurs ». Il ne sera plus distribué après le lancement.'));
       const ok = el('button', 'btn principal large', 'Merci !');
       await new Promise((fin) => { ok.onclick = () => { fermerFenetre(); fin(); }; ouvrirFenetre([corps, ok]); });
     } catch (e) {}
@@ -10573,7 +10577,7 @@ var qrcode = function() {
   });
   addEventListener('appinstalled', () => {
     stock.ecrire('kopo-installe', true); inviteInstallation = null; majBoutonInstaller();
-    toast('Kopo est installé ! Ouvre-le depuis ton écran d\'accueil' + (CADEAU_INSTALLATION ? ' pour recevoir ton cadeau.' : '.'));
+    toast('Masano est installé ! Ouvre-le depuis ton écran d\'accueil' + (CADEAU_INSTALLATION ? ' pour recevoir ton cadeau.' : '.'));
   });
   majBoutonInstaller();
   async function installer() {
@@ -10590,7 +10594,7 @@ var qrcode = function() {
     guideInstallation();
   }
   $('btnInstaller').onclick = installer;
-  const texteCadeauInstallation = () => 'Cadeau : ' + CADEAU_INSTALLATION + ' pièces la première fois que tu ouvres Kopo depuis son icône.';
+  const texteCadeauInstallation = () => 'Cadeau : ' + CADEAU_INSTALLATION + ' pièces la première fois que tu ouvres Masano depuis son icône.';
   function guideInstallation() {
     const etapes = el('ol', 'guide-ios');
     const etape = (morceaux, ico) => { const li = el('li'), t = el('span'); t.append(...morceaux); li.append(t, icone(ico)); return li; };
@@ -10598,11 +10602,11 @@ var qrcode = function() {
     if (IOS) etapes.append(
       etape(['Touche ', el('b', null, 'Partager'), ' dans la barre de Safari'], 'i-ios-partage'),
       etape(['Choisis ', el('b', null, 'Sur l\'écran d\'accueil'), ' (fais défiler la liste si besoin)'], 'i-ios-ajouter'),
-      etape(['Touche ', el('b', null, 'Ajouter'), ', puis ouvre Kopo depuis sa nouvelle icône'], 'i-installer'));
+      etape(['Touche ', el('b', null, 'Ajouter'), ', puis ouvre Masano depuis sa nouvelle icône'], 'i-installer'));
     else etapes.append(
       etape(['Touche le menu ', el('b', null, '⋮'), ' du navigateur (en haut ou en bas à droite)'], 'i-menu'),
       etape(['Choisis ', el('b', null, 'Installer l\'application'), ' ou ', el('b', null, 'Ajouter à l\'écran d\'accueil')], 'i-ios-ajouter'),
-      etape(['Confirme, puis ouvre Kopo depuis sa nouvelle icône'], 'i-installer'));
+      etape(['Confirme, puis ouvre Masano depuis sa nouvelle icône'], 'i-installer'));
     const aide = el('p', null, 'Tu ne trouves pas ? Tu es sans doute dans WhatsApp, Facebook ou une autre appli : ouvre ce lien dans ' + nav + '.');
     const copier = el('button', 'btn large', 'Copier le lien du jeu');
     copier.onclick = () => {
@@ -10638,7 +10642,7 @@ var qrcode = function() {
     const tard = el('button', 'btn large', 'Plus tard'); tard.onclick = fermerFenetre;
     const non = el('button', 'btn large', 'Non merci');
     non.onclick = () => { stock.ecrire('kopo-rappel-installation', Object.assign(stock.lire('kopo-rappel-installation') || {}, { non: true })); fermerFenetre(); };
-    ouvrirFenetre([el('h2', null, 'Installer Kopo'), el('p', null, 'Mets Kopo sur ton écran d\'accueil : il s\'ouvre d\'un geste, en plein écran, comme une appli.'), el('p', null, texteCadeauInstallation()), oui, tard, non]);
+    ouvrirFenetre([el('h2', null, 'Installer Masano'), el('p', null, 'Mets Masano sur ton écran d\'accueil : il s\'ouvre d\'un geste, en plein écran, comme une appli.'), el('p', null, texteCadeauInstallation()), oui, tard, non]);
     return true;
   }
   // Première ouverture depuis l'icône : le cadeau d'installation (une fois par compte, le serveur refuse les doublons).
@@ -10647,7 +10651,7 @@ var qrcode = function() {
     const g = el('div', 'cadeau-installation'); g.append(pieceEl(), '+' + n);
     const ok = el('button', 'btn principal large', 'Merci !');
     ok.onclick = () => { fermerFenetre(); suiteAccueil(); };
-    ouvrirFenetre([el('h2', null, 'Kopo est installé'), el('p', null, 'Merci d\'avoir mis Kopo sur ton écran d\'accueil. Voici ton cadeau :'), g, ok]);
+    ouvrirFenetre([el('h2', null, 'Masano est installé'), el('p', null, 'Merci d\'avoir mis Masano sur ton écran d\'accueil. Voici ton cadeau :'), g, ok]);
     vibrer(40); pop(g, 1.4); pop($('btnBourse'), 1.2);
   }
   function cadeauInstallation() {
@@ -10790,7 +10794,7 @@ var qrcode = function() {
   $('btnPartager').onclick = async () => {
     let url = location.origin + location.pathname;
     if (MODE_SERVEUR && compteLocal()) { try { const P = await apiJoueur('/parrainage'); if (P.code) url = lienParrain(P.code); } catch (e) {} }
-    try { if (navigator.share) { await navigator.share({ title: 'Kopo', text: 'Viens jouer au Kopo avec moi !', url }); return; } } catch (e) { return; }
+    try { if (navigator.share) { await navigator.share({ title: 'Masano', text: `Viens jouer ${jeuPartage(jeuChoisi()).au} avec moi sur Masano !`, url }); return; } } catch (e) { return; }
     try { await navigator.clipboard.writeText(url); toast('Lien du jeu copié.'); } catch (e) { toast(url); }
   };
   $('btnLancer').onclick = () => envoyer({ type: 'lancer' });
@@ -10803,7 +10807,7 @@ var qrcode = function() {
     () => { if (client && vueActuelle && vueActuelle.etat === 'salon') {} quitter(); });
   $('btnWhatsappSalon').onclick = () => {
     const v = vueActuelle; if (!v) return;
-    ouvrirWhatsApp(`Viens jouer au Kopo avec moi ! Code de la partie : ${v.code}\n${lienPartie(v.code)}`);
+    ouvrirWhatsApp(`Viens jouer ${jeuPartage(v.jeu).au} avec moi sur Masano ! Code de la partie : ${v.code}\n${lienPartie(v.code)}`);
   };
   // QR code du salon : le bouton QR (portrait) ou le petit QR (paysage) l'ouvre en grand par-dessus l'écran, toucher le referme.
   const basculerQr = () => $('ecranSalon').classList.toggle('qr-ouvert');
