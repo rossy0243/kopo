@@ -4750,7 +4750,7 @@ var qrcode = function() {
       joueurCourant: premier,
       aPioche: null, // carte piochée par le joueur courant pendant ce tour
       annonces: [], // joueurs qui ont annoncé
-      contestable: null, // joueur qui n'a pas annoncé et peut être contesté
+      contestables: [], // joueurs qui n'ont pas annoncé et peuvent être contestés
       qualifies: [],
       elimine: null,
       phase: 'jeu', // 'jeu' | 'terminee' | 'nulle'
@@ -4830,11 +4830,23 @@ var qrcode = function() {
     return false;
   }
 
+  // Joueurs qu'on peut contester : ils peuvent finir au prochain coup sans avoir annoncé.
+  // (Une partie sauvegardée avant les listes avait un seul « contestable ».)
+  function contestables(m) {
+    const liste = m.contestables || (m.contestable ? [m.contestable] : []);
+    return liste.filter((j) => m.enJeu.includes(j) && !m.annonces.includes(j) && finissable(m.mains[j]));
+  }
+  function majContestables(m) {
+    m.contestables = contestables(m);
+    delete m.contestable;
+  }
+
   // Fin du tour de « joueur » : s'il peut finir au prochain coup sans avoir annoncé,
-  // les autres peuvent le contester jusqu'à ce que le joueur suivant ait joué.
+  // les autres peuvent le contester jusqu'à son prochain tour (même si d'autres ont joué entre-temps).
   function finDeTour(m, joueur, prochain) {
     m.aPioche = null;
-    if (m.enJeu.includes(joueur) && !m.annonces.includes(joueur) && finissable(m.mains[joueur])) m.contestable = joueur;
+    majContestables(m);
+    if (m.enJeu.includes(joueur) && !m.annonces.includes(joueur) && finissable(m.mains[joueur]) && !m.contestables.includes(joueur)) m.contestables.push(joueur);
     m.joueurCourant = prochain;
   }
 
@@ -4967,7 +4979,7 @@ var qrcode = function() {
     const actions = [];
     if (m.phase !== 'jeu' || !m.enJeu.includes(joueur)) return actions;
     if (!m.annonces.includes(joueur) && finissable(m.mains[joueur])) actions.push({ type: 'annoncer', joueur });
-    if (m.contestable && m.contestable !== joueur) actions.push({ type: 'contester', joueur, cible: m.contestable });
+    for (const c of contestables(m)) if (c !== joueur) actions.push({ type: 'contester', joueur, cible: c });
     if (joueur !== m.joueurCourant) return actions;
     const coups = coupsJouer(m, joueur);
     actions.push(...coups);
@@ -4983,22 +4995,26 @@ var qrcode = function() {
     if (action.type === 'annoncer') {
       if (m.annonces.includes(j) || !finissable(m.mains[j])) throw new Error(`Action interdite : ${JSON.stringify(action)}`);
       m.annonces.push(j);
-      if (m.contestable === j) m.contestable = null;
+      majContestables(m);
       noter(m, `${j} annonce : il peut sortir au prochain coup.`);
       return m;
     }
     if (action.type === 'contester') {
-      const cible = m.contestable;
-      if (!cible || cible === j || (action.cible && action.cible !== cible)) throw new Error(`Action interdite : ${JSON.stringify(action)}`);
-      m.contestable = null;
+      const liste = contestables(m).filter((c) => c !== j);
+      const cible = action.cible || liste[0];
+      if (!cible || !liste.includes(cible)) throw new Error(`Action interdite : ${JSON.stringify(action)}`);
       piocherCartes(m, cible, 1);
+      // Une seule amende par oubli, même s'il peut encore finir avec la carte piochée.
+      m.contestables = contestables(m).filter((c) => c !== cible);
+      delete m.contestable;
       noter(m, `${j} conteste : ${cible} n'avait pas annoncé et pioche 1 carte d'amende.`);
       return m;
     }
 
     if (j !== m.joueurCourant) throw new Error(`Action interdite : ${JSON.stringify(action)}`);
-    // Le joueur suivant agit : on ne peut plus contester le joueur précédent.
-    if (m.contestable !== j) m.contestable = null;
+    // Son propre tour revient : on ne peut plus le contester pour l'oubli précédent.
+    m.contestables = contestables(m).filter((c) => c !== j);
+    delete m.contestable;
 
     if (action.type === 'piocher') {
       if (m.aPioche || coupsJouer(m, j).length) throw new Error(`Action interdite : ${JSON.stringify(action)}`);
@@ -5080,7 +5096,7 @@ var qrcode = function() {
       joueurCourant: m.joueurCourant,
       aPioche: m.joueurCourant === joueur ? m.aPioche : null,
       annonces: m.annonces.slice(),
-      contestable: m.contestable,
+      contestables: contestables(m),
       qualifies: m.qualifies.slice(),
       phase: m.phase,
       posees: m.vu.posees.slice(),
@@ -5198,7 +5214,7 @@ var qrcode = function() {
     return prochain({ ...v, sens: -v.sens });
   }
   // Le prochain joueur est dangereux : il a annoncé ou n'a presque plus de cartes.
-  const menace = (v, j) => !!j && (v.annonces.includes(j) || v.contestable === j || v.nbCartes[j] <= 2);
+  const menace = (v, j) => !!j && (v.annonces.includes(j) || (v.contestables || []).includes(j) || v.nbCartes[j] <= 2);
 
   // Annonces et contestations (hors de son tour aussi).
   function horsTour(actions, annonce, conteste, rng) {
@@ -5415,7 +5431,7 @@ var qrcode = function() {
   // Applique une action du moteur, puis fait suivre la salle (fin de manche, chrono).
   function appliquer(s, action) {
     const courantAvant = s.manche.joueurCourant;
-    const contestableAvant = s.manche.contestable;
+    const contestablesAvant = (s.manche.contestables || []).slice();
     I.jouer(s.manche, action);
     finirMancheSiBesoin(s);
     // Annoncer ou contester ne change pas le joueur courant : on ne relance pas son chrono.
@@ -5425,12 +5441,12 @@ var qrcode = function() {
     const m = s.manche;
     // Plusieurs cartes posées d'un coup : elles sont d'abord montrées en éventail à toute la table.
     if (action.type === 'jouer' && action.cartes.length > 1 && s.robotPret && !(s.pauseRobot >= 0)) s.robotPret += PAUSE_EVENTAIL;
-    // Pendant ces 3 s, personne (humain ou robot) ne peut contester ; ensuite, tout le monde peut.
-    if (m && m.contestable && m.contestable !== contestableAvant) s.annonceJusqua = estRobot(s, m.contestable) ? null : s.horloge() + DELAI_ANNONCE;
-    if (!m || !m.contestable) s.annonceJusqua = null;
-    if (m && m.contestable && m.contestable !== contestableAvant && !estRobot(s, m.contestable) && s.robotPret) {
-      s.robotPret = Math.max(s.robotPret, s.horloge() + DELAI_ANNONCE);
-    }
+    // Pendant ces 3 s, personne (humain ou robot) ne peut contester ; ensuite, tout le monde peut,
+    // jusqu'au prochain tour du joueur (même si d'autres ont joué entre-temps).
+    const nouveaux = m ? (m.contestables || []).filter((j) => !contestablesAvant.includes(j) && !estRobot(s, j)) : [];
+    s.graces = Object.fromEntries(Object.entries(s.graces || {}).filter(([j]) => m && (m.contestables || []).includes(j)));
+    for (const j of nouveaux) s.graces[j] = s.horloge() + DELAI_ANNONCE;
+    if (nouveaux.length && s.robotPret) s.robotPret = Math.max(s.robotPret, s.horloge() + DELAI_ANNONCE);
   }
 
   function lancer(s) {
@@ -5446,8 +5462,9 @@ var qrcode = function() {
 
   function tic(s) {
     // Fin des 3 s pour annoncer : le bouton « Contester » apparaît chez les autres (la vue change).
-    const finAnnonce = !!(s.annonceJusqua && s.horloge() >= s.annonceJusqua);
-    if (finAnnonce) s.annonceJusqua = null;
+    const finies = Object.keys(s.graces || {}).filter((j) => s.horloge() >= s.graces[j]);
+    finies.forEach((j) => delete s.graces[j]);
+    const finAnnonce = finies.length > 0;
     return avancer(s) || finAnnonce;
   }
   function avancer(s) {
@@ -5471,6 +5488,7 @@ var qrcode = function() {
       if (estRobot(s, m.joueurCourant)) candidats.push(m.joueurCourant);
       for (const j of candidats) {
         const a = choixRobot(s, j);
+        if (a && a.type === 'contester' && enGrace(s, a.cible || (m.contestables || [])[0])) continue; // il attend la fin des 3 s
         if (a) { appliquer(s, a); return true; }
       }
     }
@@ -5510,7 +5528,7 @@ var qrcode = function() {
     const premier = choisirPremier(s, sieges);
     s.numeroManche++;
     s.suiteA = null;
-    s.annonceJusqua = null;
+    s.graces = {};
     s.manche = I.nouvelleManche(sieges, mains, pioche, premier, { mode: s.mode, graine: Math.floor(s.rng() * 4294967296) });
     s.etat = 'manche';
     s.pause = s.durees.depart > 0 ? { type: 'depart', jusqua: s.horloge() + s.durees.depart, total: s.durees.depart } : null;
@@ -5587,6 +5605,7 @@ var qrcode = function() {
       action.cartes = a.cartes.slice();
       if (typeof a.demande === 'string') action.demande = a.demande.slice(0, 2);
     } else if (!['piocher', 'passer', 'annoncer', 'contester'].includes(a.type)) return null;
+    if (a.type === 'contester' && typeof a.cible === 'string') action.cible = a.cible.slice(0, 64);
     return action;
   }
 
@@ -5712,7 +5731,11 @@ var qrcode = function() {
         // Le joueur ne peut agir que pour lui-même : on impose son id.
         const action = actionDe(id, msg.action || {});
         if (!action) return { ok: false, erreur: 'Action impossible maintenant.' };
-        if (action.type === 'contester' && enGraceAnnonce(s)) return { ok: false, erreur: 'Laisse-lui 3 secondes pour annoncer.' };
+        if (action.type === 'contester') {
+          // Sans cible précise : le premier joueur qu'on peut déjà contester.
+          if (!action.cible) action.cible = (s.manche.contestables || []).find((c) => c !== id && !enGrace(s, c));
+          if (!action.cible || enGrace(s, action.cible)) return { ok: false, erreur: 'Laisse-lui 3 secondes pour annoncer.' };
+        }
         try {
           appliquer(s, action);
           revenu(s, id);
@@ -5743,7 +5766,8 @@ var qrcode = function() {
     });
   }
 
-  const enGraceAnnonce = (s) => !!(s.annonceJusqua && s.horloge() < s.annonceJusqua);
+  // Le joueur « j » a encore ses 3 s pour annoncer : personne ne peut le contester.
+  const enGrace = (s, j) => !!(j && s.graces && s.graces[j] && s.horloge() < s.graces[j]);
 
   // Vue envoyée à un joueur : uniquement ce qu'il a le droit de voir.
   function vue(s, id) {
@@ -5781,7 +5805,7 @@ var qrcode = function() {
         sens: p.sens,
         pioche: p.pioche,
         annonces: p.annonces,
-        contestable: p.contestable,
+        contestables: p.contestables,
         aPioche: p.aPioche,
         phase: m.phase,
         nulle: m.phase === 'nulle',
@@ -5795,8 +5819,8 @@ var qrcode = function() {
         dernier: p.dernier, // qui a posé la carte du centre
         paquets: p.paquets,
         pause: s.pause ? { type: s.pause.type, resteMs: Math.max(0, s.pause.jusqua - s.horloge()), totalMs: s.pause.total } : null,
-        annonce: enGraceAnnonce(s) ? { resteMs: s.annonceJusqua - s.horloge(), totalMs: DELAI_ANNONCE } : null,
-        actions: s.pause ? [] : I.actionsPossibles(m, id).filter((a) => !(a.type === 'contester' && enGraceAnnonce(s))).map((a) => {
+        enGrace: (p.contestables || []).filter((j) => enGrace(s, j)), // pas encore contestables (3 s pour annoncer)
+        actions: s.pause ? [] : I.actionsPossibles(m, id).filter((a) => !(a.type === 'contester' && enGrace(s, a.cible))).map((a) => {
           const r = { type: a.type };
           if (a.cartes) r.cartes = a.cartes.slice();
           if (a.demande) r.demande = a.demande;
@@ -6526,7 +6550,7 @@ var qrcode = function() {
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = '4955932f987d'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = '6dc3f5004513'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
@@ -7935,17 +7959,18 @@ var qrcode = function() {
       b.onclick = () => { b.disabled = true; envoyer({ type: 'action', action: { type: 'annoncer' } }); };
       zk.append(b);
     }
-    const contester = actions.find((a) => a.type === 'contester');
-    if (contester) {
+    // Un bouton par joueur qu'on peut contester (jusqu'à son prochain tour).
+    actions.filter((a) => a.type === 'contester').forEach((contester) => {
       const b = el('button', 'btn katapss inter contester', `CONTESTER ${nom(v, contester.cible).toUpperCase()}`);
-      b.onclick = () => { b.disabled = true; envoyer({ type: 'action', action: { type: 'contester' } }); };
+      b.onclick = () => { b.disabled = true; envoyer({ type: 'action', action: { type: 'contester', cible: contester.cible } }); };
       zk.append(b);
-    } else if (m.annonce && m.contestable && m.contestable !== v.moi && jeJoue) {
-      // Les 3 premières secondes sont pour lui : il peut encore toucher « J'annonce ».
-      const b = el('button', 'btn katapss inter contester', `CONTESTER ${nom(v, m.contestable).toUpperCase()} (dans 3 s)`);
+    });
+    // Les 3 premières secondes sont pour lui : il peut encore toucher « J'annonce ».
+    if (jeJoue) (m.enGrace || []).filter((id) => id !== v.moi).forEach((id) => {
+      const b = el('button', 'btn katapss inter contester', `CONTESTER ${nom(v, id).toUpperCase()} (dans 3 s)`);
       b.disabled = true;
       zk.append(b);
-    }
+    });
 
     // Main : on touche une ou plusieurs cartes de même valeur ; l'appli met dans l'ordre qui change la couleur.
     $('zoneMain').hidden = !jeJoue;
@@ -8065,7 +8090,7 @@ var qrcode = function() {
     m.annonces.filter((id) => !a.annonces.includes(id)).forEach((id) => { tampon("J'ANNONCE !", id === moi ? 'Toi' : nom(N, id)); retardFenetre = Date.now() + 1500; });
     // Contestation : le joueur pris en faute pioche 1 carte d'amende.
     const fil = m.journal[m.journal.length - 1] || '';
-    if (fil !== (a.journal[a.journal.length - 1] || '') && / conteste : /.test(fil) && a.contestable) bulle(a.contestable, '!', { cls: 'ko', delai: 100 });
+    if (fil !== (a.journal[a.journal.length - 1] || '') && / conteste : /.test(fil)) (a.contestables || []).filter((id) => !(m.contestables || []).includes(id)).forEach((id) => bulle(id, '!', { cls: 'ko', delai: 100 }));
     // J retour, demande du 8 : on montre ce qui change.
     if (m.sens !== a.sens) {
       pop(document.querySelector('#entete .chip:last-child'), 1.5, 600);

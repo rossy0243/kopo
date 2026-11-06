@@ -2846,17 +2846,18 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
       b.onclick = () => { b.disabled = true; envoyer({ type: 'action', action: { type: 'annoncer' } }); };
       zk.append(b);
     }
-    const contester = actions.find((a) => a.type === 'contester');
-    if (contester) {
+    // Un bouton par joueur qu'on peut contester (jusqu'à son prochain tour).
+    actions.filter((a) => a.type === 'contester').forEach((contester) => {
       const b = el('button', 'btn katapss inter contester', `CONTESTER ${nom(v, contester.cible).toUpperCase()}`);
-      b.onclick = () => { b.disabled = true; envoyer({ type: 'action', action: { type: 'contester' } }); };
+      b.onclick = () => { b.disabled = true; envoyer({ type: 'action', action: { type: 'contester', cible: contester.cible } }); };
       zk.append(b);
-    } else if (m.annonce && m.contestable && m.contestable !== v.moi && jeJoue) {
-      // Les 3 premières secondes sont pour lui : il peut encore toucher « J'annonce ».
-      const b = el('button', 'btn katapss inter contester', `CONTESTER ${nom(v, m.contestable).toUpperCase()} (dans 3 s)`);
+    });
+    // Les 3 premières secondes sont pour lui : il peut encore toucher « J'annonce ».
+    if (jeJoue) (m.enGrace || []).filter((id) => id !== v.moi).forEach((id) => {
+      const b = el('button', 'btn katapss inter contester', `CONTESTER ${nom(v, id).toUpperCase()} (dans 3 s)`);
       b.disabled = true;
       zk.append(b);
-    }
+    });
 
     // Main : on touche une ou plusieurs cartes de même valeur ; l'appli met dans l'ordre qui change la couleur.
     $('zoneMain').hidden = !jeJoue;
@@ -2976,7 +2977,7 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
     m.annonces.filter((id) => !a.annonces.includes(id)).forEach((id) => { tampon("J'ANNONCE !", id === moi ? 'Toi' : nom(N, id)); retardFenetre = Date.now() + 1500; });
     // Contestation : le joueur pris en faute pioche 1 carte d'amende.
     const fil = m.journal[m.journal.length - 1] || '';
-    if (fil !== (a.journal[a.journal.length - 1] || '') && / conteste : /.test(fil) && a.contestable) bulle(a.contestable, '!', { cls: 'ko', delai: 100 });
+    if (fil !== (a.journal[a.journal.length - 1] || '') && / conteste : /.test(fil)) (a.contestables || []).filter((id) => !(m.contestables || []).includes(id)).forEach((id) => bulle(id, '!', { cls: 'ko', delai: 100 }));
     // J retour, demande du 8 : on montre ce qui change.
     if (m.sens !== a.sens) {
       pop(document.querySelector('#entete .chip:last-child'), 1.5, 600);
