@@ -167,7 +167,7 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
 .main .carte.choisie { z-index: 1; transform: translateY(-12px); box-shadow: 0 0 0 3px var(--brass), 0 10px 18px rgba(0,0,0,.4); }
 .main .carte:disabled { opacity: .4; filter: grayscale(.4); }
 .actions { display: grid; gap: 8px; }
-@media (prefers-reduced-motion: reduce) { .main .carte, .btn.katapss { transition: none; animation: none; } }
+/* Animations coupées (réglage « Réduites », ou téléphone qui en demande moins) */ html.sans-anim .main .carte, html.sans-anim .btn.katapss { transition: none; animation: none; }
 
 /* Fenêtres */
 .voile { position: fixed; inset: 0; background: rgba(6,14,24,.75); display: grid; place-items: center; padding: 16px; z-index: 10; }
@@ -284,7 +284,7 @@ details.rappel summary { cursor: pointer; font-weight: 600; }
 @keyframes tel-fleche { 0%, 10% { opacity: 0; } 25%, 45% { opacity: 1; } 60%, 100% { opacity: 0; } }
 .tourner .tel-mini { width: 22px; height: 22px; flex: none; }
 .tourner .tel-mini .tel { transform-origin: 12px 12px; animation: tel-tourne 3.2s ease-in-out infinite; }
-@media (prefers-reduced-motion: reduce) { .tel-anim .tel, .tel-anim .fleche, .tourner .tel-mini .tel { animation: none; } .tel-anim .fleche { opacity: 1; } }
+/* Animations coupées (réglage « Réduites », ou téléphone qui en demande moins) */ html.sans-anim .tel-anim .tel, html.sans-anim .tel-anim .fleche, html.sans-anim .tourner .tel-mini .tel { animation: none; } html.sans-anim .tel-anim .fleche { opacity: 1; }
 
 /* Partie en paysage : les joueurs autour d'une table ovale, ta main en bas. */
 @media (orientation: landscape) {
@@ -432,7 +432,7 @@ body.salon:has(#voile:not([hidden])) #filChat { display: none; } /* fenêtre du 
 @keyframes roue { to { transform: rotate(360deg); } }
 .table-inter > .pile:not(.pioche-inter) { position: relative; z-index: 1; }
 @media (orientation: landscape) and (max-height: 430px) { body.en-jeu .roue-sens { width: 124px; height: 124px; margin: -62px 0 0 -62px; } }
-@media (prefers-reduced-motion: reduce) { .roue-sens svg { animation: none; } }
+/* Animations coupées (réglage « Réduites », ou téléphone qui en demande moins) */ html.sans-anim .roue-sens svg { animation: none; }
 .consigne-centre { margin-top: 4px; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--brass); color: var(--brass); font: 600 12px/1.4 var(--body); white-space: nowrap; }
 .consigne-centre.demande { background: var(--brass); color: #1d1606; }
 .eventail-titre { position: fixed; z-index: 30; padding: 4px 12px; border-radius: 999px; background: rgba(10,8,4,.82); color: #f3e3bd; font: 700 14px/1.3 var(--body); white-space: nowrap; pointer-events: none; box-shadow: 0 6px 16px rgba(0,0,0,.4); }
@@ -448,7 +448,7 @@ body.salon:has(#voile:not([hidden])) #filChat { display: none; } /* fenêtre du 
 .main .carte.recue { box-shadow: 0 0 0 3px var(--good), 0 6px 14px rgba(0,0,0,.45); }
 .trophee { font-size: 64px; text-align: center; line-height: 1; animation: saut 1s ease-in-out infinite; }
 .consigne:empty { display: none; }
-@media (prefers-reduced-motion: reduce) { .siege.courant .ligne, .siege.courant, .siege.meneur .ligne::after, .pose .carte.gagnante, .trophee { animation: none; } }
+/* Animations coupées (réglage « Réduites », ou téléphone qui en demande moins) */ html.sans-anim .siege.courant .ligne, html.sans-anim .siege.courant, html.sans-anim .siege.meneur .ligne::after, html.sans-anim .pose .carte.gagnante, html.sans-anim .trophee { animation: none; }
 
 /* Accueil : profil, grandes cartes de modes, barre du bas. */
 body.accueil header { display: none; }
@@ -594,7 +594,7 @@ ul.regles, ol.regles { margin: 0; padding-left: 20px; display: grid; gap: 6px; c
 @media (max-height: 480px) { .splash { gap: 7px; } .splash-marque { width: min(18vh, 80px); } .splash-logo { font-size: min(20vh, 110px); } .splash-couleurs { font-size: 22px; } .splash-charge { margin-top: 4px; gap: 5px; } }
 @keyframes entree { from { transform: scale(.5); opacity: 0; } }
 @keyframes saut { 0%, 100% { transform: none; } 50% { transform: translateY(-10px); } }
-@media (prefers-reduced-motion: reduce) { .splash-logo, .splash-marque, .splash-couleurs span { animation: none; } }
+/* Animations coupées (réglage « Réduites », ou téléphone qui en demande moins) */ html.sans-anim .splash-logo, html.sans-anim .splash-marque, html.sans-anim .splash-couleurs span { animation: none; }
 /* Paramètres */
 .reglages { display: grid; gap: 14px; }
 .reglages h3 { margin: 6px 0 0; font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--brass); }
@@ -767,7 +767,7 @@ body.dos-kinshasa { --dos-motif: linear-gradient(135deg, transparent 38%, #f7d03
 .aide-guidee { position: relative; display: block; margin: 0 auto; max-width: 440px; background: #fbf3dc; color: #2a1f08; border-radius: 12px; padding: 8px 12px; font-size: 14px; font-weight: 600; line-height: 1.3; box-shadow: 0 6px 18px rgba(0,0,0,.4); animation: entree .35s cubic-bezier(.2,1.4,.4,1) both; text-align: left; }
 .aide-guidee::after { content: ''; position: absolute; left: 50%; bottom: -7px; margin-left: -7px; border: 7px solid transparent; border-bottom: 0; border-top-color: #fbf3dc; }
 .aide-guidee b { color: var(--red); }
-@media (prefers-reduced-motion: reduce) { .recap-tete.gagne .ico, .aide-guidee { animation: none; } .jour7 { transition: none; } }
+/* Animations coupées (réglage « Réduites », ou téléphone qui en demande moins) */ html.sans-anim .recap-tete.gagne .ico, html.sans-anim .aide-guidee { animation: none; } html.sans-anim .jour7 { transition: none; }
 .btn.btn-ico { padding: 7px 9px; display: grid; place-items: center; }
 .reglages .version { color: var(--muted); font-size: 12px; text-align: center; }
 /* Réactions et fiche joueur */
@@ -788,7 +788,7 @@ body.en-jeu #filChat { display: flex; }
 .msg-chat .emo { font-size: 20px; vertical-align: -2px; }
 .msg-chat.part { opacity: 0; }
 @keyframes entreeChat { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-@media (prefers-reduced-motion: reduce) { .msg-chat { animation: none; transition: none; } }
+/* Animations coupées (réglage « Réduites », ou téléphone qui en demande moins) */ html.sans-anim .msg-chat { animation: none; transition: none; }
 .histo-chat { max-height: 28vh; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
 .histo-chat .msg-chat { animation: none; align-self: flex-start; }
 .liste-k { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
@@ -1041,6 +1041,13 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   .fenetre[data-type="chat"] .histo-chat { max-height: 72px; }
 }
 </style>
+<script>
+// Avant tout affichage : coupe les animations CSS si le joueur l'a choisi, ou si le téléphone en demande moins
+// (sauf si le joueur a choisi de les garder), ou si le navigateur ne sait pas animer.
+try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{}') || {}, a = p.animations;
+  var r = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (a === 'reduites' || (r && a !== 'toujours') || typeof Element.prototype.animate !== 'function') document.documentElement.classList.add('sans-anim'); })(); } catch (e) {}
+</script>
 </head>
 <body>
 <div class="app">
@@ -6634,7 +6641,7 @@ var qrcode = function() {
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = '441e4ef330be'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = 'd39489f7ff8a'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
@@ -6665,7 +6672,8 @@ var qrcode = function() {
   function enregistrerPrefs() { stock.ecrire('kopo-prefs', prefs); appliquerPrefs(); }
   function appliquerPrefs() {
     document.body.classList.toggle('quatre-couleurs', !!prefs.quatreCouleurs);
-    sansAnim = animReduiteSysteme || prefs.animations === 'reduites';
+    sansAnim = calculerSansAnim();
+    document.documentElement.classList.toggle('sans-anim', sansAnim);
     Sons.regler({ effets: prefs.effetsSonores, musique: prefs.musique });
   }
   function vibrer(ms) { if (prefs.vibrations && navigator.vibrate) try { navigator.vibrate(ms); } catch (e) {} }
@@ -7354,8 +7362,25 @@ var qrcode = function() {
 
   // ------------------------------------------------------------------ animations
   // Chaque nouvelle vue est comparée à la précédente : ce qui a changé est animé.
-  const animReduiteSysteme = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let sansAnim = animReduiteSysteme || prefs.animations === 'reduites';
+  // Beaucoup de téléphones Android (économiseur de batterie, « Supprimer les animations ») et d'iPhone
+  // (« Réduire les animations ») demandent moins d'animations : on suit ce choix, sauf si le joueur a choisi
+  // « Normales » dans les réglages (prefs.animations = 'toujours'). 'normales' = valeur par défaut = suivre le téléphone.
+  const mqAnimReduite = matchMedia('(prefers-reduced-motion: reduce)');
+  let animReduiteSysteme = mqAnimReduite.matches;
+  const animPossible = typeof Element.prototype.animate === 'function'; // très vieux navigateurs : pas d'animations JS
+  function calculerSansAnim() { return !animPossible || prefs.animations === 'reduites' || (animReduiteSysteme && prefs.animations !== 'toujours'); }
+  let sansAnim = calculerSansAnim();
+  const majAnimSysteme = () => { animReduiteSysteme = mqAnimReduite.matches; appliquerPrefs(); }; // économiseur de batterie activé en cours de partie
+  if (mqAnimReduite.addEventListener) mqAnimReduite.addEventListener('change', majAnimSysteme); else if (mqAnimReduite.addListener) mqAnimReduite.addListener(majAnimSysteme);
+  // Propriétés « scale » et « rotate » seules : Chrome 104+, Safari 14.1+. Ailleurs, on passe par « transform »
+  // (en gardant la transformation déjà présente sur l'élément), sinon l'animation ne fait rien.
+  const transfoSeules = !!(window.CSS && CSS.supports && CSS.supports('scale', '1') && CSS.supports('rotate', '0deg'));
+  function animerTransfo(e, prop, valeurs, options) {
+    if (transfoSeules) return e.animate(valeurs.map((v) => ({ [prop]: v })), options);
+    const base = getComputedStyle(e).transform;
+    const avant = base && base !== 'none' ? base + ' ' : '';
+    return e.animate(valeurs.map((v) => ({ transform: `${avant}${prop}(${v})` })), options);
+  }
   const enVol = new Map(); // sélecteur d'une carte en vol -> nombre de vols : cachée jusqu'à l'arrivée
   const cartesRecues = new Set(); // cartes ramassées, mises en évidence dans ta main
   let retardFenetre = 0, minuteurFenetre = null;
@@ -7405,7 +7430,7 @@ var qrcode = function() {
       if (o.cible) {
         const n = (enVol.get(o.cible) || 1) - 1;
         if (n > 0) enVol.set(o.cible, n);
-        else { enVol.delete(o.cible); document.querySelectorAll(o.cible).forEach((x) => { x.style.visibility = ''; x.animate([{ scale: '1.12' }, { scale: '1' }], { duration: 220 }); }); }
+        else { enVol.delete(o.cible); document.querySelectorAll(o.cible).forEach((x) => { x.style.visibility = ''; animerTransfo(x, 'scale', ['1.12', '1'], { duration: 220 }); }); }
       }
     };
     a.onfinish = fin; a.oncancel = fin;
@@ -7428,7 +7453,7 @@ var qrcode = function() {
   function secouer(id) {
     const s = siegeEl(id);
     if (!s || sansAnim) return;
-    s.animate([{ rotate: '0deg' }, { rotate: '-7deg' }, { rotate: '7deg' }, { rotate: '-5deg' }, { rotate: '5deg' }, { rotate: '0deg' }], { duration: 600, delay: 200 });
+    animerTransfo(s, 'rotate', ['0deg', '-7deg', '7deg', '-5deg', '5deg', '0deg'], { duration: 600, delay: 200 });
   }
   // Grand tampon au milieu de l'écran (KATAPSS).
   function tampon(texte, sous) {
@@ -7491,13 +7516,13 @@ var qrcode = function() {
         if (i !== n - 1) return;
         const k = (enVol.get('#centreInter') || 1) - 1;
         if (k > 0) enVol.set('#centreInter', k);
-        else { enVol.delete('#centreInter'); document.querySelectorAll('#centreInter').forEach((x) => { x.style.visibility = ''; x.animate([{ scale: '1.12' }, { scale: '1' }], { duration: 220 }); }); }
+        else { enVol.delete('#centreInter'); document.querySelectorAll('#centreInter').forEach((x) => { x.style.visibility = ''; animerTransfo(x, 'scale', ['1.12', '1'], { duration: 220 }); }); }
       };
       a.onfinish = fini; a.oncancel = fini;
     });
     return total;
   }
-  function pop(e, ampleur = 1.25, duree = 400) { if (e && !sansAnim) e.animate([{ scale: String(ampleur) }, { scale: '1' }], { duration: duree, easing: 'cubic-bezier(.3,1.6,.5,1)' }); }
+  function pop(e, ampleur = 1.25, duree = 400) { if (e && !sansAnim) animerTransfo(e, 'scale', [String(ampleur), '1'], { duration: duree, easing: 'cubic-bezier(.3,1.6,.5,1)' }); }
 
   // Distribution : les cartes partent du centre vers chaque joueur, à tour de rôle.
   function distribuer(v) {
@@ -8740,9 +8765,9 @@ var qrcode = function() {
       b.onclick = () => { prefs[cle] = !prefs[cle]; enregistrerPrefs(); maj(); if (apres) apres(); };
       maj(); ligne(texte, aide, b);
     };
-    const choix = (cle, texte, aide, options) => {
+    const choix = (cle, texte, aide, options, actuel = () => prefs[cle]) => {
       const c = el('div', 'choix');
-      const maj = () => c.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === prefs[cle])));
+      const maj = () => c.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === actuel())));
       for (const [v, t] of options) { const b = el('button', null, t); b.dataset.v = v; b.onclick = () => { prefs[cle] = v; enregistrerPrefs(); maj(); if (vueActuelle) afficher(vueActuelle); }; c.append(b); }
       maj(); ligne(texte, aide, c);
     };
@@ -8755,7 +8780,10 @@ var qrcode = function() {
     choix('tri', 'Ranger ma main', null, [['couleur', 'Par couleur'], ['valeur', 'Par valeur']]);
     bascule('confirmerToutPoser', 'Confirmer avant « Tout poser »', 'Évite de sortir par erreur', null);
     titre('Affichage');
-    choix('animations', 'Animations', animReduiteSysteme ? 'Réduites par ton téléphone' : 'Réduites : plus rapide, moins de batterie', [['normales', 'Normales'], ['reduites', 'Réduites']]);
+    // Téléphone qui demande moins d'animations : « Normales » les remet quand même ('toujours').
+    if (!animPossible) choix('animations', 'Animations', 'Ton navigateur est trop ancien pour les animations', [['reduites', 'Réduites']], () => 'reduites');
+    else if (animReduiteSysteme) choix('animations', 'Animations', 'Ton téléphone demande moins d\'animations (économie de batterie ou accessibilité). Touche « Normales » pour les voir quand même.', [['toujours', 'Normales'], ['reduites', 'Réduites']], () => (prefs.animations === 'toujours' ? 'toujours' : 'reduites'));
+    else choix('animations', 'Animations', 'Réduites : plus rapide, moins de batterie', [['normales', 'Normales'], ['reduites', 'Réduites']], () => (prefs.animations === 'reduites' ? 'reduites' : 'normales'));
     bascule('quatreCouleurs', 'Cartes à 4 couleurs', 'Pique noir, cœur rouge, carreau bleu, trèfle vert', null);
     titre('Compte');
     // Pseudo : choisi une fois, puis 2 changements au plus sur 12 mois (le serveur fait foi s'il y a un compte).
