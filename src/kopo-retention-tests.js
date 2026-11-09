@@ -47,6 +47,13 @@ test('Première partie, même perdue contre des robots : une demi-barre, pas enc
   assert.strictEqual(p.entrainement.parties, 1);
   assert.ok(!p.stats, 'les parties avec robots ne comptent pas dans les stats');
 });
+test('Battus : joueurs finis derrière soi, sans les parties contre les robots', () => {
+  const p = profil(); p.premierePartie = 'x';
+  R.enregistrerPartie(p, partie({ place: 2, nbJoueurs: 5 }), '2026-11-09');
+  R.enregistrerPartie(p, partie({ place: 5, nbJoueurs: 5 }), '2026-11-09');
+  R.enregistrerPartie(p, partie({ place: 1, nbJoueurs: 4, avecRobots: true }), '2026-11-09');
+  assert.strictEqual(p.stats.battus, 3);
+});
 test('Niveau 2 atteint : avatar débloqué', () => {
   const p = profil(); p.premierePartie = 'x'; p.bareme = R.BAREME; p.xp = 95;
   const r = R.enregistrerPartie(p, partie({ place: 2, manches: 3 }), '2026-10-31');

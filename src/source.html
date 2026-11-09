@@ -705,7 +705,54 @@ body.dos-kinshasa { --dos-motif: linear-gradient(135deg, transparent 38%, #f7d03
 .carte-mission .barre-xp span { background: var(--good); }
 .carte-mission .droite { display: flex; align-items: center; gap: 8px; }
 .fenetre[data-type="missions"] { width: min(600px, 100%); }
-.fenetre[data-type="profil"] { width: min(560px, 100%); }
+.fenetre[data-type="profil"] { width: min(480px, 100%); padding: 16px; }
+/* Mon profil (09/11) : en-tête, XP, chiffres clés, Ligue sur une ligne, stats en tableau, rivaux */
+.pf, .pf-col { display: grid; gap: 10px; align-content: start; min-width: 0; }
+.pf-tete { display: flex; align-items: center; gap: 14px; }
+.pf-tete .avatar { width: 68px; height: 68px; font-size: 34px; flex: none; }
+.pf-tete .niveau-pastille { min-width: 24px; height: 24px; border-radius: 12px; font-size: 13px; line-height: 21px; right: -6px; bottom: -5px; }
+.pf-id { display: grid; gap: 2px; min-width: 0; }
+.pf-id .nom { font-size: 20px; font-weight: 700; display: flex; align-items: center; gap: 6px; min-width: 0; }
+.pf-id .nom small { color: var(--muted); font-weight: 400; font-size: 14px; }
+.pf-id .drapeau { font-size: 20px; line-height: 1; }
+.pf-id .titre { color: var(--brass); font-size: 13px; font-weight: 600; }
+.pf-id .depuis { color: var(--muted); font-size: 12px; }
+.pf-fermer { margin-left: auto; align-self: flex-start; flex: none; width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line); background: rgba(0,0,0,.25); color: var(--ink); font-size: 18px; padding: 0; cursor: pointer; }
+.pf-xp { display: grid; gap: 4px; }
+.pf-xp .suite { font-size: 12px; color: var(--muted); text-align: right; }
+.pf-xp .suite b { color: var(--brass); }
+.pf-cles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.pf-cles div { background: rgba(255,255,255,.05); border: 1px solid var(--line); border-radius: 12px; padding: 8px 4px; display: grid; justify-items: center; gap: 1px; min-width: 0; }
+.pf-cles b { font-family: var(--display); font-size: 26px; font-weight: 400; color: var(--brass); line-height: 1; }
+.pf-cles small { font-size: 11px; color: var(--muted); }
+.pf-ligue { --div: var(--brass); display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--div) 50%, transparent); background: linear-gradient(90deg, color-mix(in srgb, var(--div) 18%, transparent), color-mix(in srgb, var(--div) 3%, transparent)); }
+.pf-ligue .ico { width: 26px; height: 26px; color: var(--div); flex: none; }
+.pf-ligue .info { display: grid; font-size: 12px; color: var(--muted); min-width: 0; }
+.pf-ligue .info .div { font-family: var(--display); font-size: 24px; letter-spacing: 1.5px; color: var(--div); text-transform: uppercase; }
+.pf-ligue .info b { color: var(--ink); font-size: 13px; }
+.pf-ligue .rang { margin-left: auto; text-align: right; display: grid; font-size: 12px; color: var(--muted); }
+.pf-ligue .rang + .rang { margin-left: 0; }
+.pf-ligue .rang b { font-family: var(--display); font-size: 22px; font-weight: 400; color: var(--ink); line-height: 1; }
+.pf-table { display: grid; grid-template-columns: 1fr auto; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); }
+.pf-table span { padding: 6px 12px; font-size: 13px; color: var(--muted); }
+.pf-table b { padding: 6px 12px; font-size: 14px; text-align: right; }
+.pf-table > :nth-child(4n+1), .pf-table > :nth-child(4n+2) { background: rgba(255,255,255,.04); }
+.pf h3 { margin: 4px 0 0; font: 400 15px/1 var(--display); letter-spacing: 1.5px; color: var(--brass); text-transform: uppercase; }
+.pf p.muted { margin: 0; font-size: 13px; }
+.pf-rivaux { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.pf-rivaux div { border-radius: 12px; padding: 8px 10px; background: rgba(255,255,255,.04); border: 1px solid var(--line); display: grid; gap: 1px; min-width: 0; }
+.pf-rivaux small { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+.pf-rivaux b { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pf-rivaux em { font-style: normal; font-size: 12px; color: var(--brass); }
+.pf-actions { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; }
+.pf-actions .btn { padding: 10px 4px; font-size: 13px; }
+@media (orientation: landscape) and (max-height: 500px) {
+  .fenetre[data-type="profil"] { width: min(820px, 100%); padding: 12px 14px; max-height: 96dvh; }
+  .pf { grid-template-columns: 1fr 1fr; column-gap: 16px; }
+  .pf-actions, .pf .pf-large { grid-column: 1 / -1; }
+  .pf-tete .avatar { width: 56px; height: 56px; font-size: 28px; }
+  .pf-table span, .pf-table b { padding: 4px 10px; }
+}
 .profil-fiche { display: grid; gap: 10px; }
 .profil-tete { display: flex; align-items: center; gap: 12px; }
 .profil-tete .avatar { width: 56px; height: 56px; flex: none; }
@@ -5311,56 +5358,90 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   function recompenseEl(n) { const r = el('span', 'recompense'); r.append('+' + n, pieceEl()); return r; }
   // Mon profil : niveau, statistiques (parties entre humains), entraînement (robots), rivaux, ligue.
   // Les stats sont tenues sur le téléphone (kopo-profil) à la fin de chaque partie.
+  // Drapeau d'un pays (code ISO à 2 lettres) en émoji.
+  const drapeauPays = (code) => /^[A-Z]{2}$/.test(code || '') ? String.fromCodePoint(...[...code].map((ch) => 0x1F1E6 + ch.charCodeAt(0) - 65)) : '';
+  const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+  // Mon profil : en-tête (avatar, niveau, drapeau, titre), barre d'XP, 4 chiffres clés, Ligue sur une ligne,
+  // statistiques en tableau, rivaux. Deux colonnes en paysage.
   function ouvrirProfil() {
-    const p = lireProfil(), s = Object.assign({ parties: 0, victoires: 0, finales: 0, manchesSurvecues: 0, katapss: 0, eliminePremier: 0 }, p.stats || {});
+    const p = lireProfil(), s = Object.assign({ parties: 0, victoires: 0, finales: 0, manchesSurvecues: 0, katapss: 0, eliminePremier: 0, battus: 0 }, p.stats || {});
     const en = p.entrainement || { parties: 0, victoires: 0 };
-    const c = compteLocal();
-    const z = el('div', 'profil-fiche');
-    const tete = el('div', 'profil-tete');
-    const av = el('span', $('avatar').className || 'avatar');
+    const c = compteLocal(), enLigne = MODE_SERVEUR && c;
     const pseudo = stock.lire('kopo-pseudo') || $('pseudo').value || 'Joueur';
-    av.append(el('b', null, pseudo[0].toUpperCase()));
-    const id = el('div');
-    id.append(el('b', 'nom', c && c.compte && c.compte.numero ? pseudo + '#' + c.compte.numero : pseudo), el('small', null, R.titre(p) || 'Petit nouveau'));
-    tete.append(av, id);
-    z.append(tete);
     const n = R.niveauDe(p.xp || 0);
-    const lv = el('div', 'recap-xp');
+    const col1 = el('div', 'pf-col'), col2 = el('div', 'pf-col');
+    // En-tête
+    const tete = el('div', 'pf-tete');
+    const av = el('span', $('avatar').className || 'avatar');
+    av.append(el('b', null, pseudo[0].toUpperCase()), el('i', 'niveau-pastille', String(n.niveau)));
+    const id = el('div', 'pf-id');
+    const nomL = el('span', 'nom', pseudo + ' ');
+    if (c && c.compte && c.compte.numero) nomL.append(el('small', null, '#' + c.compte.numero));
+    const drapeau = el('span', 'drapeau', drapeauPays(c && c.compte && c.compte.pays));
+    nomL.append(drapeau);
+    const titre = R.titre(p);
+    const depuis = el('span', 'depuis');
+    const majDepuis = (amis) => {
+      const d = /^(\d{4})-(\d{2})/.exec(p.premierePartie || '');
+      depuis.textContent = [d ? `Joue depuis ${MOIS[+d[2] - 1]} ${d[1]}` : 'Nouveau joueur', amis != null ? (amis > 1 ? amis + ' amis' : amis + ' ami') : ''].filter(Boolean).join(' · ');
+    };
+    majDepuis();
+    id.append(nomL, el('span', 'titre', titre || 'Petit nouveau'), depuis);
+    const fermerX = el('button', 'pf-fermer', '✕'); fermerX.setAttribute('aria-label', 'Fermer');
+    tete.append(av, id, fermerX);
+    // XP
+    const xp = el('div', 'pf-xp'), lv = el('div', 'recap-xp');
     const barre = el('div', 'barre-xp'), sp = el('span'); barre.append(sp);
     lv.append(el('div', 'recap-niveau', String(n.niveau)), barre, el('small', 'muted', `${n.dansNiveau}/${n.pourSuivant} XP`));
     remplir(sp, 0, n.dansNiveau / n.pourSuivant, 150);
-    z.append(lv);
-    const grille = (cases) => { const g = el('div', 'stats-grille'); for (const [v, t] of cases) { const k = el('div', 'stat-case'); k.append(el('b', null, String(v)), el('small', null, t)); g.append(k); } return g; };
-    const taux = (v, n2) => (n2 ? Math.round(100 * v / n2) : 0) + ' %';
-    // Ligue (en ligne seulement) : remplie quand le serveur répond.
+    const suite = el('div', 'suite', 'Encore '); suite.append(el('b', null, (n.pourSuivant - n.dansNiveau) + ' XP'), ` pour le niveau ${n.niveau + 1}`);
+    const cadeau = R.OBJETS_NIVEAU[n.niveau + 1];
+    if (cadeau && R.OBJETS[cadeau]) suite.append(` · avatar ${R.OBJETS[cadeau].nom} à la clé`);
+    xp.append(lv, suite);
+    // Chiffres clés
+    const cles = el('div', 'pf-cles');
     const ligueZ = el('div');
-    z.append(ligueZ);
-    if (MODE_SERVEUR && c) apiJoueur('/ligue').then((L) => {
-      const m = L && L.moi; if (!m) return;
-      ligueZ.append(el('h3', null, 'Ligue' + (L.saison ? ' · ' + L.saison.nom : '')), grille([[NOMS_DIVISIONS[m.division] || m.division, 'Division'], [m.points, 'Points'], [m.rangMondial ? '#' + m.rangMondial : '–', 'Rang mondial'], [m.parties, 'Parties classées']]));
-    }).catch(() => {});
-    // Statistiques du téléphone, complétées par celles du serveur (compte en ligne) : si le téléphone a perdu
-    // son profil (nouvelle adresse du site, navigateur nettoyé), le serveur, lui, a gardé les parties.
-    const statsZ = el('div');
-    z.append(statsZ);
+    col1.append(tete, xp, cles, ligueZ);
+    const taux = (v, n2) => (n2 ? Math.round(100 * v / n2) : 0) + ' %';
+    const statsZ = el('div', 'pf-col'), rivauxZ = el('div', 'pf-col');
+    col2.append(statsZ, rivauxZ);
     const dessinerStats = (s, en, rivaux) => {
-      statsZ.replaceChildren();
-      statsZ.append(el('h3', null, 'Statistiques'));
-      if (!s.parties) statsZ.append(el('p', 'muted', 'Joue une partie avec d\'autres joueurs pour voir tes statistiques ici.'));
-      else statsZ.append(grille([[s.parties, 'Parties jouées'], [s.victoires, 'Victoires'], [taux(s.victoires, s.parties), 'Taux de victoire'], [s.finales, 'Finales atteintes'], [s.manchesSurvecues, 'Manches survécues'], [s.katapss, 'Katapss'], [s.eliminePremier, 'Éliminé en premier']]));
-      statsZ.append(el('h3', null, 'Entraînement (robots)'));
-      statsZ.append(en.parties ? grille([[en.parties, 'Parties'], [en.victoires, 'Victoires'], [taux(en.victoires, en.parties), 'Taux de victoire']]) : el('p', 'muted', 'Aucune partie contre les robots pour l\'instant.'));
-      // Deux lignes seulement : celui que tu as le plus battu, et celui qui t'a le plus battu.
-      statsZ.append(el('h3', null, 'Rivaux'));
+      cles.replaceChildren();
+      for (const [v, t] of [[s.victoires, 'Victoires'], [taux(s.victoires, s.parties), 'Réussite'], [s.katapss, 'Katapss'], [s.battus || 0, 'Battus']]) { const k = el('div'); k.append(el('b', null, String(v)), el('small', null, t)); cles.append(k); }
+      statsZ.replaceChildren(el('h3', null, 'Statistiques'));
+      const t = el('div', 'pf-table');
+      const ligne = (a, b) => t.append(el('span', null, a), el('b', null, String(b)));
+      if (s.parties) { ligne('Parties jouées', s.parties); ligne('Finales atteintes', s.finales); ligne('Manches survécues', s.manchesSurvecues); ligne('Éliminé en premier', s.eliminePremier); }
+      ligne('Entraînement (robots)', en.parties ? `${en.parties} partie${en.parties > 1 ? 's' : ''} · ${taux(en.victoires, en.parties)}` : 'aucune partie');
+      statsZ.append(t);
+      if (!s.parties) statsZ.append(el('p', 'muted', 'Joue une partie avec d\'autres joueurs pour remplir tes statistiques.'));
+      // Deux cases : celui que tu as le plus battu, et celui qui t'a le plus battu.
+      rivauxZ.replaceChildren(el('h3', null, 'Rivaux'));
       const victime = rivaux.filter((r) => r.gagnes).sort((a, b) => b.gagnes - a.gagnes)[0];
       const bete = rivaux.filter((r) => r.perdus).sort((a, b) => b.perdus - a.perdus)[0];
-      const ligneR = (a, b) => { const l = el('div', 'rival-ligne'); l.append(el('span', null, a), el('small', null, b)); statsZ.append(l); };
-      if (victime) ligneR('Ta victime : ' + victime.pseudo, 'battu ' + victime.gagnes + ' fois');
-      if (bete) ligneR('Ta bête noire : ' + bete.pseudo, 't\'a battu ' + bete.perdus + ' fois');
-      if (!victime && !bete) statsZ.append(el('p', 'muted', 'Joue contre d\'autres joueurs pour voir tes rivaux ici.'));
+      if (!victime && !bete) { rivauxZ.append(el('p', 'muted', 'Affronte d\'autres joueurs en duel pour voir tes rivaux ici.')); return; }
+      const g = el('div', 'pf-rivaux');
+      const caseR = (t1, r, t2) => { const d = el('div'); d.append(el('small', null, t1), el('b', null, r ? r.pseudo : '–'), el('em', null, r ? t2 : '')); g.append(d); };
+      caseR('Ta victime', victime, victime && `battu ${victime.gagnes} fois`);
+      caseR('Ta bête noire', bete, bete && `t'a battu ${bete.perdus} fois`);
+      rivauxZ.append(g);
     };
     dessinerStats(s, en, Object.values(p.rivaux || {}));
-    if (MODE_SERVEUR && c) apiJoueur('/statistiques').then((srv) => {
+    // Ligue (en ligne seulement) : une ligne, remplie quand le serveur répond.
+    if (enLigne) apiJoueur('/ligue').then((L) => {
+      const m = L && L.moi; if (!m) return;
+      const lg = el('div', 'pf-ligue'); lg.style.setProperty('--div', couleurDiv(m.division));
+      const info = el('div', 'info'); const sous = el('span', null, (L.saison ? L.saison.nom + ' · ' : '')); sous.append(el('b', null, m.points + ' pts'));
+      info.append(el('span', 'div', NOMS_DIVISIONS[m.division] || m.division), sous);
+      const rang = (v, t) => { const r = el('div', 'rang'); r.append(el('b', null, v ? '#' + v : '–'), el('span', null, t)); return r; };
+      lg.append(icone('i-couronne'), info, rang(m.rangMondial, 'au monde'));
+      if (m.pays) { lg.append(rang(m.rangPays, drapeauPays(m.pays) + ' ' + nomPays(m.pays))); if (!drapeau.textContent) drapeau.textContent = drapeauPays(m.pays); }
+      ligueZ.replaceChildren(lg);
+    }).catch(() => {});
+    if (enLigne) apiJoueur('/amis').then((a) => majDepuis(a.length)).catch(() => {});
+    // Statistiques du téléphone, complétées par celles du serveur (compte en ligne) : si le téléphone a perdu
+    // son profil (nouvelle adresse du site, navigateur nettoyé), le serveur, lui, a gardé les parties.
+    if (enLigne) apiJoueur('/statistiques').then((srv) => {
       if (!srv || !srv.stats) return;
       const plus = (a, b) => Object.fromEntries(Object.keys(a).map((k) => [k, Math.max(a[k] || 0, b[k] || 0)]));
       const rv = {};
@@ -5371,19 +5452,23 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       }
       dessinerStats(plus(s, srv.stats), plus(en, srv.entrainement || {}), Object.values(rv));
     }).catch(() => {});
+    const z = el('div', 'pf');
+    z.append(col1, col2);
     // Changement d'adresse du site : un profil neuf a pu être créé ici avant que les anciennes données arrivent.
     // Passer une fois par l'ancienne adresse les ramène (elles sont réunies avec celles d'ici).
     if (NOUVELLE_ADRESSE && location.origin === new URL(NOUVELLE_ADRESSE).origin && !stock.lire('kopo-demenagement')) {
-      const rec = el('button', 'btn', 'Statistiques disparues depuis le changement d\'adresse ? Les récupérer');
+      const rec = el('button', 'btn pf-large', 'Statistiques disparues depuis le changement d\'adresse ? Les récupérer');
       rec.onclick = () => { location.href = ANCIENNE_ADRESSE; };
       z.append(rec);
     }
-    const actions = el('div', 'profil-actions');
-    const reg = el('button', 'btn', 'Changer de pseudo'); reg.onclick = ouvrirParametres;
+    const actions = el('div', 'pf-actions');
+    if (enLigne) { const amis = el('button', 'btn', 'Mes amis'); amis.onclick = () => ouvrirAmis(ouvrirProfil); actions.append(amis); }
     const mis = el('button', 'btn', 'Missions'); mis.onclick = ouvrirMissions;
-    actions.append(reg, mis);
-    const fermer = el('button', 'btn principal large', 'Fermer'); fermer.onclick = () => { fermerFenetre(); if (vueActuelle) afficher(vueActuelle); };
-    ouvrirFenetre([el('h2', null, 'Mon profil'), z, actions, fermer], 'profil');
+    const reg = el('button', 'btn', 'Pseudo'); reg.onclick = ouvrirParametres;
+    actions.append(mis, reg);
+    z.append(actions);
+    fermerX.onclick = () => { fermerFenetre(); if (vueActuelle) afficher(vueActuelle); };
+    ouvrirFenetre([z], 'profil');
   }
   window.ouvrirProfil = ouvrirProfil;
   // Encaisser une mission finie : pièces + XP, puis elle disparaît de la liste.

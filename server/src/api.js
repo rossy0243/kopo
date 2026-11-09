@@ -193,12 +193,13 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours,
         count(*) FILTER (WHERE NOT p.avec_robots AND pa.place = 1)::int AS victoires,
         count(*) FILTER (WHERE NOT p.avec_robots AND pa.place <= 2 AND p.nb_joueurs >= 2)::int AS finales,
         count(*) FILTER (WHERE NOT p.avec_robots AND pa.place = p.nb_joueurs AND p.nb_joueurs >= 2)::int AS elimine_premier,
+        coalesce(sum(p.nb_joueurs - pa.place) FILTER (WHERE NOT p.avec_robots AND p.nb_joueurs > pa.place), 0)::int AS battus,
         count(*) FILTER (WHERE p.avec_robots)::int AS entrainement_parties,
         count(*) FILTER (WHERE p.avec_robots AND pa.place = 1)::int AS entrainement_victoires
       FROM participations pa JOIN parties p ON p.id = pa.partie_id
       WHERE pa.compte_id = $1 AND pa.place IS NOT NULL AND NOT pa.abandon`, [req.compte.id])).rows[0];
     res.json({
-      stats: { parties: s.parties, victoires: s.victoires, finales: s.finales, eliminePremier: s.elimine_premier },
+      stats: { parties: s.parties, victoires: s.victoires, finales: s.finales, eliminePremier: s.elimine_premier, battus: s.battus },
       entrainement: { parties: s.entrainement_parties, victoires: s.entrainement_victoires },
       rivaux: await social.rivaux(req.compte.id, 50),
     });

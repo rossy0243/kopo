@@ -282,7 +282,7 @@
     };
   }
 
-  const STATS0 = { parties: 0, victoires: 0, finales: 0, manchesSurvecues: 0, katapss: 0, eliminePremier: 0 };
+  const STATS0 = { parties: 0, victoires: 0, finales: 0, manchesSurvecues: 0, katapss: 0, eliminePremier: 0, battus: 0 }; // battus : joueurs finis derrière soi (depuis le 09/11)
   // Ajoute de l'XP ; les objets des niveaux franchis sont donnés (et équipés).
   function ajouterXp(p, n) {
     const avant = p.xp || 0;
@@ -311,6 +311,7 @@
       s.parties++; if (e.victoire) s.victoires++; if (e.finale) s.finales++;
       s.manchesSurvecues += e.manches; s.katapss += e.katapss;
       if (e.place === e.nbJoueurs) s.eliminePremier++;
+      s.battus += Math.max(0, (e.nbJoueurs || 0) - e.place);
     }
     // Face-à-face : seulement un vrai duel, deux humains seuls à la table (pas une partie à 3 ou plus, pas de robot).
     let faceAFace = null;

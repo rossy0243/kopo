@@ -649,11 +649,12 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     const v = js.find((j) => j.compte.id === fin.vainqueur);
     const st = await api('/api/statistiques', { jeton: v.jeton });
     assert.strictEqual(st.statut, 200);
-    assert.deepStrictEqual(st.json.stats, { parties: 1, victoires: 1, finales: 1, eliminePremier: 0 });
+    assert.deepStrictEqual(st.json.stats, { parties: 1, victoires: 1, finales: 1, eliminePremier: 0, battus: 2 });
     assert.deepStrictEqual(st.json.entrainement, { parties: 0, victoires: 0 });
     assert.strictEqual(st.json.rivaux.length, 0, 'partie à 3 : pas de face-à-face');
     const premier = js.find((j) => j.compte.id === fin.elimines[0]);
     assert.strictEqual((await api('/api/statistiques', { jeton: premier.jeton })).json.stats.eliminePremier, 1);
+    assert.strictEqual((await api('/api/statistiques', { jeton: premier.jeton })).json.stats.battus, 0);
     // Copie du profil du téléphone.
     assert.strictEqual((await api('/api/profil', { jeton: v.jeton })).json.profil, null);
     assert.strictEqual((await api('/api/profil', { methode: 'PUT', jeton: v.jeton, corps: { profil: [] } })).statut, 400);
