@@ -347,6 +347,7 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     const fin = await jouerPartie(js, { jeu: 'inter8', reglages: { mode: 'delire' } });
     assert.strictEqual(fin.jeu, 'inter8');
     assert.strictEqual(fin.mode, 'delire');
+    assert.strictEqual(fin.jRetour, true, 'une appli qui envoie « délire » seul garde le J retour');
     const ordre = [fin.vainqueur, ...fin.elimines.slice().reverse()];
     assert.strictEqual((await srv.comptes.lire(ordre[0])).solde, 500 + 2 * 5 + 40, 'vainqueur : 2 manches et la victoire');
     assert.strictEqual((await srv.comptes.lire(ordre[1])).solde, 500 + 5 + 15, '2e');

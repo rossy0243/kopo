@@ -28,8 +28,9 @@
     return (NOMS_VALEURS[valeur(carte)] || valeur(carte)) + SYMBOLES[couleur(carte)];
   }
 
-  // 1 paquet de 54 cartes de 2 à 4 joueurs, 2 paquets (108 cartes) de 5 à 8 joueurs.
-  const nombrePaquets = (nbJoueurs) => (nbJoueurs >= 5 ? 2 : 1);
+  // Le mode fixe le nombre de paquets, de 2 à 8 joueurs : simple = 1 paquet (54 cartes),
+  // délire = 2 paquets (108 cartes).
+  const nombrePaquets = (mode) => (mode === 'delire' ? 2 : 1);
 
   function nouveauPaquet(nbPaquets) {
     const paquet = [];
@@ -79,7 +80,8 @@
 
   // sieges : joueurs dans le sens des aiguilles d'une montre. mains : { joueur: [cartes] }.
   // pioche : cartes restantes (on tire par la fin). premier : joueur qui commence.
-  // options : { mode: 'simple' | 'delire', graine } (la graine sert à remélanger la défausse).
+  // options : { mode: 'simple' | 'delire', jRetour, graine } (la graine sert à remélanger la défausse).
+  // jRetour : option du mode délire (le valet change le sens du jeu), désactivée par défaut.
   // options.differerDepart : l'effet de la carte de départ attend appliquerDepart(m)
   // (l'appli le déclenche à la fin de la distribution).
   function nouvelleManche(sieges, mains, pioche, premier, options) {
@@ -91,6 +93,7 @@
       pioche: pioche.slice(),
       defausse: [], // la dernière carte est la carte de référence
       mode: o.mode === 'delire' ? 'delire' : 'simple',
+      jRetour: o.mode === 'delire' && !!o.jRetour,
       sens: 1, // 1 = aiguilles d'une montre, -1 = sens inverse (J retour, mode délire)
       libre: false, // le joueur courant pose la carte de son choix
       demande: null, // { valeur, par } : « Inter demande »
@@ -115,7 +118,7 @@
     }
     m.defausse.push(depart);
     m.vu.posees.push(depart);
-    noter(m, `Début de la manche : ${sieges.length} joueurs, mode ${m.mode}. Carte de départ : ${afficher(depart)}. ${premier} commence.`);
+    noter(m, `Début de la manche : ${sieges.length} joueurs, mode ${m.mode}${m.jRetour ? ' avec J retour' : ''}. Carte de départ : ${afficher(depart)}. ${premier} commence.`);
     // Une carte de départ spéciale agit sur le premier joueur, comme si elle venait d'être jouée.
     if (o.differerDepart) m.departEnAttente = premier;
     else effetsDepart(m, depart, premier);
@@ -160,10 +163,12 @@
   }
 
   // Pioche n cartes (moins s'il n'en reste pas assez). Piocher annule l'annonce.
-  function piocherCartes(m, joueur, n) {
+  // sansMelange : une pénalité ne fait pas remélanger la défausse (sinon, avec un seul paquet,
+  // les pénalités tournent en rond et la manche ne finit jamais).
+  function piocherCartes(m, joueur, n, sansMelange) {
     const tirees = [];
     for (let k = 0; k < n; k++) {
-      if (!m.pioche.length && !remelanger(m)) break;
+      if (!m.pioche.length && (sansMelange || !remelanger(m))) break;
       tirees.push(m.pioche.pop());
     }
     m.mains[joueur].push(...tirees);
@@ -206,10 +211,19 @@
     m.joueurCourant = prochain;
   }
 
+  // Toute la table voit qu'un joueur passe parce qu'il n'y a plus rien à piocher.
+  function signalerPiocheVide(m, joueur, motif) {
+    const n = m.vu.piocheVide ? m.vu.piocheVide.n + 1 : 1;
+    m.vu.piocheVide = { joueur, motif, n };
+  }
+
   // Le joueur « cible » pioche une pénalité et passe son tour. Renvoie le joueur d'après.
   function penaliser(m, cible, n) {
-    const tirees = piocherCartes(m, cible, n);
-    noter(m, `${cible} pioche ${tirees.length} carte${tirees.length > 1 ? 's' : ''} et passe son tour.`);
+    const tirees = piocherCartes(m, cible, n, true);
+    if (!tirees.length) {
+      noter(m, `Plus de cartes à piocher : ${cible} ne pioche rien et passe son tour.`);
+      signalerPiocheVide(m, cible, 'penalite');
+    } else noter(m, `${cible} pioche ${tirees.length} carte${tirees.length > 1 ? 's' : ''}${tirees.length < n ? ` sur ${n} (pioche vide)` : ''} et passe son tour.`);
     return suivant(m, cible);
   }
 
@@ -233,7 +247,7 @@
       // Le premier joueur passe son tour.
       noter(m, `Tour sauté : ${premier}.`);
       m.joueurCourant = suivant(m, premier);
-    } else if (v === 'V' && m.mode === 'delire' && m.enJeu.length > 2) {
+    } else if (v === 'V' && m.jRetour && m.enJeu.length > 2) {
       m.sens = -m.sens;
       noter(m, 'J retour : le sens du jeu change.');
     }
@@ -376,9 +390,18 @@
       if (m.aPioche || coupsJouer(m, j).length) throw new Error(`Action interdite : ${JSON.stringify(action)}`);
       const tirees = piocherCartes(m, j, 1);
       if (!tirees.length) {
-        m.phase = 'nulle';
-        m.joueurCourant = null;
-        noter(m, 'Plus de pioche ni de défausse : match nul, la manche est rejouée.');
+        // Rien à piocher : le joueur passe. Match nul seulement si toute la table passe ainsi
+        // à la suite sans que personne ne pose.
+        m.passesVides = (m.passesVides || 0) + 1;
+        if (m.passesVides >= m.enJeu.length) {
+          m.phase = 'nulle';
+          m.joueurCourant = null;
+          noter(m, 'Plus de pioche ni de défausse, et personne ne peut jouer : match nul, la manche est rejouée.');
+          return m;
+        }
+        noter(m, `Plus de cartes à piocher : ${j} passe son tour.`);
+        signalerPiocheVide(m, j, 'pioche');
+        finDeTour(m, j, suivant(m, j));
         return m;
       }
       if (m.demande) m.vu.piochesDemande.push({ joueur: j, valeur: m.demande.valeur });
@@ -401,6 +424,7 @@
     const v = valeur(cartes[0]);
     for (const c of cartes) m.mains[j].splice(m.mains[j].indexOf(c), 1);
     m.defausse.push(...cartes);
+    m.passesVides = 0;
     m.vu.posees.push(...cartes);
     m.vu.dernier = j; // qui a posé la carte du centre (affichage)
     m.libre = false;
@@ -424,7 +448,7 @@
     } else if (v === 'A') {
       prochain = apresAs(m, j, cartes.length);
     } else {
-      if (v === 'V' && m.mode === 'delire' && m.enJeu.length > 2 && cartes.length % 2 === 1) {
+      if (v === 'V' && m.jRetour && m.enJeu.length > 2 && cartes.length % 2 === 1) {
         m.sens = -m.sens;
         noter(m, 'J retour : le sens du jeu change.');
       }
@@ -447,17 +471,22 @@
       demande: m.demande ? { ...m.demande } : null,
       sens: m.sens,
       mode: m.mode,
+      jRetour: m.jRetour,
       paquets: Math.round((m.pioche.length + m.defausse.length + Object.values(m.mains).reduce((t, l) => t + l.length, 0)) / 54),
       pioche: m.pioche.length,
+      piochable: m.pioche.length + Math.max(0, m.defausse.length - 1), // pioche + défausse remélangeable
       joueurCourant: m.joueurCourant,
       aPioche: m.joueurCourant === joueur ? m.aPioche : null,
       annonces: m.annonces.slice(),
       contestables: contestables(m),
       qualifies: m.qualifies.slice(),
       phase: m.phase,
-      posees: m.vu.posees.slice(),
+      posees: m.vu.posees.slice(-8), // dernières cartes posées (une longue manche en compte des milliers)
+      nbPosees: m.vu.posees.length,
+      defausse: m.defausse.slice(), // cartes posées depuis le dernier mélange (vues de tous)
       dernier: m.vu.dernier || null,
-      piochesDemande: m.vu.piochesDemande.map((p) => ({ ...p })),
+      piocheVide: m.vu.piocheVide ? { ...m.vu.piocheVide } : null, // dernier joueur qui a passé faute de cartes à piocher
+      piochesDemande: m.vu.piochesDemande.slice(-40).map((p) => ({ ...p })),
     };
   }
 
@@ -466,10 +495,11 @@
   // ---------------------------------------------------------------------------
 
   // strategie(manche, joueur, actions) -> une action parmi « actions », ou null.
-  // options : { mode: 'simple' | 'delire' }. Le nombre de paquets est fixé au début de la partie.
+  // options : { mode: 'simple' | 'delire', jRetour }. Le mode fixe le nombre de paquets.
   function jouerPartie(joueurs, strategie, rng, options) {
     const mode = (options && options.mode) || 'simple';
-    const nbPaquets = nombrePaquets(joueurs.length);
+    const jRetour = !!(options && options.jRetour);
+    const nbPaquets = nombrePaquets(mode);
     let restants = joueurs.slice();
     const manches = [];
     let nulles = 0;
@@ -477,7 +507,7 @@
       const sieges = melanger(restants, rng);
       const { mains, pioche } = distribuer(sieges, nbPaquets, rng);
       const premier = sieges[Math.floor(rng() * sieges.length)];
-      const m = nouvelleManche(sieges, mains, pioche, premier, { mode, graine: Math.floor(rng() * 4294967296) });
+      const m = nouvelleManche(sieges, mains, pioche, premier, { mode, jRetour, graine: Math.floor(rng() * 4294967296) });
       let coups = 0;
       while (m.phase === 'jeu') {
         if (++coups > 20000) throw new Error('Manche bloquée');

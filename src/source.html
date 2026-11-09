@@ -102,6 +102,8 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
 .table-inter .pioche-inter { position: absolute; right: 4px; top: 0; gap: 2px; }
 .table-inter .pioche-inter .carte { width: 40px; height: 58px; }
 .table-inter .pioche-inter .legende { font-weight: 700; color: var(--ink); }
+.table-inter .pioche-inter.vide .carte { opacity: .35; }
+.table-inter .pioche-inter.vide .legende { color: var(--bad); }
 #poses:has(.table-inter) { width: 100%; }
 @media (orientation: landscape) { body.en-jeu .main.defile { justify-content: flex-start; overflow-x: auto; overflow-y: hidden; padding-top: 26px; scrollbar-width: none; } body.en-jeu .main.defile .carte { flex: none; transform: none; } body.en-jeu .main.defile .carte.choisie { transform: translateY(-20px); } body.en-jeu .main.defile { -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%); mask-image: linear-gradient(90deg, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%); } }
 .table-inter .pile { display: grid; justify-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
@@ -1270,7 +1272,12 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
         <p class="style-inter" hidden>Quel style ?</p>
         <div class="choix choix-niveau-robots style-inter" id="styleRobots" role="group" aria-label="Style de la partie" hidden>
           <button type="button" data-v="simple">Simple</button>
-          <button type="button" data-v="delire">Délire (J retour)</button>
+          <button type="button" data-v="delire">Délire</button>
+        </div>
+        <small class="muted style-inter" hidden id="aideStyleRobots"></small>
+        <div class="choix choix-niveau-robots" id="jRetourRobots" role="group" aria-label="J retour" hidden>
+          <button type="button" data-v="non">Sans J retour</button>
+          <button type="button" data-v="oui">Avec J retour</button>
         </div>
         <p>Quel niveau ?</p>
         <div class="choix choix-niveau-robots" id="niveauRobots" role="group" aria-label="Niveau des robots">
@@ -1281,7 +1288,6 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
         <small class="muted" id="niveauRobotsAide"></small>
         <p>Combien de robots autour de la table ?</p>
         <div class="choix-robots" id="choixRobots"></div>
-        <small class="muted style-inter" hidden>Tu joues avec eux : 3 robots = 4 joueurs, 1 paquet. Dès 4 robots (5 joueurs), on joue avec 2 paquets.</small>
         <button class="btn principal large" id="btnGuidee" hidden>Première partie guidée (2 robots gentils)</button>
         <button class="btn large" id="btnFermerRobots">Annuler</button>
       </div>
@@ -1341,6 +1347,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     <div class="colonne">
     <div class="reglage" id="reglage"></div>
     <div class="reglage" id="reglageStyle" hidden></div>
+    <div class="reglage" id="reglageJRetour" hidden></div>
     <h3 id="titreJoueurs"></h3>
     <ul class="liste-joueurs" id="listeJoueurs"></ul>
     <p id="attenteHote" hidden>En attente du lancement par l'hôte…</p>
@@ -1900,7 +1907,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       const cli = new Colyseus.Client(SERVEUR.replace(/^http/, 'ws'));
       if (facon.reconnexion) room = await cli.reconnect(facon.reconnexion).catch(() => facon.code ? reprendreServeur(cli, c.jeton, facon.code).then((r) => r || Promise.reject(new Error('reconnexion'))) : Promise.reject(new Error('reconnexion')));
       else if (facon.matchJour) room = await cli.create('kopo-jour', { jeton: c.jeton });
-      else if (facon.creer) room = await cli.create(facon.jeu === 'inter8' ? 'inter8' : 'kopo', Object.assign({ jeton: c.jeton, code: nouveauCode() }, facon.jeu === 'inter8' ? { mode: facon.mode } : {}));
+      else if (facon.creer) room = await cli.create(facon.jeu === 'inter8' ? 'inter8' : 'kopo', Object.assign({ jeton: c.jeton, code: nouveauCode() }, facon.jeu === 'inter8' ? { mode: facon.mode, jRetour: !!facon.jRetour } : {}));
       // Par le code : la table peut être de Kopo ou d'Inter (8), on cherche dans les deux.
       else if (facon.code) room = (await reprendreServeur(cli, c.jeton, facon.code)) || await cli.join('kopo', { jeton: c.jeton, code: facon.code }).catch((e) => cli.join('inter8', { jeton: c.jeton, code: facon.code }).catch(() => { throw e; }));
       else if (facon.mise) room = await cli.joinOrCreate('kopo-mise', { jeton: c.jeton, publique: true, taille: facon.taille, mise: facon.mise });
@@ -2578,16 +2585,28 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
         rg.append(b);
       } else if (v.delai === d) rg.append(el('strong', null, d ? d + ' secondes par joueur' : 'sans chrono'));
     }
-    // Inter (8) : le style de la partie (simple, ou délire avec le J retour), choisi par l'hôte.
+    // Inter (8) : le style de la partie (simple : 1 paquet ; délire : 2 paquets), choisi par l'hôte.
     const rs = $('reglageStyle'); rs.hidden = v.jeu !== 'inter8'; rs.replaceChildren();
     if (v.jeu === 'inter8') {
       rs.append(el('span', null, 'Style'));
-      for (const [mode, libelle] of [['simple', 'Simple'], ['delire', 'Délire (J retour)']]) {
+      for (const [mode, libelle] of [['simple', 'Simple · 1 paquet'], ['delire', 'Délire · 2 paquets']]) {
         if (jeSuisHote && !v.publique) {
           const b = el('button', 'btn' + (v.mode === mode ? ' actif' : ''), libelle);
-          b.onclick = () => envoyer({ type: 'reglages', mode });
+          b.onclick = () => { stock.ecrire('kopo-inter8-style', mode); envoyer(Object.assign({ type: 'reglages' }, reglagesStyleInter(mode))); };
           rs.append(b);
         } else if (v.mode === mode) rs.append(el('strong', null, libelle));
+      }
+    }
+    // Délire : le J retour, en option.
+    const rj = $('reglageJRetour'); rj.hidden = v.jeu !== 'inter8' || v.mode !== 'delire'; rj.replaceChildren();
+    if (!rj.hidden) {
+      rj.append(el('span', null, 'J retour'));
+      for (const [oui, libelle] of [[false, 'Non'], [true, 'Oui']]) {
+        if (jeSuisHote && !v.publique) {
+          const b = el('button', 'btn' + (!!v.jRetour === oui ? ' actif' : ''), libelle);
+          b.onclick = () => { ecrireJRetour(oui); envoyer({ type: 'reglages', jRetour: oui }); };
+          rj.append(b);
+        } else if (!!v.jRetour === oui) rj.append(el('strong', null, libelle));
       }
     }
     const maxJoueurs = v.jeu === 'inter8' ? SI.MAX : 9;
@@ -2905,7 +2924,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     const m = v.manche;
     const finale = v.restants.length === 2;
     $('info').innerHTML = '';
-    $('info').append(el('strong', null, finale ? 'Finale' : 'Manche ' + v.numeroManche), document.createTextNode(` · ${v.mode === 'delire' ? 'Délire' : 'Simple'} · ${v.code}`));
+    $('info').append(el('strong', null, finale ? 'Finale' : 'Manche ' + v.numeroManche), document.createTextNode(` · ${v.mode === 'delire' ? (v.jRetour ? 'Délire · J retour' : 'Délire') : 'Simple'} · ${v.code}`));
     const pause = m.pause;
     dessinerSieges(v);
     // Qui a annoncé, et le sens du jeu (mode délire).
@@ -2917,7 +2936,9 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     if (!pause && m.phase === 'jeu') {
       if (m.demande) { const c = el('span', 'chip demande'); c.append('Demande ', el('b', null, nomValeur(m.demande.valeur)), ` · ${qui(m.demande.par)}`); ent.append(c); }
       else if (m.libre) ent.append(el('span', 'chip', 'Jeu libre : pose la carte de ton choix'));
-      if (v.mode === 'delire' && m.enJeu.length > 2) { const c = el('span', 'chip'); c.append('Sens ', el('b', null, m.sens === 1 ? '↻' : '↺')); ent.append(c); }
+      // Plus rien à piocher : qui ne peut pas jouer passe son tour (dit à toute la table).
+      if (m.piochable === 0) ent.append(el('span', 'chip vide', 'Pioche vide : qui ne peut pas jouer passe'));
+      if (v.mode === 'delire' && v.jRetour && m.enJeu.length > 2) { const c = el('span', 'chip'); c.append('Sens ', el('b', null, m.sens === 1 ? '↻' : '↺')); ent.append(c); }
     }
 
     // Table : compte à rebours de départ, ou la carte du centre et la pioche.
@@ -2938,11 +2959,12 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       const pioche = el('div', 'pile');
       const dos = el('div', 'carte dos-carte'); dos.id = 'piocheInter';
       pioche.classList.add('pioche-inter');
-      pioche.append(dos, el('span', 'legende', String(m.pioche)));
+      if (m.piochable === 0) pioche.classList.add('vide');
+      pioche.append(dos, el('span', 'legende', m.piochable === 0 ? 'Vide' : String(m.pioche)));
       pioche.setAttribute('aria-label', `Pioche : ${m.pioche} carte${m.pioche > 1 ? 's' : ''}`);
       t.append(ref, pioche); // la carte posée au milieu, la pioche dans un coin
       // Mode délire : le sens du jeu tourne en permanence autour de la carte du centre.
-      if (v.mode === 'delire' && m.enJeu.length > 2) t.prepend(roueSens(m.sens));
+      if (v.mode === 'delire' && v.jRetour && m.enJeu.length > 2) t.prepend(roueSens(m.sens));
       poses.append(t);
     }
 
@@ -3044,7 +3066,8 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     }
     else if (choixInter.length) { const annuler = el('button', 'btn large', 'Reprendre les cartes'); annuler.onclick = () => { choixInter = []; afficherPartieInter(vueActuelle); }; act.append(annuler); }
     if (actions.some((a) => a.type === 'piocher')) {
-      const b = el('button', 'btn principal large', 'Piocher une carte');
+      // Plus rien à piocher (ni pioche, ni défausse à remélanger) : on passe son tour, et toute la table le voit.
+      const b = el('button', 'btn principal large', m.piochable === 0 ? 'Plus de cartes : passer mon tour' : 'Piocher une carte');
       b.onclick = () => { b.disabled = true; envoyer({ type: 'action', action: { type: 'piocher' } }); };
       act.append(b);
     }
@@ -3103,6 +3126,13 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     // Contestation : le joueur pris en faute pioche 1 carte d'amende.
     const fil = m.journal[m.journal.length - 1] || '';
     if (fil !== (a.journal[a.journal.length - 1] || '') && / conteste : /.test(fil)) (a.contestables || []).filter((id) => !(m.contestables || []).includes(id)).forEach((id) => bulle(id, '!', { cls: 'ko', delai: 100 }));
+    // Plus de cartes à piocher : toute la table voit qui passe son tour, et pourquoi.
+    if (m.piocheVide && (!a.piocheVide || a.piocheVide.n !== m.piocheVide.n)) {
+      const id = m.piocheVide.joueur, qui = id === moi ? 'Tu passes ton tour' : nom(N, id) + ' passe son tour';
+      tampon('PIOCHE VIDE', qui);
+      bulle(id, '⏭', { delai: 300 });
+      retardFenetre = Math.max(retardFenetre, Date.now() + 1500);
+    }
     // J retour, demande du 8 : on montre ce qui change.
     if (m.sens !== a.sens) {
       pop(document.querySelector('#entete .chip:last-child'), 1.5, 600);
@@ -5619,9 +5649,10 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     return p;
   }
   function creerPartie(p, jeu, mode) {
-    if (MODE_SERVEUR) return entrerServeur(p, { creer: true, jeu, mode });
+    const style = jeu === 'inter8' ? reglagesStyleInter(mode) : {};
+    if (MODE_SERVEUR) return entrerServeur(p, Object.assign({ creer: true, jeu }, style));
     demarrerHote(nouveauCode(), p, false, null, jeu);
-    if (jeu === 'inter8') envoyer({ type: 'reglages', mode });
+    if (jeu === 'inter8') envoyer(Object.assign({ type: 'reglages' }, style));
   }
   // Inter (8) : « Quelle partie ? » (Simple ou Délire) avant d'ouvrir la table. Le style se change encore dans le salon.
   function choisirStyleInter(p) {
@@ -5631,13 +5662,23 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       corps.append(el('b', null, titre), el('span', null, texte));
       if (puces) { const l = el('span', 'style-puces'); puces.forEach((x) => l.append(el('i', null, x))); corps.append(l); }
       b.append(el('span', 'style-carte', lettre), corps);
-      b.onclick = () => { stock.ecrire('kopo-inter8-style', mode); fermerFenetre(); creerPartie(p, 'inter8', mode); };
+      b.onclick = () => { if (!stock.lire('kopo-inter8-jretour')) ecrireJRetour(jRetourInter()); stock.ecrire('kopo-inter8-style', mode); fermerFenetre(); creerPartie(p, 'inter8', mode); };
       return b;
     };
+    // Délire : le J retour est une option (désactivée par défaut), choisie avant d'ouvrir la table.
+    const option = el('div', 'choix choix-niveau-robots option-jretour'); option.setAttribute('role', 'group'); option.setAttribute('aria-label', 'J retour en délire');
+    const majOption = () => option.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.v === 'oui') === jRetourInter())));
+    for (const [v, libelle] of [['non', 'Sans J retour'], ['oui', 'Avec J retour']]) {
+      const b = el('button', null, libelle); b.type = 'button'; b.dataset.v = v;
+      b.onclick = () => { ecrireJRetour(v === 'oui'); majOption(); };
+      option.append(b);
+    }
+    majOption();
     const annuler = el('button', 'btn large', 'Annuler'); annuler.onclick = fermerFenetre;
     ouvrirFenetre([el('h2', null, 'Quelle partie ?'), el('p', 'muted', "Inter (8), entre amis. Choisis le style avant d'inviter."),
-      carte('simple', '8', 'Simple', 'Les règles de base, de 2 à 8 joueurs.', ["1 paquet jusqu'à 4", '2 paquets (108) dès 5']),
-      carte('delire', 'J', 'Délire', 'Tout le mode simple, plus le J retour : le valet change le sens du jeu.'), annuler], 'styleInter');
+      carte('simple', '8', 'Simple', 'Les règles de base, de 2 à 8 joueurs.', ['1 paquet (54 cartes)']),
+      carte('delire', 'J', 'Délire', 'Les mêmes règles avec deux paquets, de 2 à 8 joueurs. Le J retour (le valet change le sens du jeu) en option.', ['2 paquets (108 cartes)']),
+      el('small', 'muted', 'En délire :'), option, annuler], 'styleInter');
   }
   $('btnCreer').onclick = async () => { const p = lirePseudo(); if (!p || await exigerGoogle()) return; if (jeuChoisi() === 'inter8') choisirStyleInter(p); else creerPartie(p, 'kopo'); };
   $('btnRejoindre').onclick = () => {
@@ -5978,13 +6019,21 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   $('niveauRobots').querySelectorAll('button').forEach((b) => (b.onclick = () => { stock.ecrire('kopo-niveau-robots', b.dataset.v); majNiveauRobots(); majSousTitresModes(); }));
   // Inter (8) : le style de la partie (gardé sur le téléphone), et 7 robots au plus (8 joueurs).
   const styleInter = () => (stock.lire('kopo-inter8-style') === 'delire' ? 'delire' : 'simple');
+  // J retour : option du délire, désactivée par défaut. Qui jouait déjà en délire (avant l'option) le garde.
+  const jRetourInter = () => { const j = stock.lire('kopo-inter8-jretour'); return j ? j === 'oui' : styleInter() === 'delire'; };
+  const ecrireJRetour = (oui) => stock.ecrire('kopo-inter8-jretour', oui ? 'oui' : 'non');
+  const reglagesStyleInter = (mode) => ({ mode, jRetour: mode === 'delire' && jRetourInter() });
   function majStyleRobots() {
-    const inter = jeuChoisi() === 'inter8';
+    const inter = jeuChoisi() === 'inter8', delire = styleInter() === 'delire';
     document.querySelectorAll('#voileRobots .style-inter').forEach((e) => (e.hidden = !inter));
     $('styleRobots').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === styleInter())));
+    $('aideStyleRobots').textContent = delire ? '2 paquets (108 cartes). Le J retour fait changer le sens du jeu.' : '1 paquet (54 cartes), les règles de base.';
+    $('jRetourRobots').hidden = !inter || !delire;
+    $('jRetourRobots').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.v === 'oui') === jRetourInter())));
     $('choixRobots').querySelectorAll('button').forEach((b) => (b.hidden = inter && +b.textContent > SI.MAX - 1));
   }
-  $('styleRobots').querySelectorAll('button').forEach((b) => (b.onclick = () => { stock.ecrire('kopo-inter8-style', b.dataset.v); majStyleRobots(); }));
+  $('styleRobots').querySelectorAll('button').forEach((b) => (b.onclick = () => { if (!stock.lire('kopo-inter8-jretour')) ecrireJRetour(jRetourInter()); stock.ecrire('kopo-inter8-style', b.dataset.v); majStyleRobots(); }));
+  $('jRetourRobots').querySelectorAll('button').forEach((b) => (b.onclick = () => { ecrireJRetour(b.dataset.v === 'oui'); majStyleRobots(); }));
   $('btnModeRobots').onclick = () => {
     if (!lirePseudo()) return;
     $('btnGuidee').hidden = !!lireProfil().premierePartie || jeuChoisi() === 'inter8';
@@ -6002,7 +6051,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       // Partie avec des robots : on crée la salle, on ajoute les robots et on lance tout de suite.
       const inter = jeuChoisi() === 'inter8';
       demarrerHote(nouveauCode(), p, false, null, inter ? 'inter8' : 'kopo');
-      envoyer(Object.assign({ type: 'reglages', robots: niveauRobots(), niveau: monNiveau() }, inter ? { mode: styleInter() } : {}));
+      envoyer(Object.assign({ type: 'reglages', robots: niveauRobots(), niveau: monNiveau() }, inter ? reglagesStyleInter(styleInter()) : {}));
       for (let i = 0; i < n; i++) envoyer({ type: 'ajouterRobot' });
       envoyer({ type: 'lancer' });
     };
