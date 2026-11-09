@@ -135,6 +135,7 @@
     if (s.pause) {
       if (s.horloge() < s.pause.jusqua) return false;
       s.pause = null;
+      I.appliquerDepart(m);
       armerChrono(s);
       return true;
     }
@@ -185,7 +186,10 @@
     s.numeroManche++;
     s.suiteA = null;
     s.graces = {};
-    s.manche = I.nouvelleManche(sieges, mains, pioche, premier, { mode: s.mode, graine: Math.floor(s.rng() * 4294967296) });
+    // Avec une distribution animée, l'effet de la carte de départ (pénalité, tour sauté, J retour)
+    // attend la fin du compte à rebours : le joueur sanctionné reçoit ses cartes après les autres.
+    const differerDepart = s.durees.depart > 0;
+    s.manche = I.nouvelleManche(sieges, mains, pioche, premier, { mode: s.mode, graine: Math.floor(s.rng() * 4294967296), differerDepart });
     s.etat = 'manche';
     s.pause = s.durees.depart > 0 ? { type: 'depart', jusqua: s.horloge() + s.durees.depart, total: s.durees.depart } : null;
     armerChrono(s);

@@ -229,6 +229,32 @@ test('Compte à rebours de départ : personne ne joue pendant la pause', () => {
   assert.ok(S.vue(s, id).manche.actions.length > 0);
 });
 
+test('Carte de départ pénalisante : la sanction tombe après la distribution', () => {
+  // On cherche une graine dont la carte de départ est un 2, un 10 ou un joker.
+  for (let graine = 1; graine < 500; graine++) {
+    const s = salleAvec(3, graine);
+    const h = horloge(); s.horloge = h;
+    s.durees.depart = 5000;
+    S.recevoir(s, 'p1', { type: 'lancer' });
+    const m = s.manche;
+    const depart = m.defausse[m.defausse.length - 1];
+    const n = I.PENALITES[I.valeur(depart)];
+    if (!n) continue;
+    const premier = m.joueurCourant;
+    // Pendant la distribution : 4 cartes pour tout le monde, rien d'appliqué.
+    m.sieges.forEach((j) => assert.strictEqual(m.mains[j].length, 4));
+    assert.strictEqual(S.vue(s, premier).manche.nbCartes[premier], 4);
+    h.avancer(5001);
+    S.tic(s);
+    // Fin du compte à rebours : le premier joueur pioche sa pénalité et passe son tour.
+    assert.strictEqual(m.mains[premier].length, 4 + n);
+    assert.notStrictEqual(m.joueurCourant, premier);
+    assert.strictEqual(m.departEnAttente, undefined);
+    return;
+  }
+  throw new Error('Aucune graine avec une carte de départ pénalisante');
+});
+
 console.log('\nFin de partie');
 
 test('Revanche : elle repart quand tous les présents ont accepté', () => {
