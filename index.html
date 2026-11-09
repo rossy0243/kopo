@@ -906,6 +906,53 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
 .ligue-fin .titre { font: 400 34px/1 var(--display); letter-spacing: 2px; color: var(--div, var(--brass)); }
 .notif-carte { display: grid; gap: 10px; justify-items: center; text-align: center; }
 .notif-carte .ico { font-size: 44px; color: var(--brass); }
+/* Amis : bouton sur l'accueil (entre les pièces et le pseudo) et fenêtre Amis */
+.btn-amis { position: relative; flex: none; width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; background: rgba(0,0,0,.3); border: 1px solid rgba(226,176,74,.45); color: var(--brass); cursor: pointer; padding: 0; }
+.btn-amis:active { transform: scale(.96); }
+.btn-amis .ico { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.btn-amis .compte { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--red); color: #fff; font: 700 11px/18px var(--body); font-style: normal; box-shadow: 0 0 0 2px var(--table); }
+.btn-amis:not([hidden]) + .profil { margin-left: 0; }
+@media (max-width: 420px) { .btn-amis { width: 38px; height: 38px; } .btn-amis .ico { width: 21px; height: 21px; } .hub-haut:has(.btn-amis:not([hidden])) { gap: 6px; } .hub-haut:has(.btn-amis:not([hidden])) .logo { font-size: 26px; } }
+.fenetre[data-type="amis"] { width: min(460px, 100%); gap: 10px; padding: 16px 16px 14px; }
+.fenetre[data-type="amis"] .amis-tete { display: flex; align-items: center; justify-content: space-between; }
+.fenetre[data-type="amis"] .amis-tete h2 { font-size: 32px; }
+.fenetre[data-type="amis"] .amis-fermer { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line); background: rgba(0,0,0,.25); color: var(--ink); font-size: 18px; padding: 0; cursor: pointer; }
+.amis-onglets { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 12px; background: rgba(0,0,0,.28); border: 1px solid rgba(226,176,74,.3); }
+.amis-onglets button { border: 0; border-radius: 9px; padding: 8px; background: transparent; color: var(--muted); font: 600 14px var(--body); display: flex; justify-content: center; gap: 6px; align-items: center; cursor: pointer; }
+.amis-onglets button[aria-pressed="true"] { background: var(--brass); color: #1d1606; }
+.amis-onglets .n { min-width: 18px; height: 18px; border-radius: 9px; background: var(--red); color: #fff; font: 700 11px/18px var(--body); font-style: normal; padding: 0 5px; }
+.amis-liste { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; align-content: start; }
+.amis-liste li { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 12px; background: rgba(255,255,255,.04); border: 1px solid var(--line); min-width: 0; }
+.amis-liste li.vide { justify-content: center; text-align: center; color: var(--muted); font-size: 14px; }
+.amis-liste .avatar { width: 42px; height: 42px; font-size: 22px; }
+.amis-liste li.absent .avatar { filter: grayscale(.85) brightness(.8); }
+.amis-liste .point-ligne { position: absolute; left: -2px; bottom: -2px; width: 12px; height: 12px; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 2px var(--table-2); }
+.amis-liste .qui { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.amis-liste .qui b { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.amis-liste .qui b small { color: var(--muted); font-weight: 400; font-size: 12px; }
+.amis-liste .qui span { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.amis-liste .qui .on { color: var(--good); }
+.amis-liste .qui em { font-style: normal; color: var(--brass); font-weight: 600; }
+.amis-liste .btn { padding: 7px 12px; font-size: 13px; flex: none; }
+.amis-liste .plus { border: 0; background: none; color: var(--muted); font-size: 20px; padding: 4px 6px; cursor: pointer; flex: none; }
+.fenetre[data-type="amis"] .amis-moi { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--muted); padding: 8px 10px; border: 1px dashed rgba(226,176,74,.4); border-radius: 10px; }
+.fenetre[data-type="amis"] .amis-moi b { color: var(--ink); font-size: 15px; letter-spacing: .5px; }
+.fenetre[data-type="amis"] .amis-moi .btn { padding: 5px 10px; font-size: 12px; }
+.fenetre[data-type="amis"] .amis-bas { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.fenetre[data-type="amis"] .amis-bas .btn { padding: 11px 6px; font-size: 14px; }
+.fenetre[data-type="amis"] .btn.wa { background: #1fa855; border-color: #1fa855; color: #fff; }
+.fenetre[data-type="amis"] .amis-ajout { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.fenetre[data-type="amis"] .amis-parrain { justify-self: center; border: 0; background: none; color: var(--brass); font: 600 13px var(--body); text-decoration: underline; cursor: pointer; padding: 2px; }
+@media (orientation: landscape) and (max-height: 500px) {
+  .fenetre[data-type="amis"] { width: min(640px, 100%); grid-template-columns: 1fr 1fr; column-gap: 14px; row-gap: 8px; padding: 12px 14px; max-height: 96dvh; }
+  .fenetre[data-type="amis"] .amis-tete { grid-column: 1; } .fenetre[data-type="amis"] .amis-onglets { grid-column: 2; grid-row: 1; }
+  .fenetre[data-type="amis"] .amis-tete h2 { font-size: 26px; }
+  .fenetre[data-type="amis"] .amis-liste, .fenetre[data-type="amis"] .amis-ajout, .fenetre[data-type="amis"] .amis-parrain { grid-column: 1 / -1; }
+  .fenetre[data-type="amis"] .amis-liste { grid-template-columns: 1fr 1fr; }
+  .fenetre[data-type="amis"] .amis-moi { grid-column: 1; } .fenetre[data-type="amis"] .amis-bas { grid-column: 2; }
+  .amis-liste li { padding: 6px 8px; }
+  .amis-liste .avatar { width: 36px; height: 36px; font-size: 19px; }
+}
 .liste-amis-inviter li { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .liste-amis-inviter .en-ligne { color: var(--good); font-size: 12px; }
 /* Demandes d'ami reçues : pastille rouge avec le nombre (Paramètres, Mes amis). */
@@ -1077,6 +1124,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   <symbol id="i-plein" viewBox="0 0 32 32"><path d="M5 11V5h6M21 5h6v6M27 21v6h-6M11 27H5v-6"/><rect x="12" y="10" width="8" height="12" rx="1.6"/></symbol>
   <symbol id="i-reglages" viewBox="0 0 32 32"><rect x="8" y="4" width="16" height="24" rx="2.5"/><path d="M12 10h8M12 16h8M12 22h8"/><circle cx="15" cy="10" r="1.8" style="fill:var(--fond)"/><circle cx="18.5" cy="16" r="1.8" style="fill:var(--fond)"/><circle cx="14" cy="22" r="1.8" style="fill:var(--acc,#c7362f);stroke:none"/></symbol>
   <symbol id="i-jour" viewBox="0 0 32 32"><rect x="9" y="5" width="14" height="22" rx="2.5"/><circle cx="16" cy="14" r="3.2"/><path d="M16 7.6v1.6M16 18.8v1.6M9.6 14h1.6M20.8 14h1.6M11.5 9.5l1.1 1.1M19.4 17.4l1.1 1.1M20.5 9.5l-1.1 1.1M12.6 17.4l-1.1 1.1"/><path style="fill:var(--acc,#c7362f);stroke:none" d="M16 22l1.6 2.1-1.6 2.1-1.6-2.1z"/></symbol>
+  <symbol id="i-amis" viewBox="0 0 32 32"><circle cx="12" cy="11" r="4.5"/><path d="M4 26c0-5 3.6-8 8-8s8 3 8 8"/><circle cx="22" cy="10" r="3.6"/><path d="M21 17.2c4.2 0 7 2.6 7 7"/></symbol>
   <symbol id="i-bande" viewBox="0 0 32 32"><rect x="4" y="9" width="11" height="17" rx="2.2" transform="rotate(-12 9.5 17.5)"/><rect x="17" y="9" width="11" height="17" rx="2.2" transform="rotate(12 22.5 17.5)"/><rect x="10.5" y="6" width="11" height="17" rx="2.2" style="fill:var(--fond,#0f3d2e)"/><path style="fill:var(--acc,#c7362f);stroke:none" d="M16 11.2l1.8 2.4-1.8 2.4-1.8-2.4z"/></symbol>
   <symbol id="i-couronne" viewBox="0 0 32 32"><path d="M6 24L4.5 10l6.5 5.5L16 7l5 8.5 6.5-5.5L26 24z"/><path d="M7 28h18"/><path style="fill:var(--acc,#c7362f);stroke:none" d="M16 16.5l1.8 2.4-1.8 2.4-1.8-2.4z"/></symbol>
   <symbol id="i-drapeau" viewBox="0 0 32 32"><path d="M9 28V4M9 6h14l-3.5 5 3.5 5H9"/><path style="fill:var(--acc,#c7362f);stroke:none" d="M14.5 8.6l1.6 2.2-1.6 2.2-1.6-2.2z"/></symbol>
@@ -1120,6 +1168,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     <div class="hub-haut">
       <div class="logo"><img class="marque" src="icons/masano-logo.svg" alt="">MASANO</div>
       <button class="bourse" id="btnBourse" title="Tes pièces d'essai"><span class="piece" aria-hidden="true">M</span><span class="bourse-txt"><b id="solde">500</b><small>pièces d'essai</small></span></button>
+      <button class="btn-amis" id="btnAmis" title="Amis" aria-label="Amis" hidden><svg class="ico"><use href="#i-amis"/></svg><i class="compte" id="compteAmis" hidden></i></button>
       <label class="profil" id="profil" title="Ton pseudo">
         <span class="avatar" id="avatar"><b id="avatarLettre">?</b><i class="niveau-pastille" id="niveauPastille" hidden></i></span>
         <span class="profil-champ"><small>Ton pseudo</small><input id="pseudo" maxlength="16" autocomplete="nickname" placeholder="Ex. As_de_Pique"><span class="xp-mini" id="xpMini" hidden><span></span></span></span>
@@ -6641,7 +6690,7 @@ var qrcode = function() {
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = 'd39489f7ff8a'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = '32dca5eb120a'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
@@ -7656,6 +7705,7 @@ var qrcode = function() {
     $('titreSalon').textContent = `Salle de ${v.taille}`; $('titreSalon').hidden = !v.publique; // le salon privé est déjà nommé dans l'en-tête
     $('attentePublique').hidden = !v.publique;
     $('btnInviterAmi').hidden = !(MODE_SERVEUR && compteLocal() && !v.publique); // une salle publique rejointe par code n'est plus classée
+    if (MODE_SERVEUR && amiAInviter) inviterAmiAuSalon(v); // « Inviter » depuis la fenêtre Amis
     if (v.publique) $('attentePublique').replaceChildren('En attente de joueurs : ', el('strong', null, `${v.joueurs.length}/${v.taille}`), `. La partie démarre dès que la salle est pleine. ${lobby.enLigne()} en ligne.`);
     $('texteCode').textContent = v.publique ? 'Code pour tes amis' : 'Code de la partie';
     $('codeSalon').textContent = v.code;
@@ -8820,7 +8870,7 @@ var qrcode = function() {
     if (compteLocal()) {
       const c = compteLocal();
       ligne('Ton identifiant', 'À donner à tes amis', el('b', null, c.compte.pseudo + '#' + c.compte.numero));
-      const amis = el('button', 'btn', 'Mes amis'); amis.onclick = ouvrirAmis; amis.dataset.mesAmis = '';
+      const amis = el('button', 'btn', 'Mes amis'); amis.onclick = () => ouvrirAmis(ouvrirParametres); amis.dataset.mesAmis = '';
       setTimeout(() => majPastilleAmis(), 0);
       const bl = el('button', 'btn', 'Joueurs bloqués'); bl.onclick = ouvrirBloques;
       z.append(amis, bl);
@@ -9607,6 +9657,7 @@ var qrcode = function() {
   }
   setInterval(lireNotifications, 15000); // invitations : il faut les voir vite
   setTimeout(lireNotifications, 6000); // après le bonus du jour et les fenêtres d'accueil
+  boutonAmis();
 
   // Salon entre amis : inviter un ami du Kopo (il reçoit le code sur son accueil).
   $('btnInviterAmi').onclick = async () => {
@@ -9909,7 +9960,7 @@ var qrcode = function() {
     nom = (r && r.ami && r.ami.pseudo) || nom || 'Ce joueur';
     toast(r && r.etat === 'ami' ? nom + ' est dans tes amis.' : 'Demande envoyée à ' + nom + '. Il doit l\'accepter.');
   }
-  // Pastille rouge sur Paramètres (et « Mes amis ») tant qu'une demande d'ami attend une réponse.
+  // Pastille rouge sur Paramètres (et « Mes amis »), compteur sur le bouton Amis de l'accueil, tant qu'une demande d'ami attend une réponse.
   let demandesAmi = 0;
   function majPastilleAmis(n) {
     if (n != null) demandesAmi = n;
@@ -9917,67 +9968,157 @@ var qrcode = function() {
       if (!b) continue;
       if (demandesAmi > 0) b.dataset.demandes = String(demandesAmi); else delete b.dataset.demandes;
     }
+    $('compteAmis').hidden = !(demandesAmi > 0);
+    $('compteAmis').textContent = demandesAmi > 9 ? '9+' : String(demandesAmi);
   }
   async function repondreDemande(id, accepter) {
     await apiJoueur('/amis/demandes/' + encodeURIComponent(id) + '/' + (accepter ? 'accepter' : 'refuser'), 'POST');
     majPastilleAmis(Math.max(0, demandesAmi - 1));
   }
 
-  async function ouvrirAmis() {
-    const liste = el('ul', 'liste-k');
-    const demandes = el('div', 'demandes-ami');
+  // Fenêtre Amis (ouverte depuis l'accueil ou Paramètres → Mes amis) : onglets Amis et Demandes,
+  // niveau et apparence de chacun, qui est en ligne, face-à-face, et « Inviter » pour lancer une table avec lui.
+  let ongletAmis = 'amis';
+  function depuisQuand(d) {
+    const m = Math.round((Date.now() - new Date(d)) / 60e3);
+    if (!d || !(m >= 0)) return '';
+    if (m < 60) return 'Vu il y a ' + Math.max(m, 2) + ' min';
+    const h = Math.round(m / 60);
+    if (h < 24) return 'Vu il y a ' + h + ' h';
+    const j = Math.round(h / 24);
+    return j <= 1 ? 'Vu hier' : j < 30 ? 'Vu il y a ' + j + ' jours' : 'Vu il y a longtemps';
+  }
+  function niveauAmi(a) {
+    const p = { xp: Number(a.xp) || 0, bareme: a.bareme };
+    if (!p.xp) return 0;
+    R.convertirXp(p);
+    return R.niveauDe(p.xp).niveau;
+  }
+  function avatarAmi(a, enLigne) {
+    const av = el('span', 'avatar ' + (a.apparence || 'av-laiton') + (a.cadre ? ' ' + a.cadre : ''));
+    av.append(el('b', null, (a.pseudo || '?')[0].toUpperCase()));
+    const n = niveauAmi(a);
+    if (n) av.append(el('i', 'niveau-pastille', String(n)));
+    if (enLigne) av.append(el('i', 'point-ligne'));
+    return av;
+  }
+  function boutonAmis() {
+    if (!MODE_SERVEUR) return;
+    $('btnAmis').hidden = false;
+    $('btnAmis').onclick = async () => {
+      const cfg = await lireConfig();
+      if (avecGoogle() || compteLocal() && !(cfg && cfg.google)) return ouvrirAmis();
+      const wa = el('button', 'btn large', 'Inviter sur WhatsApp');
+      wa.onclick = () => window.open('https://wa.me/?text=' + encodeURIComponent('Viens jouer avec moi sur Masano (Kopo et Inter (8)) !\n' + LIEN_SITE()), '_blank', 'noopener');
+      fenetreGoogle('Amis', 'Connecte-toi pour ajouter tes amis, voir qui est en ligne et les inviter à ta table. Ta progression et tes pièces sont gardées.', [wa]);
+    };
+  }
+  // « Inviter » sur un ami en ligne : on crée la table, et l'invitation part dès que le salon est ouvert.
+  let amiAInviter = null;
+  function inviterAmiAuSalon(v) {
+    const a = amiAInviter;
+    if (!a || !v || v.publique || !v.code) return;
+    amiAInviter = null;
+    if (Date.now() - a.quand > 3 * 60e3) return; // trop ancien : il a sans doute changé d'avis
+    apiJoueur('/amis/' + encodeURIComponent(a.id) + '/inviter', 'POST', { code: v.code })
+      .then(() => toast('Invitation envoyée à ' + a.pseudo + '.'), (e) => toast(e.message));
+  }
+  async function ouvrirAmis(retour, garderOnglet) {
+    if (typeof retour !== 'function') retour = fermerFenetre;
+    const rouvrir = () => ouvrirAmis(retour, true);
+    const c = compteLocal();
+    if (!c) return;
+    const onglets = el('div', 'amis-onglets');
+    const bAmis = el('button', null, 'Amis'), bDem = el('button', null, 'Demandes');
+    bAmis.type = bDem.type = 'button';
+    onglets.append(bAmis, bDem);
+    const liste = el('ul', 'amis-liste');
+    const fermer = el('button', 'amis-fermer', '✕'); fermer.setAttribute('aria-label', 'Fermer'); fermer.onclick = () => retour();
+    const tete = el('div', 'amis-tete'); tete.append(el('h2', null, 'Amis'), fermer);
+    const ident = c.compte.pseudo + '#' + c.compte.numero;
+    const moi = el('div', 'amis-moi'); const t = el('span', null, 'Ton identifiant'); t.append(el('br'), el('b', null, ident));
+    const copier = el('button', 'btn', 'Copier');
+    copier.onclick = async () => { try { await navigator.clipboard.writeText(ident); toast('Identifiant copié.'); } catch (e) { toast(ident); } };
+    moi.append(t, copier);
     const champ = el('input', 'texte'); champ.placeholder = 'Pseudo#1234'; champ.setAttribute('aria-label', 'Pseudo et numéro de ton ami');
-    const ajouter = el('button', 'btn principal', 'Ajouter');
-    const dessiner = async () => {
-      liste.replaceChildren(el('li', null, 'Chargement…'));
+    const valider = el('button', 'btn principal', 'Ajouter');
+    const ajout = el('div', 'amis-ajout'); ajout.append(champ, valider); ajout.hidden = true;
+    valider.onclick = async () => { const v = champ.value.trim(); if (!v) return champ.focus(); try { toastAjoutAmi(await apiJoueur('/amis', 'POST', { cible: v })); champ.value = ''; ajout.hidden = true; dessiner(); } catch (e) { toast(e.message); } };
+    champ.onkeydown = (e) => { if (e.key === 'Enter') valider.click(); };
+    const ajouter = el('button', 'btn principal', 'Ajouter un ami');
+    ajouter.onclick = () => { ajout.hidden = !ajout.hidden; if (!ajout.hidden) champ.focus(); };
+    const wa = el('button', 'btn wa', 'WhatsApp');
+    wa.onclick = () => { const m = `Viens jouer avec moi sur Masano (Kopo et Inter (8)) ! Ajoute-moi : ${ident}\n${LIEN_SITE()}`; window.open('https://wa.me/?text=' + encodeURIComponent(m), '_blank', 'noopener'); };
+    const bas = el('div', 'amis-bas'); bas.append(ajouter, wa);
+    const parrain = el('button', 'amis-parrain', 'Inviter et gagner des pièces');
+    parrain.onclick = () => ouvrirParrainage(rouvrir);
+    let donnees = null;
+    const ligneVide = (txt) => el('li', 'vide', txt);
+    function montrer() {
+      bAmis.setAttribute('aria-pressed', String(ongletAmis === 'amis'));
+      bDem.setAttribute('aria-pressed', String(ongletAmis === 'demandes'));
+      if (!donnees) return;
+      const { amis, rivaux, dm } = donnees;
+      bAmis.textContent = amis.length ? 'Amis · ' + amis.length : 'Amis';
+      bDem.replaceChildren('Demandes'); if (dm.recues.length) bDem.append(el('i', 'n', String(dm.recues.length)));
+      liste.replaceChildren();
+      if (ongletAmis === 'amis') {
+        if (!amis.length) liste.append(ligneVide('Pas encore d\'amis. Ajoute-les avec leur pseudo#numéro, ou invite-les sur WhatsApp.'));
+        for (const a of [...amis].sort((x, y) => Number(y.en_ligne) - Number(x.en_ligne))) {
+          const li = el('li', a.en_ligne ? null : 'absent');
+          const qui = el('span', 'qui'); const nomA = el('b', null, a.pseudo + ' '); nomA.append(el('small', null, '#' + a.numero)); qui.append(nomA);
+          const rv = rivaux.find((r) => r.id === a.id);
+          const score = rv && `Toi ${rv.moi} – ${rv.lui} ${a.pseudo}`;
+          if (a.en_ligne) { qui.append(el('span', 'on', '● En ligne')); if (score) { const s2 = el('span'); s2.append(el('em', null, score)); qui.append(s2); } }
+          else qui.append(el('span', null, [depuisQuand(a.vu_le), score].filter(Boolean).join(' · ')));
+          li.append(avatarAmi(a, a.en_ligne), qui);
+          if (a.en_ligne) {
+            const inv = el('button', 'btn principal', 'Inviter');
+            inv.onclick = () => { amiAInviter = { id: a.id, pseudo: a.pseudo, quand: Date.now() }; fermerFenetre(); $('btnCreer').click(); };
+            li.append(inv);
+          }
+          const plus = el('button', 'plus', '⋯'); plus.setAttribute('aria-label', 'Plus');
+          plus.onclick = () => {
+            const ret = el('button', 'btn large', 'Retirer de mes amis');
+            ret.onclick = () => demanderConfirmation(`${a.pseudo} ne sera plus dans tes amis.`, async () => { try { await apiJoueur('/amis/' + encodeURIComponent(a.id), 'DELETE'); } catch (e) { toast(e.message); } rouvrir(); }, { titre: 'Retirer ' + a.pseudo + ' ?', oui: 'Retirer', annuler: rouvrir });
+            const ann = el('button', 'btn principal large', 'Retour'); ann.onclick = rouvrir;
+            ouvrirFenetre([el('h2', null, a.pseudo), el('p', null, a.pseudo + '#' + a.numero), ret, ann]);
+          };
+          li.append(plus); liste.append(li);
+        }
+      } else {
+        if (!dm.recues.length && !dm.envoyees.length) liste.append(ligneVide('Aucune demande en attente.'));
+        for (const d of dm.recues) {
+          const li = el('li'), qui = el('span', 'qui'), nomD = el('b', null, d.pseudo + ' ');
+          nomD.append(el('small', null, '#' + d.numero)); qui.append(nomD, el('span', null, 'veut être ton ami'));
+          const oui = el('button', 'btn principal', 'Accepter'), non = el('button', 'plus', '✕'); non.setAttribute('aria-label', 'Refuser');
+          oui.onclick = async () => { try { await repondreDemande(d.id, true); toast(d.pseudo + ' est dans tes amis.'); } catch (e) { toast(e.message); } dessiner(); };
+          non.onclick = async () => { try { await repondreDemande(d.id, false); } catch (e) { toast(e.message); } dessiner(); };
+          li.append(avatarAmi(d), qui, oui, non); liste.append(li);
+        }
+        for (const d of dm.envoyees) {
+          const li = el('li', 'absent'), qui = el('span', 'qui'), nomD = el('b', null, d.pseudo + ' ');
+          nomD.append(el('small', null, '#' + d.numero)); qui.append(nomD, el('span', null, 'Demande envoyée'));
+          const x = el('button', 'plus', '✕'); x.setAttribute('aria-label', 'Annuler la demande');
+          x.onclick = async () => { try { await apiJoueur('/amis/demandes/' + encodeURIComponent(d.id), 'DELETE'); } catch (e) { toast(e.message); } dessiner(); };
+          li.append(avatarAmi(d), qui, x); liste.append(li);
+        }
+      }
+    }
+    async function dessiner() {
+      if (!donnees) liste.replaceChildren(ligneVide('Chargement…'));
       try {
         const [amis, rivaux, dm] = await Promise.all([apiJoueur('/amis'), apiJoueur('/rivaux').catch(() => []), apiJoueur('/amis/demandes').catch(() => ({ recues: [], envoyees: [] }))]);
         majPastilleAmis(dm.recues.length);
-        demandes.replaceChildren();
-        if (dm.recues.length) {
-          const ul = el('ul', 'liste-k');
-          for (const d of dm.recues) {
-            const li = el('li'), act = el('span', 'actions');
-            const oui = el('button', 'btn principal', 'Accepter'), non = el('button', 'btn', 'Refuser');
-            oui.onclick = async () => { try { await repondreDemande(d.id, true); toast(d.pseudo + ' est dans tes amis.'); dessiner(); } catch (e) { toast(e.message); dessiner(); } };
-            non.onclick = async () => { try { await repondreDemande(d.id, false); dessiner(); } catch (e) { toast(e.message); dessiner(); } };
-            act.append(oui, non);
-            li.append(el('span', null, d.pseudo + '#' + d.numero), act); ul.append(li);
-          }
-          demandes.append(el('h3', null, dm.recues.length > 1 ? `${dm.recues.length} demandes d'ami` : 'Demande d\'ami'), ul);
-        }
-        liste.replaceChildren();
-        if (!amis.length) liste.append(el('li', null, 'Pas encore d\'amis. Ajoute-les avec leur pseudo#numéro.'));
-        for (const a of amis) {
-          const li = el('li');
-          const t = el('span', null, a.pseudo + '#' + a.numero + ' ');
-          const rv = rivaux.find((r) => r.id === a.id);
-          if (rv) t.append(el('b', null, `${rv.moi} – ${rv.lui} `));
-          t.append(el('small', null, a.en_ligne ? '· en ligne' : ''));
-          const x = el('button', 'btn', 'Retirer');
-          x.onclick = async () => { try { await apiJoueur('/amis/' + encodeURIComponent(a.id), 'DELETE'); dessiner(); } catch (e) { toast(e.message); } };
-          li.append(t, x); liste.append(li);
-        }
-        for (const d of dm.envoyees) {
-          const li = el('li');
-          const t = el('span', null, d.pseudo + '#' + d.numero + ' '); t.append(el('small', null, '· demande envoyée'));
-          const x = el('button', 'btn', 'Annuler');
-          x.onclick = async () => { try { await apiJoueur('/amis/demandes/' + encodeURIComponent(d.id), 'DELETE'); dessiner(); } catch (e) { toast(e.message); } };
-          li.append(t, x); liste.append(li);
-        }
-      } catch (e) { liste.replaceChildren(el('li', null, e.message)); }
-    };
-    ajouter.onclick = async () => { try { toastAjoutAmi(await apiJoueur('/amis', 'POST', { cible: champ.value.trim() })); champ.value = ''; dessiner(); } catch (e) { toast(e.message); } };
-    const ligne = el('div', 'lien'); ligne.append(champ, ajouter);
-    const c = compteLocal();
-    const moi = el('p', null, 'Ton identifiant à donner à tes amis : ');
-    moi.append(el('b', null, c.compte.pseudo + '#' + c.compte.numero));
-    const inviter = el('button', 'btn large', 'Inviter sur WhatsApp');
-    inviter.onclick = () => { const t = `Viens jouer avec moi sur Masano (Kopo et Inter (8)) ! Ajoute-moi : ${c.compte.pseudo}#${c.compte.numero}\n${location.origin + location.pathname}`; window.open('https://wa.me/?text=' + encodeURIComponent(t), '_blank', 'noopener'); };
-    const f = el('button', 'btn large', 'Fermer'); f.onclick = () => ouvrirParametres();
-    const parrainer = el('button', 'btn principal large', 'Inviter et gagner des pièces');
-    parrainer.onclick = () => ouvrirParrainage(ouvrirAmis);
-    ouvrirFenetre([el('h2', null, 'Mes amis'), demandes, moi, ligne, liste, parrainer, inviter, f]);
+        donnees = { amis, rivaux, dm };
+        montrer();
+      } catch (e) { liste.replaceChildren(ligneVide(e.message)); }
+    }
+    bAmis.onclick = () => { ongletAmis = 'amis'; montrer(); };
+    bDem.onclick = () => { ongletAmis = 'demandes'; montrer(); };
+    if (!garderOnglet) ongletAmis = demandesAmi > 0 ? 'demandes' : 'amis'; // à l'ouverture : les demandes d'abord s'il y en a
+    montrer();
+    ouvrirFenetre([tete, onglets, liste, ajout, moi, bas, parrain], 'amis');
     dessiner();
   }
 

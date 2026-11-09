@@ -255,6 +255,10 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.strictEqual((await api('/api/amis', { jeton: a.jeton })).json[0].pseudo, 'Bruno');
     assert.strictEqual((await api('/api/amis', { jeton: b.jeton })).json[0].pseudo, 'Alice');
     assert.deepStrictEqual((await api('/api/amis/demandes', { jeton: b.jeton })).json, { recues: [], envoyees: [] });
+    // La fenêtre Amis montre l'XP (le téléphone en tire le niveau), l'apparence et la dernière visite.
+    await api('/api/profil', { methode: 'PUT', jeton: b.jeton, corps: { profil: { xp: 420, bareme: 2 } } });
+    const fb = (await api('/api/amis', { jeton: a.jeton })).json[0];
+    assert.deepStrictEqual([fb.xp, fb.bareme, fb.apparence, fb.en_ligne, !!fb.vu_le], [420, 2, null, true, true]);
     const na = (await api('/api/notifications', { jeton: a.jeton })).json.liste[0];
     assert.deepStrictEqual([na.texte, na.donnees.accepte], ['Bruno a accepté ta demande d\'ami', true]);
     assert.strictEqual((await api('/api/amis/demandes/' + a.compte.id + '/accepter', { methode: 'POST', jeton: b.jeton })).statut, 404, 'plus de demande');
