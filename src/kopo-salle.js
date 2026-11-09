@@ -60,9 +60,15 @@
   // Force de 0 (gentil) à 2 (fort). Dans chaque niveau, elle monte avec le niveau du joueur
   // (niveau 1 : bas de la plage, niveau 20 et plus : haut de la plage).
   const PLAGES_FORCE = { faciles: [0, 0.7], normaux: [1, 1.5], forts: [1.6, 2] };
-  function forceRobots(s) {
+  // Chaque robot ajouté peut avoir son propre niveau (j.niveau) ; sinon, celui de la table
+  // (s.robots), par exemple pour un robot qui remplace un joueur parti.
+  function niveauDuRobot(s, j) {
+    const r = j && s.joueurs ? s.joueurs.find((x) => x.id === j) : null;
+    return r && !r.remplace && NIVEAUX_ROBOTS.includes(r.niveau) ? r.niveau : s.robots;
+  }
+  function forceRobots(s, j) {
     if (s.robots === 'gentils') return 0;
-    const plage = PLAGES_FORCE[s.robots] || PLAGES_FORCE.normaux;
+    const plage = PLAGES_FORCE[niveauDuRobot(s, j)] || PLAGES_FORCE.normaux;
     const n = s.niveauJoueur > 1 ? s.niveauJoueur : 1;
     const t = Math.min(1, (n - 1) / 19);
     return plage[0] + (plage[1] - plage[0]) * t;
@@ -73,7 +79,7 @@
   function choixRobot(s, j) {
     const v = K.vuePublique(s.manche, j);
     const actions = K.actionsPossibles(s.manche, j);
-    const f = forceRobots(s);
+    const f = forceRobots(s, j);
     const cerveau = f < 1 ? (s.rng() < f ? robotNormal : robotGentil) : (s.rng() < f - 1 ? robotFort : robotNormal);
     return cerveau(v, actions, s.rng);
   }
@@ -415,7 +421,16 @@
         if (s.joueurs.length >= MAX) return { ok: false, erreur: 'La table est pleine (9 joueurs).' };
         let n = 1;
         while (s.joueurs.some((j) => j.nom === 'Robot ' + n)) n++;
-        s.joueurs.push({ id: 'robot-' + n + '-' + Math.floor(s.rng() * 1e6), nom: 'Robot ' + n, connecte: true, robot: true, voix: false, muet: true });
+        if (msg.niveau !== undefined && !NIVEAUX_ROBOTS.includes(msg.niveau)) return { ok: false, erreur: 'Impossible.' };
+        const robot = { id: 'robot-' + n + '-' + Math.floor(s.rng() * 1e6), nom: 'Robot ' + n, connecte: true, robot: true, voix: false, muet: true };
+        if (msg.niveau) robot.niveau = msg.niveau; // sinon, le niveau de la table
+        s.joueurs.push(robot);
+        return { ok: true };
+      }
+      case 'niveauRobot': { // l'hôte change le niveau d'un robot ajouté, dans le salon
+        const cible = s.joueurs.find((j) => j.id === msg.cible);
+        if (id !== s.hote || s.etat !== 'salon' || s.publique || !cible || !cible.robot || cible.remplace || !NIVEAUX_ROBOTS.includes(msg.niveau)) return { ok: false, erreur: 'Impossible.' };
+        cible.niveau = msg.niveau;
         return { ok: true };
       }
       case 'remplacerParRobot': {
@@ -545,7 +560,7 @@
       etat: s.etat,
       moi: id,
       hote: s.hote,
-      joueurs: s.joueurs.map((j) => ({ id: j.id, nom: j.nom, connecte: j.connecte, peerId: j.peerId || null, voix: !!j.voix, muet: j.muet !== false, robot: !!j.robot, pret: !!j.pret || !!j.robot, remplace: !!j.remplace, absent: estAbsent(s, j.id) })),
+      joueurs: s.joueurs.map((j) => ({ id: j.id, nom: j.nom, connecte: j.connecte, peerId: j.peerId || null, voix: !!j.voix, muet: j.muet !== false, robot: !!j.robot, niveau: j.robot && !j.remplace ? niveauDuRobot(s, j.id) : null, pret: !!j.pret || !!j.robot, remplace: !!j.remplace, absent: estAbsent(s, j.id) })),
       delai: s.delai,
       publique: !!s.publique,
       taille: s.taille,
@@ -595,7 +610,7 @@
     return s;
   }
 
-  const KopoSalle = { MIN, MAX, hasardManche, placerDonne, DELAIS, PAUSE_ROBOT, DUREES, creerSalle, rendrePublique, choixRobot, NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, robotGentil, robotNormal, robotFort, reconnecter, DELAI_ABSENT, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
+  const KopoSalle = { MIN, MAX, hasardManche, placerDonne, DELAIS, PAUSE_ROBOT, DUREES, creerSalle, rendrePublique, choixRobot, NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, niveauDuRobot, robotGentil, robotNormal, robotFort, reconnecter, DELAI_ABSENT, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
   if (typeof module !== 'undefined' && module.exports) module.exports = KopoSalle;
   else root.KopoSalle = KopoSalle;
 })(typeof window !== 'undefined' ? window : globalThis);
