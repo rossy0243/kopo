@@ -6738,7 +6738,7 @@ var qrcode = function() {
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = 'd568ced47fc1'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = 'b483efb985ed'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
@@ -9182,6 +9182,7 @@ var qrcode = function() {
       const x = b.bandes.find((y) => y.inscrit) || b.bandes[0];
       $('bandeResume').textContent = !x ? 'Défie tes amis' : x.inscrit ? `${x.jeSuisChef ? '👑 ' : ''}${x.nom} · ${x.rang}e` : x.nom;
     } catch (e) {}
+    try { const a = await apiJoueur('/amis'); amisEnLigne = a.filter((x) => x.en_ligne).length; majSousTitresModes(); } catch (e) {}
     proposerLienBande();
     majBadgesNouveaute();
     rappelBande();
@@ -11169,7 +11170,7 @@ var qrcode = function() {
     $('niveauRobots').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === n)));
     $('niveauRobotsAide').textContent = AIDES_NIVEAU_ROBOTS[n] + ' Ils deviennent un peu plus forts à chaque niveau que tu gagnes (tu es niveau ' + monNiveau() + ').';
   }
-  $('niveauRobots').querySelectorAll('button').forEach((b) => (b.onclick = () => { stock.ecrire('kopo-niveau-robots', b.dataset.v); majNiveauRobots(); }));
+  $('niveauRobots').querySelectorAll('button').forEach((b) => (b.onclick = () => { stock.ecrire('kopo-niveau-robots', b.dataset.v); majNiveauRobots(); majSousTitresModes(); }));
   // Inter (8) : le style de la partie (gardé sur le téléphone), et 7 robots au plus (8 joueurs).
   const styleInter = () => (stock.lire('kopo-inter8-style') === 'delire' ? 'delire' : 'simple');
   function majStyleRobots() {
@@ -11221,6 +11222,17 @@ var qrcode = function() {
     kopo: { btnCreer: 'Entre amis, de 2 à 9', btnModeRobots: 'Partie rapide, seul' },
     inter8: { btnCreer: 'Entre amis, de 2 à 8 · simple ou délire', btnModeRobots: 'Pour apprendre Inter (8)' },
   };
+  // Cartes vivantes : « Créer une partie » dit combien d'amis sont en ligne, « Contre les robots » le niveau choisi (Kopo).
+  let amisEnLigne = 0;
+  const NOMS_NIVEAUX_ROBOTS = { faciles: 'Facile', normaux: 'Normal', forts: 'Fort' };
+  function majSousTitresModes() {
+    const jeu = jeuChoisi();
+    for (const [id, t] of Object.entries(textesModes[jeu])) {
+      const s = $(id) && $(id).querySelector('small'); if (!s) continue;
+      s.replaceChildren(id === 'btnModeRobots' && jeu === 'kopo' ? `Partie rapide · niveau ${(NOMS_NIVEAUX_ROBOTS[niveauRobots()] || 'Normal').toLowerCase()}` : t);
+      if (id === 'btnCreer' && amisEnLigne > 0) s.append(el('br'), el('span', 'point-en-ligne'), `${amisEnLigne} ami${amisEnLigne > 1 ? 's' : ''} en ligne`);
+    }
+  }
   // État de chaque jeu (tableau de bord) : 'ouvert', 'test' (je suis testeur), 'ferme' (réservé aux testeurs) ou 'maintenance'.
   function etatJeu(jeu) { const j = configServeur && configServeur.jeux; return (j && j[jeu]) || 'ouvert'; }
   function jeuxVisibles() { const l = JEUX_HUB.filter((j) => etatJeu(j) !== 'ferme'); return l.length ? l : ['kopo']; }
@@ -11237,7 +11249,7 @@ var qrcode = function() {
       if (e === 'maintenance' || e === 'test') { if (!marque) { marque = el('span', 'etat-jeu'); b.append(marque); } marque.textContent = e === 'test' ? 'test' : 'maintenance'; marque.classList.toggle('maint', e === 'maintenance'); }
       else if (marque) marque.remove();
     });
-    for (const [id, t] of Object.entries(textesModes[jeu])) { const s = $(id) && $(id).querySelector('small'); if (s) s.textContent = t; }
+    majSousTitresModes();
     const r = $('btnRegles'); if (r && r.lastChild) r.lastChild.textContent = jeu === 'inter8' ? 'Règles Inter' : 'Règles';
   }
   $('choixJeu').querySelectorAll('button').forEach((b) => (b.onclick = () => { stock.ecrire('kopo-jeu', b.dataset.jeu); majChoixJeu(); }));
