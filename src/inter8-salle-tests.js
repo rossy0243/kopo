@@ -217,6 +217,50 @@ test("Passé ce délai, le robot conteste : amende d'1 carte", () => {
   assert.strictEqual(s.manche.mains.p1.length, 2);
 });
 
+// p1 humain, un robot qui commence et pose son avant-dernière carte.
+function robotPresDeFinir(niveau, graine) {
+  const s = salleAvec(1, graine);
+  const h = horloge(); s.horloge = h; s.pauseRobot = 0;
+  S.recevoir(s, 'p1', { type: 'reglages', robots: niveau });
+  S.recevoir(s, 'p1', { type: 'ajouterRobot' });
+  S.recevoir(s, 'p1', { type: 'lancer' });
+  const robot = s.joueurs[1].id;
+  s.manche = I.nouvelleManche(['p1', robot], { p1: ['3P', '4P', '6P', '7P'], [robot]: ['3C', '4P'] },
+    Array.from({ length: 20 }, (_, i) => '9' + 'PCKT'[i % 4] + '*').concat('5C'), robot, { graine: 1 });
+  S.tic(s);
+  assert.deepStrictEqual(s.manche.mains[robot], ['4P'], 'le robot a posé son avant-dernière carte');
+  return { s, h, robot };
+}
+
+test("Un robot normal annonce dans la foulée : on ne peut jamais le contester", () => {
+  for (const niveau of ['normaux', 'forts']) {
+    const { s, h, robot } = robotPresDeFinir(niveau, 4);
+    assert.ok(s.manche.annonces.includes(robot), 'annonce immédiate (' + niveau + ')');
+    assert.deepStrictEqual(s.manche.contestables, []);
+    h.avancer(S.DELAI_ANNONCE + 1);
+    S.tic(s);
+    assert.ok(!S.vue(s, 'p1').manche.actions.some((a) => a.type === 'contester'));
+  }
+});
+
+test("Un robot qui oublie d'annoncer a lui aussi 3 s avant qu'on puisse le contester", () => {
+  // Robots faciles : on cherche une graine où le robot oublie.
+  let cas = null;
+  for (let g = 1; g < 200 && !cas; g++) {
+    const c = robotPresDeFinir('faciles', g);
+    if (!c.s.manche.annonces.includes(c.robot)) cas = c;
+  }
+  assert.ok(cas, 'un robot facile oublie parfois');
+  const { s, h, robot } = cas;
+  assert.deepStrictEqual(S.vue(s, 'p1').manche.enGrace, [robot]);
+  assert.ok(!S.recevoir(s, 'p1', { type: 'action', action: { type: 'contester' } }).ok, 'pas avant 3 s');
+  h.avancer(S.DELAI_ANNONCE + 1);
+  S.tic(s);
+  assert.ok(!s.manche.annonces.includes(robot), "il ne se rattrape pas en douce");
+  assert.ok(S.recevoir(s, 'p1', { type: 'action', action: { type: 'contester' } }).ok);
+  assert.strictEqual(s.manche.mains[robot].length, 2, "amende d'1 carte");
+});
+
 test('Compte à rebours de départ : personne ne joue pendant la pause', () => {
   const s = salleAvec(2);
   const h = horloge(); s.horloge = h;

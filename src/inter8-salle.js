@@ -98,11 +98,22 @@
     // Plusieurs cartes posées d'un coup : elles sont d'abord montrées en éventail à toute la table.
     if (action.type === 'jouer' && action.cartes.length > 1 && s.robotPret && !(s.pauseRobot >= 0)) s.robotPret += PAUSE_EVENTAIL;
     // Pendant ces 3 s, personne (humain ou robot) ne peut contester ; ensuite, tout le monde peut,
-    // jusqu'au prochain tour du joueur (même si d'autres ont joué entre-temps).
-    const nouveaux = m ? (m.contestables || []).filter((j) => !contestablesAvant.includes(j) && !estRobot(s, j)) : [];
-    s.graces = Object.fromEntries(Object.entries(s.graces || {}).filter(([j]) => m && (m.contestables || []).includes(j)));
+    // jusqu'au prochain tour du joueur (même si d'autres ont joué entre-temps). Les robots ont
+    // droit aux mêmes 3 s que les humains (règle, section 9).
+    const nouveaux = m ? (m.contestables || []).filter((j) => !contestablesAvant.includes(j)) : [];
+    const garder = ([j]) => m && (m.contestables || []).includes(j);
+    s.graces = Object.fromEntries(Object.entries(s.graces || {}).filter(garder));
+    s.oublis = Object.fromEntries(Object.entries(s.oublis || {}).filter(garder));
     for (const j of nouveaux) s.graces[j] = s.horloge() + DELAI_ANNONCE;
-    if (nouveaux.length && s.robotPret) s.robotPret = Math.max(s.robotPret, s.horloge() + DELAI_ANNONCE);
+    // Un robot annonce dans la foulée de son coup, sans attendre sa pause de réflexion.
+    // Un robot facile peut oublier : il ne se rattrape pas, on pourra le contester après les 3 s.
+    for (const j of nouveaux.filter((x) => estRobot(s, x))) {
+      if (R.robotAnnonce(s.robots, s.niveauJoueur, s.rng)) {
+        I.jouer(m, { type: 'annoncer', joueur: j });
+        delete s.graces[j];
+      } else s.oublis[j] = true;
+    }
+    if (nouveaux.some((j) => !estRobot(s, j)) && s.robotPret) s.robotPret = Math.max(s.robotPret, s.horloge() + DELAI_ANNONCE);
   }
 
   function lancer(s) {
@@ -145,6 +156,7 @@
       for (const j of candidats) {
         const a = choixRobot(s, j);
         if (a && a.type === 'contester' && enGrace(s, a.cible || (m.contestables || [])[0])) continue; // il attend la fin des 3 s
+        if (a && a.type === 'annoncer' && s.oublis && s.oublis[j] && j !== m.joueurCourant) continue; // il a oublié
         if (a) { appliquer(s, a); return true; }
       }
     }
@@ -185,6 +197,7 @@
     s.numeroManche++;
     s.suiteA = null;
     s.graces = {};
+    s.oublis = {};
     s.manche = I.nouvelleManche(sieges, mains, pioche, premier, { mode: s.mode, graine: Math.floor(s.rng() * 4294967296) });
     s.etat = 'manche';
     s.pause = s.durees.depart > 0 ? { type: 'depart', jusqua: s.horloge() + s.durees.depart, total: s.durees.depart } : null;
