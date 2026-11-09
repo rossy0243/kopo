@@ -80,6 +80,8 @@
   // sieges : joueurs dans le sens des aiguilles d'une montre. mains : { joueur: [cartes] }.
   // pioche : cartes restantes (on tire par la fin). premier : joueur qui commence.
   // options : { mode: 'simple' | 'delire', graine } (la graine sert à remélanger la défausse).
+  // options.differerDepart : l'effet de la carte de départ attend appliquerDepart(m)
+  // (l'appli le déclenche à la fin de la distribution).
   function nouvelleManche(sieges, mains, pioche, premier, options) {
     const o = options || {};
     const m = {
@@ -115,8 +117,17 @@
     m.vu.posees.push(depart);
     noter(m, `Début de la manche : ${sieges.length} joueurs, mode ${m.mode}. Carte de départ : ${afficher(depart)}. ${premier} commence.`);
     // Une carte de départ spéciale agit sur le premier joueur, comme si elle venait d'être jouée.
-    effetsDepart(m, depart, premier);
+    if (o.differerDepart) m.departEnAttente = premier;
+    else effetsDepart(m, depart, premier);
     return m;
+  }
+
+  // Applique l'effet de la carte de départ mis en attente par nouvelleManche (differerDepart).
+  function appliquerDepart(m) {
+    if (!m.departEnAttente) return;
+    const premier = m.departEnAttente;
+    delete m.departEnAttente;
+    effetsDepart(m, m.defausse[m.defausse.length - 1], premier);
   }
 
   function noter(m, texte) {
@@ -515,7 +526,7 @@
   const Inter8 = {
     COULEURS, NOMS_COULEURS, SYMBOLES, VALEURS, PENALITES, MAX_JOUEURS,
     valeur, couleur, afficher, finissable, nombrePaquets, nouveauPaquet, hasard, melanger, distribuer,
-    nouvelleManche, actionsPossibles, refus, jouer, jouerPartie, vuePublique,
+    nouvelleManche, appliquerDepart, actionsPossibles, refus, jouer, jouerPartie, vuePublique,
     strategieSimple, strategieHasard,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = Inter8;
