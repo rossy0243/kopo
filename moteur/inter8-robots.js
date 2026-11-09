@@ -150,6 +150,15 @@
     return cerveau(v, actions, rng);
   }
 
+  // Juste après le coup qui lui permet de finir au coup suivant : le robot annonce-t-il tout de suite ?
+  // Même tirage que choixRobot : un robot normal ou fort annonce toujours, un robot gentil
+  // (facile) oublie une fois sur deux. La décision est prise une seule fois, au moment du coup.
+  function robotAnnonce(niveauRobots, niveauJoueur, rng) {
+    const f = forceRobots(niveauRobots, niveauJoueur);
+    if (f >= 1) return true;
+    return rng() < f || rng() < 0.5;
+  }
+
   // Coup joué automatiquement quand le temps est écoulé (ou le joueur hors ligne) :
   // il pioche, ou passe après avoir pioché, sinon pose le coup le plus simple.
   function coupAutomatique(m, joueur) {
@@ -158,7 +167,7 @@
     return actions.find((a) => a.type === 'piocher') || actions.find((a) => a.type === 'passer') || coups(actions)[0] || null;
   }
 
-  const Inter8Robots = { NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, robotGentil, robotNormal, robotFort, choixRobot, coupAutomatique };
+  const Inter8Robots = { NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, robotGentil, robotNormal, robotFort, choixRobot, robotAnnonce, coupAutomatique };
   if (typeof module !== 'undefined' && module.exports) module.exports = Inter8Robots;
   else root.Inter8Robots = Inter8Robots;
 })(typeof window !== 'undefined' ? window : globalThis);

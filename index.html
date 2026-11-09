@@ -5446,6 +5446,15 @@ var qrcode = function() {
     return cerveau(v, actions, rng);
   }
 
+  // Juste après le coup qui lui permet de finir au coup suivant : le robot annonce-t-il tout de suite ?
+  // Même tirage que choixRobot : un robot normal ou fort annonce toujours, un robot gentil
+  // (facile) oublie une fois sur deux. La décision est prise une seule fois, au moment du coup.
+  function robotAnnonce(niveauRobots, niveauJoueur, rng) {
+    const f = forceRobots(niveauRobots, niveauJoueur);
+    if (f >= 1) return true;
+    return rng() < f || rng() < 0.5;
+  }
+
   // Coup joué automatiquement quand le temps est écoulé (ou le joueur hors ligne) :
   // il pioche, ou passe après avoir pioché, sinon pose le coup le plus simple.
   function coupAutomatique(m, joueur) {
@@ -5454,7 +5463,7 @@ var qrcode = function() {
     return actions.find((a) => a.type === 'piocher') || actions.find((a) => a.type === 'passer') || coups(actions)[0] || null;
   }
 
-  const Inter8Robots = { NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, robotGentil, robotNormal, robotFort, choixRobot, coupAutomatique };
+  const Inter8Robots = { NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, robotGentil, robotNormal, robotFort, choixRobot, robotAnnonce, coupAutomatique };
   if (typeof module !== 'undefined' && module.exports) module.exports = Inter8Robots;
   else root.Inter8Robots = Inter8Robots;
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -5559,11 +5568,22 @@ var qrcode = function() {
     // Plusieurs cartes posées d'un coup : elles sont d'abord montrées en éventail à toute la table.
     if (action.type === 'jouer' && action.cartes.length > 1 && s.robotPret && !(s.pauseRobot >= 0)) s.robotPret += PAUSE_EVENTAIL;
     // Pendant ces 3 s, personne (humain ou robot) ne peut contester ; ensuite, tout le monde peut,
-    // jusqu'au prochain tour du joueur (même si d'autres ont joué entre-temps).
-    const nouveaux = m ? (m.contestables || []).filter((j) => !contestablesAvant.includes(j) && !estRobot(s, j)) : [];
-    s.graces = Object.fromEntries(Object.entries(s.graces || {}).filter(([j]) => m && (m.contestables || []).includes(j)));
+    // jusqu'au prochain tour du joueur (même si d'autres ont joué entre-temps). Les robots ont
+    // droit aux mêmes 3 s que les humains (règle, section 9).
+    const nouveaux = m ? (m.contestables || []).filter((j) => !contestablesAvant.includes(j)) : [];
+    const garder = ([j]) => m && (m.contestables || []).includes(j);
+    s.graces = Object.fromEntries(Object.entries(s.graces || {}).filter(garder));
+    s.oublis = Object.fromEntries(Object.entries(s.oublis || {}).filter(garder));
     for (const j of nouveaux) s.graces[j] = s.horloge() + DELAI_ANNONCE;
-    if (nouveaux.length && s.robotPret) s.robotPret = Math.max(s.robotPret, s.horloge() + DELAI_ANNONCE);
+    // Un robot annonce dans la foulée de son coup, sans attendre sa pause de réflexion.
+    // Un robot facile peut oublier : il ne se rattrape pas, on pourra le contester après les 3 s.
+    for (const j of nouveaux.filter((x) => estRobot(s, x))) {
+      if (R.robotAnnonce(s.robots, s.niveauJoueur, s.rng)) {
+        I.jouer(m, { type: 'annoncer', joueur: j });
+        delete s.graces[j];
+      } else s.oublis[j] = true;
+    }
+    if (nouveaux.some((j) => !estRobot(s, j)) && s.robotPret) s.robotPret = Math.max(s.robotPret, s.horloge() + DELAI_ANNONCE);
   }
 
   function lancer(s) {
@@ -5607,6 +5627,7 @@ var qrcode = function() {
       for (const j of candidats) {
         const a = choixRobot(s, j);
         if (a && a.type === 'contester' && enGrace(s, a.cible || (m.contestables || [])[0])) continue; // il attend la fin des 3 s
+        if (a && a.type === 'annoncer' && s.oublis && s.oublis[j] && j !== m.joueurCourant) continue; // il a oublié
         if (a) { appliquer(s, a); return true; }
       }
     }
@@ -5647,6 +5668,7 @@ var qrcode = function() {
     s.numeroManche++;
     s.suiteA = null;
     s.graces = {};
+    s.oublis = {};
     // Avec une distribution animée, l'effet de la carte de départ (pénalité, tour sauté, J retour)
     // attend la fin du compte à rebours : le joueur sanctionné reçoit ses cartes après les autres.
     const differerDepart = s.durees.depart > 0;
@@ -6753,7 +6775,7 @@ var qrcode = function() {
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = '4abc5f2b6ffa'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = 'ecb015e34c2a'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
