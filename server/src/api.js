@@ -3,6 +3,7 @@
 const express = require('express');
 const { DEBLOCAGE } = require('./salle-kopo');
 const { etatJeuPour, NOMS_JEUX, communautesPubliques } = require('./reglages');
+const { COLONNES_CARTE } = require('./social');
 
 const MOTIFS = ['pseudo', 'insultes', 'triche', 'abandon', 'autre'];
 const enveloppe = (fn) => (req, res) => fn(req, res).catch((e) => res.status(e.statut || 500).json({ erreur: e.statut ? e.message : 'Erreur du serveur.' }) && (e.statut || console.error(e)));
@@ -160,7 +161,7 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours,
   }));
   r.delete('/bloques/:id', joueur, enveloppe(async (req, res) => { await base.query('DELETE FROM blocages WHERE compte_id = $1 AND bloque_id = $2', [req.compte.id, req.params.id]); res.json({ ok: true }); }));
 
-  r.get('/amis', joueur, enveloppe(async (req, res) => res.json((await base.query("SELECT c.id, c.pseudo, c.numero, c.avatar, c.vu_le > now() - interval '2 minutes' AS en_ligne FROM amis a JOIN comptes c ON c.id = a.ami_id WHERE a.compte_id = $1 AND c.statut <> 'supprime' ORDER BY c.pseudo", [req.compte.id])).rows)));
+  r.get('/amis', joueur, enveloppe(async (req, res) => res.json((await base.query(`SELECT c.id, c.pseudo, c.numero, c.avatar, ${COLONNES_CARTE}, c.vu_le, c.vu_le > now() - interval '2 minutes' AS en_ligne FROM amis a JOIN comptes c ON c.id = a.ami_id WHERE a.compte_id = $1 AND c.statut <> 'supprime' ORDER BY c.pseudo`, [req.compte.id])).rows)));
   // Ajouter un ami : envoie une demande, qu'il accepte ou refuse (sauf s'il m'avait déjà demandé).
   r.post('/amis', joueur, enveloppe(async (req, res) => {
     const c = await cible(req.body.cible);

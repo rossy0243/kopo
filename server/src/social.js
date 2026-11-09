@@ -4,6 +4,11 @@
 
 const TYPES = ['rivalite', 'invitation', 'ami', 'bande'];
 const paire = (x, y) => (x < y ? [x, y] : [y, x]);
+// Ce qu'on montre d'un ami ou d'un demandeur dans la fenêtre Amis : son apparence (avatar, cadre)
+// et son XP (le téléphone en tire le niveau, avec le barème du profil).
+const COLONNES_CARTE = `c.equipes->>'avatar' AS apparence, c.equipes->>'cadre' AS cadre,
+  CASE WHEN jsonb_typeof(c.profil->'xp') = 'number' THEN floor((c.profil->>'xp')::numeric)::int END AS xp,
+  CASE WHEN jsonb_typeof(c.profil->'bareme') = 'number' THEN (c.profil->>'bareme')::int END AS bareme`;
 
 function creerSocial(base) {
   async function veut(q, compteId, type) {
@@ -115,9 +120,9 @@ function creerSocial(base) {
 
     // Mes demandes reçues (à accepter ou refuser) et envoyées (en attente).
     async demandesAmi(compteId) {
-      const recues = (await base.query(`SELECT c.id, c.pseudo, c.numero, c.avatar, d.cree_le FROM demandes_ami d JOIN comptes c ON c.id = d.de_id
+      const recues = (await base.query(`SELECT c.id, c.pseudo, c.numero, c.avatar, ${COLONNES_CARTE}, d.cree_le FROM demandes_ami d JOIN comptes c ON c.id = d.de_id
         WHERE d.a_id = $1 AND d.refusee_le IS NULL AND c.statut NOT IN ('supprime', 'banni') ORDER BY d.cree_le DESC LIMIT 50`, [compteId])).rows;
-      const envoyees = (await base.query(`SELECT c.id, c.pseudo, c.numero, c.avatar, d.cree_le FROM demandes_ami d JOIN comptes c ON c.id = d.a_id
+      const envoyees = (await base.query(`SELECT c.id, c.pseudo, c.numero, c.avatar, ${COLONNES_CARTE}, d.cree_le FROM demandes_ami d JOIN comptes c ON c.id = d.a_id
         WHERE d.de_id = $1 AND c.statut <> 'supprime' ORDER BY d.cree_le DESC LIMIT 50`, [compteId])).rows;
       return { recues, envoyees };
     },
@@ -166,4 +171,4 @@ function creerSocial(base) {
   return api;
 }
 
-module.exports = { creerSocial, TYPES };
+module.exports = { creerSocial, TYPES, COLONNES_CARTE };
