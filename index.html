@@ -5599,7 +5599,14 @@ var qrcode = function() {
   }
 
   const estRobot = (s, id) => !!(s.joueurs.find((j) => j.id === id) || {}).robot;
-  const choixRobot = (s, j) => R.choixRobot(s.manche, j, s.robots, s.niveauJoueur, s.rng);
+  // Chaque robot ajouté peut avoir son propre niveau (j.niveau) ; sinon, celui de la table
+  // (s.robots), par exemple pour un robot qui remplace un joueur parti. Robots gentils : tous gentils.
+  function niveauDuRobot(s, j) {
+    if (s.robots === 'gentils') return 'gentils';
+    const r = s.joueurs.find((x) => x.id === j);
+    return r && !r.remplace && NIVEAUX_ROBOTS.includes(r.niveau) ? r.niveau : s.robots;
+  }
+  const choixRobot = (s, j) => R.choixRobot(s.manche, j, niveauDuRobot(s, j), s.niveauJoueur, s.rng);
 
   function estAbsent(s, id) {
     const j = s.joueurs.find((x) => x.id === id);
@@ -5644,7 +5651,7 @@ var qrcode = function() {
     // Un robot annonce dans la foulée de son coup, sans attendre sa pause de réflexion.
     // Un robot facile peut oublier : il ne se rattrape pas, on pourra le contester après les 3 s.
     for (const j of nouveaux.filter((x) => estRobot(s, x))) {
-      if (R.robotAnnonce(s.robots, s.niveauJoueur, s.rng)) {
+      if (R.robotAnnonce(niveauDuRobot(s, j), s.niveauJoueur, s.rng)) {
         I.jouer(m, { type: 'annoncer', joueur: j });
         delete s.graces[j];
       } else s.oublis[j] = true;
@@ -5849,7 +5856,16 @@ var qrcode = function() {
         if (s.joueurs.length >= MAX) return { ok: false, erreur: `La table est pleine (${MAX} joueurs).` };
         let n = 1;
         while (s.joueurs.some((j) => j.nom === 'Robot ' + n)) n++;
-        s.joueurs.push({ id: 'robot-' + n + '-' + Math.floor(s.rng() * 1e6), nom: 'Robot ' + n, connecte: true, robot: true, voix: false, muet: true });
+        if (msg.niveau !== undefined && !NIVEAUX_ROBOTS.includes(msg.niveau)) return { ok: false, erreur: 'Impossible.' };
+        const robot = { id: 'robot-' + n + '-' + Math.floor(s.rng() * 1e6), nom: 'Robot ' + n, connecte: true, robot: true, voix: false, muet: true };
+        if (msg.niveau) robot.niveau = msg.niveau; // sinon, le niveau de la table
+        s.joueurs.push(robot);
+        return { ok: true };
+      }
+      case 'niveauRobot': { // l'hôte change le niveau d'un robot ajouté, dans le salon
+        const cible = s.joueurs.find((j) => j.id === msg.cible);
+        if (id !== s.hote || s.etat !== 'salon' || s.publique || !cible || !cible.robot || cible.remplace || !NIVEAUX_ROBOTS.includes(msg.niveau)) return { ok: false, erreur: 'Impossible.' };
+        cible.niveau = msg.niveau;
         return { ok: true };
       }
       case 'remplacerParRobot': {
@@ -5995,7 +6011,7 @@ var qrcode = function() {
       hote: s.hote,
       mode: s.mode,
       jRetour: !!s.jRetour,
-      joueurs: s.joueurs.map((j) => ({ id: j.id, nom: j.nom, connecte: j.connecte, peerId: j.peerId || null, voix: !!j.voix, muet: j.muet !== false, robot: !!j.robot, pret: !!j.pret || !!j.robot, remplace: !!j.remplace, absent: estAbsent(s, j.id) })),
+      joueurs: s.joueurs.map((j) => ({ id: j.id, nom: j.nom, connecte: j.connecte, peerId: j.peerId || null, voix: !!j.voix, muet: j.muet !== false, robot: !!j.robot, niveau: j.robot && !j.remplace ? niveauDuRobot(s, j.id) : null, pret: !!j.pret || !!j.robot, remplace: !!j.remplace, absent: estAbsent(s, j.id) })),
       delai: s.delai,
       publique: !!s.publique,
       taille: s.taille,
@@ -6066,7 +6082,7 @@ var qrcode = function() {
     return s;
   }
 
-  const Inter8Salle = { JEU, MIN, MAX, MODES, DELAIS, PAUSE_ROBOT, DUREES, DELAI_ABSENT, DELAI_ANNONCE, NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, creerSalle, rendrePublique, choixRobot, reconnecter, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
+  const Inter8Salle = { JEU, MIN, MAX, MODES, DELAIS, PAUSE_ROBOT, DUREES, DELAI_ABSENT, DELAI_ANNONCE, NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, niveauDuRobot, creerSalle, rendrePublique, choixRobot, reconnecter, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
   if (enNode) module.exports = Inter8Salle;
   else root.Inter8Salle = Inter8Salle;
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -6854,7 +6870,7 @@ var qrcode = function() {
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = 'fd26eb0d4222'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = '9ee4d1f4e81f'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
@@ -7922,7 +7938,7 @@ var qrcode = function() {
       const li = el('li');
       li.dataset.id = j.id;
       // Robot avec son niveau : l'icône dit déjà « robot », on garde le numéro pour laisser la place au niveau.
-      const avecNiveau = j.robot && j.niveau && v.jeu !== 'inter8' && v.robots !== 'gentils';
+      const avecNiveau = j.robot && j.niveau && v.robots !== 'gentils';
       li.append(j.robot ? avecIco(el('span'), 'robots', avecNiveau ? j.nom.replace(/^Robot /, '') : j.nom) : el('span', null, j.nom));
       if (avecNiveau) li.firstChild.setAttribute('aria-label', j.nom);
       if (j.id === v.hote) li.append(el('span', 'pastille tour', 'hôte'));
@@ -11355,7 +11371,6 @@ var qrcode = function() {
     $('jRetourRobots').hidden = !inter || !delire;
     $('jRetourRobots').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.v === 'oui') === jRetourInter())));
     $('choixRobots').querySelectorAll('button').forEach((b) => (b.hidden = inter && +b.textContent > SI.MAX - 1));
-    $('btnComposerTable').hidden = inter; // Inter (8) : bientôt
   }
   $('styleRobots').querySelectorAll('button').forEach((b) => (b.onclick = () => { if (!stock.lire('kopo-inter8-jretour')) ecrireJRetour(jRetourInter()); stock.ecrire('kopo-inter8-style', b.dataset.v); majStyleRobots(); }));
   $('jRetourRobots').querySelectorAll('button').forEach((b) => (b.onclick = () => { ecrireJRetour(b.dataset.v === 'oui'); majStyleRobots(); }));
@@ -11382,17 +11397,19 @@ var qrcode = function() {
     };
     $('choixRobots').append(b);
   }
-  // « Composer ma table » (Kopo) : un niveau pour chaque robot, gardé sur le téléphone pour la prochaine fois.
-  function lireTableRobots() {
-    let t = stock.lire('kopo-table-robots');
-    t = Array.isArray(t) ? t.filter((n) => S.NIVEAUX_ROBOTS.includes(n)).slice(0, 8) : [];
+  // « Composer ma table » : un niveau pour chaque robot, gardé sur le téléphone pour la prochaine fois (une table par jeu).
+  const cleTableRobots = (inter) => (inter ? 'kopo-inter8-table-robots' : 'kopo-table-robots');
+  const maxRobots = (inter) => (inter ? SI.MAX - 1 : 8);
+  function lireTableRobots(inter) {
+    let t = stock.lire(cleTableRobots(inter));
+    t = Array.isArray(t) ? t.filter((n) => S.NIVEAUX_ROBOTS.includes(n)).slice(0, maxRobots(inter)) : [];
     return t.length ? t : [niveauRobots(), niveauRobots(), niveauRobots()];
   }
   function composerTable() {
     $('voileRobots').hidden = true;
-    const table = lireTableRobots();
+    const inter = jeuChoisi() === 'inter8', table = lireTableRobots(inter);
     const grille = el('div', 'table-robots'), jouer = el('button', 'btn principal large'), retour = el('button', 'btn large', 'Retour');
-    const garder = () => stock.ecrire('kopo-table-robots', table);
+    const garder = () => stock.ecrire(cleTableRobots(inter), table);
     function dessiner() {
       grille.replaceChildren();
       table.forEach((n, i) => {
@@ -11408,7 +11425,7 @@ var qrcode = function() {
         };
         grille.append(b);
       });
-      if (table.length < 8) {
+      if (table.length < maxRobots(inter)) {
         const plus = el('button', 'btn ajout', '+');
         plus.setAttribute('aria-label', 'Ajouter un robot');
         plus.onclick = () => { table.push(niveauRobots()); garder(); dessiner(); };
@@ -11419,14 +11436,16 @@ var qrcode = function() {
     jouer.onclick = () => {
       const p = lirePseudo(); if (!p) return;
       fermerFenetre(); garder();
-      demarrerHote(nouveauCode(), p, false, null, 'kopo');
-      envoyer({ type: 'reglages', robots: niveauRobots(), niveau: monNiveau() }); // niveau de la table : pour un robot qui remplace un joueur
+      demarrerHote(nouveauCode(), p, false, null, inter ? 'inter8' : 'kopo');
+      // Niveau de la table : pour un robot qui remplace un joueur. Inter (8) : le style choisi dans la fenêtre robots.
+      envoyer(Object.assign({ type: 'reglages', robots: niveauRobots(), niveau: monNiveau() }, inter ? reglagesStyleInter(styleInter()) : {}));
       for (const n of table) envoyer({ type: 'ajouterRobot', niveau: n });
       envoyer({ type: 'lancer' });
     };
     retour.onclick = () => { fermerFenetre(); $('btnModeRobots').click(); };
     dessiner();
-    ouvrirFenetre([el('h2', null, 'Ma table'), el('p', 'muted', 'Touche un robot pour changer son niveau, + pour en ajouter.'), grille,
+    const style = inter ? el('small', 'muted', `Inter (8) · ${styleInter() === 'delire' ? 'Délire' + (jRetourInter() ? ' avec J retour' : ' sans J retour') : 'Simple'}`) : null;
+    ouvrirFenetre([el('h2', null, 'Ma table'), ...(style ? [style] : []), el('p', 'muted', 'Touche un robot pour changer son niveau, + pour en ajouter.'), grille,
       el('small', 'muted', 'Facile → Normal → Fort → retiré. Ta table est gardée pour la prochaine fois.'), jouer, retour]);
   }
   $('btnComposerTable').onclick = composerTable;
@@ -11538,9 +11557,8 @@ var qrcode = function() {
   $('btnLancer').onclick = () => envoyer({ type: 'lancer' });
   $('btnPleinEcran').onclick = pleinEcran;
   $('btnPleinEcranEntete').onclick = pleinEcran;
-  // Kopo : un nouveau robot arrive au niveau du dernier ajouté (ou changé), sinon à celui choisi pour « Contre les robots ».
+  // Un nouveau robot arrive au niveau du dernier ajouté (ou changé), sinon à celui choisi pour « Contre les robots ».
   $('btnRobot').onclick = () => {
-    if (vueActuelle && vueActuelle.jeu === 'inter8') return envoyer({ type: 'ajouterRobot' });
     const n = stock.lire('kopo-niveau-dernier-robot');
     envoyer({ type: 'ajouterRobot', niveau: S.NIVEAUX_ROBOTS.includes(n) ? n : niveauRobots() });
   };

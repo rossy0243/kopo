@@ -64,7 +64,14 @@
   }
 
   const estRobot = (s, id) => !!(s.joueurs.find((j) => j.id === id) || {}).robot;
-  const choixRobot = (s, j) => R.choixRobot(s.manche, j, s.robots, s.niveauJoueur, s.rng);
+  // Chaque robot ajouté peut avoir son propre niveau (j.niveau) ; sinon, celui de la table
+  // (s.robots), par exemple pour un robot qui remplace un joueur parti. Robots gentils : tous gentils.
+  function niveauDuRobot(s, j) {
+    if (s.robots === 'gentils') return 'gentils';
+    const r = s.joueurs.find((x) => x.id === j);
+    return r && !r.remplace && NIVEAUX_ROBOTS.includes(r.niveau) ? r.niveau : s.robots;
+  }
+  const choixRobot = (s, j) => R.choixRobot(s.manche, j, niveauDuRobot(s, j), s.niveauJoueur, s.rng);
 
   function estAbsent(s, id) {
     const j = s.joueurs.find((x) => x.id === id);
@@ -109,7 +116,7 @@
     // Un robot annonce dans la foulée de son coup, sans attendre sa pause de réflexion.
     // Un robot facile peut oublier : il ne se rattrape pas, on pourra le contester après les 3 s.
     for (const j of nouveaux.filter((x) => estRobot(s, x))) {
-      if (R.robotAnnonce(s.robots, s.niveauJoueur, s.rng)) {
+      if (R.robotAnnonce(niveauDuRobot(s, j), s.niveauJoueur, s.rng)) {
         I.jouer(m, { type: 'annoncer', joueur: j });
         delete s.graces[j];
       } else s.oublis[j] = true;
@@ -314,7 +321,16 @@
         if (s.joueurs.length >= MAX) return { ok: false, erreur: `La table est pleine (${MAX} joueurs).` };
         let n = 1;
         while (s.joueurs.some((j) => j.nom === 'Robot ' + n)) n++;
-        s.joueurs.push({ id: 'robot-' + n + '-' + Math.floor(s.rng() * 1e6), nom: 'Robot ' + n, connecte: true, robot: true, voix: false, muet: true });
+        if (msg.niveau !== undefined && !NIVEAUX_ROBOTS.includes(msg.niveau)) return { ok: false, erreur: 'Impossible.' };
+        const robot = { id: 'robot-' + n + '-' + Math.floor(s.rng() * 1e6), nom: 'Robot ' + n, connecte: true, robot: true, voix: false, muet: true };
+        if (msg.niveau) robot.niveau = msg.niveau; // sinon, le niveau de la table
+        s.joueurs.push(robot);
+        return { ok: true };
+      }
+      case 'niveauRobot': { // l'hôte change le niveau d'un robot ajouté, dans le salon
+        const cible = s.joueurs.find((j) => j.id === msg.cible);
+        if (id !== s.hote || s.etat !== 'salon' || s.publique || !cible || !cible.robot || cible.remplace || !NIVEAUX_ROBOTS.includes(msg.niveau)) return { ok: false, erreur: 'Impossible.' };
+        cible.niveau = msg.niveau;
         return { ok: true };
       }
       case 'remplacerParRobot': {
@@ -460,7 +476,7 @@
       hote: s.hote,
       mode: s.mode,
       jRetour: !!s.jRetour,
-      joueurs: s.joueurs.map((j) => ({ id: j.id, nom: j.nom, connecte: j.connecte, peerId: j.peerId || null, voix: !!j.voix, muet: j.muet !== false, robot: !!j.robot, pret: !!j.pret || !!j.robot, remplace: !!j.remplace, absent: estAbsent(s, j.id) })),
+      joueurs: s.joueurs.map((j) => ({ id: j.id, nom: j.nom, connecte: j.connecte, peerId: j.peerId || null, voix: !!j.voix, muet: j.muet !== false, robot: !!j.robot, niveau: j.robot && !j.remplace ? niveauDuRobot(s, j.id) : null, pret: !!j.pret || !!j.robot, remplace: !!j.remplace, absent: estAbsent(s, j.id) })),
       delai: s.delai,
       publique: !!s.publique,
       taille: s.taille,
@@ -531,7 +547,7 @@
     return s;
   }
 
-  const Inter8Salle = { JEU, MIN, MAX, MODES, DELAIS, PAUSE_ROBOT, DUREES, DELAI_ABSENT, DELAI_ANNONCE, NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, creerSalle, rendrePublique, choixRobot, reconnecter, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
+  const Inter8Salle = { JEU, MIN, MAX, MODES, DELAIS, PAUSE_ROBOT, DUREES, DELAI_ABSENT, DELAI_ANNONCE, NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, niveauDuRobot, creerSalle, rendrePublique, choixRobot, reconnecter, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
   if (enNode) module.exports = Inter8Salle;
   else root.Inter8Salle = Inter8Salle;
 })(typeof window !== 'undefined' ? window : globalThis);

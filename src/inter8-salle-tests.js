@@ -359,5 +359,48 @@ test('Sauvegarde et reprise : la partie continue à l\'identique', () => {
   assert.ok(s2.vainqueur);
 });
 
+console.log('\nNiveau de chaque robot');
+test('Chaque robot ajouté peut avoir son niveau ; sans niveau, il suit la table', () => {
+  const s = salleAvec(1);
+  assert.ok(S.recevoir(s, 'p1', { type: 'reglages', robots: 'normaux', niveau: 1 }).ok);
+  assert.ok(S.recevoir(s, 'p1', { type: 'ajouterRobot', niveau: 'faciles' }).ok);
+  assert.ok(S.recevoir(s, 'p1', { type: 'ajouterRobot', niveau: 'forts' }).ok);
+  assert.ok(S.recevoir(s, 'p1', { type: 'ajouterRobot' }).ok);
+  assert.ok(!S.recevoir(s, 'p1', { type: 'ajouterRobot', niveau: 'gentils' }).ok);
+  assert.deepStrictEqual(S.vue(s, 'p1').joueurs.map((j) => j.niveau), [null, 'faciles', 'forts', 'normaux']);
+  assert.deepStrictEqual(s.joueurs.slice(1).map((j) => S.niveauDuRobot(s, j.id)), ['faciles', 'forts', 'normaux']);
+  s.robots = 'gentils'; // partie guidée : tous gentils
+  assert.strictEqual(S.niveauDuRobot(s, s.joueurs[2].id), 'gentils');
+});
+test("Dans le salon, seul l'hôte change le niveau d'un robot ; un remplaçant suit la table", () => {
+  const s = salleAvec(3);
+  assert.ok(S.recevoir(s, 'p1', { type: 'reglages', robots: 'faciles', niveau: 1 }).ok);
+  assert.ok(S.recevoir(s, 'p1', { type: 'ajouterRobot' }).ok);
+  const r = s.joueurs[3];
+  assert.ok(!S.recevoir(s, 'p2', { type: 'niveauRobot', cible: r.id, niveau: 'forts' }).ok);
+  assert.ok(!S.recevoir(s, 'p1', { type: 'niveauRobot', cible: 'p2', niveau: 'forts' }).ok);
+  assert.ok(S.recevoir(s, 'p1', { type: 'niveauRobot', cible: r.id, niveau: 'forts' }).ok);
+  assert.strictEqual(S.vue(s, 'p3').joueurs[3].niveau, 'forts');
+  assert.ok(S.recevoir(s, 'p1', { type: 'lancer' }).ok);
+  assert.ok(!S.recevoir(s, 'p1', { type: 'niveauRobot', cible: r.id, niveau: 'faciles' }).ok);
+  assert.ok(S.recevoir(s, 'p1', { type: 'remplacerParRobot', cible: 'p2' }).ok);
+  assert.strictEqual(S.niveauDuRobot(s, 'p2'), 'faciles');
+  assert.strictEqual(S.importer(S.exporter(s)).joueurs[3].niveau, 'forts');
+});
+test('Une partie avec des robots de trois niveaux va au bout', () => {
+  const s = salleAvec(1, 7);
+  const h = horloge(); s.horloge = h;
+  for (const n of ['faciles', 'normaux', 'forts']) S.recevoir(s, 'p1', { type: 'ajouterRobot', niveau: n });
+  S.recevoir(s, 'p1', { type: 'lancer' });
+  let tours = 0;
+  while (s.etat !== 'finPartie') {
+    if (++tours > 200000) throw new Error('Partie bloquée');
+    if (s.etat === 'finManche') { S.recevoir(s, 'p1', { type: 'mancheSuivante' }); continue; }
+    h.avancer(500);
+    S.tic(s);
+  }
+  assert.strictEqual(s.elimines.length, 3);
+});
+
 console.log(`\n${ok} test(s) réussi(s), ${ko} échec(s).`);
 if (ko) process.exit(1);
