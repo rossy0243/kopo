@@ -383,6 +383,16 @@ CREATE TABLE IF NOT EXISTS push_abonnements (
   vu_le     timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS push_abonnements_compte ON push_abonnements (compte_id);
+-- Applis mobiles : jetons Firebase Cloud Messaging (Android ; iOS par Firebase, qui passe par APNs).
+CREATE TABLE IF NOT EXISTS push_natifs (
+  jeton      text PRIMARY KEY,
+  compte_id  text NOT NULL REFERENCES comptes(id),
+  plateforme text NOT NULL,
+  appareil   text,
+  cree_le    timestamptz NOT NULL DEFAULT now(),
+  vu_le      timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS push_natifs_compte ON push_natifs (compte_id);
 -- Types de notifications push coupés par le joueur : { "invitation": false, "ami": true, "match": true, "annonce": true }.
 -- À part de « notifs » : couper la notification push ne cache pas le message dans le jeu.
 ALTER TABLE comptes ADD COLUMN IF NOT EXISTS push_prefs jsonb NOT NULL DEFAULT '{}';

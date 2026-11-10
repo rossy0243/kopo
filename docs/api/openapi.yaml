@@ -1,0 +1,1180 @@
+openapi: 3.1.0
+info:
+  title: API Masano (Kopo et Inter (8))
+  version: 1.0.0
+  summary: API HTTP des joueurs, pour le site et les applis mobiles (Flutter).
+  description: |
+    Toutes les routes de cette page sont servies sous **/api/v1** (applis mobiles, version figée) et sous **/api** (site web).
+    Le temps réel (salles de jeu, chat, Match du jour) passe par WebSocket : voir `docs/api/temps-reel.md`.
+    Le parcours complet de l'appli (connexion Google, push FCM, reconnexion, mises à jour) : `docs/api/guide-mobile.md`.
+
+    **Authentification.** Jeton Masano dans l'en-tête `Authorization: Bearer <jeton>` (JWT signé par le serveur, valable 90 jours,
+    à renouveler avec `POST /jeton`). On l'obtient avec `POST /invite` (compte invité) ou `POST /connexion` (Google, via Supabase).
+    Pas de cookies.
+
+    **Appli mobile.** Envoyer `X-Masano-Client: android/1.2.0` (ou `ios/1.2.0`) sur chaque requête. Si la version est plus ancienne que
+    la version minimale réglée dans le tableau de bord, toutes les routes (sauf `/config`) répondent **426** avec le lien du store.
+
+    **Erreurs.** Toute erreur est `{ "erreur": "message en français, à afficher tel quel" }`, avec le statut HTTP :
+    400 (requête invalide), 401 (jeton absent, invalide ou compte supprimé), 403 (interdit, compte banni), 404 (introuvable),
+    409 (pseudo pris), 426 (appli à mettre à jour), 429 (trop de demandes), 503 (service pas encore ouvert), 500 (erreur du serveur).
+    Quelques routes répondent 200 avec `{ "ok": false, "erreur": "…" }` quand rien n'est fait mais que ce n'est pas une faute
+    (bonus déjà pris, récompense déjà reçue…) : c'est indiqué route par route.
+
+    **Identifiants.** Comptes `c_…`, parties `p_…`, Bandes `b_…`. Un joueur se désigne aussi par `pseudo#numéro` (ex. `Kevin#1290`).
+    Les dates sont en ISO 8601 (UTC). Le fuseau du jeu (fin de journée, Match du jour, nuit sans notification) est celui de Kinshasa (UTC+1).
+servers:
+  - url: https://kopo-serveur.onrender.com/api/v1
+    description: Production (Render)
+  - url: http://localhost:2567/api/v1
+    description: Local (cd server && npm start)
+security:
+  - jeton: []
+tags:
+  - name: Démarrage
+  - name: Compte
+  - name: Profil et statistiques
+  - name: Amis
+  - name: Modération
+  - name: Notifications
+  - name: Push
+  - name: Pièces
+  - name: Boutique et parcours
+  - name: Ligue
+  - name: Parrainage
+  - name: Match du jour
+  - name: La Bande
+  - name: Salles
+
+paths:
+  # ------------------------------------------------------------------ Démarrage
+  /config:
+    get:
+      tags: [Démarrage]
+      summary: Réglages lus au démarrage de l'appli
+      description: |
+        Jeux ouverts, annonce, maintenance, versions minimales, liens légaux, Supabase pour la connexion Google, messages du chat…
+        Sans jeton, ou avec : un testeur voit un jeu réservé aux testeurs comme `test`. Jamais de 426 sur cette route :
+        `miseAJour: true` dit à l'appli d'afficher l'écran « Mets à jour » (lien dans `mobile.<plateforme>.store`).
+      security: [{}, { jeton: [] }]
+      parameters: [{ $ref: '#/components/parameters/Client' }]
+      responses:
+        '200':
+          description: Réglages
+          content: { application/json: { schema: { $ref: '#/components/schemas/Config' } } }
+
+  # ------------------------------------------------------------------ Compte
+  /invite:
+    post:
+      tags: [Compte]
+      summary: Créer un compte invité (sans Google)
+      description: |
+        Renvoie un jeton et le compte (500 pièces de bienvenue). Un invité peut jouer contre les robots (salles `entrainement`),
+        le Match du jour et la Bande demandent Google, et quand `googleObligatoire` est vrai les salles en ligne aussi.
+        20 comptes par adresse IP et par heure au plus (429).
+      security: [{}]
+      requestBody:
+        content: { application/json: { schema: { type: object, properties: { pseudo: { type: string, description: 'Pseudo souhaité (3 à 16 caractères). Refusé ou absent : Joueur1234.' } } } } }
+      responses:
+        '200': { description: Compte créé, content: { application/json: { schema: { $ref: '#/components/schemas/Session' } } } }
+        '429': { $ref: '#/components/responses/Erreur' }
+  /connexion:
+    post:
+      tags: [Compte]
+      summary: Se connecter avec Google (jeton Supabase)
+      description: |
+        L'appli connecte le joueur à Google avec le SDK Supabase (`signInWithIdToken`, voir le guide mobile), puis envoie ici
+        le jeton d'accès Supabase. Si `jeton` (jeton invité) est fourni et que ce compte Google est neuf, le compte invité lui est
+        rattaché (pièces et progrès gardés). Le nom Google n'est jamais repris comme pseudo.
+      security: [{}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [jetonSupabase]
+              properties:
+                jetonSupabase: { type: string, description: 'access_token de la session Supabase' }
+                jeton: { type: string, description: Jeton du compte invité à rattacher }
+                pseudo: { type: string, description: Pseudo de l'appareil pour un compte neuf }
+                parrain: { type: string, description: 'Code de parrainage (lien ?parrain=CODE)' }
+      responses:
+        '200':
+          description: Connecté
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Session'
+                  - type: object
+                    properties:
+                      parrainage: { description: 'Résultat du code parrain (null sans code)', oneOf: [{ type: 'null' }, { $ref: '#/components/schemas/Resultat' }] }
+        '401': { $ref: '#/components/responses/Erreur' }
+        '403': { $ref: '#/components/responses/Erreur' }
+  /jeton:
+    post:
+      tags: [Compte]
+      summary: Renouveler son jeton (90 jours de plus)
+      description: À appeler au démarrage, par exemple une fois par semaine. Garder le nouveau jeton à la place de l'ancien (qui reste valable jusqu'à son expiration).
+      responses:
+        '200': { description: Nouveau jeton, content: { application/json: { schema: { type: object, properties: { jeton: { type: string }, expireDans: { type: integer, description: secondes } } } } } }
+        '401': { $ref: '#/components/responses/Erreur' }
+  /moi:
+    get:
+      tags: [Compte]
+      summary: Mon compte
+      responses:
+        '200':
+          description: Compte
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  compte: { $ref: '#/components/schemas/Compte' }
+                  lie: { type: boolean, description: Compte rattaché à Google }
+                  quotaPseudo: { $ref: '#/components/schemas/QuotaPseudo' }
+        '401': { $ref: '#/components/responses/Erreur' }
+    patch:
+      tags: [Compte]
+      summary: Changer pseudo, avatar, pays ou notifications dans le jeu
+      description: |
+        Chaque champ est facultatif. Pseudo : 2 changements par an (403 au-delà), 409 s'il est pris.
+        `notifs` coupe un type de notification dans le jeu (`rivalite`, `invitation`, `ami`, `bande`).
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pseudo: { type: string }
+                avatar: { type: string }
+                pays: { type: [string, 'null'], description: 'Code pays à 2 lettres (CD, CI, SN…) pour les classements, null pour ne pas l''afficher' }
+                notifs: { type: object, additionalProperties: { type: boolean } }
+      responses:
+        '200': { description: Compte modifié, content: { application/json: { schema: { type: object, properties: { compte: { $ref: '#/components/schemas/Compte' }, quotaPseudo: { $ref: '#/components/schemas/QuotaPseudo' } } } } } }
+        '400': { $ref: '#/components/responses/Erreur' }
+        '403': { $ref: '#/components/responses/Erreur' }
+        '409': { $ref: '#/components/responses/Erreur' }
+    delete:
+      tags: [Compte]
+      summary: Supprimer mon compte (exigé par les stores)
+      description: Efface le compte, ses appareils de notification et l'utilisateur Google dans Supabase. Définitif.
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+
+  # ------------------------------------------------------------------ Profil et statistiques
+  /profil:
+    get:
+      tags: [Profil et statistiques]
+      summary: Copie du profil du téléphone (XP, missions, défi…)
+      description: Le progrès hors ligne (XP, niveau, missions, défi, bienvenue) est calculé sur le téléphone ; le serveur en garde une copie pour la retrouver sur un autre appareil.
+      responses:
+        '200': { description: Profil, content: { application/json: { schema: { type: object, properties: { profil: { type: [object, 'null'] }, maj: { type: [string, 'null'], format: date-time } } } } } }
+    put:
+      tags: [Profil et statistiques]
+      summary: Envoyer la copie du profil (après chaque partie)
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [profil], properties: { profil: { type: object, description: 'Objet libre (64 ko au plus). xp et bareme servent au niveau affiché chez les amis.' } } } } }
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+        '400': { $ref: '#/components/responses/Erreur' }
+  /statistiques:
+    get:
+      tags: [Profil et statistiques]
+      summary: Statistiques tenues par le serveur et rivaux
+      responses:
+        '200':
+          description: Statistiques
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  stats: { type: object, properties: { parties: { type: integer }, victoires: { type: integer }, finales: { type: integer }, eliminePremier: { type: integer }, battus: { type: integer } } }
+                  entrainement: { type: object, description: Parties contre les robots jouées sur le serveur, properties: { parties: { type: integer }, victoires: { type: integer } } }
+                  rivaux: { type: array, items: { $ref: '#/components/schemas/Rival' } }
+  /rivaux:
+    get:
+      tags: [Profil et statistiques]
+      summary: Mes face-à-face les plus disputés (10)
+      responses:
+        '200': { description: Rivaux, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Rival' } } } } }
+  /recents:
+    get:
+      tags: [Profil et statistiques, Amis]
+      summary: Mes 5 dernières parties contre des joueurs, avec les adversaires
+      description: Onglet « Récents » de la fenêtre Amis (ajouter quelqu'un après coup).
+      responses:
+        '200':
+          description: Parties récentes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: { type: string }
+                    jeu: { $ref: '#/components/schemas/Jeu' }
+                    fin: { type: string, format: date-time }
+                    nbJoueurs: { type: integer }
+                    place: { type: [integer, 'null'] }
+                    joueurs:
+                      type: array
+                      items:
+                        allOf:
+                          - $ref: '#/components/schemas/CarteJoueur'
+                          - type: object
+                            properties:
+                              place: { type: [integer, 'null'] }
+                              ami: { type: boolean }
+                              envoyee: { type: boolean, description: Ma demande d'ami est envoyée }
+                              recue: { type: boolean, description: Il m'a demandé en ami }
+                              moi: { type: [integer, 'null'], description: Mes victoires en face-à-face }
+                              lui: { type: [integer, 'null'] }
+
+  # ------------------------------------------------------------------ Amis
+  /amis:
+    get:
+      tags: [Amis]
+      summary: Mes amis (en ligne, dernière visite)
+      responses:
+        '200':
+          description: Amis, par pseudo
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  allOf:
+                    - $ref: '#/components/schemas/CarteJoueur'
+                    - type: object
+                      properties:
+                        vu_le: { type: [string, 'null'], format: date-time }
+                        en_ligne: { type: boolean, description: Vu ces 2 dernières minutes }
+    post:
+      tags: [Amis]
+      summary: Ajouter un ami (envoie une demande)
+      description: |
+        Si l'autre m'avait déjà demandé, on devient amis tout de suite (`etat: ami`). Sinon `etat: envoyee`.
+        Un refus n'est pas signalé (et bloque une nouvelle demande 7 jours). 30 demandes par jour au plus (429).
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [cible], properties: { cible: { type: string, description: 'pseudo#numéro (ex. Kevin#1290) ou identifiant c_…' } } } } }
+      responses:
+        '200': { description: Demande envoyée ou amis, content: { application/json: { schema: { type: object, properties: { ok: { type: boolean }, etat: { enum: [envoyee, ami] }, ami: { $ref: '#/components/schemas/Joueur' } } } } } }
+        '404': { $ref: '#/components/responses/Erreur' }
+        '429': { $ref: '#/components/responses/Erreur' }
+  /amis/{id}:
+    delete:
+      tags: [Amis]
+      summary: Retirer un ami (des deux côtés)
+      parameters: [{ $ref: '#/components/parameters/IdCompte' }]
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+  /amis/demandes:
+    get:
+      tags: [Amis]
+      summary: Demandes d'ami reçues et envoyées
+      responses:
+        '200':
+          description: Demandes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  recues: { type: array, items: { allOf: [{ $ref: '#/components/schemas/CarteJoueur' }, { type: object, properties: { cree_le: { type: string, format: date-time } } }] } }
+                  envoyees: { type: array, items: { allOf: [{ $ref: '#/components/schemas/CarteJoueur' }, { type: object, properties: { cree_le: { type: string, format: date-time } } }] } }
+  /amis/demandes/{id}:
+    delete:
+      tags: [Amis]
+      summary: Annuler ma demande envoyée à ce joueur
+      parameters: [{ $ref: '#/components/parameters/IdCompte' }]
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+  /amis/demandes/{id}/accepter:
+    post:
+      tags: [Amis]
+      summary: Accepter la demande de ce joueur
+      parameters: [{ $ref: '#/components/parameters/IdCompte' }]
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+        '404': { $ref: '#/components/responses/Erreur' }
+  /amis/demandes/{id}/refuser:
+    post:
+      tags: [Amis]
+      summary: Refuser la demande de ce joueur (il n'est pas prévenu)
+      parameters: [{ $ref: '#/components/parameters/IdCompte' }]
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+  /amis/{id}/inviter:
+    post:
+      tags: [Amis, Salles]
+      summary: Inviter un ami à ma table
+      description: |
+        L'ami reçoit une notification dans le jeu (`action: table`, `donnees.code`, `donnees.jeu`) et un push (expire après 10 min).
+        Ouvrir d'abord la salle (code connu), puis inviter. 1 fois par ami toutes les 2 min (429), 15 par heure.
+      parameters: [{ $ref: '#/components/parameters/IdCompte' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [code], properties: { code: { type: string, pattern: '^[A-Z]{4}$' } } } } }
+      responses:
+        '200': { description: Invitation, content: { application/json: { schema: { type: object, properties: { ok: { type: boolean }, envoyee: { type: boolean, description: "false si l'ami a coupé les invitations" } } } } } }
+        '400': { $ref: '#/components/responses/Erreur' }
+        '404': { $ref: '#/components/responses/Erreur' }
+        '429': { $ref: '#/components/responses/Erreur' }
+
+  # ------------------------------------------------------------------ Modération
+  /signaler:
+    post:
+      tags: [Modération]
+      summary: Signaler un joueur
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cible, motif]
+              properties:
+                cible: { type: string, description: 'pseudo#numéro ou identifiant' }
+                motif: { enum: [pseudo, insultes, triche, abandon, autre] }
+                details: { type: string, maxLength: 500 }
+                partie: { type: string, description: Identifiant de la partie (p_…) }
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+        '404': { $ref: '#/components/responses/Erreur' }
+        '429': { $ref: '#/components/responses/Erreur' }
+  /bloques:
+    get:
+      tags: [Modération]
+      summary: Joueurs que j'ai bloqués
+      responses:
+        '200': { description: Bloqués, content: { application/json: { schema: { type: array, items: { type: object, properties: { id: { type: string }, pseudo: { type: string }, numero: { type: string } } } } } } }
+    post:
+      tags: [Modération]
+      summary: Bloquer un joueur (retire aussi l'amitié et les demandes)
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [cible], properties: { cible: { type: string } } } } }
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+        '404': { $ref: '#/components/responses/Erreur' }
+  /bloques/{id}:
+    delete:
+      tags: [Modération]
+      summary: Débloquer
+      parameters: [{ $ref: '#/components/parameters/IdCompte' }]
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+
+  # ------------------------------------------------------------------ Notifications dans le jeu
+  /notifications:
+    get:
+      tags: [Notifications]
+      summary: Mes 30 dernières notifications dans le jeu
+      responses:
+        '200':
+          description: Notifications
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  nonLues: { type: integer }
+                  demandesAmi: { type: integer, description: Demandes d'ami reçues en attente (pastille) }
+                  liste: { type: array, items: { $ref: '#/components/schemas/Notification' } }
+  /notifications/lues:
+    post:
+      tags: [Notifications]
+      summary: Marquer comme lues (toutes, ou certaines)
+      requestBody:
+        content: { application/json: { schema: { type: object, properties: { ids: { type: array, items: { type: integer }, description: Absent ou vide = toutes } } } } }
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+
+  # ------------------------------------------------------------------ Push
+  /push:
+    get:
+      tags: [Push]
+      summary: État des notifications push pour moi
+      responses:
+        '200':
+          description: État
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  actif: { type: boolean, description: Au moins un canal ouvert sur le serveur }
+                  web: { type: boolean, description: Web Push (site) ouvert }
+                  natif: { type: boolean, description: FCM (applis) ouvert }
+                  cle: { type: [string, 'null'], description: Clé publique VAPID (site seulement) }
+                  prefs: { $ref: '#/components/schemas/PrefsPush' }
+                  appareils: { type: integer }
+                  natifs: { type: array, items: { type: object, properties: { plateforme: { enum: [android, ios] }, appareil: { type: [string, 'null'] }, vu_le: { type: string, format: date-time } } } }
+  /push/natif:
+    post:
+      tags: [Push]
+      summary: Enregistrer le jeton FCM de cet appareil (appli Android ou iOS)
+      description: |
+        À appeler à chaque démarrage (après connexion) et quand Firebase renouvelle le jeton (`onTokenRefresh`).
+        Sur iOS, utiliser le jeton FCM (Firebase passe par APNs), pas le jeton APNs brut. 10 appareils par compte au plus (les plus anciens sont oubliés).
+        503 tant que le serveur n'a pas de compte de service Firebase (`FCM_COMPTE_SERVICE`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [jeton, plateforme]
+              properties:
+                jeton: { type: string, description: Jeton d'enregistrement FCM }
+                plateforme: { enum: [android, ios] }
+                appareil: { type: string, maxLength: 40, description: 'Nom lisible (ex. Pixel 7)' }
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+        '400': { $ref: '#/components/responses/Erreur' }
+        '503': { $ref: '#/components/responses/Erreur' }
+    delete:
+      tags: [Push]
+      summary: Oublier le jeton FCM de cet appareil (déconnexion)
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [jeton], properties: { jeton: { type: string } } } } }
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+  /push/abonnement:
+    post:
+      tags: [Push]
+      summary: Abonner ce navigateur (Web Push, site seulement)
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [abonnement], properties: { abonnement: { type: object, description: 'PushSubscription.toJSON() : { endpoint, keys: { p256dh, auth } }' }, appareil: { type: string } } } } }
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+        '400': { $ref: '#/components/responses/Erreur' }
+        '503': { $ref: '#/components/responses/Erreur' }
+    delete:
+      tags: [Push]
+      summary: Désabonner ce navigateur (Web Push)
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [endpoint], properties: { endpoint: { type: string } } } } }
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+  /push/prefs:
+    patch:
+      tags: [Push]
+      summary: Couper ou rallumer un type de push
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/PrefsPush' } } }
+      responses:
+        '200': { description: Réglages, content: { application/json: { schema: { type: object, properties: { ok: { type: boolean }, prefs: { $ref: '#/components/schemas/PrefsPush' } } } } } }
+
+  # ------------------------------------------------------------------ Pièces
+  /pieces:
+    get:
+      tags: [Pièces]
+      summary: Solde et derniers mouvements
+      responses:
+        '200':
+          description: Pièces
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  solde: { type: integer }
+                  historique: { type: array, items: { type: object, properties: { montant: { type: integer }, motif: { type: string, description: 'bienvenue, bonus_jour, manche, katapss, victoire, deuxieme, mise, pot, achat, parcours, mission, defi, bienvenue7, parrainage, bande…' }, ref: { type: [string, 'null'] }, par_admin: { type: boolean }, cree_le: { type: string, format: date-time } } } }
+  /bonus-du-jour:
+    post:
+      tags: [Pièces]
+      summary: Prendre le bonus du jour (série, joker hebdomadaire)
+      responses:
+        '200':
+          description: 'Bonus pris, ou { ok: false, erreur } s''il est déjà pris aujourd''hui'
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/Resultat'
+                  - type: object
+                    properties:
+                      montant: { type: integer }
+                      gain: { type: integer }
+                      serie: { type: integer }
+                      joker: { type: boolean, description: Le joker de la semaine a sauvé la série }
+                      jokerLibre: { type: boolean }
+                      prochain: { type: integer, description: Montant de demain }
+                      solde: { type: integer }
+  /remise-a-flot:
+    post:
+      tags: [Pièces]
+      summary: Remise à flot (solde presque vide)
+      responses:
+        '200': { description: 'Pièces données, ou { ok: false, erreur }', content: { application/json: { schema: { $ref: '#/components/schemas/Resultat' } } } }
+  /recompense:
+    post:
+      tags: [Pièces]
+      summary: Pièces gagnées sur le téléphone (missions, défi, bienvenue, installation)
+      description: |
+        Plafonnées et sans doublon (même `ref`). mission : 100 max, 5 par jour. defi : 300 max, 1 par semaine.
+        bienvenue : 300 max, 1 par jour, 7 en tout. installation : 200 max, une fois.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [motif, montant]
+              properties:
+                motif: { enum: [mission, defi, bienvenue, installation] }
+                montant: { type: integer }
+                ref: { type: string, maxLength: 80, description: 'Identifiant unique (ex. mission:2026-11-10:3)' }
+      responses:
+        '200': { description: '{ ok, montant, solde } ou { ok: false, erreur: "Déjà reçu." }', content: { application/json: { schema: { $ref: '#/components/schemas/Resultat' } } } }
+        '400': { $ref: '#/components/responses/Erreur' }
+  /cadeau-fondateur:
+    post:
+      tags: [Pièces, Boutique et parcours]
+      summary: Dos de cartes « Les Fondateurs » (tant que l'offre est ouverte)
+      responses:
+        '200': { description: Cadeau, content: { application/json: { schema: { type: object, properties: { ok: { type: boolean }, nouveau: { type: boolean }, objet: { type: string } } } } } }
+
+  # ------------------------------------------------------------------ Boutique et parcours
+  /boutique:
+    get:
+      tags: [Boutique et parcours]
+      summary: Catalogue, solde et ma collection
+      responses:
+        '200':
+          description: Boutique
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Collection'
+                  - type: object
+                    properties:
+                      solde: { type: integer }
+                      objets: { type: array, items: { $ref: '#/components/schemas/Objet' } }
+  /boutique/acheter:
+    post:
+      tags: [Boutique et parcours]
+      summary: Acheter un objet avec des pièces
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [objet], properties: { objet: { type: string } } } } }
+      responses:
+        '200': { description: Acheté, content: { application/json: { schema: { type: object, properties: { ok: { type: boolean }, solde: { type: integer }, objet: { $ref: '#/components/schemas/Objet' } } } } } }
+        '400': { $ref: '#/components/responses/Erreur' }
+  /collection:
+    get:
+      tags: [Boutique et parcours]
+      summary: Objets possédés et équipés
+      responses:
+        '200': { description: Collection, content: { application/json: { schema: { $ref: '#/components/schemas/Collection' } } } }
+  /collection/equiper:
+    post:
+      tags: [Boutique et parcours]
+      summary: Équiper un objet possédé (avatar, dos de cartes, cadre)
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [objet], properties: { objet: { type: [string, 'null'] } } } } }
+      responses:
+        '200': { description: Collection, content: { application/json: { schema: { $ref: '#/components/schemas/Collection' } } } }
+        '400': { $ref: '#/components/responses/Erreur' }
+  /parcours:
+    get:
+      tags: [Boutique et parcours]
+      summary: Parcours de saison (XP, 30 paliers, voie gratuite et voie Kopo+)
+      responses:
+        '200':
+          description: Parcours
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  saison: { $ref: '#/components/schemas/Saison' }
+                  xp: { type: integer }
+                  palier: { type: integer }
+                  xpPalier: { type: integer }
+                  paliersMax: { type: integer }
+                  kopoPlus: { type: boolean }
+                  paliers:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        n: { type: integer }
+                        atteint: { type: boolean }
+                        gratuit: { $ref: '#/components/schemas/RecompensePalier' }
+                        plus: { oneOf: [{ type: 'null' }, { $ref: '#/components/schemas/RecompensePalier' }] }
+  /parcours/recuperer:
+    post:
+      tags: [Boutique et parcours]
+      summary: Récupérer la récompense d'un palier atteint
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [palier, voie], properties: { palier: { type: integer }, voie: { enum: [gratuit, plus] } } } } }
+      responses:
+        '200': { description: Récupéré, content: { application/json: { schema: { type: object, properties: { ok: { type: boolean }, pieces: { type: integer }, solde: { type: integer }, objet: { type: [string, 'null'] } } } } } }
+        '400': { $ref: '#/components/responses/Erreur' }
+
+  # ------------------------------------------------------------------ Ligue
+  /ligue:
+    get:
+      tags: [Ligue]
+      summary: Saison en cours, divisions, mes points et mon rang
+      responses:
+        '200':
+          description: Ligue
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  saison: { $ref: '#/components/schemas/Saison' }
+                  divisions: { type: array, items: { type: object, properties: { id: { $ref: '#/components/schemas/Division' }, nom: { type: string }, seuil: { type: integer }, recompense: { type: integer } } } }
+                  points: { type: object, additionalProperties: { type: integer }, description: 'Barème : premier, deuxieme, troisieme, avantDernier, dernier, abandon' }
+                  moi:
+                    type: object
+                    properties:
+                      points: { type: integer }
+                      division: { $ref: '#/components/schemas/Division' }
+                      meilleure: { $ref: '#/components/schemas/Division' }
+                      parties: { type: integer }
+                      victoires: { type: integer }
+                      protection: { type: integer, description: Parties encore protégées après une montée }
+                      prochaine: { type: [object, 'null'], properties: { division: { type: string }, seuil: { type: integer }, manque: { type: integer } } }
+                      rangMondial: { type: [integer, 'null'] }
+                      rangPays: { type: [integer, 'null'] }
+                      pays: { type: [string, 'null'] }
+                  dernieres: { type: array, items: { type: object, properties: { partie_id: { type: string }, place: { type: integer }, nb_joueurs: { type: integer }, delta: { type: integer }, points_apres: { type: integer }, division_apres: { type: string }, cree_le: { type: string, format: date-time } } } }
+                  recompense: { type: [object, 'null'], description: 'Récompense de fin de saison pas encore vue (écran de fin de saison, puis POST /ligue/vu)' }
+                  titres: { type: array, items: { type: object } }
+  /ligue/vu:
+    post:
+      tags: [Ligue]
+      summary: L'écran de fin de saison a été vu
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+  /classement:
+    get:
+      tags: [Ligue]
+      summary: Classement de la saison
+      parameters:
+        - { name: type, in: query, schema: { enum: [mondial, pays, amis], default: mondial } }
+        - { name: pays, in: query, schema: { type: string }, description: 'Autre pays (CD…) pour type=pays' }
+        - { name: limite, in: query, schema: { type: integer, default: 100, maximum: 200 } }
+      responses:
+        '200':
+          description: Classement
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  saison: { $ref: '#/components/schemas/Saison' }
+                  type: { type: string }
+                  pays: { type: [string, 'null'] }
+                  total: { type: integer }
+                  liste: { type: array, items: { $ref: '#/components/schemas/LigneLigue' } }
+                  moi: { oneOf: [{ type: 'null' }, { $ref: '#/components/schemas/LigneLigue' }] }
+
+  # ------------------------------------------------------------------ Parrainage
+  /parrainage:
+    get:
+      tags: [Parrainage]
+      summary: Mon code et mon lien, mes filleuls, mes paliers
+      description: 'Lien à partager : <site>?parrain=CODE. L''ami crée son compte Google par ce lien (code passé dans POST /connexion { parrain }).'
+      responses:
+        '200':
+          description: Parrainage
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  actif: { type: boolean }
+                  lie: { type: boolean, description: Compte Google (obligatoire pour parrainer) }
+                  code: { type: [string, 'null'] }
+                  regles: { type: object, properties: { parties: { type: integer }, piecesParrain: { type: integer }, piecesFilleul: { type: integer }, parMois: { type: integer }, total: { type: [integer, 'null'] }, joursPourJouer: { type: integer } } }
+                  recompenses: { type: object, properties: { mois: { type: integer }, total: { type: integer } } }
+                  amis: { type: integer, description: Amis venus jouer (comptent pour les paliers) }
+                  titre: { type: [string, 'null'] }
+                  createur: { type: boolean }
+                  paliers: { type: array, items: { type: object, properties: { n: { type: integer }, pieces: { type: integer }, objet: { type: string }, titre: { type: string }, atteint: { type: boolean } } } }
+                  filleuls: { type: array, items: { type: object } }
+                  parrain: { type: [object, 'null'] }
+                  peutEtreParraine: { type: boolean }
+    post:
+      tags: [Parrainage]
+      summary: Saisir le code d'un parrain (compte Google neuf)
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [code], properties: { code: { type: string } } } } }
+      responses:
+        '200': { description: Lié, content: { application/json: { schema: { $ref: '#/components/schemas/Resultat' } } } }
+        '400': { $ref: '#/components/responses/Erreur' }
+
+  # ------------------------------------------------------------------ Match du jour
+  /match-jour:
+    get:
+      tags: [Match du jour]
+      summary: Match du jour (même donne pour tous contre 8 robots Forts)
+      description: |
+        Un essai officiel par jour, score sur 100 (+10 par manche passée, +30 la victoire), fin à minuit (Kinshasa). Compte Google obligatoire.
+        Pour jouer : salle temps réel `kopo-jour` (voir temps-reel.md).
+      responses:
+        '200':
+          description: Match du jour
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  actif: { type: boolean }
+                  numero: { type: integer }
+                  jour: { type: string, format: date }
+                  google: { type: boolean, description: Le joueur a un compte Google }
+                  finA: { type: string, format: date-time }
+                  resteMs: { type: integer }
+                  moi: { type: [object, 'null'], properties: { score: { type: integer }, manches: { type: integer }, victoire: { type: boolean }, fini: { type: boolean } } }
+                  rang: { type: [integer, 'null'] }
+                  joueurs: { type: integer }
+                  hier: { type: [object, 'null'], properties: { numero: { type: integer }, score: { type: integer }, victoire: { type: boolean }, rang: { type: integer }, joueurs: { type: integer } } }
+                  regles: { type: object, properties: { parManche: { type: integer }, victoire: { type: integer }, manches: { type: integer } } }
+  /match-jour/classement:
+    get:
+      tags: [Match du jour]
+      summary: Classement du jour
+      parameters:
+        - { name: type, in: query, schema: { enum: [mondial, pays, amis], default: mondial } }
+        - { name: limite, in: query, schema: { type: integer, default: 50, maximum: 100 } }
+      responses:
+        '200':
+          description: Classement
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  type: { type: string }
+                  jour: { type: string, format: date }
+                  numero: { type: integer }
+                  liste: { type: array, items: { $ref: '#/components/schemas/LigneMatchJour' } }
+                  moi: { oneOf: [{ type: 'null' }, { $ref: '#/components/schemas/LigneMatchJour' }] }
+
+  # ------------------------------------------------------------------ La Bande
+  /bandes:
+    get:
+      tags: [La Bande]
+      summary: Mes Bandes (3 au plus)
+      responses:
+        '200':
+          description: Mes Bandes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bandes: { type: array, items: { type: object, properties: { id: { type: string }, nom: { type: string }, membres: { type: integer }, inscrits: { type: integer }, inscrit: { type: boolean }, rang: { type: [integer, 'null'] }, total: { type: [integer, 'null'] }, chef: { type: [object, 'null'] }, jeSuisChef: { type: boolean }, jeSuisLoser: { type: boolean } } } }
+                  max: { type: integer }
+                  regles: { type: object }
+                  google: { type: boolean }
+                  actif: { type: boolean }
+    post:
+      tags: [La Bande]
+      summary: Créer une Bande
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nom]
+              properties:
+                nom: { type: string, minLength: 3 }
+                mise: { type: integer, description: 'Mise de la semaine (réglage miseMin à miseMax, 500 à 10 000 par défaut)' }
+                ouverte: { type: boolean, description: Visible dans les Bandes ouvertes de mon pays }
+                pays: { type: string }
+      responses:
+        '200': { description: La Bande créée, content: { application/json: { schema: { $ref: '#/components/schemas/Bande' } } } }
+        '400': { $ref: '#/components/responses/Erreur' }
+        '403': { $ref: '#/components/responses/Erreur' }
+  /bandes/ouvertes:
+    get:
+      tags: [La Bande]
+      summary: Bandes ouvertes de mon pays (30)
+      parameters: [{ name: pays, in: query, schema: { type: string } }]
+      responses:
+        '200': { description: Bandes ouvertes, content: { application/json: { schema: { type: object, properties: { pays: { type: [string, 'null'] }, liste: { type: array, items: { type: object, properties: { id: { type: string }, nom: { type: string }, mise: { type: integer }, pays: { type: [string, 'null'] }, membres: { type: integer }, demandee: { type: boolean } } } } } } } } }
+  /bandes/rejoindre:
+    post:
+      tags: [La Bande]
+      summary: Rejoindre par le lien d'invitation (?bande=CODE)
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [code], properties: { code: { type: string } } } } }
+      responses:
+        '200': { description: La Bande, content: { application/json: { schema: { $ref: '#/components/schemas/Bande' } } } }
+        '404': { $ref: '#/components/responses/Erreur' }
+  /bandes/{id}:
+    parameters: [{ $ref: '#/components/parameters/IdBande' }]
+    get:
+      tags: [La Bande]
+      summary: Une Bande (membres, semaine en cours, classement, titres)
+      responses:
+        '200': { description: La Bande, content: { application/json: { schema: { $ref: '#/components/schemas/Bande' } } } }
+        '404': { $ref: '#/components/responses/Erreur' }
+    patch:
+      tags: [La Bande]
+      summary: Modifier (créateur seulement)
+      requestBody:
+        content: { application/json: { schema: { type: object, properties: { nom: { type: string }, mise: { type: integer }, ouverte: { type: boolean }, pays: { type: [string, 'null'] } } } } }
+      responses:
+        '200': { description: La Bande, content: { application/json: { schema: { $ref: '#/components/schemas/Bande' } } } }
+        '403': { $ref: '#/components/responses/Erreur' }
+  /bandes/{id}/miser:
+    post:
+      tags: [La Bande]
+      summary: Miser pour la semaine (jusqu'au mercredi 23 h)
+      parameters: [{ $ref: '#/components/parameters/IdBande' }]
+      responses:
+        '200': { description: La Bande, content: { application/json: { schema: { $ref: '#/components/schemas/Bande' } } } }
+        '403': { $ref: '#/components/responses/Erreur' }
+  /bandes/{id}/auto:
+    post:
+      tags: [La Bande]
+      summary: Mise automatique chaque lundi
+      parameters: [{ $ref: '#/components/parameters/IdBande' }]
+      requestBody:
+        content: { application/json: { schema: { type: object, properties: { auto: { type: boolean } } } } }
+      responses:
+        '200': { description: Réglé, content: { application/json: { schema: { type: object, properties: { ok: { type: boolean }, auto: { type: boolean } } } } } }
+  /bandes/{id}/demander:
+    post:
+      tags: [La Bande]
+      summary: Demander à entrer dans une Bande ouverte
+      parameters: [{ $ref: '#/components/parameters/IdBande' }]
+      responses:
+        '200': { description: Demande envoyée, content: { application/json: { schema: { type: object, properties: { ok: { type: boolean }, demandee: { type: boolean } } } } } }
+  /bandes/{id}/demandes/{compte}:
+    post:
+      tags: [La Bande]
+      summary: Accepter ou refuser une demande (créateur)
+      parameters: [{ $ref: '#/components/parameters/IdBande' }, { name: compte, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        content: { application/json: { schema: { type: object, properties: { accepter: { type: boolean } } } } }
+      responses:
+        '200': { description: La Bande, content: { application/json: { schema: { $ref: '#/components/schemas/Bande' } } } }
+  /bandes/{id}/quitter:
+    post:
+      tags: [La Bande]
+      summary: Quitter la Bande
+      parameters: [{ $ref: '#/components/parameters/IdBande' }]
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+  /bandes/{id}/membres/{compte}:
+    delete:
+      tags: [La Bande]
+      summary: Retirer un membre (créateur)
+      parameters: [{ $ref: '#/components/parameters/IdBande' }, { name: compte, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+
+  # ------------------------------------------------------------------ Salles (le jeu lui-même est en temps réel)
+  /en-ligne:
+    get:
+      tags: [Salles]
+      summary: Joueurs connectés et salles publiques ouvertes
+      security: [{}]
+      responses:
+        '200':
+          description: En ligne
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  joueurs: { type: integer }
+                  sallesOuvertes: { type: array, items: { type: object, properties: { jeu: { $ref: '#/components/schemas/Jeu' }, id: { type: string }, code: { type: string }, taille: { type: integer }, joueurs: { type: integer }, classee: { type: boolean }, mise: { type: [string, 'null'] } } } }
+  /salles/{code}:
+    get:
+      tags: [Salles]
+      summary: Quelle table porte ce code (Kopo ou Inter (8)) ?
+      description: 'Pour rejoindre un ami avec son code ou depuis une invitation : donne la salle temps réel à rejoindre (`salle`) avec `{ jeton, code }`.'
+      security: [{}]
+      parameters: [{ name: code, in: path, required: true, schema: { type: string, pattern: '^[A-Za-z]{4}$' } }]
+      responses:
+        '200':
+          description: Table ouverte
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code: { type: string }
+                  jeu: { $ref: '#/components/schemas/Jeu' }
+                  salle: { enum: [kopo, kopo-mise, inter8], description: Nom de la salle temps réel }
+                  roomId: { type: string }
+                  etat: { enum: [salon, manche, finManche, finPartie] }
+                  publique: { type: boolean }
+                  mise: { type: [string, 'null'] }
+                  mode: { type: [string, 'null'], enum: [simple, delire, null] }
+                  joueurs: { type: integer, description: Humains assis }
+                  places: { type: integer }
+                  pleine: { type: boolean }
+        '400': { $ref: '#/components/responses/Erreur' }
+        '404': { $ref: '#/components/responses/Erreur' }
+  /reprendre:
+    post:
+      tags: [Salles]
+      summary: Reprendre sa place à une table avec son code
+      description: |
+        Après une appli fermée ou une coupure plus longue que 2 minutes (jeton de reconnexion perdu ou expiré) :
+        renvoie une réservation de place à consommer comme une réponse de matchmaking (voir temps-reel.md).
+        404 si le joueur n'est assis à aucune table ouverte avec ce code.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [code], properties: { code: { type: string } } } } }
+      responses:
+        '200': { description: Réservation de place, content: { application/json: { schema: { $ref: '#/components/schemas/Reservation' } } } }
+        '400': { $ref: '#/components/responses/Erreur' }
+        '401': { $ref: '#/components/responses/Erreur' }
+        '404': { $ref: '#/components/responses/Erreur' }
+
+components:
+  securitySchemes:
+    jeton:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Jeton Masano (POST /invite, POST /connexion, POST /jeton)
+  parameters:
+    Client:
+      name: X-Masano-Client
+      in: header
+      description: 'Plateforme et version de l''appli : android/1.2.0 ou ios/1.2.0 (absent sur le site)'
+      schema: { type: string, example: android/1.0.0 }
+    IdCompte:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, example: c_gRmOK3wQLMat }
+    IdBande:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, example: b_jd8SAq6TUtSW }
+  responses:
+    Ok:
+      description: Fait
+      content: { application/json: { schema: { type: object, properties: { ok: { const: true } } } } }
+    Erreur:
+      description: Erreur (message à afficher tel quel)
+      content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } }
+  schemas:
+    Erreur:
+      type: object
+      required: [erreur]
+      properties:
+        erreur: { type: string }
+        miseAJour: { type: object, description: 'Seulement avec 426', properties: { plateforme: { enum: [android, ios] }, versionMin: { type: string }, store: { type: [string, 'null'] } } }
+    Resultat:
+      type: object
+      description: 'ok vrai : fait (avec d''autres champs selon la route) ; ok faux : rien de fait, erreur à afficher'
+      properties:
+        ok: { type: boolean }
+        erreur: { type: string }
+        montant: { type: integer }
+        solde: { type: integer }
+      additionalProperties: true
+    Jeu:
+      enum: [kopo, inter8]
+    Division:
+      enum: [bois, bronze, argent, or, diamant, legende]
+    Session:
+      type: object
+      properties:
+        jeton: { type: string, description: Jeton Masano à garder (stockage sécurisé) }
+        compte: { $ref: '#/components/schemas/Compte' }
+    Compte:
+      type: object
+      properties:
+        id: { type: string }
+        pseudo: { type: string }
+        numero: { type: string, description: '4 chiffres : pseudo#numéro' }
+        avatar: { type: string }
+        solde: { type: integer }
+        statut: { enum: [actif, suspendu, banni] }
+        serieBonus: { type: integer }
+        dernierBonus: { type: [string, 'null'], format: date }
+        pays: { type: [string, 'null'] }
+        notifs: { type: object, properties: { rivalite: { type: boolean }, invitation: { type: boolean }, ami: { type: boolean }, bande: { type: boolean } } }
+        kopoPlus: { type: boolean }
+        google: { type: boolean }
+    QuotaPseudo:
+      type: object
+      properties:
+        restants: { type: integer }
+        max: { type: integer }
+        prochain: { type: [string, 'null'], format: date-time }
+    Joueur:
+      type: object
+      properties:
+        id: { type: string }
+        pseudo: { type: string }
+        numero: { type: string }
+        avatar: { type: string }
+    CarteJoueur:
+      allOf:
+        - $ref: '#/components/schemas/Joueur'
+        - type: object
+          properties:
+            apparence: { type: [string, 'null'], description: Avatar équipé (objet de la collection) }
+            cadre: { type: [string, 'null'] }
+            xp: { type: [integer, 'null'], description: XP du profil (le niveau se calcule avec le barème) }
+            bareme: { type: [integer, 'null'] }
+    Rival:
+      allOf:
+        - $ref: '#/components/schemas/Joueur'
+        - type: object
+          properties:
+            moi: { type: integer, description: Mes victoires contre lui }
+            lui: { type: integer }
+    Notification:
+      type: object
+      properties:
+        id: { type: integer }
+        type: { enum: [rivalite, invitation, ami, bande] }
+        texte: { type: string }
+        donnees: { type: [object, 'null'], description: 'invitation : { de, pseudo, code, jeu } ; ami : { de, pseudo, numero, demande | accepte } ; rivalite : { de, pseudo, toi, lui } ; bande : { bande, … }' }
+        lue: { type: boolean }
+        cree_le: { type: string, format: date-time }
+        action: { enum: [table, amis, rivaux, bande, accueil], description: Écran à ouvrir au toucher }
+    PrefsPush:
+      type: object
+      properties:
+        invitation: { type: boolean }
+        ami: { type: boolean }
+        match: { type: boolean }
+        annonce: { type: boolean }
+    Objet:
+      type: object
+      properties:
+        id: { type: string }
+        type: { enum: [avatar, dos, cadre] }
+        nom: { type: string }
+        collection: { type: string }
+        prix: { type: [integer, 'null'], description: 'null = pas en vente (parcours, cadeau…)' }
+    Collection:
+      type: object
+      properties:
+        possedes: { type: array, items: { type: string } }
+        equipes: { type: object, properties: { avatar: { type: [string, 'null'] }, dos: { type: [string, 'null'] }, cadre: { type: [string, 'null'] } } }
+    RecompensePalier:
+      type: object
+      properties:
+        pieces: { type: integer }
+        objet: { type: string }
+        nom: { type: string }
+        type: { type: string }
+        recupere: { type: boolean }
+    Saison:
+      type: object
+      properties:
+        numero: { type: integer }
+        nom: { type: string }
+        theme: { type: string }
+        debut: { type: string, format: date-time }
+        fin: { type: string, format: date-time }
+        statut: { type: string }
+        titre: { type: string }
+    LigneLigue:
+      type: object
+      properties:
+        rang: { type: integer }
+        id: { type: string }
+        pseudo: { type: string }
+        numero: { type: string }
+        avatar: { type: string }
+        points: { type: integer }
+        division: { $ref: '#/components/schemas/Division' }
+        parties: { type: integer }
+    LigneMatchJour:
+      type: object
+      properties:
+        id: { type: string }
+        pseudo: { type: string }
+        avatar: { type: string }
+        score: { type: integer }
+        victoire: { type: boolean }
+        rang: { type: integer }
+    Bande:
+      type: object
+      properties:
+        id: { type: string }
+        nom: { type: string }
+        code: { type: string, description: 'Code du lien d''invitation (?bande=CODE)' }
+        ouverte: { type: boolean }
+        pays: { type: [string, 'null'] }
+        miseBande: { type: integer }
+        createur: { type: boolean, description: Je suis le créateur }
+        membres: { type: array, items: { type: object, properties: { id: { type: string }, pseudo: { type: string }, numero: { type: string }, avatar: { type: string }, createur: { type: boolean }, joueAujourdhui: { type: boolean }, inscrit: { type: boolean } } } }
+        demandes: { type: array, items: { type: object } }
+        semaine:
+          type: object
+          properties:
+            lundi: { type: string, format: date }
+            mise: { type: integer }
+            finA: { type: string, format: date-time }
+            limite: { type: string, format: date-time, description: Fin des inscriptions (mercredi 23 h) }
+            inscriptionOuverte: { type: boolean }
+            inscrits: { type: integer }
+            lancee: { type: boolean }
+            aGagner: { type: integer }
+            classement: { type: array, items: { type: object, properties: { id: { type: string }, pseudo: { type: string }, avatar: { type: string }, rang: { type: integer }, total: { type: integer }, joues: { type: integer }, enRegle: { type: boolean }, jours: { type: array, items: { type: object } } } } }
+        moi: { type: object, properties: { inscrit: { type: boolean }, auto: { type: boolean }, peutMiser: { type: boolean }, manque: { type: array, items: { type: string } } } }
+        titres: { type: object, properties: { chefs: { type: array, items: { type: object } }, losers: { type: array, items: { type: object } }, semaine: { type: [string, 'null'] } } }
+        regles: { type: object }
+    Reservation:
+      type: object
+      description: Réservation de place (comme une réponse de POST /matchmake/…) à consommer par WebSocket
+      properties:
+        room: { type: object, properties: { name: { type: string }, roomId: { type: string }, processId: { type: string }, publicAddress: { type: [string, 'null'] } } }
+        sessionId: { type: string }
+    Config:
+      type: object
+      properties:
+        jeux: { type: object, description: 'État de chaque jeu pour ce joueur', properties: { kopo: { enum: [ouvert, test, ferme, maintenance] }, inter8: { enum: [ouvert, test, ferme, maintenance] } } }
+        annonce: { type: [string, 'null'], description: Bandeau d'annonce }
+        maintenance: { type: [string, 'null'], description: Message de maintenance (plus de nouvelles parties) }
+        versionMin: { type: string, description: Version minimale du site }
+        mobile: { type: object, description: 'Versions minimales et liens des stores', properties: { android: { $ref: '#/components/schemas/VersionMobile' }, ios: { $ref: '#/components/schemas/VersionMobile' } } }
+        miseAJour: { type: boolean, description: L'appli qui appelle (X-Masano-Client) est trop ancienne }
+        tables: { type: object, description: 'Mise de chaque table (bronze, argent, or, diamant)', additionalProperties: { type: integer } }
+        deblocage: { type: integer, description: Une table se débloque avec ce multiple de la mise en solde }
+        pot: { type: object, description: 'Partage du pot en % (vainqueur, deuxieme, troisieme, maison)', additionalProperties: { type: integer } }
+        remiseAFlot: { type: integer, description: Seuil de solde pour la remise à flot }
+        messages: { type: array, items: { type: string }, description: 'Messages du chat en partie (les seuls acceptés par le message « reaction »)' }
+        communautes: { type: array, items: { type: object, properties: { reseau: { type: string }, libelle: { type: string }, url: { type: string } } } }
+        nouveaute: { type: [string, 'null'] }
+        google: { type: [string, 'null'], description: 'Adresse Supabase (site), null si la connexion Google est fermée' }
+        supabase: { type: [object, 'null'], properties: { url: { type: string }, cleAnon: { type: [string, 'null'], description: Clé publique anon pour le SDK Supabase } } }
+        googleObligatoire: { type: boolean, description: 'En ligne et entre amis : compte Google exigé (sinon : robots seulement)' }
+        liens: { type: object, properties: { site: { type: string }, conditions: { type: string, description: CGU }, confidentialite: { type: string }, support: { type: [string, 'null'] } } }
+        push: { type: object, properties: { web: { type: boolean }, natif: { type: boolean, description: FCM ouvert sur le serveur } } }
+    VersionMobile:
+      type: object
+      properties:
+        versionMin: { type: [string, 'null'] }
+        store: { type: [string, 'null'] }

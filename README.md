@@ -25,6 +25,7 @@ Jeu de cartes multijoueur, de 2 à 9 joueurs, chacun sur son téléphone.
 
 ## Serveur
 Le dossier `server/` contient le serveur de la V1 (comptes, parties sur le serveur, registre des pièces, tableau de bord admin), prêt pour Render + Supabase. Voir [server/README.md](server/README.md).
+Documentation de l'API pour l'appli mobile (Flutter) : [docs/api/](docs/api/) (OpenAPI, temps réel, guide mobile, client Dart de référence).
 
 ## Fichiers
 - `index.html` : la page complète, générée par `node build.js`.

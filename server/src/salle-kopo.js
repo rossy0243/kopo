@@ -24,7 +24,11 @@ class SalleKopo extends Room {
   static services = null;
 
   onCreate(options = {}) {
-    this.jeu = this.roomName === 'inter8' ? 'inter8' : 'kopo';
+    // Entraînement (salles « entrainement ») : un joueur seul contre des robots, Kopo ou Inter (8) selon options.jeu.
+    // Pour les applis qui ne font pas tourner le moteur sur le téléphone (appli Flutter). Sans compte Google,
+    // sans pièces, sans ligue, sans XP de parcours : comme « Contre les robots » sur le site.
+    this.entrainement = this.roomName === 'entrainement';
+    this.jeu = this.roomName === 'inter8' || (this.entrainement && options.jeu === 'inter8') ? 'inter8' : 'kopo';
     this.S = this.jeu === 'inter8' ? SI : SK;
     this.maxClients = this.S.MAX;
     this.autoDispose = true;
@@ -33,7 +37,7 @@ class SalleKopo extends Room {
     const pris = (c) => [...salles].some((x) => x.code === c);
     this.code = options.code && /^[A-Z]{4}$/.test(options.code) && !pris(options.code) ? options.code : nouveauCode();
     while (pris(this.code)) this.code = nouveauCode();
-    this.publique = !!options.publique;
+    this.publique = !!options.publique && !this.entrainement;
     // Match du jour (salles « kopo-jour ») : un joueur seul contre 8 robots, la même donne pour tous ce jour-là.
     this.jour = null;
     if (this.roomName === 'kopo-jour') {
@@ -63,10 +67,15 @@ class SalleKopo extends Room {
       if (!this.publique || !NOMS_TABLES[options.mise] || !(montant > 0)) throw new Error('Table à mise inconnue.');
       this.mise = { niveau: options.mise, montant };
     }
+    if (this.entrainement) {
+      this.maxClients = 1;
+      this.reglagesEntrainement = optionsEntrainement(this.S, options);
+      this.proprietaire = null; // le compte qui a ouvert la salle : lui seul peut y entrer (et y revenir)
+    }
     // Les amis peuvent aussi rejoindre une salle publique avec son code.
     if (this.listing) this.listing.code = this.code;
     const rapide = options.rapide && process.env.KOPO_TESTS === '1';
-    if (rapide) { this.salle.durees = { depart: 0, finTour: 0, mancheAuto: 1 }; if (this.jour) this.salle.pauseRobot = 0; } // tests seulement
+    if (rapide) { this.salle.durees = { depart: 0, finTour: 0, mancheAuto: 1 }; if (this.jour || this.entrainement) this.salle.pauseRobot = 0; } // tests seulement
     this.clientsParId = new Map();
     this.comptes = new Map(); // id -> compte (au moment de l'entrée)
     this.attentes = new Map(); // id -> reconnexion en attente (allowReconnection), annulée si le joueur revient par le code
@@ -100,7 +109,11 @@ class SalleKopo extends Room {
     if (!assis && etat === 'ferme') throw new Error(`${NOMS_JEUX[this.jeu]} n'est pas encore ouvert.`);
     // En ligne et entre amis : compte Google obligatoire (quand la connexion Google est active).
     // Sans compte, on joue contre les robots, sur le téléphone. On laisse revenir un joueur déjà assis.
-    if (!assis && !this.jour && SalleKopo.services.googleObligatoire && !c.auth_id) throw new Error(ERREUR_GOOGLE);
+    if (!assis && !this.jour && !this.entrainement && SalleKopo.services.googleObligatoire && !c.auth_id) throw new Error(ERREUR_GOOGLE);
+    if (this.entrainement) {
+      if (this.proprietaire && this.proprietaire !== c.id) throw new Error('Cette partie n\'est pas la tienne.');
+      this.proprietaire = c.id;
+    }
     if (this.jour) {
       // Une seule personne par salle du jour : son retour après une coupure, ou rien.
       if (this.jour.compteId) { if (this.jour.compteId !== c.id) throw new Error('Cette partie n\'est pas la tienne.'); }
@@ -133,7 +146,18 @@ class SalleKopo extends Room {
     if (this.partie) this.partie.coupures.delete(id);
     this.comptes.set(id, compte);
     if (this.jour && this.salle.etat === 'salon') this.lancerJour(id, client);
+    if (this.entrainement && !ancien && this.salle.etat === 'salon' && !this.salle.joueurs.some((j) => j.robot)) this.preparerEntrainement(id);
     this.apresChangement();
+  }
+
+  // Entraînement : robots et réglages demandés à l'ouverture. Le joueur garde la main dans le salon
+  // (ajouterRobot, niveauRobot, retirer, reglages), puis envoie « lancer ».
+  preparerEntrainement(id) {
+    const o = this.reglagesEntrainement;
+    const r = this.S.recevoir(this.salle, id, Object.assign({ type: 'reglages' }, o.reglages));
+    if (!r.ok) console.error('Entraînement : réglages refusés', o.reglages);
+    for (let i = 0; i < o.robots; i++) this.S.recevoir(this.salle, id, { type: 'ajouterRobot' });
+    if (o.lancer) this.S.recevoir(this.salle, id, { type: 'lancer' });
   }
 
   // Match du jour : 8 robots aux places fixes, puis la partie part tout de suite.
@@ -268,7 +292,7 @@ class SalleKopo extends Room {
     }
     // Une partie commencée ne reçoit plus de nouveaux joueurs (seulement les reconnexions).
     if (s.etat !== 'salon' && !this.locked) this.lock();
-    const places = this.publique ? this.taille : this.S.MAX;
+    const places = this.entrainement ? 1 : this.publique ? this.taille : this.S.MAX;
     if (s.etat === 'salon' && this.maxClients !== places) this.maxClients = places; // place ajoutée par reserverRetour
     if (s.etat === 'salon' && this.locked && s.joueurs.length < places) this.unlock();
     this.setMetadata(this.meta(s.etat, s.joueurs.filter((j) => !j.robot).length));
@@ -388,6 +412,25 @@ class SalleKopo extends Room {
   }
 }
 
+// Options d'ouverture d'une salle d'entraînement, vérifiées (valeurs par défaut sinon) :
+// { jeu: 'kopo'|'inter8', robots: 1..MAX-1, niveau: 'faciles'|'normaux'|'forts'|'gentils', niveauJoueur: 1..1000,
+//   delai: secondes (DELAIS du jeu), mode: 'simple'|'delire', jRetour: bool (Inter (8)), lancer: bool }.
+function optionsEntrainement(S, o = {}) {
+  const robots = Math.min(S.MAX - 1, Math.max(1, Math.trunc(Number(o.robots)) || 2));
+  const reglages = {};
+  if (S.NIVEAUX_ROBOTS.concat('gentils').includes(o.niveau)) {
+    reglages.robots = o.niveau;
+    if (Number.isInteger(o.niveauJoueur) && o.niveauJoueur >= 1 && o.niveauJoueur <= 1000) reglages.niveau = o.niveauJoueur;
+  }
+  if (o.delai !== undefined && S.DELAIS.includes(o.delai)) reglages.delai = o.delai;
+  else if (reglages.robots === undefined) reglages.delai = S.DELAIS.includes(5) ? 5 : S.DELAIS[1];
+  if (S === SI && SI.MODES.includes(o.mode)) {
+    reglages.mode = o.mode;
+    if (typeof o.jRetour === 'boolean') reglages.jRetour = o.jRetour;
+  }
+  return { robots, reglages, lancer: o.lancer === true };
+}
+
 // Retrouver la place d'un joueur avec le code de la salle (POST /api/reprendre).
 async function reprendre(compte, code) {
   for (const salle of salles) {
@@ -398,4 +441,13 @@ async function reprendre(compte, code) {
   return null;
 }
 
-module.exports = { SalleKopo, salles, DEBLOCAGE, reprendre };
+// Quelle salle ouverte porte ce code ? (GET /api/salles/:code) Les salles d'entraînement et du Match du jour ne se rejoignent pas.
+function salleParCode(code) {
+  for (const s of salles) {
+    if (s.code !== code || s.entrainement || s.jour) continue;
+    return { code, jeu: s.jeu, salle: s.roomName, roomId: s.roomId, etat: s.salle.etat, publique: s.publique, mise: s.mise ? s.mise.niveau : null, mode: s.jeu === 'inter8' ? s.salle.mode : null, joueurs: s.salle.joueurs.filter((j) => !j.robot).length, places: s.publique ? s.taille : s.S.MAX, pleine: s.salle.joueurs.length >= (s.publique ? s.taille : s.S.MAX) };
+  }
+  return null;
+}
+
+module.exports = { SalleKopo, salles, DEBLOCAGE, reprendre, salleParCode, optionsEntrainement };

@@ -10,6 +10,17 @@ const COLONNES_CARTE = `c.equipes->>'avatar' AS apparence, c.equipes->>'cadre' A
   CASE WHEN jsonb_typeof(c.profil->'xp') = 'number' THEN floor((c.profil->>'xp')::numeric)::int END AS xp,
   CASE WHEN jsonb_typeof(c.profil->'bareme') = 'number' THEN (c.profil->>'bareme')::int END AS bareme`;
 
+// Écran que l'appli ouvre quand on touche une notification (le site utilise des liens, l'appli ces actions).
+// 'table' (rejoindre la table : donnees.code, donnees.jeu), 'amis', 'rivaux', 'bande' (donnees.bande), 'accueil'.
+function actionDe(type, d) {
+  d = d || {};
+  if (type === 'invitation' && d.code) return 'table';
+  if (type === 'ami') return 'amis';
+  if (type === 'rivalite') return 'rivaux';
+  if (type === 'bande') return 'bande';
+  return 'accueil';
+}
+
 function creerSocial(base, push = null) {
   async function veut(q, compteId, type) {
     const r = await q.query('SELECT notifs, statut FROM comptes WHERE id = $1', [compteId]);
@@ -71,7 +82,7 @@ function creerSocial(base, push = null) {
     async notifier(compteId, type, texte, donnees) { return notifier(base, compteId, type, texte, donnees); },
 
     async liste(compteId) {
-      const l = (await base.query('SELECT id, type, texte, donnees, lue, cree_le FROM notifications WHERE compte_id = $1 ORDER BY id DESC LIMIT 30', [compteId])).rows.map((n) => ({ ...n, id: Number(n.id) }));
+      const l = (await base.query('SELECT id, type, texte, donnees, lue, cree_le FROM notifications WHERE compte_id = $1 ORDER BY id DESC LIMIT 30', [compteId])).rows.map((n) => ({ ...n, id: Number(n.id), action: actionDe(n.type, n.donnees) }));
       const d = (await base.query("SELECT count(*)::int AS n FROM demandes_ami d JOIN comptes c ON c.id = d.de_id WHERE d.a_id = $1 AND d.refusee_le IS NULL AND c.statut NOT IN ('supprime', 'banni')", [compteId])).rows[0].n;
       return { nonLues: l.filter((n) => !n.lue).length, liste: l, demandesAmi: d }; // demandesAmi : pastille sur Paramètres et « Mes amis »
     },
@@ -180,7 +191,7 @@ function creerSocial(base, push = null) {
     },
 
     // Invitation d'un ami dans ma salle (code à 4 lettres). Limites : 1 par ami toutes les 2 minutes, 15 par heure.
-    async inviter(de, ami, code) {
+    async inviter(de, ami, code, jeu = null) {
       if (!/^[A-Z]{4}$/.test(String(code || ''))) throw Object.assign(new Error('Code de salle invalide.'), { statut: 400 });
       const lien = await base.query('SELECT 1 FROM amis WHERE compte_id = $1 AND ami_id = $2', [de.id, ami]);
       if (!lien.rows.length) throw Object.assign(new Error('Ce joueur n\'est pas dans tes amis.'), { statut: 404 });
@@ -190,11 +201,11 @@ function creerSocial(base, push = null) {
         FROM notifications WHERE type = 'invitation' AND donnees->>'de' = $1`, [de.id, ami])).rows[0];
       if (recent.ami) throw Object.assign(new Error('Invitation déjà envoyée, attends un peu.'), { statut: 429 });
       if (recent.heure >= 15) throw Object.assign(new Error('Trop d\'invitations. Réessaie plus tard.'), { statut: 429 });
-      const ok = await notifier(base, ami, 'invitation', `${de.pseudo} t'invite à sa table`, { de: de.id, pseudo: de.pseudo, code });
+      const ok = await notifier(base, ami, 'invitation', `${de.pseudo} t'invite à sa table`, { de: de.id, pseudo: de.pseudo, code, ...(jeu ? { jeu } : {}) });
       return { ok: true, envoyee: ok };
     },
   };
   return api;
 }
 
-module.exports = { creerSocial, TYPES, COLONNES_CARTE };
+module.exports = { creerSocial, TYPES, COLONNES_CARTE, actionDe };

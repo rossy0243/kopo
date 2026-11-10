@@ -2,7 +2,7 @@
 'use strict';
 const express = require('express');
 const { DEBLOCAGE } = require('./salle-kopo');
-const { etatJeuPour, NOMS_JEUX, communautesPubliques } = require('./reglages');
+const { etatJeuPour, NOMS_JEUX, communautesPubliques, versionPlusRecente, PLATEFORMES } = require('./reglages');
 const { COLONNES_CARTE } = require('./social');
 
 const MOTIFS = ['pseudo', 'insultes', 'triche', 'abandon', 'autre'];
@@ -12,9 +12,30 @@ const publicCompte = (c) => c && { id: c.id, pseudo: c.pseudo, numero: c.numero,
 // Pays déduit du réseau (en-tête posé par Cloudflare quand il existe), sinon choisi par le joueur.
 const paysReseau = (req) => { const p = String(req.get('cf-ipcountry') || '').toUpperCase(); return /^[A-Z]{2}$/.test(p) && p !== 'XX' ? p : null; };
 
-function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours, parrainage, matchJour, bande, push }) {
+// Appli mobile : en-tête « X-Masano-Client: android/1.2.0 » (ou ios/…). Renvoie { plateforme, version } ou null (site web).
+function clientMobile(req) {
+  const m = /^(android|ios)\/(\d{1,3}(?:\.\d{1,3}){0,3})\b/i.exec(String(req.get('x-masano-client') || '').trim());
+  return m ? { plateforme: m[1].toLowerCase(), version: m[2] } : null;
+}
+
+// Adresse publique du site (liens légaux, liens d'invitation).
+const adresseSite = (env) => String(env.SITE_URL || 'https://kopo-d655.onrender.com/').replace(/\/?$/, '/');
+
+function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours, parrainage, matchJour, bande, push, env = process.env }) {
   const r = express.Router();
   r.use(express.json({ limit: '64kb' })); // la copie du profil (PUT /profil) peut faire quelques dizaines de ko
+
+  // Appli mobile trop ancienne (version minimale du tableau de bord) : 426, avec le lien du store.
+  // /config reste ouvert pour que l'appli puisse afficher l'écran « Mets à jour ».
+  r.use((req, res, next) => {
+    const c = clientMobile(req);
+    if (!c || req.path === '/config') return next();
+    const m = (reglages.get('mobile') || {})[c.plateforme] || {};
+    if (m.versionMin && versionPlusRecente(m.versionMin, c.version)) {
+      return res.status(426).json({ erreur: 'Une nouvelle version de Masano est disponible. Mets l\'appli à jour pour continuer.', miseAJour: { plateforme: c.plateforme, versionMin: m.versionMin, store: m.store || null } });
+    }
+    next();
+  });
 
   // Qui appelle ? (jeton Kopo dans l'en-tête Authorization: Bearer …)
   async function joueur(req, res, next) {
@@ -42,11 +63,23 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours,
       try { const id = await auth.verifierJoueur(jeton); const c = id && (await comptes.statut(id)); pseudo = c && c.pseudo; } catch (e) {}
     }
     const jeux = Object.fromEntries(Object.keys(NOMS_JEUX).map((j) => [j, etatJeuPour(t.jeux, j, pseudo)]));
+    const mobile = t.mobile || {};
+    const client = clientMobile(req);
+    const site = adresseSite(env);
     res.json({ jeux, annonce: t.annonce.active ? t.annonce.texte : null, maintenance: t.maintenance.active ? t.maintenance.message : null, versionMin: t.versionMin, tables: t.tables, deblocage: DEBLOCAGE, pot: t.pot, remiseAFlot: t.remiseAFlot.seuil, messages: t.messagesRapides,
       communautes: communautesPubliques(t.communautes), // groupes à rejoindre (bouton Partager)
       nouveaute: t.nouveaute && t.nouveaute.bande ? 'bande' : null, // fenêtre « Nouveau : Match du jour et Bande »
       // Connexion Google : active quand CONNEXION_GOOGLE=1 et que Google est activé dans Supabase.
-      google: process.env.CONNEXION_GOOGLE === '1' && process.env.SUPABASE_URL ? origineSupabase(process.env.SUPABASE_URL) : null });
+      google: env.CONNEXION_GOOGLE === '1' && env.SUPABASE_URL ? origineSupabase(env.SUPABASE_URL) : null,
+      // Applis mobiles : connexion Google native par le SDK Supabase (adresse + clé publique « anon », pas secrète).
+      supabase: env.SUPABASE_URL ? { url: origineSupabase(env.SUPABASE_URL), cleAnon: env.SUPABASE_ANON_KEY || null } : null,
+      googleObligatoire: env.CONNEXION_GOOGLE === '1' && !!env.SUPABASE_URL, // en ligne et entre amis : compte Google exigé
+      // Versions minimales des applis et liens des stores ; miseAJour = true si l'appli qui appelle est trop ancienne.
+      mobile: Object.fromEntries(PLATEFORMES.map((p) => [p, { versionMin: (mobile[p] && mobile[p].versionMin) || null, store: (mobile[p] && mobile[p].store) || null }])),
+      miseAJour: !!(client && mobile[client.plateforme] && mobile[client.plateforme].versionMin && versionPlusRecente(mobile[client.plateforme].versionMin, client.version)),
+      liens: { site, conditions: site + 'legal/conditions.html', confidentialite: site + 'legal/confidentialite.html', support: env.SUPPORT_URL || null },
+      push: { web: !!(push && push.cle()), natif: !!(push && push.fcmActif && push.fcmActif()) },
+    });
   }));
 
   // Jouer sans compte (invité). Le compte pourra être rattaché à Google ou au téléphone ensuite.
@@ -87,6 +120,12 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours,
     res.json({ jeton: await auth.jetonJoueur(c.id), compte: publicCompte(c), parrainage: parrain });
   }));
 
+  // Renouveler son jeton (valable 90 jours) sans se reconnecter : l'appli l'appelle au démarrage, par exemple une fois par semaine.
+  r.post('/jeton', joueur, enveloppe(async (req, res) => {
+    await comptes.presence(req.compte.id);
+    res.json({ jeton: await auth.jetonJoueur(req.compte.id), expireDans: 90 * 24 * 3600 });
+  }));
+
   r.get('/moi', joueur, enveloppe(async (req, res) => {
     await comptes.presence(req.compte.id);
     res.json({ compte: publicCompte(req.compte), lie: !!req.compte.auth_id, quotaPseudo: await comptes.quotaPseudo(req.compte.id) });
@@ -101,6 +140,9 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours,
   r.get('/push', joueur, enveloppe(async (req, res) => res.json(push ? await push.etat(req.compte.id) : { actif: false })));
   r.post('/push/abonnement', joueur, enveloppe(async (req, res) => res.json(await push.abonner(req.compte.id, req.body.abonnement, req.body.appareil))));
   r.delete('/push/abonnement', joueur, enveloppe(async (req, res) => res.json(await push.desabonner(req.compte.id, req.body.endpoint))));
+  // Applis mobiles : jeton FCM de l'appareil (Android, ou iOS par Firebase qui passe par APNs).
+  r.post('/push/natif', joueur, enveloppe(async (req, res) => res.json(await push.abonnerNatif(req.compte.id, req.body || {}))));
+  r.delete('/push/natif', joueur, enveloppe(async (req, res) => res.json(await push.desabonnerNatif(req.compte.id, req.body && req.body.jeton))));
   r.patch('/push/prefs', joueur, enveloppe(async (req, res) => res.json(await push.changerPrefs(req.compte.id, req.body))));
 
   // --- Parcours de saison, collection, boutique (apparences seulement)
@@ -179,7 +221,11 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours,
   r.post('/amis/demandes/:id/refuser', joueur, enveloppe(async (req, res) => res.json(await social.refuserAmi(req.compte, req.params.id))));
   r.delete('/amis/demandes/:id', joueur, enveloppe(async (req, res) => res.json(await social.annulerDemande(req.compte, req.params.id))));
   // Inviter un ami dans ma salle (il reçoit une notification avec le code).
-  r.post('/amis/:id/inviter', joueur, enveloppe(async (req, res) => res.json(await social.inviter(req.compte, req.params.id, req.body.code))));
+  r.post('/amis/:id/inviter', joueur, enveloppe(async (req, res) => {
+    const code = String(req.body.code || '').toUpperCase();
+    const salle = require('./salle-kopo').salleParCode(code); // le jeu de la table (Kopo ou Inter (8)), pour l'appli de l'ami
+    res.json(await social.inviter(req.compte, req.params.id, code, salle ? salle.jeu : null));
+  }));
 
   // --- Rivalités et notifications
   // --- Parrainage : mon lien, mes filleuls ; saisir le code d'un parrain (compte Google neuf)
@@ -233,4 +279,4 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours,
   return r;
 }
 
-module.exports = { routesJoueurs, publicCompte, enveloppe };
+module.exports = { routesJoueurs, publicCompte, enveloppe, clientMobile };

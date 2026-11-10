@@ -35,6 +35,12 @@ services:
         sync: false
       - key: VAPID_CONTACT         # adresse de contact pour les services de push (mailto:… ou https://…)
         value: https://kopo-d655.onrender.com/
+      - key: FCM_COMPTE_SERVICE    # push des applis Android/iOS : JSON du compte de service Firebase (ou ce JSON en base64)
+        sync: false
+      - key: SUPABASE_ANON_KEY     # clé publique « anon » de Supabase, donnée aux applis pour la connexion Google
+        sync: false
+      - key: SUPPORT_URL           # facultatif : page ou adresse de contact affichée dans l'appli
+        sync: false
       - key: ORIGINES              # pages autorisées à appeler le serveur
         value: https://rossy0243.github.io,https://kopo-d655.onrender.com,capacitor://localhost,https://localhost
 
