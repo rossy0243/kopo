@@ -981,7 +981,7 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
 .fenetre[data-type="amis"] .amis-tete { display: flex; align-items: center; justify-content: space-between; }
 .fenetre[data-type="amis"] .amis-tete h2 { font-size: 32px; }
 .fenetre[data-type="amis"] .amis-fermer { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line); background: rgba(0,0,0,.25); color: var(--ink); font-size: 18px; padding: 0; cursor: pointer; }
-.amis-onglets { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 12px; background: rgba(0,0,0,.28); border: 1px solid rgba(226,176,74,.3); }
+.amis-onglets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; border-radius: 12px; background: rgba(0,0,0,.28); border: 1px solid rgba(226,176,74,.3); }
 .amis-onglets button { border: 0; border-radius: 9px; padding: 8px; background: transparent; color: var(--muted); font: 600 14px var(--body); display: flex; justify-content: center; gap: 6px; align-items: center; cursor: pointer; }
 .amis-onglets button[aria-pressed="true"] { background: var(--brass); color: #1d1606; }
 .amis-onglets .n { min-width: 18px; height: 18px; border-radius: 9px; background: var(--red); color: #fff; font: 700 11px/18px var(--body); font-style: normal; padding: 0 5px; }
@@ -999,6 +999,12 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
 .amis-liste .qui em { font-style: normal; color: var(--brass); font-weight: 600; }
 .amis-liste .btn { padding: 7px 12px; font-size: 13px; flex: none; }
 .amis-liste .plus { border: 0; background: none; color: var(--muted); font-size: 20px; padding: 4px 6px; cursor: pointer; flex: none; }
+/* Onglet Récents : joueurs des 5 dernières parties, groupés par partie. */
+.amis-liste li.recent-partie { background: none; border: 0; padding: 8px 2px 0; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; justify-content: space-between; grid-column: 1 / -1; }
+.amis-liste li.recent-partie b { color: var(--brass); font-weight: 600; }
+.amis-liste .recent-etat { font-size: 12px; color: var(--muted); flex: none; padding: 0 6px; }
+.amis-liste .recent-etat.ok { color: var(--good); }
+.fenetre[data-type="amis"] .recents-aide { font-size: 12px; color: var(--muted); text-align: center; margin: 0; }
 .fenetre[data-type="amis"] .amis-moi { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--muted); padding: 8px 10px; border: 1px dashed rgba(226,176,74,.4); border-radius: 10px; }
 .fenetre[data-type="amis"] .amis-moi b { color: var(--ink); font-size: 15px; letter-spacing: .5px; }
 .fenetre[data-type="amis"] .amis-moi .btn { padding: 5px 10px; font-size: 12px; }
@@ -1011,7 +1017,7 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
   .fenetre[data-type="amis"] { width: min(640px, 100%); grid-template-columns: 1fr 1fr; column-gap: 14px; row-gap: 8px; padding: 12px 14px; max-height: 96dvh; }
   .fenetre[data-type="amis"] .amis-tete { grid-column: 1; } .fenetre[data-type="amis"] .amis-onglets { grid-column: 2; grid-row: 1; }
   .fenetre[data-type="amis"] .amis-tete h2 { font-size: 26px; }
-  .fenetre[data-type="amis"] .amis-liste, .fenetre[data-type="amis"] .amis-ajout, .fenetre[data-type="amis"] .amis-parrain { grid-column: 1 / -1; }
+  .fenetre[data-type="amis"] .amis-liste, .fenetre[data-type="amis"] .amis-ajout, .fenetre[data-type="amis"] .amis-parrain, .fenetre[data-type="amis"] .recents-aide { grid-column: 1 / -1; }
   .fenetre[data-type="amis"] .amis-liste { grid-template-columns: 1fr 1fr; }
   .fenetre[data-type="amis"] .amis-moi { grid-column: 1; } .fenetre[data-type="amis"] .amis-bas { grid-column: 2; }
   .amis-liste li { padding: 6px 8px; }
@@ -4960,9 +4966,9 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     const c = compteLocal();
     if (!c) return;
     const onglets = el('div', 'amis-onglets');
-    const bAmis = el('button', null, 'Amis'), bDem = el('button', null, 'Demandes');
-    bAmis.type = bDem.type = 'button';
-    onglets.append(bAmis, bDem);
+    const bAmis = el('button', null, 'Amis'), bDem = el('button', null, 'Demandes'), bRec = el('button', null, 'Récents');
+    bAmis.type = bDem.type = bRec.type = 'button';
+    onglets.append(bAmis, bDem, bRec);
     const liste = el('ul', 'amis-liste');
     const fermer = el('button', 'amis-fermer', '✕'); fermer.setAttribute('aria-label', 'Fermer'); fermer.onclick = () => retour();
     const tete = el('div', 'amis-tete'); tete.append(el('h2', null, 'Amis'), fermer);
@@ -4985,11 +4991,14 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     parrain.onclick = () => ouvrirParrainage(rouvrir);
     let donnees = null;
     const ligneVide = (txt) => el('li', 'vide', txt);
+    const aideRecents = el('p', 'recents-aide', 'Les joueurs de tes 5 dernières parties. Les robots ne sont pas affichés.');
     function montrer() {
       bAmis.setAttribute('aria-pressed', String(ongletAmis === 'amis'));
       bDem.setAttribute('aria-pressed', String(ongletAmis === 'demandes'));
+      bRec.setAttribute('aria-pressed', String(ongletAmis === 'recents'));
+      aideRecents.hidden = ongletAmis !== 'recents';
       if (!donnees) return;
-      const { amis, rivaux, dm } = donnees;
+      const { amis, rivaux, dm, recents } = donnees;
       bAmis.textContent = amis.length ? 'Amis · ' + amis.length : 'Amis';
       bDem.replaceChildren('Demandes'); if (dm.recues.length) bDem.append(el('i', 'n', String(dm.recues.length)));
       liste.replaceChildren();
@@ -5017,6 +5026,40 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
           };
           li.append(plus); liste.append(li);
         }
+      } else if (ongletAmis === 'recents') {
+        if (!recents) liste.append(ligneVide('Chargement…'));
+        else if (!recents.length) liste.append(ligneVide('Joue contre d\'autres joueurs : ils apparaîtront ici pour que tu puisses les ajouter.'));
+        for (const p of recents || []) {
+          const tete = el('li', 'recent-partie');
+          const resultat = p.place === 1 ? 'Gagné' : p.place ? `${p.place}e sur ${p.nbJoueurs}` : 'Partie quittée';
+          tete.append(el('span', null, (p.jeu === 'inter8' ? 'Inter (8)' : 'Kopo') + ' · ' + depuisQuand(p.fin).replace(/^Vu /, '')), el('b', null, resultat));
+          liste.append(tete);
+          for (const j of p.joueurs) {
+            const li = el('li'), qui = el('span', 'qui'), nomJ = el('b', null, j.pseudo + ' ');
+            nomJ.append(el('small', null, '#' + j.numero)); qui.append(nomJ);
+            const score = j.moi != null && `Toi ${j.moi} – ${j.lui} ${j.pseudo}`;
+            qui.append(el('span', null, j.ami ? 'Déjà ton ami' : j.recue ? 'Veut être ton ami' : score || (j.place === 1 ? 'A gagné la partie' : '')));
+            li.append(avatarAmi(j), qui);
+            if (j.ami) li.append(el('span', 'recent-etat ok', '✓ Ami'));
+            else if (j.envoyee) li.append(el('span', 'recent-etat', 'Demande envoyée'));
+            else {
+              const aj = el('button', 'btn principal', j.recue ? 'Accepter' : 'Ajouter');
+              aj.onclick = async () => {
+                aj.disabled = true;
+                try {
+                  const r = await apiJoueur('/amis', 'POST', { cible: j.id });
+                  toastAjoutAmi(r, j.pseudo);
+                  // Le même joueur peut être dans plusieurs parties : on met à jour toutes ses lignes.
+                  for (const x of recents) for (const y of x.joueurs) if (y.id === j.id) { if (r.etat === 'ami') y.ami = true; else y.envoyee = true; }
+                  if (r.etat === 'ami' && j.recue) majPastilleAmis(Math.max(0, demandesAmi - 1));
+                  montrer();
+                } catch (e) { aj.disabled = false; toast(e.message); }
+              };
+              li.append(aj);
+            }
+            liste.append(li);
+          }
+        }
       } else {
         if (!dm.recues.length && !dm.envoyees.length) liste.append(ligneVide('Aucune demande en attente.'));
         for (const d of dm.recues) {
@@ -5039,18 +5082,19 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     async function dessiner() {
       if (!donnees) liste.replaceChildren(ligneVide('Chargement…'));
       try {
-        const [amis, rivaux, dm] = await Promise.all([apiJoueur('/amis'), apiJoueur('/rivaux').catch(() => []), apiJoueur('/amis/demandes').catch(() => ({ recues: [], envoyees: [] }))]);
+        const [amis, rivaux, dm, recents] = await Promise.all([apiJoueur('/amis'), apiJoueur('/rivaux').catch(() => []), apiJoueur('/amis/demandes').catch(() => ({ recues: [], envoyees: [] })), apiJoueur('/recents').catch(() => [])]);
         majPastilleAmis(dm.recues.length);
-        donnees = { amis, rivaux, dm };
+        donnees = { amis, rivaux, dm, recents };
         montrer();
       } catch (e) { liste.replaceChildren(ligneVide(e.message)); }
     }
     bAmis.onclick = () => { ongletAmis = 'amis'; montrer(); };
     bDem.onclick = () => { ongletAmis = 'demandes'; montrer(); };
+    bRec.onclick = () => { ongletAmis = 'recents'; montrer(); };
     if (!garderOnglet) ongletAmis = demandesAmi > 0 ? 'demandes' : 'amis'; // à l'ouverture : les demandes d'abord s'il y en a
     montrer();
     const zonePush = el('div'); zonePush.style.display = 'contents';
-    ouvrirFenetre([tete, zonePush, onglets, liste, ajout, moi, bas, parrain], 'amis');
+    ouvrirFenetre([tete, zonePush, onglets, liste, aideRecents, ajout, moi, bas, parrain], 'amis');
     dessiner();
     bandeauPush('amis').then((b) => b && zonePush.append(b));
   }
