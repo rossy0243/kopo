@@ -46,7 +46,11 @@ class SalleKopo extends Room {
       this.salle.niveauJoueur = d.niveauRobots;
     } else this.salle = this.S.creerSalle(this.code);
     // Inter (8) : le style choisi à la création (« Quelle partie ? »), modifiable ensuite dans le salon.
-    if (this.jeu === 'inter8' && SI.MODES.includes(options.mode)) this.salle.mode = options.mode;
+    // Délire : 2 paquets, J retour en option (une ancienne appli qui ne l'envoie pas jouait avec).
+    if (this.jeu === 'inter8' && SI.MODES.includes(options.mode)) {
+      this.salle.mode = options.mode;
+      this.salle.jRetour = options.mode === 'delire' && (options.jRetour === undefined ? true : options.jRetour === true);
+    }
     // Salle publique : N joueurs inconnus, elle démarre seule quand elle est pleine.
     this.taille = this.publique ? Math.min(this.S.MAX, Math.max(this.S.MIN, Number(options.taille) || this.S.MAX)) : null;
     if (this.publique) { this.S.rendrePublique(this.salle, this.taille); this.maxClients = this.taille; }

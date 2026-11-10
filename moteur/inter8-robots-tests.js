@@ -18,7 +18,7 @@ function test(nom, fn) {
 }
 
 const remplir = (depart) => Array.from({ length: 20 }, (_, i) => ['3', '4', '5', '6', '9'][i % 5] + 'PCKT'[i % 4] + '*').concat(depart);
-const manche = (mains, depart, premier, mode) => I.nouvelleManche(Object.keys(mains), mains, remplir(depart), premier, { mode: mode || 'simple', graine: 3 });
+const manche = (mains, depart, premier, mode, jRetour) => I.nouvelleManche(Object.keys(mains), mains, remplir(depart), premier, { mode: mode || 'simple', jRetour, graine: 3 });
 const decide = (cerveau, m, j, rng) => cerveau(I.vuePublique(m, j), I.actionsPossibles(m, j), rng || (() => 0.5));
 
 console.log('\nNiveaux');
@@ -86,8 +86,8 @@ test('Fort garde son 8 pour ne jamais devoir piocher', () => {
   assert.strictEqual(decide(R.robotFort, m, 'A').cartes[0], '5C');
 });
 
-test('Fort, en mode délire, pose un J retour pour éloigner le tour d\'un joueur qui va sortir', () => {
-  const m = manche({ A: ['VC', '5C', '9K', 'DK'], B: ['3P'], C: ['3T', '4T', '5T', '6T'], D: ['3K', '4K', '5K', '6K'] }, '7C', 'A', 'delire');
+test('Fort, en mode délire avec J retour, pose un J retour pour éloigner le tour d\'un joueur qui va sortir', () => {
+  const m = manche({ A: ['VC', '5C', '9K', 'DK'], B: ['3P'], C: ['3T', '4T', '5T', '6T'], D: ['3K', '4K', '5K', '6K'] }, '7C', 'A', 'delire', true);
   const a = decide(R.robotFort, m, 'A');
   assert.strictEqual(a.cartes[0], 'VC');
 });
@@ -106,7 +106,7 @@ test('300 parties à tous les niveaux (2 à 8 joueurs, simple et délire) : jama
     const nb = 2 + (n % 7);
     const niveau = R.NIVEAUX_ROBOTS[n % 3];
     const joueurs = 'ABCDEFGH'.slice(0, nb).split('');
-    const r = I.jouerPartie(joueurs, (m, j) => R.choixRobot(m, j, niveau, 1 + (n % 25), rng), rng, { mode: n % 2 ? 'delire' : 'simple' });
+    const r = I.jouerPartie(joueurs, (m, j) => R.choixRobot(m, j, niveau, 1 + (n % 25), rng), rng, { mode: n % 2 ? 'delire' : 'simple', jRetour: n % 4 === 1 });
     assert.ok(joueurs.includes(r.vainqueur));
   }
 });
@@ -116,7 +116,7 @@ function victoires(a, b, n, graine) {
   let gagnees = 0;
   for (let k = 0; k < n; k++) {
     const joueurs = k % 2 ? ['a', 'b'] : ['b', 'a'];
-    const r = I.jouerPartie(joueurs, (m, j, act) => (j === 'a' ? a : b)(I.vuePublique(m, j), act, rng), rng, { mode: k % 4 < 2 ? 'simple' : 'delire' });
+    const r = I.jouerPartie(joueurs, (m, j, act) => (j === 'a' ? a : b)(I.vuePublique(m, j), act, rng), rng, { mode: k % 4 < 2 ? 'simple' : 'delire', jRetour: k % 8 >= 6 });
     if (r.vainqueur === 'a') gagnees++;
   }
   return gagnees / n;

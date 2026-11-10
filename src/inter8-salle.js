@@ -32,8 +32,9 @@
       jeu: JEU,
       code,
       etat: 'salon', // 'salon' | 'manche' | 'finManche' | 'finPartie'
-      mode: 'simple', // 'simple' | 'delire' (J retour), choisi par l'hôte dans le salon
-      paquets: 1, // fixé au lancement selon le nombre de joueurs
+      mode: 'simple', // 'simple' (1 paquet) | 'delire' (2 paquets), choisi par l'hôte dans le salon
+      jRetour: false, // option du mode délire : le valet change le sens du jeu
+      paquets: 1, // fixé au lancement selon le mode
       joueurs: [],
       hote: null,
       restants: [],
@@ -118,7 +119,7 @@
 
   function lancer(s) {
     s.restants = s.joueurs.map((j) => j.id);
-    s.paquets = I.nombrePaquets(s.restants.length);
+    s.paquets = I.nombrePaquets(s.mode);
     demarrerManche(s);
   }
   function rendrePublique(s, taille) {
@@ -202,7 +203,7 @@
     // Avec une distribution animée, l'effet de la carte de départ (pénalité, tour sauté, J retour)
     // attend la fin du compte à rebours : le joueur sanctionné reçoit ses cartes après les autres.
     const differerDepart = s.durees.depart > 0;
-    s.manche = I.nouvelleManche(sieges, mains, pioche, premier, { mode: s.mode, graine: Math.floor(s.rng() * 4294967296), differerDepart });
+    s.manche = I.nouvelleManche(sieges, mains, pioche, premier, { mode: s.mode, jRetour: s.jRetour, graine: Math.floor(s.rng() * 4294967296), differerDepart });
     s.etat = 'manche';
     s.pause = s.durees.depart > 0 ? { type: 'depart', jusqua: s.horloge() + s.durees.depart, total: s.durees.depart } : null;
     armerChrono(s);
@@ -283,7 +284,8 @@
   }
 
   // Traite un message d'un joueur. Renvoie { ok, erreur? }. Mêmes messages que la salle de Kopo,
-  // plus le style de partie dans les réglages : { type: 'reglages', mode: 'simple' | 'delire' }.
+  // plus le style de partie dans les réglages : { type: 'reglages', mode: 'simple' | 'delire', jRetour: bool }.
+  // Une ancienne appli envoie « délire » sans jRetour : c'était le délire avec J retour.
   function recevoir(s, id, msg) {
     const joueur = s.joueurs.find((j) => j.id === id);
     switch (msg && msg.type) {
@@ -345,7 +347,13 @@
         if (msg.mode !== undefined) {
           if (!MODES.includes(msg.mode)) return { ok: false, erreur: 'Impossible.' };
           s.mode = msg.mode;
+          if (msg.jRetour === undefined) s.jRetour = s.mode === 'delire';
         }
+        if (msg.jRetour !== undefined) {
+          if (typeof msg.jRetour !== 'boolean') return { ok: false, erreur: 'Impossible.' };
+          s.jRetour = msg.jRetour;
+        }
+        if (s.mode !== 'delire') s.jRetour = false;
         if (msg.robots !== undefined) {
           if (s.publique || !NIVEAUX_ROBOTS.concat('gentils').includes(msg.robots)) return { ok: false, erreur: 'Impossible.' };
           s.robots = msg.robots;
@@ -435,7 +443,7 @@
     const ids = s.joueurs.map((j) => j.id).sort((a, b) => b.length - a.length);
     return m.journal.slice(-8).map((t) => {
       for (const id of ids) t = t.split(id).join(nomDe(s, id));
-      return t.replace('mode delire', 'mode délire (J retour)');
+      return t.replace('mode delire avec J retour', 'mode délire (J retour)').replace('mode delire', 'mode délire');
     });
   }
 
@@ -451,6 +459,7 @@
       moi: id,
       hote: s.hote,
       mode: s.mode,
+      jRetour: !!s.jRetour,
       joueurs: s.joueurs.map((j) => ({ id: j.id, nom: j.nom, connecte: j.connecte, peerId: j.peerId || null, voix: !!j.voix, muet: j.muet !== false, robot: !!j.robot, pret: !!j.pret || !!j.robot, remplace: !!j.remplace, absent: estAbsent(s, j.id) })),
       delai: s.delai,
       publique: !!s.publique,
@@ -477,6 +486,7 @@
         demande: p.demande,
         sens: p.sens,
         pioche: p.pioche,
+        piochable: p.piochable,
         annonces: p.annonces,
         contestables: p.contestables,
         aPioche: p.aPioche,
@@ -487,9 +497,10 @@
         elimine: m.elimine,
         journal: journalLisible(s, m),
         main: p.main,
-        posees: p.posees.slice(-8), // dernières cartes posées (animations côté téléphone)
-        nbPosees: p.posees.length,
+        posees: p.posees, // dernières cartes posées (animations côté téléphone)
+        nbPosees: p.nbPosees,
         dernier: p.dernier, // qui a posé la carte du centre
+        piocheVide: p.piocheVide, // { joueur, motif, n } : il a passé faute de cartes à piocher
         paquets: p.paquets,
         pause: s.pause ? { type: s.pause.type, resteMs: Math.max(0, s.pause.jusqua - s.horloge()), totalMs: s.pause.total } : null,
         enGrace: (p.contestables || []).filter((j) => enGrace(s, j)), // pas encore contestables (3 s pour annoncer)
@@ -514,6 +525,9 @@
     s.rng = rng || hasardFort();
     s.horloge = Date.now;
     s.joueurs.forEach((j) => (j.connecte = !!j.robot));
+    // Partie enregistrée avant l'option J retour : le délire se jouait avec.
+    if (s.jRetour === undefined) s.jRetour = s.mode === 'delire';
+    if (s.manche && s.manche.jRetour === undefined) s.manche.jRetour = s.manche.mode === 'delire';
     return s;
   }
 

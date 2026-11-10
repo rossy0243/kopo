@@ -17,9 +17,11 @@ function test(nom, fn) {
 }
 
 // Manche sur mesure : la pioche se tire par la fin, la carte de départ est la dernière de la pioche.
+// mode : 'simple', 'delire' (sans J retour) ou 'delire+J' (avec J retour).
 function manche(mains, pioche, premier, mode) {
   const sieges = Object.keys(mains);
-  return I.nouvelleManche(sieges, mains, pioche, premier || sieges[0], { mode: mode || 'simple', graine: 7 });
+  const o = { mode: mode === 'delire+J' ? 'delire' : mode || 'simple', jRetour: mode === 'delire+J', graine: 7 };
+  return I.nouvelleManche(sieges, mains, pioche, premier || sieges[0], o);
 }
 const J = (m, joueur, cartes, demande) => I.jouer(m, demande ? { type: 'jouer', joueur, cartes, demande } : { type: 'jouer', joueur, cartes });
 const P = (m, joueur) => I.jouer(m, { type: 'piocher', joueur });
@@ -33,13 +35,13 @@ const remplir = (depart, n) => Array.from({ length: n || 20 }, (_, i) => ['3', '
 
 console.log('\nMatériel');
 
-test('1 paquet de 54 cartes de 2 à 4 joueurs, 2 paquets (108) de 5 à 8', () => {
+test('Simple : 1 paquet de 54 cartes ; délire : 2 paquets (108), de 2 à 8 joueurs', () => {
   assert.strictEqual(I.nouveauPaquet(1).length, 54);
   assert.strictEqual(I.nouveauPaquet(2).length, 108);
   assert.strictEqual(new Set(I.nouveauPaquet(2)).size, 108, 'chaque carte est unique');
-  assert.strictEqual(I.nombrePaquets(4), 1);
-  assert.strictEqual(I.nombrePaquets(5), 2);
-  assert.strictEqual(I.nombrePaquets(8), 2);
+  assert.strictEqual(I.nombrePaquets('simple'), 1);
+  assert.strictEqual(I.nombrePaquets('delire'), 2);
+  assert.strictEqual(I.nombrePaquets(), 1);
 });
 
 test('Lecture des cartes', () => {
@@ -316,22 +318,29 @@ console.log('\nMode délire : J retour');
 
 test('Le valet change le sens ; deux valets s\'annulent', () => {
   const mains = () => ({ A: ['VC', 'VP', '4C', '9K'], B: ['3P', '4P', '5P', '6P'], C: ['3T', '4T', '5T', '6T'], D: ['3K', '4K', '5K', '6K'] });
-  const m = manche(mains(), remplir('5C'), 'A', 'delire');
+  const m = manche(mains(), remplir('5C'), 'A', 'delire+J');
   J(m, 'A', ['VC']);
   assert.strictEqual(m.joueurCourant, 'D');
-  const m2 = manche(mains(), remplir('5C'), 'A', 'delire');
+  const m2 = manche(mains(), remplir('5C'), 'A', 'delire+J');
   J(m2, 'A', ['VC', 'VP']);
   assert.strictEqual(m2.joueurCourant, 'B');
 });
 
-test('Le valet est une carte ordinaire en mode simple et à 2 joueurs', () => {
+test('Le valet est une carte ordinaire en mode simple, en délire sans J retour, et à 2 joueurs', () => {
   const m = manche({ A: ['VC', '4C', '9K', '9P'], B: ['3P', '4P', '5P', '6P'], C: ['3T', '4T', '5T', '6T'] }, remplir('5C'), 'A', 'simple');
   J(m, 'A', ['VC']);
   assert.strictEqual(m.joueurCourant, 'B');
-  const m2 = manche({ A: ['VC', '4C', '9K', '9P'], B: ['3P', '4P', '5P', '6P'] }, remplir('5C'), 'A', 'delire');
+  const m2 = manche({ A: ['VC', '4C', '9K', '9P'], B: ['3P', '4P', '5P', '6P'] }, remplir('5C'), 'A', 'delire+J');
   J(m2, 'A', ['VC']);
   assert.strictEqual(m2.joueurCourant, 'B');
   assert.strictEqual(m2.sens, 1);
+  const m3 = manche({ A: ['VC', '4C', '9K', '9P'], B: ['3P', '4P', '5P', '6P'], C: ['3T', '4T', '5T', '6T'] }, remplir('5C'), 'A', 'delire');
+  assert.strictEqual(m3.jRetour, false, 'J retour désactivé par défaut');
+  J(m3, 'A', ['VC']);
+  assert.strictEqual(m3.joueurCourant, 'B');
+  assert.strictEqual(m3.sens, 1);
+  const m4 = I.nouvelleManche(['A', 'B', 'C'], { A: ['VC'], B: ['3P'], C: ['3T'] }, remplir('5C'), 'A', { mode: 'simple', jRetour: true });
+  assert.strictEqual(m4.jRetour, false, 'pas de J retour en mode simple');
 });
 
 console.log('\nAnnonce et sortie');
@@ -409,16 +418,47 @@ test('Pioche vide : on remélange la défausse sauf la carte de référence', ()
   assert.strictEqual(m.mains.A.length, 5);
 });
 
-test('Plus de pioche ni de défausse : match nul', () => {
+test('Plus rien à piocher : le joueur passe son tour', () => {
+  const m = manche({ A: ['3C', '4C', '5C', '6C'], B: ['3P', '4P', '5P', '9P'], C: ['3K', '4K', '5K', '6K'] }, ['9T'], 'A');
+  P(m, 'A');
+  assert.strictEqual(m.phase, 'jeu');
+  assert.strictEqual(m.joueurCourant, 'B');
+  assert.strictEqual(m.mains.A.length, 4);
+  assert.deepStrictEqual(I.vuePublique(m, 'C').piocheVide, { joueur: 'A', motif: 'pioche', n: 1 }, 'toute la table sait pourquoi A passe');
+  assert.ok(m.journal.some((t) => t === 'Plus de cartes à piocher : A passe son tour.'));
+  J(m, 'B', ['9P']); // quelqu'un pose : le compte des tours passés repart à zéro
+  assert.strictEqual(m.passesVides, 0);
+});
+
+test('Pénalité avec la pioche vide : la table voit que le joueur ne pioche rien', () => {
+  const m = manche({ A: ['2C', '4C', '5C', '6C'], B: ['3P', '4P', '5P', '6P'], C: ['3K', '4K', '5K', '6K'] }, ['9C'], 'A');
+  J(m, 'A', ['2C']);
+  assert.strictEqual(m.mains.B.length, 4, 'une pénalité ne fait pas remélanger la défausse');
+  assert.strictEqual(m.defausse.length, 2);
+  assert.ok(m.journal.some((t) => t === 'Plus de cartes à piocher : B ne pioche rien et passe son tour.'));
+  assert.strictEqual(I.vuePublique(m, 'C').piocheVide.joueur, 'B');
+  assert.strictEqual(m.joueurCourant, 'C');
+  // Carte de départ 2♣ et plus rien d'autre : le premier joueur ne pioche rien.
+  const m2 = manche({ A: ['3C', '4C', '5C', '6C'], B: ['3P', '4P', '5P', '6P'], C: ['3K', '4K', '5K', '6K'] }, ['2C'], 'B');
+  assert.strictEqual(m2.mains.B.length, 4);
+  assert.strictEqual(I.vuePublique(m2, 'A').piocheVide.joueur, 'B');
+  assert.strictEqual(I.vuePublique(m2, 'A').piocheVide.motif, 'penalite');
+  assert.strictEqual(m2.joueurCourant, 'C');
+});
+
+test('Plus de pioche ni de défausse, et toute la table passe : match nul', () => {
   const m = manche({ A: ['3C', '4C', '5C', '6C'], B: ['3P', '4P', '5P', '6P'] }, ['9T'], 'A');
   P(m, 'A');
+  assert.strictEqual(m.phase, 'jeu');
+  P(m, 'B');
   assert.strictEqual(m.phase, 'nulle');
 });
 
-test('Une pénalité plus grande que la pioche : on pioche ce qu\'il y a', () => {
+test('Une pénalité plus grande que la pioche : on pioche ce qu\'il y a, sans remélanger', () => {
   const m = manche({ A: ['10C', '4C', '5C', '6C'], B: ['3P', '4P', '5P', '6P'] }, ['3T', '9C'], 'A');
   J(m, 'A', ['10C']);
-  assert.strictEqual(m.mains.B.length, 6, '1 carte de pioche + 1 de la défausse remélangée');
+  assert.strictEqual(m.mains.B.length, 5, '1 carte de pioche, la défausse reste en place');
+  assert.ok(m.journal.some((t) => /B pioche 1 carte sur 4 \(pioche vide\)/.test(t)));
   assert.strictEqual(m.phase, 'jeu');
 });
 
@@ -437,15 +477,16 @@ test('2 000 parties au hasard (2 à 8 joueurs, simple et délire) : jamais bloqu
     const nb = 2 + (n % 7);
     const joueurs = 'ABCDEFGH'.slice(0, nb).split('');
     const mode = n % 2 ? 'delire' : 'simple';
+    const jRetour = n % 4 === 1;
     const strat = n % 3 ? I.strategieHasard(rng) : I.strategieSimple;
-    const total = I.nouveauPaquet(I.nombrePaquets(nb)).length;
+    const total = I.nouveauPaquet(I.nombrePaquets(mode)).length;
     const verifier = (m) => {
       const cartes = [...m.pioche, ...m.defausse, ...Object.values(m.mains).flat()];
       assert.strictEqual(cartes.length, total, 'nombre de cartes');
       assert.strictEqual(new Set(cartes).size, total, 'cartes en double');
     };
     const avecVerif = (m, j, a) => { verifier(m); return strat(m, j, a); };
-    const r = I.jouerPartie(joueurs, avecVerif, rng, { mode });
+    const r = I.jouerPartie(joueurs, avecVerif, rng, { mode, jRetour });
     assert.ok(joueurs.includes(r.vainqueur));
     const elimines = r.manches.filter((m) => m.phase === 'terminee').map((m) => m.elimine);
     assert.strictEqual(elimines.length, nb - 1);
