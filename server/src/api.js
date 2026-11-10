@@ -12,7 +12,7 @@ const publicCompte = (c) => c && { id: c.id, pseudo: c.pseudo, numero: c.numero,
 // Pays déduit du réseau (en-tête posé par Cloudflare quand il existe), sinon choisi par le joueur.
 const paysReseau = (req) => { const p = String(req.get('cf-ipcountry') || '').toUpperCase(); return /^[A-Z]{2}$/.test(p) && p !== 'XX' ? p : null; };
 
-function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours, parrainage, matchJour, bande }) {
+function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours, parrainage, matchJour, bande, push }) {
   const r = express.Router();
   r.use(express.json({ limit: '64kb' })); // la copie du profil (PUT /profil) peut faire quelques dizaines de ko
 
@@ -95,7 +95,13 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours,
     const compte = await comptes.changerProfil(req.compte.id, req.body);
     res.json({ compte: publicCompte(compte), quotaPseudo: await comptes.quotaPseudo(req.compte.id) });
   }));
-  r.delete('/moi', joueur, enveloppe(async (req, res) => { await comptes.supprimer(req.compte.id); res.json({ ok: true }); }));
+  r.delete('/moi', joueur, enveloppe(async (req, res) => { await comptes.supprimer(req.compte.id); if (push) await push.oublier(req.compte.id); res.json({ ok: true }); }));
+
+  // --- Notifications push : clé publique, abonnement de ce téléphone, types coupés
+  r.get('/push', joueur, enveloppe(async (req, res) => res.json(push ? await push.etat(req.compte.id) : { actif: false })));
+  r.post('/push/abonnement', joueur, enveloppe(async (req, res) => res.json(await push.abonner(req.compte.id, req.body.abonnement, req.body.appareil))));
+  r.delete('/push/abonnement', joueur, enveloppe(async (req, res) => res.json(await push.desabonner(req.compte.id, req.body.endpoint))));
+  r.patch('/push/prefs', joueur, enveloppe(async (req, res) => res.json(await push.changerPrefs(req.compte.id, req.body))));
 
   // --- Parcours de saison, collection, boutique (apparences seulement)
   r.get('/parcours', joueur, enveloppe(async (req, res) => res.json(await parcours.etat(req.compte))));

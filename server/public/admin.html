@@ -60,6 +60,7 @@ input, select, textarea { background: #0b1a2c; border: 1px solid var(--ligne); c
   <symbol id="d-signal" viewBox="0 0 32 32"><rect x="8" y="4" width="16" height="24" rx="2.5"/><path d="M16 10v8"/><circle cx="16" cy="22.5" r="1.6" class="acc"/></symbol>
   <symbol id="d-pilotage" viewBox="0 0 32 32"><rect x="8" y="4" width="16" height="24" rx="2.5"/><path d="M12 10h8M12 16h8M12 22h8"/><circle cx="14" cy="22" r="1.8" class="acc"/></symbol>
   <symbol id="d-ligue" viewBox="0 0 32 32"><rect x="8" y="4" width="16" height="24" rx="2.5"/><path d="M12 10h8v3a4 4 0 0 1-8 0zM16 17v4M13 22h6"/><circle cx="16" cy="11.5" r="1.4" class="acc"/></symbol>
+  <symbol id="d-notif" viewBox="0 0 32 32"><rect x="8" y="4" width="16" height="24" rx="2.5"/><path d="M12 19v-4a4 4 0 0 1 8 0v4l1.5 2h-11zM14.5 23.5h3"/><circle cx="20.5" cy="10" r="1.8" class="acc"/></symbol>
   <symbol id="d-journal" viewBox="0 0 32 32"><rect x="8" y="4" width="16" height="24" rx="2.5"/><path d="M12 10h8M12 14h8M12 18h5"/></symbol>
 </svg>
 
@@ -122,7 +123,7 @@ $('#btnDeconnexion').onclick = deconnexion;
 // --- Navigation
 const PAGES = [
   ['direct', 'En direct', 'd-direct'], ['audience', 'Audience', 'd-audience'], ['economie', 'Pièces', 'd-pieces'],
-  ['ligue', 'Ligue', 'd-ligue'], ['bandes', 'Bandes', 'd-joueurs'], ['joueurs', 'Joueurs', 'd-joueurs'], ['signalements', 'Signalements', 'd-signal'], ['pilotage', 'Pilotage', 'd-pilotage'], ['journal', 'Journal', 'd-journal'],
+  ['ligue', 'Ligue', 'd-ligue'], ['bandes', 'Bandes', 'd-joueurs'], ['joueurs', 'Joueurs', 'd-joueurs'], ['signalements', 'Signalements', 'd-signal'], ['pilotage', 'Pilotage', 'd-pilotage'], ['notifications', 'Notifications', 'd-notif'], ['journal', 'Journal', 'd-journal'],
 ];
 function nav() {
   $('#nav').innerHTML = PAGES.map(([id, t, ico]) => `<button data-page="${id}" ${id === page ? 'aria-current="page"' : ''}><svg class="ico-k"><use href="#${ico}"/></svg>${t}${id === 'signalements' ? ' <span class="badge" id="nbSignal" hidden></span>' : ''}</button>`).join('');
@@ -444,6 +445,39 @@ const afficher = {
       const montant = Number($('#cadeauMontant').value);
       if (!confirm(`Donner ${montant} pièces à tous les joueurs actifs ?`)) return;
       try { const r2 = await api('/cadeau', { methode: 'POST', corps: { montant, motif: $('#cadeauMotif').value } }); message(`Cadeau envoyé à ${nb(r2.joueurs)} joueurs.`); } catch (e) { message(e.message); }
+    };
+  },
+
+  // Notifications push : abonnés, envoyer une annonce (essai sur son propre téléphone d'abord), annonces envoyées.
+  async notifications() {
+    const r = await api('/push');
+    const pub = () => ($('#pushPays').value.trim() ? { pays: $('#pushPays').value.trim().toUpperCase() } : {});
+    const corps = () => ({ titre: $('#pushTitre').value, texte: $('#pushTexte').value, public: pub() });
+    $('#contenu').innerHTML = `<h2>Notifications</h2>
+      ${r.actif ? '' : '<p class="ko">Notifications push éteintes : ajoute VAPID_PUBLIC, VAPID_PRIVE et VAPID_CONTACT dans Render (Environment), puis redéploie.</p>'}
+      <div class="tuiles"><div class="tuile"><b>${nb(r.joueurs)}</b><span>joueurs abonnés</span></div><div class="tuile"><b>${nb(r.appareils)}</b><span>téléphones</span></div></div>
+      <div class="carte"><h3 style="margin-top:0">Envoyer une annonce</h3>
+        <p class="muted">Elle arrive sur le téléphone des joueurs qui ont activé les notifications et n'ont pas coupé « Annonces de Masano ». Elle part tout de suite, même la nuit : pense à l'heure. Une annonce toutes les 10 minutes au plus.</p>
+        <div class="ligne"><input id="pushTitre" maxlength="60" placeholder="Titre (ex. Tournoi ce soir)" style="flex:1;min-width:240px"></div>
+        <div class="ligne"><textarea id="pushTexte" maxlength="200" rows="3" placeholder="Texte (200 caractères au plus)" style="flex:1;min-width:240px;font-size:16px"></textarea></div>
+        <div class="ligne"><label>Public <input id="pushPays" maxlength="2" placeholder="Pays (CD, CI…), vide = tous" style="width:220px"></label><button class="btn" id="btnPushCompter">Combien de joueurs ?</button><span id="pushCompte" class="muted"></span></div>
+        <div class="ligne"><input id="pushEssai" placeholder="Ton identifiant (Pseudo#1234)" style="width:240px"><button class="btn" id="btnPushEssai">M'envoyer un essai</button></div>
+        <div class="ligne"><button class="btn principal" id="btnPushEnvoyer">Envoyer à tous</button></div></div>
+      <div class="carte"><h3 style="margin-top:0">Annonces envoyées</h3><table><tr><th>Date</th><th>Titre</th><th>Texte</th><th>Public</th><th>Joueurs</th><th>Reçues</th></tr>
+        ${r.annonces.length ? r.annonces.map((a) => `<tr><td>${date(a.cree_le)}</td><td>${esc(a.titre)}</td><td class="muted">${esc(a.texte)}</td><td>${esc((a.public && a.public.pays) || 'Tous')}</td><td>${nb(a.joueurs)}</td><td>${nb(a.envoyees)}</td></tr>`).join('') : '<tr><td class="muted">Aucune pour l\'instant.</td></tr>'}</table></div>`;
+    $('#btnPushCompter').onclick = async () => { try { const x = await api('/push/compter', { methode: 'POST', corps: { public: pub() } }); $('#pushCompte').textContent = `${nb(x.joueurs)} joueurs (${nb(x.appareils)} téléphones)`; } catch (e) { message(e.message); } };
+    $('#btnPushEssai').onclick = async () => {
+      try { const x = await api('/push/annonce', { methode: 'POST', corps: { ...corps(), essai: $('#pushEssai').value } }); message(`Essai envoyé sur ${nb(x.envoyees)} téléphone(s).`); } catch (e) { message(e.message); }
+    };
+    $('#btnPushEnvoyer').onclick = async () => {
+      if (!$('#pushTexte').value.trim()) return message('Écris le texte de l\'annonce.');
+      try {
+        const x = await api('/push/compter', { methode: 'POST', corps: { public: pub() } });
+        if (!confirm(`Envoyer « ${$('#pushTitre').value || 'Masano'} » à ${x.joueurs} joueurs${pub().pays ? ' (' + pub().pays + ')' : ''} ? C'est immédiat.`)) return;
+        const y = await api('/push/annonce', { methode: 'POST', corps: corps() });
+        message(`Annonce envoyée : ${nb(y.envoyees)} téléphone(s) sur ${nb(y.appareils)}.`);
+        afficher.notifications();
+      } catch (e) { message(e.message); }
     };
   },
 

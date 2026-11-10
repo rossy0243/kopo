@@ -29,6 +29,12 @@ services:
         sync: false
       - key: CONNEXION_GOOGLE      # 1 = bouton « Se connecter avec Google » (Google est activé dans Supabase)
         value: "1"
+      - key: VAPID_PUBLIC          # notifications push : clé publique (node server/src/outils.js vapid)
+        sync: false
+      - key: VAPID_PRIVE           # notifications push : clé privée (secrète), créée avec la clé publique
+        sync: false
+      - key: VAPID_CONTACT         # adresse de contact pour les services de push (mailto:… ou https://…)
+        value: https://kopo-d655.onrender.com/
       - key: ORIGINES              # pages autorisées à appeler le serveur
         value: https://rossy0243.github.io,https://kopo-d655.onrender.com,capacitor://localhost,https://localhost
 

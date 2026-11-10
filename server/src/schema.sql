@@ -370,3 +370,35 @@ CREATE INDEX IF NOT EXISTS bande_inscriptions_compte ON bande_inscriptions (comp
 -- ===== Adresse Google visible dans l'admin (onglet Joueurs) =====
 -- Notée à chaque connexion Google ; '' = compte lié sans adresse (téléphone). Effacée à la suppression du compte.
 ALTER TABLE comptes ADD COLUMN IF NOT EXISTS email text;
+
+-- ===== Notifications push (Web Push) =====
+-- Un abonnement par téléphone (navigateur ou appli installée). Effacé quand le navigateur le dit périmé (404, 410).
+CREATE TABLE IF NOT EXISTS push_abonnements (
+  endpoint  text PRIMARY KEY,
+  compte_id text NOT NULL REFERENCES comptes(id),
+  p256dh    text NOT NULL,
+  auth      text NOT NULL,
+  appareil  text,
+  cree_le   timestamptz NOT NULL DEFAULT now(),
+  vu_le     timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS push_abonnements_compte ON push_abonnements (compte_id);
+-- Types de notifications push coupés par le joueur : { "invitation": false, "ami": true, "match": true, "annonce": true }.
+-- À part de « notifs » : couper la notification push ne cache pas le message dans le jeu.
+ALTER TABLE comptes ADD COLUMN IF NOT EXISTS push_prefs jsonb NOT NULL DEFAULT '{}';
+-- Rappel du Match du jour : au plus un par joueur et par jour, même si le serveur redémarre.
+CREATE TABLE IF NOT EXISTS push_rappels (
+  compte_id text NOT NULL REFERENCES comptes(id),
+  jour      date NOT NULL,
+  PRIMARY KEY (compte_id, jour)
+);
+-- Annonces envoyées depuis le tableau de bord.
+CREATE TABLE IF NOT EXISTS push_annonces (
+  id        bigserial PRIMARY KEY,
+  titre     text NOT NULL,
+  texte     text NOT NULL,
+  public    jsonb,
+  joueurs   integer NOT NULL DEFAULT 0,
+  envoyees  integer NOT NULL DEFAULT 0,
+  cree_le   timestamptz NOT NULL DEFAULT now()
+);

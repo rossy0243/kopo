@@ -18,6 +18,7 @@ const { creerParcours } = require('./parcours');
 const { creerParrainage } = require('./parrainage');
 const { creerMatchJour } = require('./match-jour');
 const { creerBande } = require('./bande');
+const { creerPush } = require('./push');
 
 async function demarrer({ port = Number(process.env.PORT || 2567), env = process.env } = {}) {
   const base = await ouvrirBase(env.DATABASE_URL);
@@ -31,7 +32,9 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
   // Chaque minute : la saison finie est clôturée (récompenses) et la suivante s'ouvre.
   const minuteurSaison = setInterval(() => ligue.assurerSaison().then((r) => r.cloturee && console.log(`Saison ${r.cloturee} clôturée, saison ${r.ouverte} ouverte.`)).catch((e) => console.error('Saison :', e.message)), 60e3);
   minuteurSaison.unref();
-  const social = creerSocial(base);
+  const push = creerPush(base, reglages, env);
+  if (!push.actif()) console.log('Notifications push éteintes (VAPID_PUBLIC et VAPID_PRIVE absents).');
+  const social = creerSocial(base, push);
   const parcours = creerParcours(base, reglages, comptes, ligue);
   const parrainage = creerParrainage(base, reglages, comptes, social, env);
   const matchJour = creerMatchJour(base, reglages, env);
@@ -39,6 +42,9 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
   // Chaque minute : semaines de Bande finies (pot partagé), mises automatiques du lundi, rappel du soir.
   const minuteurBande = setInterval(() => bande.tic().catch((e) => console.error('Bande :', e.message)), 60e3);
   minuteurBande.unref();
+  // Chaque minute : rappel du Match du jour en push (une fois, à 19 h à Kinshasa).
+  const minuteurPush = setInterval(() => push.tic().catch((e) => console.error('Push :', e.message)), 60e3);
+  minuteurPush.unref();
   // Jouer en ligne ou entre amis demande un compte Google dès que la connexion Google est active.
   const googleObligatoire = env.CONNEXION_GOOGLE === '1' && !!env.SUPABASE_URL;
   SalleKopo.services = { base, auth, comptes, reglages, ligue, social, parcours, parrainage, matchJour, bande, googleObligatoire };
@@ -57,8 +63,8 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
   });
   // version = commit déployé (Render le donne dans RENDER_GIT_COMMIT) : pour vérifier qu'une mise à jour est en ligne.
   app.get('/sante', (req, res) => res.json({ ok: true, salles: salles.size, version: (env.RENDER_GIT_COMMIT || '').slice(0, 7) || null }));
-  app.use('/api', routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours, parrainage, matchJour, bande }));
-  app.use('/admin/api', routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainage, bande, salles, demarrage: Date.now() }));
+  app.use('/api', routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours, parrainage, matchJour, bande, push }));
+  app.use('/admin/api', routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainage, bande, push, salles, demarrage: Date.now() }));
   app.get('/admin', (req, res) => { res.set('Cache-Control', 'no-store'); res.set('X-Frame-Options', 'DENY'); res.sendFile(path.join(__dirname, '..', 'public', 'admin.html')); });
 
   // Compteur en ligne et salles ouvertes (lu par l'accueil).
@@ -99,8 +105,8 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
   console.log(`Kopo : serveur prêt sur le port ${adresse.port} (base : ${base.genre}).`);
 
   return {
-    port: adresse.port, base, comptes, reglages, auth, ligue, social, parcours, parrainage, matchJour, bande,
-    async arreter() { clearInterval(minuteurSaison); clearInterval(minuteurBande); await jeu.gracefullyShutdown(false).catch(() => {}); serveurHttp.close(); await base.fermer(); },
+    port: adresse.port, base, comptes, reglages, auth, ligue, social, parcours, parrainage, matchJour, bande, push,
+    async arreter() { clearInterval(minuteurSaison); clearInterval(minuteurBande); clearInterval(minuteurPush); await jeu.gracefullyShutdown(false).catch(() => {}); serveurHttp.close(); await base.fermer(); },
   };
 }
 
