@@ -1,0 +1,6 @@
+name: masano_temps_reel
+description: Client de référence (Dart pur, sans dépendance) pour les salles de jeu Masano (Colyseus 0.16).
+publish_to: none
+version: 1.0.0
+environment:
+  sdk: ">=3.0.0 <4.0.0"

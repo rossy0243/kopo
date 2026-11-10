@@ -1572,6 +1572,144 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     const resume = (await api('/admin/api/push', { jeton: adminJeton })).json;
     assert.strictEqual(resume.annonces[0].titre, 'Tournoi');
   });
+  // --- Applis mobiles (Flutter) : config, versions, jeton, /api/v1, entraînement contre les robots, push FCM
+  await test('mobile : config (Supabase, liens légaux, versions), 426 pour une appli trop ancienne, /api/v1', async () => {
+    const c = (await api('/api/config')).json;
+    assert.ok(c.liens && /legal\/conditions\.html$/.test(c.liens.conditions) && /legal\/confidentialite\.html$/.test(c.liens.confidentialite));
+    assert.deepStrictEqual(c.mobile, { android: { versionMin: null, store: null }, ios: { versionMin: null, store: null } });
+    assert.strictEqual(c.miseAJour, false);
+    assert.ok('push' in c && 'supabase' in c && 'googleObligatoire' in c);
+    const x = await invite('MobileVers');
+    const ecrire = (valeur) => api('/admin/api/reglages/mobile', { methode: 'PUT', jeton: adminJeton, corps: { valeur } });
+    assert.strictEqual((await ecrire({ android: { versionMin: 'abc' } })).statut, 400);
+    assert.strictEqual((await ecrire({ android: { versionMin: '1.2.0', store: 'https://play.google.com/store/apps/details?id=app.masano' }, ios: { versionMin: '' } })).statut, 200);
+    try {
+      const appel = async (chemin, client) => { const r = await fetch(URL_ + chemin, { headers: { authorization: 'Bearer ' + x.jeton, 'x-masano-client': client } }); return { statut: r.status, json: await r.json() }; };
+      const vieux = await appel('/api/v1/moi', 'android/1.1.9');
+      assert.strictEqual(vieux.statut, 426);
+      assert.strictEqual(vieux.json.miseAJour.versionMin, '1.2.0'); assert.match(vieux.json.miseAJour.store, /play\.google/);
+      assert.strictEqual((await appel('/api/v1/moi', 'android/1.2.0')).statut, 200);
+      assert.strictEqual((await appel('/api/v1/moi', 'ios/0.1')).statut, 200, 'pas de minimum pour iOS');
+      assert.strictEqual((await appel('/api/moi', 'Mozilla/5.0')).statut, 200, 'le site n\'est pas concerné');
+      const conf = await appel('/api/v1/config', 'android/1.0.0');
+      assert.strictEqual(conf.statut, 200); assert.strictEqual(conf.json.miseAJour, true);
+    } finally { await ecrire({}); }
+  });
+  await test('mobile : renouveler le jeton', async () => {
+    const x = await invite('MobileJeton');
+    const r = await api('/api/v1/jeton', { methode: 'POST', jeton: x.jeton });
+    assert.strictEqual(r.statut, 200); assert.ok(r.json.jeton && r.json.expireDans > 0);
+    assert.strictEqual((await api('/api/v1/moi', { jeton: r.json.jeton })).json.compte.id, x.compte.id);
+    assert.strictEqual((await api('/api/v1/jeton', { methode: 'POST', jeton: 'faux' })).statut, 401);
+  });
+  await test('mobile : salle par code (Kopo ou Inter (8)), invitation avec le jeu et l\'action « table »', async () => {
+    const a = await invite('MobileHote'), b = await invite('MobileAmi');
+    await devenirAmis(a, b);
+    const client = new Client(URL_.replace('http', 'ws'));
+    const s = await client.create('inter8', { jeton: a.jeton, code: 'MOBI', mode: 'delire' });
+    s.onMessage('vue', () => {});
+    await attendre(50);
+    try {
+      const r = await api('/api/v1/salles/mobi');
+      assert.strictEqual(r.statut, 200);
+      assert.strictEqual(r.json.jeu, 'inter8'); assert.strictEqual(r.json.salle, 'inter8'); assert.strictEqual(r.json.mode, 'delire'); assert.strictEqual(r.json.etat, 'salon');
+      assert.strictEqual((await api('/api/v1/salles/ZZZZ')).statut, 404);
+      assert.strictEqual((await api('/api/v1/salles/12')).statut, 400);
+      await api('/api/v1/amis/' + encodeURIComponent(b.compte.id) + '/inviter', { methode: 'POST', jeton: a.jeton, corps: { code: 'MOBI' } });
+      const n = (await api('/api/v1/notifications', { jeton: b.jeton })).json.liste.find((x) => x.type === 'invitation');
+      assert.strictEqual(n.action, 'table'); assert.strictEqual(n.donnees.code, 'MOBI'); assert.strictEqual(n.donnees.jeu, 'inter8');
+      assert.ok((await api('/api/v1/notifications', { jeton: b.jeton })).json.liste.some((x) => x.type === 'ami' && x.action === 'amis'));
+    } finally { await s.leave(); }
+  });
+  await test('mobile : entraînement contre les robots sur le serveur, sans Google, une seule personne', async () => {
+    const { SalleKopo } = require('../src/salle-kopo');
+    const x = await invite('MobileSolo'), y = await invite('MobileIntrus');
+    const client = new Client(URL_.replace('http', 'ws'));
+    SalleKopo.services.googleObligatoire = true;
+    let salle, fin = null, premiere = null;
+    try {
+      // Inter (8) : 3 robots Forts, mode Délire, réglages appliqués dès l'ouverture.
+      const i8 = await client.create('entrainement', { jeton: x.jeton, jeu: 'inter8', robots: 3, niveau: 'forts', mode: 'delire', jRetour: false, delai: 10 });
+      let vi = null; i8.onMessage('vue', (v) => { vi = v; });
+      for (let t = 0; t < 40 && !vi; t++) await attendre(25);
+      assert.strictEqual(vi.jeu, 'inter8'); assert.strictEqual(vi.mode, 'delire'); assert.strictEqual(vi.jRetour, false); assert.strictEqual(vi.delai, 10);
+      assert.strictEqual(vi.joueurs.filter((j) => j.robot).length, 3); assert.strictEqual(vi.robots, 'forts'); assert.strictEqual(vi.etat, 'salon');
+      await assert.rejects(client.joinById(i8.roomId, { jeton: y.jeton }), 'personne d\'autre n\'entre');
+      await i8.leave();
+      // Kopo : 1 robot, partie jouée jusqu'au bout ; ni pièces ni ligue, mais comptée en entraînement.
+      const solde = (await api('/api/moi', { jeton: x.jeton })).json.compte.solde;
+      salle = await client.create('entrainement', { jeton: x.jeton, robots: 1, rapide: true });
+      salle.onMessage('erreur', () => {}); salle.onMessage('solde', () => {});
+      salle.onMessage('vue', (v) => {
+        premiere = premiere || v;
+        if (v.etat === 'finPartie') fin = fin || v;
+        const a = v.manche && v.manche.actions[0];
+        if (v.etat === 'manche' && a) setTimeout(() => salle.send('action', { action: a }), 5);
+      });
+      for (let t = 0; t < 40 && !premiere; t++) await attendre(25);
+      assert.strictEqual(premiere.joueurs.length, 2); assert.strictEqual(premiere.hote, x.compte.id);
+      salle.send('lancer');
+      for (let t = 0; t < 400 && !fin; t++) await attendre(50);
+      assert.ok(fin, 'la partie se termine');
+      await attendre(400);
+      assert.strictEqual((await api('/api/moi', { jeton: x.jeton })).json.compte.solde, solde, 'pas de pièces contre les robots');
+      assert.strictEqual((await api('/api/statistiques', { jeton: x.jeton })).json.entrainement.parties, 1);
+      assert.strictEqual((await api('/api/v1/salles/' + fin.code)).statut, 404, 'une salle d\'entraînement ne se rejoint pas par son code');
+    } finally { SalleKopo.services.googleObligatoire = false; if (salle) await salle.leave().catch(() => {}); }
+  });
+  await test('mobile : push FCM (Android et iOS) avec action, jeton périmé oublié', async () => {
+    const fcm = [];
+    const { privateKey } = await jose.generateKeyPair('RS256', { extractable: true });
+    srv.push.regler({ compte: { client_email: 'masano@essai.iam.gserviceaccount.com', private_key: await jose.exportPKCS8(privateKey), project_id: 'masano-essai' }, fcm: async (url, init) => {
+      if (/oauth2/.test(url)) return { ok: true, status: 200, json: async () => ({ access_token: 'acces-essai', expires_in: 3600 }) };
+      const corps = JSON.parse(init.body);
+      fcm.push({ url, auth: init.headers.authorization, ...corps.message });
+      if (corps.message.token.includes('perime')) return { ok: false, status: 404, json: async () => ({ error: { message: 'Requested entity was not found.', details: [{ errorCode: 'UNREGISTERED' }] } }) };
+      return { ok: true, status: 200, json: async () => ({ name: 'projects/masano-essai/messages/1' }) };
+    } });
+    const a = await invite('FcmA'), b = await invite('FcmB');
+    await devenirAmis(a, b);
+    const jetonFcm = 'fcm-android-' + 'x'.repeat(40);
+    assert.strictEqual((await api('/api/v1/push/natif', { methode: 'POST', jeton: b.jeton, corps: { jeton: 'court', plateforme: 'android' } })).statut, 400);
+    assert.strictEqual((await api('/api/v1/push/natif', { methode: 'POST', jeton: b.jeton, corps: { jeton: jetonFcm, plateforme: 'windows' } })).statut, 400);
+    assert.strictEqual((await api('/api/v1/push/natif', { methode: 'POST', jeton: b.jeton, corps: { jeton: jetonFcm, plateforme: 'android', appareil: 'Pixel 7' } })).statut, 200);
+    const e = (await api('/api/v1/push', { jeton: b.jeton })).json;
+    assert.strictEqual(e.natif, true); assert.strictEqual(e.natifs.length, 1); assert.strictEqual(e.natifs[0].plateforme, 'android');
+    await api('/api/v1/amis/' + encodeURIComponent(b.compte.id) + '/inviter', { methode: 'POST', jeton: a.jeton, corps: { code: 'FCMA' } });
+    await attendre(100);
+    const m = fcm.find((x) => x.token === jetonFcm && x.data.type === 'invitation');
+    assert.ok(m, 'invitation envoyée par FCM');
+    assert.strictEqual(m.url, 'https://fcm.googleapis.com/v1/projects/masano-essai/messages:send'); assert.strictEqual(m.auth, 'Bearer acces-essai');
+    assert.strictEqual(m.data.action, 'table'); assert.strictEqual(m.data.code, 'FCMA'); assert.strictEqual(m.android.priority, 'high'); assert.strictEqual(m.android.ttl, '600s');
+    assert.strictEqual(m.apns.headers['apns-priority'], '10'); assert.match(m.notification.body, /FcmA t'invite/);
+    assert.ok(Object.values(m.data).every((v) => typeof v === 'string'), 'données FCM en texte');
+    // Jeton périmé (appli désinstallée) : oublié au premier envoi.
+    await api('/api/v1/push/natif', { methode: 'POST', jeton: b.jeton, corps: { jeton: 'fcm-perime-' + 'y'.repeat(40), plateforme: 'ios' } });
+    assert.strictEqual((await api('/api/v1/push', { jeton: b.jeton })).json.natifs.length, 2);
+    await srv.push.envoyer(b.compte.id, 'ami', { titre: 'x', texte: 'y', action: 'amis' });
+    assert.strictEqual((await api('/api/v1/push', { jeton: b.jeton })).json.natifs.length, 1);
+    await api('/api/v1/push/natif', { methode: 'DELETE', jeton: b.jeton, corps: { jeton: jetonFcm } });
+    assert.strictEqual((await api('/api/v1/push', { jeton: b.jeton })).json.natifs.length, 0);
+  });
+  await test('documentation : chaque route des joueurs est décrite dans docs/api/openapi.yaml', async () => {
+    const yaml = require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'docs', 'api', 'openapi.yaml'), 'utf8');
+    const decrites = new Set();
+    let chemin = null;
+    for (const l of yaml.split('\n')) {
+      const c = /^  (\/[^:]+):\s*$/.exec(l); if (c) { chemin = c[1]; continue; }
+      const m = /^    (get|post|put|patch|delete):/.exec(l); if (m && chemin) decrites.add(m[1].toUpperCase() + ' ' + chemin);
+      if (/^\S/.test(l)) chemin = null;
+    }
+    const { routesJoueurs } = require('../src/api');
+    const r = routesJoueurs({ reglages: { get: () => ({}) } });
+    const manquantes = [];
+    const routes = r.stack.filter((x) => x.route).flatMap((x) => Object.keys(x.route.methods).map((m) => m.toUpperCase() + ' /' + x.route.path.replace(/^\//, '').replace(/:(\w+)/g, '{$1}')))
+      .concat(['GET /en-ligne', 'GET /salles/{code}', 'POST /reprendre']);
+    for (const x of routes) if (!decrites.has(x)) manquantes.push(x);
+    assert.deepStrictEqual(manquantes, [], 'routes sans documentation');
+    const res = await fetch(URL_ + '/api/openapi.yaml');
+    assert.strictEqual(res.status, 200); assert.match(await res.text(), /^openapi: 3\.1/);
+  });
   await srv.arreter();
   console.log(`\n${reussis} tests réussis, ${echecs} en échec.`);
   process.exit(echecs ? 1 : 0);

@@ -11,7 +11,7 @@ const { creerReglages } = require('./reglages');
 const { creerComptes, migrerPseudos } = require('./comptes');
 const { routesJoueurs } = require('./api');
 const { routesAdmin } = require('./admin');
-const { SalleKopo, salles, reprendre } = require('./salle-kopo');
+const { SalleKopo, salles, reprendre, salleParCode } = require('./salle-kopo');
 const { creerLigue } = require('./ligue');
 const { creerSocial } = require('./social');
 const { creerParcours } = require('./parcours');
@@ -56,28 +56,36 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
   app.use((req, res, next) => {
     const o = req.get('origin');
     if (o && (origines.includes('*') || origines.includes(o))) { res.set('Access-Control-Allow-Origin', o); res.set('Vary', 'Origin'); }
-    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Masano-Client');
     res.set('Access-Control-Allow-Methods', 'GET, POST, PATCH, PUT, DELETE, OPTIONS');
     if (req.method === 'OPTIONS') return res.sendStatus(204);
     next();
   });
   // version = commit déployé (Render le donne dans RENDER_GIT_COMMIT) : pour vérifier qu'une mise à jour est en ligne.
   app.get('/sante', (req, res) => res.json({ ok: true, salles: salles.size, version: (env.RENDER_GIT_COMMIT || '').slice(0, 7) || null }));
-  app.use('/api', routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours, parrainage, matchJour, bande, push }));
-  app.use('/admin/api', routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainage, bande, push, salles, demarrage: Date.now() }));
-  app.get('/admin', (req, res) => { res.set('Cache-Control', 'no-store'); res.set('X-Frame-Options', 'DENY'); res.sendFile(path.join(__dirname, '..', 'public', 'admin.html')); });
+  // API des joueurs : /api (site) et /api/v1 (applis mobiles, version figée de l'API). Les deux servent les mêmes routes.
+  const routes = routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours, parrainage, matchJour, bande, push, env });
 
   // Compteur en ligne et salles ouvertes (lu par l'accueil).
-  app.get('/api/en-ligne', async (req, res) => {
+  routes.get('/en-ligne', async (req, res) => {
     let joueurs = 0; for (const s of salles) joueurs += s.clientsParId.size;
     const ouvertes = [...(await matchMaker.query({ name: 'kopo' })), ...(await matchMaker.query({ name: 'kopo-mise' })), ...(await matchMaker.query({ name: 'inter8' }))].filter((r) => r.metadata && r.metadata.publique && r.metadata.etat === 'salon' && !r.locked);
     res.json({ joueurs, sallesOuvertes: ouvertes.map((r) => ({ jeu: r.metadata.jeu || 'kopo', id: r.roomId, code: r.metadata.code, taille: r.metadata.taille, joueurs: r.clients, classee: !!r.metadata.classee, mise: r.metadata.mise ? r.metadata.mise.niveau : null })) });
   });
 
+  // Quelle salle porte ce code (Kopo ou Inter (8)) ? Pour rejoindre un ami sans essayer les deux salles.
+  routes.get('/salles/:code', (req, res) => {
+    const code = String(req.params.code || '').toUpperCase();
+    if (!/^[A-Z]{4}$/.test(code)) return res.status(400).json({ erreur: 'Code invalide.' });
+    const s = salleParCode(code);
+    if (!s) return res.status(404).json({ erreur: 'Aucune table ouverte avec ce code.' });
+    res.json(s);
+  });
+
   // Reprendre sa place avec le code de la salle (page fermée par erreur, réseau perdu) : la salle d'une
   // partie commencée est verrouillée, le matchmaking ne la propose plus. Renvoie une réservation de place
   // (client.consumeSeatReservation), ou 404 si le joueur n'est assis à aucune table ouverte avec ce code.
-  app.post('/api/reprendre', express.json({ limit: '4kb' }), async (req, res) => {
+  routes.post('/reprendre', async (req, res) => {
     try {
       const id = await auth.verifierJoueur((req.get('authorization') || '').replace(/^Bearer\s+/i, ''));
       const c = id && (await comptes.statut(id));
@@ -91,6 +99,13 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
     } catch (e) { console.error('Reprendre :', e.message); res.status(500).json({ erreur: 'Erreur du serveur.' }); }
   });
 
+  // Documentation de l'API (OpenAPI) pour les applis : lisible par Swagger UI, Postman, openapi-generator (Dart)…
+  app.get('/api/openapi.yaml', (req, res) => { res.type('application/yaml'); res.sendFile(path.join(__dirname, '..', '..', 'docs', 'api', 'openapi.yaml')); });
+  app.use('/api/v1', routes);
+  app.use('/api', routes);
+  app.use('/admin/api', routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainage, bande, push, salles, demarrage: Date.now() }));
+  app.get('/admin', (req, res) => { res.set('Cache-Control', 'no-store'); res.set('X-Frame-Options', 'DENY'); res.sendFile(path.join(__dirname, '..', 'public', 'admin.html')); });
+
   const serveurHttp = http.createServer(app);
   const jeu = new Server({ transport: new WebSocketTransport({ server: serveurHttp, pingInterval: 5000, pingMaxRetries: 3 }) });
   jeu.define('kopo', SalleKopo).filterBy(['code', 'publique', 'taille']);
@@ -100,6 +115,8 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
   jeu.define('kopo-jour', SalleKopo);
   // Inter (8) : entre amis (code) et salles publiques gratuites, même salle que Kopo avec la logique d'Inter (8).
   jeu.define('inter8', SalleKopo).filterBy(['code', 'publique', 'taille']);
+  // Entraînement contre les robots (Kopo ou Inter (8), options.jeu) : une salle par joueur, sans compte Google.
+  jeu.define('entrainement', SalleKopo);
   await new Promise((ok) => serveurHttp.listen(port, ok));
   const adresse = serveurHttp.address();
   console.log(`Kopo : serveur prêt sur le port ${adresse.port} (base : ${base.genre}).`);

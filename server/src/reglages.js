@@ -12,6 +12,9 @@ const DEFAUTS = {
   nouveaute: { bande: false },
   maintenance: { active: false, message: 'Masano est en maintenance. On revient très vite !' },
   versionMin: '1.0',
+  // Applis mobiles (Flutter) : version minimale par plateforme (en dessous, l'API répond 426 « mets à jour »)
+  // et lien vers la fiche du store. Vide = pas de minimum.
+  mobile: { android: { versionMin: '', store: '' }, ios: { versionMin: '', store: '' } },
   // État de chaque jeu : ouvert à tous, réservé aux testeurs (pseudos de la liste), ou en maintenance.
   jeux: { kopo: 'ouvert', inter8: 'ouvert', testeurs: [] },
   // Messages du chat en partie : les joueurs ne peuvent envoyer que ceux-là (pas de texte libre, donc pas d'insultes).
@@ -174,6 +177,22 @@ function etatJeuPour(jeux, jeu, pseudo) {
   return p && (jeux.testeurs || []).some((t) => t.toLowerCase() === p) ? 'test' : 'ferme';
 }
 
+// Versions des applis mobiles : { android: { versionMin: '1.2.0', store: 'https://play.google.com/…' }, ios: { … } }.
+const PLATEFORMES = ['android', 'ios'];
+function verifierMobile(v) {
+  const err = (m) => { throw Object.assign(new Error(m), { statut: 400 }); };
+  const out = {};
+  for (const p of PLATEFORMES) {
+    const x = (v && v[p]) || {};
+    const versionMin = String(x.versionMin || '').trim();
+    if (versionMin && !/^\d{1,3}(\.\d{1,3}){0,3}$/.test(versionMin)) err(`Version invalide pour ${p} (exemple : 1.2.0).`);
+    const store = String(x.store || '').trim();
+    if (store && !/^https:\/\/[^\s<>"]{3,300}$/.test(store)) err(`Lien du store invalide pour ${p} (https://…).`);
+    out[p] = { versionMin, store };
+  }
+  return out;
+}
+
 function creerReglages(base) {
   let cache = JSON.parse(JSON.stringify(DEFAUTS));
   return {
@@ -240,6 +259,7 @@ function creerReglages(base) {
         } else valeur = { enAttente: false };
       }
       if (cle === 'jeux') valeur = verifierJeux(valeur);
+      if (cle === 'mobile') valeur = verifierMobile(valeur);
       if (cle === 'nouveaute') valeur = { bande: !!(valeur && valeur.bande === true) };
       if (cle === 'prochaineSaison') valeur = { nom: String(valeur.nom || '').replace(/[<>]/g, '').trim().slice(0, 40), theme: String(valeur.theme || '').replace(/[<>]/g, '').trim().slice(0, 40) };
       if (cle === 'pot') {
@@ -253,4 +273,4 @@ function creerReglages(base) {
   };
 }
 
-module.exports = { verifierCommunautes, communautesPubliques, RESEAUX, verifierJeux, etatJeuPour, NOMS_JEUX, creerReglages, DEFAUTS, VERSION_APPLI, versionPlusRecente, verifierMessages, verifierLigue, verifierBande, DIVISIONS, MESSAGE_MAX };
+module.exports = { verifierMobile, PLATEFORMES, verifierCommunautes, communautesPubliques, RESEAUX, verifierJeux, etatJeuPour, NOMS_JEUX, creerReglages, DEFAUTS, VERSION_APPLI, versionPlusRecente, verifierMessages, verifierLigue, verifierBande, DIVISIONS, MESSAGE_MAX };

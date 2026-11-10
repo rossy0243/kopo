@@ -362,6 +362,10 @@ const afficher = {
         <div class="ligne"><label><input type="checkbox" id="fondateurActif" ${r.cadeauFondateur && r.cadeauFondateur.active !== false && r.cadeauFondateur.actif ? 'checked' : ''}> distribuer le dos « Les Fondateurs » aux joueurs qui avaient des pièces d'essai</label><button class="btn" id="btnFondateur">Enregistrer</button></div>
         <h3>Version minimale de l'application</h3>
         <div class="ligne"><input id="version" value="${esc(r.versionMin)}" style="width:110px"><button class="btn" id="btnVersion">Enregistrer</button><span class="muted">Version actuelle de l'appli : <b>${esc(r.versionAppli || '?')}</b>. Les versions plus anciennes devront se mettre à jour (pas plus haut que la version actuelle).</span></div>
+        <h3>Applis mobiles (Android, iOS)</h3>
+        <p class="muted">En dessous de la version minimale, l'appli affiche « Mets à jour » avec le lien du store (vide = pas de minimum).</p>
+        ${[['android', 'Android'], ['ios', 'iOS']].map(([p, nom]) => `<div class="ligne"><span style="min-width:120px">${nom}</span><input id="mobVer_${p}" value="${esc(((r.mobile || {})[p] || {}).versionMin || '')}" placeholder="1.0.0" style="width:110px"><input id="mobStore_${p}" value="${esc(((r.mobile || {})[p] || {}).store || '')}" placeholder="https://… (fiche du store)" style="flex:1;min-width:220px"></div>`).join('')}
+        <button class="btn" id="btnMobile">Enregistrer</button>
       </div>
       <div class="carte"><h3 style="margin-top:0">Gains (tables gratuites)</h3>${champs('gains', { bienvenue: 'Cadeau de bienvenue', manche: 'Par manche survécue', katapss: 'Katapss', victoire: 'Victoire', deuxieme: '2e place' })}<button class="btn principal" data-enregistrer="gains">Enregistrer les gains</button>
         <h3>Bonus du jour</h3>${champs('bonusJour', { depart: 'Premier jour', pas: 'En plus chaque jour', plafond: 'Plafond' })}<button class="btn principal" data-enregistrer="bonusJour">Enregistrer le bonus</button>
@@ -441,6 +445,7 @@ const afficher = {
     $('#btnMatchJour').onclick = () => ecrire('matchJour', { actif: $('#mjActif').checked, robots: $('#mjRobots').value, niveauRobots: Number($('#mjNiveau').value) });
     $('#btnNouveaute').onclick = () => ecrire('nouveaute', { bande: $('#nouveauteBande').checked });
     $('#btnVersion').onclick = () => ecrire('versionMin', $('#version').value.trim());
+    $('#btnMobile').onclick = () => ecrire('mobile', Object.fromEntries(['android', 'ios'].map((p) => [p, { versionMin: $('#mobVer_' + p).value.trim(), store: $('#mobStore_' + p).value.trim() }])));
     $('#btnCadeau').onclick = async () => {
       const montant = Number($('#cadeauMontant').value);
       if (!confirm(`Donner ${montant} pièces à tous les joueurs actifs ?`)) return;

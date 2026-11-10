@@ -9,7 +9,7 @@ La logique de jeu n'est pas dupliquée : le serveur utilise `src/kopo-salle.js` 
 cd server
 npm install
 npm start              # sans DATABASE_URL : base Postgres en mémoire (rien n'est gardé)
-npm test               # 63 tests
+npm test               # 99 tests
 npm run charge -- 1500 30   # test de charge : 1 500 joueurs simulés pendant 30 s
 ```
 Tableau de bord en local : http://localhost:2567/admin (définir `ADMIN_MOT_DE_PASSE` et `ADMIN_TOTP`).
@@ -36,11 +36,21 @@ Les tables sont créées toutes seules au premier démarrage (`src/schema.sql`).
 | `ORIGINES` | Pages autorisées à appeler l'API (séparées par des virgules) |
 | `VAPID_PUBLIC`, `VAPID_PRIVE` | Notifications push : les deux clés, créées une fois avec `node server/src/outils.js vapid` (en changer désabonne tous les téléphones). Sans elles, pas de notifications push, le reste du jeu marche normalement |
 | `VAPID_CONTACT` | Notifications push : adresse de contact donnée aux services de push (`https://…` ou `mailto:…`) |
+| `FCM_COMPTE_SERVICE` | Notifications push des applis Android et iOS (Firebase Cloud Messaging) : le JSON du compte de service Firebase, tel quel ou en base64. Sans lui, pas de push dans les applis |
+| `SUPABASE_ANON_KEY` | Clé publique *anon* de Supabase, donnée aux applis par `/api/config` pour la connexion Google native |
+| `SITE_URL`, `SUPPORT_URL` | Adresse du site (liens CGU et confidentialité de `/api/config`) et contact du support (facultatif) |
 
 ## API (pour l'application)
+Documentation complète pour l'appli mobile : [`docs/api/`](../docs/api/) — [`openapi.yaml`](../docs/api/openapi.yaml) (toutes les routes, servi aussi sur `/api/openapi.yaml`), [`temps-reel.md`](../docs/api/temps-reel.md) (salles de jeu, protocole Colyseus octet par octet), [`guide-mobile.md`](../docs/api/guide-mobile.md) (Flutter : connexion Google, push FCM, écrans), et un client Dart de référence dans [`docs/api/dart/`](../docs/api/dart/) (essai : `node tests/client-dart.js /chemin/vers/dart`).
+
+Toutes les routes ci-dessous existent sous `/api` (site) et `/api/v1` (applis). Les applis envoient `X-Masano-Client: android/1.2.0` (ou `ios/…`) : en dessous de la version minimale (tableau de bord, « Applis mobiles »), réponse 426 avec le lien du store.
+
 | Route | Rôle |
 |---|---|
-| `GET /api/config` | Annonce, maintenance, version minimale, mises des tables |
+| `GET /api/config` | Annonce, maintenance, version minimale, mises des tables, messages du chat ; pour les applis : `supabase` (adresse et clé publique), `mobile` (versions minimales et stores), `miseAJour`, `liens` (CGU, confidentialité, support), `push` |
+| `POST /api/jeton` | Renouveler son jeton (90 jours de plus) |
+| `GET /api/salles/:code` | Quelle table porte ce code : `{ jeu, salle, etat, joueurs, places… }` (pour rejoindre sans essayer Kopo puis Inter (8)) |
+| `POST/DELETE /api/push/natif` | Applis : enregistrer ou oublier le jeton FCM de l'appareil `{ jeton, plateforme: 'android'\|'ios', appareil }` |
 | `POST /api/invite` | Jouer sans compte : renvoie un jeton et le compte (500 pièces) |
 | `POST /api/connexion` | Connexion Google/téléphone (jeton Supabase), rattache le compte invité |
 | `GET/PATCH/DELETE /api/moi` | Profil, changer pseudo/avatar, supprimer son compte |
@@ -64,6 +74,7 @@ Les tables sont créées toutes seules au premier démarrage (`src/schema.sql`).
 | `GET /api/match-jour`, `GET /api/match-jour/classement?type=mondial\|amis` | Match du jour (même donne pour tous contre 8 robots Forts, un essai officiel, score sur 100 : +10 par manche passée, +30 la victoire, fin à minuit heure de Kinshasa) : numéro, temps restant, mon score et mon rang ; classement du jour. Compte Google obligatoire |
 | `GET/POST /api/bandes`, `GET /api/bandes/ouvertes`, `POST /api/bandes/rejoindre { code }` | La Bande (2 à 20 joueurs, 3 Bandes au plus) : mes Bandes, créer `{ nom, mise, ouverte }`, Bandes ouvertes de mon pays, rejoindre par le lien `?bande=CODE` |
 | `GET/PATCH /api/bandes/:id`, `POST /api/bandes/:id/miser\|auto\|demander\|quitter`, `POST /api/bandes/:id/demandes/:compte`, `DELETE /api/bandes/:id/membres/:compte` | Une Bande : membres, semaine en cours (mise, inscrits, classement, ce que gagne le Chef), titres de la semaine passée ; miser pour la semaine (jusqu'au mercredi 23 h, jours déjà passés = pire note du jour - 10), mise automatique chaque lundi, demandes pour les Bandes ouvertes (le créateur accepte ou refuse). Fin de semaine le dimanche à minuit : 15 % détruits, le 2e récupère sa mise (3 joueurs en règle ou plus), le Chef prend le reste ; moins de 5 Matchs joués = mise perdue |
+| WebSocket, salle `entrainement` | Seul contre des robots, Kopo ou Inter (8), sans compte Google, sans pièces ni ligue. Options : `{ jeton, jeu, robots, niveau, niveauJoueur, delai, mode, jRetour, lancer }` |
 | WebSocket, salle `kopo-jour` | Le Match du jour. Options : `{ jeton }`. Le serveur envoie `matchJour` (`{ debut, numero, officiel }` puis `{ fin, manches, victoire, score, officiel }`) |
 | WebSocket, salle `kopo` | La partie. Options : `{ jeton, code?, publique? }`. Messages : les mêmes que `kopo-salle.js`. Le serveur envoie `vue`, `erreur`, `solde`, `exclu`, `classee` (au début : `{ classee }`) et `ligue` (fin de partie classée : `{ delta, points, division, divisionAvant, promu, relegue, protection, prochaine, saison }`). |
 
