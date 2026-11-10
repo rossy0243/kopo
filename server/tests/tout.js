@@ -334,6 +334,27 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     await new Promise((ok) => setTimeout(ok, 300));
     assert.deepStrictEqual(await srv.social.duels(js[0].compte.id, [js[1].compte.id]), [], 'pas de face-à-face avec un robot à la table');
   });
+  await test('5 dernières parties : adversaires humains seulement, ami ou demande en cours, sans les bloqués', async () => {
+    const [a, b, c, d] = [await invite('Rena'), await invite('Rabi'), await invite('Rako'), await invite('Rado')];
+    await jouerPartie([a, b, c], { jeu: 'inter8', reglages: { mode: 'delire' } });
+    await jouerPartie([a, b], { robots: 1 });
+    await api('/api/amis', { methode: 'POST', jeton: a.jeton, corps: { cible: c.compte.id } });
+    await devenirAmis(a, b);
+    let r = (await api('/api/recents', { jeton: a.jeton })).json;
+    assert.strictEqual(r.length, 2, 'deux parties');
+    assert.strictEqual(r[0].jeu, 'kopo'); assert.strictEqual(r[1].jeu, 'inter8');
+    assert.deepStrictEqual(r[0].joueurs.map((j) => j.pseudo), ['Rabi'], 'les robots ne sont jamais montrés');
+    assert.strictEqual(r[0].joueurs[0].ami, true);
+    assert.deepStrictEqual(r[1].joueurs.map((j) => j.pseudo).sort(), ['Rabi', 'Rako']);
+    const rako = r[1].joueurs.find((j) => j.pseudo === 'Rako');
+    assert.strictEqual(rako.envoyee, true); assert.strictEqual(rako.ami, false);
+    assert.ok(r[1].place >= 1 && r[1].nbJoueurs === 3);
+    assert.strictEqual((await api('/api/recents', { jeton: c.jeton })).json[0].joueurs.find((j) => j.pseudo === 'Rena').recue, true, 'Rako voit que Rena lui a demandé');
+    await api('/api/bloques', { methode: 'POST', jeton: c.jeton, corps: { cible: a.compte.id } });
+    r = (await api('/api/recents', { jeton: a.jeton })).json;
+    assert.deepStrictEqual(r[1].joueurs.map((j) => j.pseudo), ['Rabi'], 'un joueur qui m\'a bloqué disparaît');
+    assert.deepStrictEqual((await api('/api/recents', { jeton: d.jeton })).json, [], 'aucune partie');
+  });
   await test('un joueur banni ne peut pas entrer dans une salle', async () => {
     const x = await invite('Tricheur');
     await srv.base.query("UPDATE comptes SET statut = 'banni' WHERE id = $1", [x.compte.id]);

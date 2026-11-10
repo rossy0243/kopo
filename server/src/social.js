@@ -102,6 +102,30 @@ function creerSocial(base, push = null) {
       return r.rows;
     },
 
+    // Mes 5 dernières parties avec d'autres joueurs (les robots n'ont pas de compte, ils n'y sont donc jamais),
+    // et pour chaque adversaire : déjà ami, demande en cours, face-à-face. Pour ajouter après coup qui on a oublié.
+    async recents(compteId, limite = 5) {
+      const parties = (await base.query(`SELECT p.id, p.jeu, p.fin, p.nb_joueurs, pa.place FROM participations pa JOIN parties p ON p.id = pa.partie_id
+        WHERE pa.compte_id = $1 AND p.fin IS NOT NULL AND EXISTS (SELECT 1 FROM participations o WHERE o.partie_id = p.id AND o.compte_id <> $1)
+        ORDER BY p.fin DESC LIMIT $2`, [compteId, limite])).rows;
+      if (!parties.length) return [];
+      const joueurs = (await base.query(`SELECT o.partie_id, o.place, c.id, c.pseudo, c.numero, c.avatar, ${COLONNES_CARTE},
+          EXISTS (SELECT 1 FROM amis a WHERE a.compte_id = $1 AND a.ami_id = c.id) AS ami,
+          EXISTS (SELECT 1 FROM demandes_ami d WHERE d.de_id = $1 AND d.a_id = c.id) AS envoyee,
+          EXISTS (SELECT 1 FROM demandes_ami d WHERE d.de_id = c.id AND d.a_id = $1 AND d.refusee_le IS NULL) AS recue,
+          CASE WHEN f.a = $1 THEN f.victoires_a ELSE f.victoires_b END AS moi,
+          CASE WHEN f.a = $1 THEN f.victoires_b ELSE f.victoires_a END AS lui
+        FROM participations o JOIN comptes c ON c.id = o.compte_id
+        LEFT JOIN face_a_face f ON (f.a = $1 AND f.b = c.id) OR (f.b = $1 AND f.a = c.id)
+        WHERE o.partie_id = ANY($2) AND o.compte_id <> $1 AND c.statut NOT IN ('supprime', 'banni')
+          AND NOT EXISTS (SELECT 1 FROM blocages b WHERE (b.compte_id = $1 AND b.bloque_id = c.id) OR (b.compte_id = c.id AND b.bloque_id = $1))
+        ORDER BY o.place NULLS LAST, c.pseudo`, [compteId, parties.map((x) => x.id)])).rows;
+      return parties.map((x) => ({
+        id: x.id, jeu: x.jeu, fin: x.fin, nbJoueurs: x.nb_joueurs, place: x.place,
+        joueurs: joueurs.filter((j) => j.partie_id === x.id).map(({ partie_id, ...j }) => j),
+      })).filter((x) => x.joueurs.length);
+    },
+
     // --- Demandes d'ami : on ne devient amis que si l'autre accepte.
     // Renvoie { etat: 'ami' } (déjà amis, ou il m'avait demandé : c'est accepté) ou { etat: 'envoyee' }.
     async demanderAmi(de, c) {

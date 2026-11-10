@@ -222,6 +222,7 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours,
     res.json({ ok: true });
   }));
 
+  r.get('/recents', joueur, enveloppe(async (req, res) => res.json(await social.recents(req.compte.id))));
   r.get('/rivaux', joueur, enveloppe(async (req, res) => res.json(await social.rivaux(req.compte.id))));
   r.get('/notifications', joueur, enveloppe(async (req, res) => res.json(await social.liste(req.compte.id))));
   r.post('/notifications/lues', joueur, enveloppe(async (req, res) => { await social.marquerLues(req.compte.id, req.body.ids); res.json({ ok: true }); }));
