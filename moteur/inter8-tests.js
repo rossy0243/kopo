@@ -112,6 +112,34 @@ test('On ne peut pas piocher quand on peut jouer', () => {
   interdit(() => P(m, 'A'));
 });
 
+test('Le joker et le 8 ne forcent pas à jouer : on peut les garder et piocher', () => {
+  // Jeu normal sur le 9♣ : A n'a qu'un joker et un 8 de jouables.
+  const m = manche({ A: ['XN', '8C', '5C', '6C'], B: ['3P', '4P', '5P', '6P'] }, remplir('9T').slice(0, -1).concat('DP', '9T'), 'A');
+  assert.ok(peut(m, 'A', 'jouer'));
+  assert.ok(peut(m, 'A', 'piocher'));
+  P(m, 'A');
+  assert.strictEqual(m.mains.A.length, 5);
+  assert.strictEqual(m.joueurCourant, 'B', 'la carte piochée ne se joue pas : le tour passe');
+});
+
+test("Pendant une demande, un joueur qui n'a pas la valeur demandée peut garder son joker et piocher", () => {
+  const m = manche({ A: ['8T', '4C', '5K', '6K'], B: ['XN', '9P', '5P', '6P'], C: ['3T', '9T', '5T', '6T'] }, remplir('DC').slice(0, -1).concat('DP', 'DC'), 'A');
+  J(m, 'A', ['8T'], '4');
+  assert.ok(peut(m, 'B', 'jouer'), 'il peut poser son joker');
+  assert.ok(peut(m, 'B', 'piocher'), 'ou le garder et piocher');
+  P(m, 'B');
+  assert.ok(m.mains.B.includes('XN'));
+  assert.strictEqual(m.joueurCourant, 'C');
+  assert.deepStrictEqual(m.demande, { valeur: '4', par: 'A' });
+});
+
+test('Avec la valeur demandée en main, on la pose : pas de pioche', () => {
+  const m = manche({ A: ['8T', '4C', '5K', '6K'], B: ['XN', '4P', '5P', '6P'], C: ['3T', '9T', '5T', '6T'] }, remplir('DC'), 'A');
+  J(m, 'A', ['8T'], '4');
+  assert.ok(!peut(m, 'B', 'piocher'));
+  interdit(() => P(m, 'B'));
+});
+
 test("Après avoir pioché, on peut garder la carte et passer ; si elle ne se joue pas, le tour passe seul", () => {
   const m = manche({ A: ['3C', '4C', '5C', '6C'], B: ['3P', '4P', '5P', '6P'] }, remplir('9T').slice(0, -1).concat('9P', '9T'), 'A');
   P(m, 'A');

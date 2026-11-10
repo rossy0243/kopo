@@ -344,6 +344,13 @@
     return coups;
   }
 
+  // On pioche quand on ne peut pas jouer. Le joker et le 8 ne forcent jamais à jouer : si ce sont
+  // les seules cartes jouables, on peut les garder et piocher (pendant une demande comme en jeu normal).
+  function piochePermise(m, joueur, coups) {
+    if (m.aPioche) return false;
+    return (coups || coupsJouer(m, joueur)).every((a) => ['8', JOKER].includes(valeur(a.cartes[0])));
+  }
+
   // Actions possibles pour un joueur, dans l'état actuel.
   function actionsPossibles(m, joueur) {
     const actions = [];
@@ -354,7 +361,7 @@
     const coups = coupsJouer(m, joueur);
     actions.push(...coups);
     if (m.aPioche) actions.push({ type: 'passer', joueur });
-    else if (!coups.length) actions.push({ type: 'piocher', joueur });
+    else if (piochePermise(m, joueur, coups)) actions.push({ type: 'piocher', joueur });
     return actions;
   }
 
@@ -387,7 +394,7 @@
     delete m.contestable;
 
     if (action.type === 'piocher') {
-      if (m.aPioche || coupsJouer(m, j).length) throw new Error(`Action interdite : ${JSON.stringify(action)}`);
+      if (!piochePermise(m, j)) throw new Error(`Action interdite : ${JSON.stringify(action)}`);
       const tirees = piocherCartes(m, j, 1);
       if (!tirees.length) {
         // Rien à piocher : le joueur passe. Match nul seulement si toute la table passe ainsi
