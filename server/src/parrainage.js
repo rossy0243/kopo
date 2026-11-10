@@ -125,7 +125,7 @@ function creerParrainage(base, reglages, comptes, social, env = process.env) {
         if ((await q.query('SELECT 1 FROM parrainages WHERE filleul_id = $1', [f.id])).rows.length) return { ok: false, erreur: 'Tu as déjà un parrain.' };
         // Le compte Google doit être nouveau pour le Kopo : sa première empreinte appartient à ce compte-ci.
         const emp = (await q.query('SELECT empreinte FROM empreintes WHERE compte_id = $1', [f.id])).rows;
-        if (!emp.length || f.identite_connue) return { ok: false, erreur: 'Ce compte Google a déjà été utilisé sur le Kopo : le parrainage est réservé aux nouveaux joueurs.' };
+        if (!emp.length || f.identite_connue) return { ok: false, erreur: 'Ce compte Google a déjà été utilisé sur Masano : le parrainage est réservé aux nouveaux joueurs.' };
         if (new Date(f.cree_le) < new Date(Date.now() - c.joursCompte * 864e5)) return { ok: false, erreur: 'Le parrainage est réservé aux nouveaux joueurs.' };
         // Le même compte Google des deux côtés (impossible en temps normal, gardé par prudence).
         const memes = await q.query('SELECT 1 FROM empreintes a JOIN empreintes b ON a.empreinte = b.empreinte WHERE a.compte_id = $1 AND b.compte_id = $2', [f.id, p.id]);
@@ -194,7 +194,7 @@ function creerParrainage(base, reglages, comptes, social, env = process.env) {
           const quoi = [pl.pieces ? pl.pieces + ' pièces' : null, pl.objet ? 'une apparence exclusive' : null, pl.titre ? 'le titre « ' + pl.titre + ' »' : null].filter(Boolean).join(', ');
           await social.notifier(res.parrainId, 'parrainage', `${pl.n} amis venus jouer grâce à toi : tu gagnes ${quoi} !`, { palier: pl.n, pieces: pl.pieces || 0, objet: pl.objet || null, titre: pl.titre || null });
         }
-        if (res.piecesFilleul) await social.notifier(res.filleulId, 'parrainage', `Merci d'avoir rejoint le Kopo avec ${res.parrain} : tu gagnes ${res.piecesFilleul} pièces !`, { parrain: res.parrain, pieces: res.piecesFilleul });
+        if (res.piecesFilleul) await social.notifier(res.filleulId, 'parrainage', `Merci d'avoir rejoint Masano avec ${res.parrain} : tu gagnes ${res.piecesFilleul} pièces !`, { parrain: res.parrain, pieces: res.piecesFilleul });
       }
       return res;
     },
