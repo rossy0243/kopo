@@ -1,30 +1,23 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
+// Tests rapides : règles des cartes et calculs de progression, sans réseau.
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:masano/main.dart';
+import 'package:masano/commun/cartes.dart';
+import 'package:masano/commun/retention.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
-
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
-
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+  test('Kopo : valeur, couleur, Katapss', () {
+    expect(KopoCartes.valeur('10P'), 10);
+    expect(KopoCartes.afficher('7C'), '7♥');
+    expect(KopoCartes.typeKatapss(['2P', '5P', '7P', '10P'], 3), 'couleur');
+    expect(KopoCartes.typeKatapss(['2P', '3C', '4K', '2T'], 3), 'petite');
+  });
+  test('Inter (8) : noms des valeurs', () {
+    expect(InterCartes.nomValeur('A'), 'As');
+    expect(InterCartes.nomValeur('X'), 'Joker');
+    expect(InterCartes.nomValeur('D'), 'Q');
+    expect(InterCartes.afficher('VC'), 'J♥');
+  });
+  test('Niveaux', () {
+    expect(R.niveauDe(0).niveau, 1);
+    expect(R.niveauDe(100).niveau, 2);
   });
 }
