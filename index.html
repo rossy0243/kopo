@@ -102,6 +102,8 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
 .table-inter .pioche-inter { position: absolute; right: 4px; top: 0; gap: 2px; }
 .table-inter .pioche-inter .carte { width: 40px; height: 58px; }
 .table-inter .pioche-inter .legende { font-weight: 700; color: var(--ink); }
+.table-inter .pioche-inter.vide .carte { opacity: .35; }
+.table-inter .pioche-inter.vide .legende { color: var(--bad); }
 #poses:has(.table-inter) { width: 100%; }
 @media (orientation: landscape) { body.en-jeu .main.defile { justify-content: flex-start; overflow-x: auto; overflow-y: hidden; padding-top: 26px; scrollbar-width: none; } body.en-jeu .main.defile .carte { flex: none; transform: none; } body.en-jeu .main.defile .carte.choisie { transform: translateY(-20px); } body.en-jeu .main.defile { -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%); mask-image: linear-gradient(90deg, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%); } }
 .table-inter .pile { display: grid; justify-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
@@ -1270,7 +1272,12 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
         <p class="style-inter" hidden>Quel style ?</p>
         <div class="choix choix-niveau-robots style-inter" id="styleRobots" role="group" aria-label="Style de la partie" hidden>
           <button type="button" data-v="simple">Simple</button>
-          <button type="button" data-v="delire">Délire (J retour)</button>
+          <button type="button" data-v="delire">Délire</button>
+        </div>
+        <small class="muted style-inter" hidden id="aideStyleRobots"></small>
+        <div class="choix choix-niveau-robots" id="jRetourRobots" role="group" aria-label="J retour" hidden>
+          <button type="button" data-v="non">Sans J retour</button>
+          <button type="button" data-v="oui">Avec J retour</button>
         </div>
         <p>Quel niveau ?</p>
         <div class="choix choix-niveau-robots" id="niveauRobots" role="group" aria-label="Niveau des robots">
@@ -1281,7 +1288,6 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
         <small class="muted" id="niveauRobotsAide"></small>
         <p>Combien de robots autour de la table ?</p>
         <div class="choix-robots" id="choixRobots"></div>
-        <small class="muted style-inter" hidden>Tu joues avec eux : 3 robots = 4 joueurs, 1 paquet. Dès 4 robots (5 joueurs), on joue avec 2 paquets.</small>
         <button class="btn principal large" id="btnGuidee" hidden>Première partie guidée (2 robots gentils)</button>
         <button class="btn large" id="btnFermerRobots">Annuler</button>
       </div>
@@ -1341,6 +1347,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     <div class="colonne">
     <div class="reglage" id="reglage"></div>
     <div class="reglage" id="reglageStyle" hidden></div>
+    <div class="reglage" id="reglageJRetour" hidden></div>
     <h3 id="titreJoueurs"></h3>
     <ul class="liste-joueurs" id="listeJoueurs"></ul>
     <p id="attenteHote" hidden>En attente du lancement par l'hôte…</p>
@@ -4789,8 +4796,9 @@ var qrcode = function() {
     return (NOMS_VALEURS[valeur(carte)] || valeur(carte)) + SYMBOLES[couleur(carte)];
   }
 
-  // 1 paquet de 54 cartes de 2 à 4 joueurs, 2 paquets (108 cartes) de 5 à 8 joueurs.
-  const nombrePaquets = (nbJoueurs) => (nbJoueurs >= 5 ? 2 : 1);
+  // Le mode fixe le nombre de paquets, de 2 à 8 joueurs : simple = 1 paquet (54 cartes),
+  // délire = 2 paquets (108 cartes).
+  const nombrePaquets = (mode) => (mode === 'delire' ? 2 : 1);
 
   function nouveauPaquet(nbPaquets) {
     const paquet = [];
@@ -4840,7 +4848,8 @@ var qrcode = function() {
 
   // sieges : joueurs dans le sens des aiguilles d'une montre. mains : { joueur: [cartes] }.
   // pioche : cartes restantes (on tire par la fin). premier : joueur qui commence.
-  // options : { mode: 'simple' | 'delire', graine } (la graine sert à remélanger la défausse).
+  // options : { mode: 'simple' | 'delire', jRetour, graine } (la graine sert à remélanger la défausse).
+  // jRetour : option du mode délire (le valet change le sens du jeu), désactivée par défaut.
   // options.differerDepart : l'effet de la carte de départ attend appliquerDepart(m)
   // (l'appli le déclenche à la fin de la distribution).
   function nouvelleManche(sieges, mains, pioche, premier, options) {
@@ -4852,6 +4861,7 @@ var qrcode = function() {
       pioche: pioche.slice(),
       defausse: [], // la dernière carte est la carte de référence
       mode: o.mode === 'delire' ? 'delire' : 'simple',
+      jRetour: o.mode === 'delire' && !!o.jRetour,
       sens: 1, // 1 = aiguilles d'une montre, -1 = sens inverse (J retour, mode délire)
       libre: false, // le joueur courant pose la carte de son choix
       demande: null, // { valeur, par } : « Inter demande »
@@ -4876,7 +4886,7 @@ var qrcode = function() {
     }
     m.defausse.push(depart);
     m.vu.posees.push(depart);
-    noter(m, `Début de la manche : ${sieges.length} joueurs, mode ${m.mode}. Carte de départ : ${afficher(depart)}. ${premier} commence.`);
+    noter(m, `Début de la manche : ${sieges.length} joueurs, mode ${m.mode}${m.jRetour ? ' avec J retour' : ''}. Carte de départ : ${afficher(depart)}. ${premier} commence.`);
     // Une carte de départ spéciale agit sur le premier joueur, comme si elle venait d'être jouée.
     if (o.differerDepart) m.departEnAttente = premier;
     else effetsDepart(m, depart, premier);
@@ -4921,10 +4931,12 @@ var qrcode = function() {
   }
 
   // Pioche n cartes (moins s'il n'en reste pas assez). Piocher annule l'annonce.
-  function piocherCartes(m, joueur, n) {
+  // sansMelange : une pénalité ne fait pas remélanger la défausse (sinon, avec un seul paquet,
+  // les pénalités tournent en rond et la manche ne finit jamais).
+  function piocherCartes(m, joueur, n, sansMelange) {
     const tirees = [];
     for (let k = 0; k < n; k++) {
-      if (!m.pioche.length && !remelanger(m)) break;
+      if (!m.pioche.length && (sansMelange || !remelanger(m))) break;
       tirees.push(m.pioche.pop());
     }
     m.mains[joueur].push(...tirees);
@@ -4967,10 +4979,19 @@ var qrcode = function() {
     m.joueurCourant = prochain;
   }
 
+  // Toute la table voit qu'un joueur passe parce qu'il n'y a plus rien à piocher.
+  function signalerPiocheVide(m, joueur, motif) {
+    const n = m.vu.piocheVide ? m.vu.piocheVide.n + 1 : 1;
+    m.vu.piocheVide = { joueur, motif, n };
+  }
+
   // Le joueur « cible » pioche une pénalité et passe son tour. Renvoie le joueur d'après.
   function penaliser(m, cible, n) {
-    const tirees = piocherCartes(m, cible, n);
-    noter(m, `${cible} pioche ${tirees.length} carte${tirees.length > 1 ? 's' : ''} et passe son tour.`);
+    const tirees = piocherCartes(m, cible, n, true);
+    if (!tirees.length) {
+      noter(m, `Plus de cartes à piocher : ${cible} ne pioche rien et passe son tour.`);
+      signalerPiocheVide(m, cible, 'penalite');
+    } else noter(m, `${cible} pioche ${tirees.length} carte${tirees.length > 1 ? 's' : ''}${tirees.length < n ? ` sur ${n} (pioche vide)` : ''} et passe son tour.`);
     return suivant(m, cible);
   }
 
@@ -4994,7 +5015,7 @@ var qrcode = function() {
       // Le premier joueur passe son tour.
       noter(m, `Tour sauté : ${premier}.`);
       m.joueurCourant = suivant(m, premier);
-    } else if (v === 'V' && m.mode === 'delire' && m.enJeu.length > 2) {
+    } else if (v === 'V' && m.jRetour && m.enJeu.length > 2) {
       m.sens = -m.sens;
       noter(m, 'J retour : le sens du jeu change.');
     }
@@ -5137,9 +5158,18 @@ var qrcode = function() {
       if (m.aPioche || coupsJouer(m, j).length) throw new Error(`Action interdite : ${JSON.stringify(action)}`);
       const tirees = piocherCartes(m, j, 1);
       if (!tirees.length) {
-        m.phase = 'nulle';
-        m.joueurCourant = null;
-        noter(m, 'Plus de pioche ni de défausse : match nul, la manche est rejouée.');
+        // Rien à piocher : le joueur passe. Match nul seulement si toute la table passe ainsi
+        // à la suite sans que personne ne pose.
+        m.passesVides = (m.passesVides || 0) + 1;
+        if (m.passesVides >= m.enJeu.length) {
+          m.phase = 'nulle';
+          m.joueurCourant = null;
+          noter(m, 'Plus de pioche ni de défausse, et personne ne peut jouer : match nul, la manche est rejouée.');
+          return m;
+        }
+        noter(m, `Plus de cartes à piocher : ${j} passe son tour.`);
+        signalerPiocheVide(m, j, 'pioche');
+        finDeTour(m, j, suivant(m, j));
         return m;
       }
       if (m.demande) m.vu.piochesDemande.push({ joueur: j, valeur: m.demande.valeur });
@@ -5162,6 +5192,7 @@ var qrcode = function() {
     const v = valeur(cartes[0]);
     for (const c of cartes) m.mains[j].splice(m.mains[j].indexOf(c), 1);
     m.defausse.push(...cartes);
+    m.passesVides = 0;
     m.vu.posees.push(...cartes);
     m.vu.dernier = j; // qui a posé la carte du centre (affichage)
     m.libre = false;
@@ -5185,7 +5216,7 @@ var qrcode = function() {
     } else if (v === 'A') {
       prochain = apresAs(m, j, cartes.length);
     } else {
-      if (v === 'V' && m.mode === 'delire' && m.enJeu.length > 2 && cartes.length % 2 === 1) {
+      if (v === 'V' && m.jRetour && m.enJeu.length > 2 && cartes.length % 2 === 1) {
         m.sens = -m.sens;
         noter(m, 'J retour : le sens du jeu change.');
       }
@@ -5208,17 +5239,22 @@ var qrcode = function() {
       demande: m.demande ? { ...m.demande } : null,
       sens: m.sens,
       mode: m.mode,
+      jRetour: m.jRetour,
       paquets: Math.round((m.pioche.length + m.defausse.length + Object.values(m.mains).reduce((t, l) => t + l.length, 0)) / 54),
       pioche: m.pioche.length,
+      piochable: m.pioche.length + Math.max(0, m.defausse.length - 1), // pioche + défausse remélangeable
       joueurCourant: m.joueurCourant,
       aPioche: m.joueurCourant === joueur ? m.aPioche : null,
       annonces: m.annonces.slice(),
       contestables: contestables(m),
       qualifies: m.qualifies.slice(),
       phase: m.phase,
-      posees: m.vu.posees.slice(),
+      posees: m.vu.posees.slice(-8), // dernières cartes posées (une longue manche en compte des milliers)
+      nbPosees: m.vu.posees.length,
+      defausse: m.defausse.slice(), // cartes posées depuis le dernier mélange (vues de tous)
       dernier: m.vu.dernier || null,
-      piochesDemande: m.vu.piochesDemande.map((p) => ({ ...p })),
+      piocheVide: m.vu.piocheVide ? { ...m.vu.piocheVide } : null, // dernier joueur qui a passé faute de cartes à piocher
+      piochesDemande: m.vu.piochesDemande.slice(-40).map((p) => ({ ...p })),
     };
   }
 
@@ -5227,10 +5263,11 @@ var qrcode = function() {
   // ---------------------------------------------------------------------------
 
   // strategie(manche, joueur, actions) -> une action parmi « actions », ou null.
-  // options : { mode: 'simple' | 'delire' }. Le nombre de paquets est fixé au début de la partie.
+  // options : { mode: 'simple' | 'delire', jRetour }. Le mode fixe le nombre de paquets.
   function jouerPartie(joueurs, strategie, rng, options) {
     const mode = (options && options.mode) || 'simple';
-    const nbPaquets = nombrePaquets(joueurs.length);
+    const jRetour = !!(options && options.jRetour);
+    const nbPaquets = nombrePaquets(mode);
     let restants = joueurs.slice();
     const manches = [];
     let nulles = 0;
@@ -5238,7 +5275,7 @@ var qrcode = function() {
       const sieges = melanger(restants, rng);
       const { mains, pioche } = distribuer(sieges, nbPaquets, rng);
       const premier = sieges[Math.floor(rng() * sieges.length)];
-      const m = nouvelleManche(sieges, mains, pioche, premier, { mode, graine: Math.floor(rng() * 4294967296) });
+      const m = nouvelleManche(sieges, mains, pioche, premier, { mode, jRetour, graine: Math.floor(rng() * 4294967296) });
       let coups = 0;
       while (m.phase === 'jeu') {
         if (++coups > 20000) throw new Error('Manche bloquée');
@@ -5385,7 +5422,7 @@ var qrcode = function() {
 
   // Robot fort : il compte les cartes déjà posées, demande avec le 8 une valeur que les autres
   // n'ont probablement plus, vise le joueur qui va sortir, prépare sa sortie et conteste toujours.
-  // En mode délire, il se sert du J retour pour éloigner le tour d'un joueur qui va sortir.
+  // En mode délire avec J retour, il se sert du valet pour éloigner le tour d'un joueur qui va sortir.
   function robotFort(v, actions) {
     const h = horsTour(actions, 1, 1, () => 0);
     if (h) return h;
@@ -5395,9 +5432,11 @@ var qrcode = function() {
     const sortie = c.find((a) => sort(v, a));
     if (sortie) return sortie;
 
-    // Cartes que je ne connais pas : chez les autres ou dans la pioche.
+    // Cartes que je ne connais pas : chez les autres ou dans la pioche. Seules les cartes de la
+    // défausse (posées depuis le dernier mélange) sont sûrement hors jeu : les autres ont pu être
+    // remélangées dans la pioche.
     const connues = {};
-    for (const x of v.main.concat(v.posees)) connues[x] = true;
+    for (const x of v.main.concat(v.defausse)) connues[x] = true;
     const inconnues = I.nouveauPaquet(v.paquets || 1).filter((x) => !connues[x]);
     const restantes = (val) => inconnues.filter((x) => I.valeur(x) === val).length;
     const manquees = (val) => v.piochesDemande.filter((p) => p.valeur === val).length;
@@ -5421,7 +5460,7 @@ var qrcode = function() {
         // Le 8 se garde pour ne jamais devoir piocher. Quand il part, il demande une valeur
         // rare chez les autres, que d'autres ont déjà manquée.
         score += -40 + manquees(a.demande) * 12 - restantes(a.demande) * 6 + nb(a.demande) * 4;
-      } else if (val === 'V' && v.mode === 'delire' && v.enJeu.length > 2) {
+      } else if (val === 'V' && v.jRetour && v.enJeu.length > 2) {
         score += danger && !dangerDerriere && a.cartes.length % 2 === 1 ? 60 : 0;
       } else {
         // Carte ordinaire : se débarrasser des valeurs que les autres peuvent encore suivre le moins.
@@ -5502,8 +5541,9 @@ var qrcode = function() {
       jeu: JEU,
       code,
       etat: 'salon', // 'salon' | 'manche' | 'finManche' | 'finPartie'
-      mode: 'simple', // 'simple' | 'delire' (J retour), choisi par l'hôte dans le salon
-      paquets: 1, // fixé au lancement selon le nombre de joueurs
+      mode: 'simple', // 'simple' (1 paquet) | 'delire' (2 paquets), choisi par l'hôte dans le salon
+      jRetour: false, // option du mode délire : le valet change le sens du jeu
+      paquets: 1, // fixé au lancement selon le mode
       joueurs: [],
       hote: null,
       restants: [],
@@ -5588,7 +5628,7 @@ var qrcode = function() {
 
   function lancer(s) {
     s.restants = s.joueurs.map((j) => j.id);
-    s.paquets = I.nombrePaquets(s.restants.length);
+    s.paquets = I.nombrePaquets(s.mode);
     demarrerManche(s);
   }
   function rendrePublique(s, taille) {
@@ -5672,7 +5712,7 @@ var qrcode = function() {
     // Avec une distribution animée, l'effet de la carte de départ (pénalité, tour sauté, J retour)
     // attend la fin du compte à rebours : le joueur sanctionné reçoit ses cartes après les autres.
     const differerDepart = s.durees.depart > 0;
-    s.manche = I.nouvelleManche(sieges, mains, pioche, premier, { mode: s.mode, graine: Math.floor(s.rng() * 4294967296), differerDepart });
+    s.manche = I.nouvelleManche(sieges, mains, pioche, premier, { mode: s.mode, jRetour: s.jRetour, graine: Math.floor(s.rng() * 4294967296), differerDepart });
     s.etat = 'manche';
     s.pause = s.durees.depart > 0 ? { type: 'depart', jusqua: s.horloge() + s.durees.depart, total: s.durees.depart } : null;
     armerChrono(s);
@@ -5753,7 +5793,8 @@ var qrcode = function() {
   }
 
   // Traite un message d'un joueur. Renvoie { ok, erreur? }. Mêmes messages que la salle de Kopo,
-  // plus le style de partie dans les réglages : { type: 'reglages', mode: 'simple' | 'delire' }.
+  // plus le style de partie dans les réglages : { type: 'reglages', mode: 'simple' | 'delire', jRetour: bool }.
+  // Une ancienne appli envoie « délire » sans jRetour : c'était le délire avec J retour.
   function recevoir(s, id, msg) {
     const joueur = s.joueurs.find((j) => j.id === id);
     switch (msg && msg.type) {
@@ -5815,7 +5856,13 @@ var qrcode = function() {
         if (msg.mode !== undefined) {
           if (!MODES.includes(msg.mode)) return { ok: false, erreur: 'Impossible.' };
           s.mode = msg.mode;
+          if (msg.jRetour === undefined) s.jRetour = s.mode === 'delire';
         }
+        if (msg.jRetour !== undefined) {
+          if (typeof msg.jRetour !== 'boolean') return { ok: false, erreur: 'Impossible.' };
+          s.jRetour = msg.jRetour;
+        }
+        if (s.mode !== 'delire') s.jRetour = false;
         if (msg.robots !== undefined) {
           if (s.publique || !NIVEAUX_ROBOTS.concat('gentils').includes(msg.robots)) return { ok: false, erreur: 'Impossible.' };
           s.robots = msg.robots;
@@ -5905,7 +5952,7 @@ var qrcode = function() {
     const ids = s.joueurs.map((j) => j.id).sort((a, b) => b.length - a.length);
     return m.journal.slice(-8).map((t) => {
       for (const id of ids) t = t.split(id).join(nomDe(s, id));
-      return t.replace('mode delire', 'mode délire (J retour)');
+      return t.replace('mode delire avec J retour', 'mode délire (J retour)').replace('mode delire', 'mode délire');
     });
   }
 
@@ -5921,6 +5968,7 @@ var qrcode = function() {
       moi: id,
       hote: s.hote,
       mode: s.mode,
+      jRetour: !!s.jRetour,
       joueurs: s.joueurs.map((j) => ({ id: j.id, nom: j.nom, connecte: j.connecte, peerId: j.peerId || null, voix: !!j.voix, muet: j.muet !== false, robot: !!j.robot, pret: !!j.pret || !!j.robot, remplace: !!j.remplace, absent: estAbsent(s, j.id) })),
       delai: s.delai,
       publique: !!s.publique,
@@ -5947,6 +5995,7 @@ var qrcode = function() {
         demande: p.demande,
         sens: p.sens,
         pioche: p.pioche,
+        piochable: p.piochable,
         annonces: p.annonces,
         contestables: p.contestables,
         aPioche: p.aPioche,
@@ -5957,9 +6006,10 @@ var qrcode = function() {
         elimine: m.elimine,
         journal: journalLisible(s, m),
         main: p.main,
-        posees: p.posees.slice(-8), // dernières cartes posées (animations côté téléphone)
-        nbPosees: p.posees.length,
+        posees: p.posees, // dernières cartes posées (animations côté téléphone)
+        nbPosees: p.nbPosees,
         dernier: p.dernier, // qui a posé la carte du centre
+        piocheVide: p.piocheVide, // { joueur, motif, n } : il a passé faute de cartes à piocher
         paquets: p.paquets,
         pause: s.pause ? { type: s.pause.type, resteMs: Math.max(0, s.pause.jusqua - s.horloge()), totalMs: s.pause.total } : null,
         enGrace: (p.contestables || []).filter((j) => enGrace(s, j)), // pas encore contestables (3 s pour annoncer)
@@ -5984,6 +6034,9 @@ var qrcode = function() {
     s.rng = rng || hasardFort();
     s.horloge = Date.now;
     s.joueurs.forEach((j) => (j.connecte = !!j.robot));
+    // Partie enregistrée avant l'option J retour : le délire se jouait avec.
+    if (s.jRetour === undefined) s.jRetour = s.mode === 'delire';
+    if (s.manche && s.manche.jRetour === undefined) s.manche.jRetour = s.manche.mode === 'delire';
     return s;
   }
 
@@ -6775,7 +6828,7 @@ var qrcode = function() {
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = 'ecb015e34c2a'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = '9da5fb2ef2f9'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
@@ -7132,7 +7185,7 @@ var qrcode = function() {
       const cli = new Colyseus.Client(SERVEUR.replace(/^http/, 'ws'));
       if (facon.reconnexion) room = await cli.reconnect(facon.reconnexion).catch(() => facon.code ? reprendreServeur(cli, c.jeton, facon.code).then((r) => r || Promise.reject(new Error('reconnexion'))) : Promise.reject(new Error('reconnexion')));
       else if (facon.matchJour) room = await cli.create('kopo-jour', { jeton: c.jeton });
-      else if (facon.creer) room = await cli.create(facon.jeu === 'inter8' ? 'inter8' : 'kopo', Object.assign({ jeton: c.jeton, code: nouveauCode() }, facon.jeu === 'inter8' ? { mode: facon.mode } : {}));
+      else if (facon.creer) room = await cli.create(facon.jeu === 'inter8' ? 'inter8' : 'kopo', Object.assign({ jeton: c.jeton, code: nouveauCode() }, facon.jeu === 'inter8' ? { mode: facon.mode, jRetour: !!facon.jRetour } : {}));
       // Par le code : la table peut être de Kopo ou d'Inter (8), on cherche dans les deux.
       else if (facon.code) room = (await reprendreServeur(cli, c.jeton, facon.code)) || await cli.join('kopo', { jeton: c.jeton, code: facon.code }).catch((e) => cli.join('inter8', { jeton: c.jeton, code: facon.code }).catch(() => { throw e; }));
       else if (facon.mise) room = await cli.joinOrCreate('kopo-mise', { jeton: c.jeton, publique: true, taille: facon.taille, mise: facon.mise });
@@ -7810,16 +7863,28 @@ var qrcode = function() {
         rg.append(b);
       } else if (v.delai === d) rg.append(el('strong', null, d ? d + ' secondes par joueur' : 'sans chrono'));
     }
-    // Inter (8) : le style de la partie (simple, ou délire avec le J retour), choisi par l'hôte.
+    // Inter (8) : le style de la partie (simple : 1 paquet ; délire : 2 paquets), choisi par l'hôte.
     const rs = $('reglageStyle'); rs.hidden = v.jeu !== 'inter8'; rs.replaceChildren();
     if (v.jeu === 'inter8') {
       rs.append(el('span', null, 'Style'));
-      for (const [mode, libelle] of [['simple', 'Simple'], ['delire', 'Délire (J retour)']]) {
+      for (const [mode, libelle] of [['simple', 'Simple · 1 paquet'], ['delire', 'Délire · 2 paquets']]) {
         if (jeSuisHote && !v.publique) {
           const b = el('button', 'btn' + (v.mode === mode ? ' actif' : ''), libelle);
-          b.onclick = () => envoyer({ type: 'reglages', mode });
+          b.onclick = () => { stock.ecrire('kopo-inter8-style', mode); envoyer(Object.assign({ type: 'reglages' }, reglagesStyleInter(mode))); };
           rs.append(b);
         } else if (v.mode === mode) rs.append(el('strong', null, libelle));
+      }
+    }
+    // Délire : le J retour, en option.
+    const rj = $('reglageJRetour'); rj.hidden = v.jeu !== 'inter8' || v.mode !== 'delire'; rj.replaceChildren();
+    if (!rj.hidden) {
+      rj.append(el('span', null, 'J retour'));
+      for (const [oui, libelle] of [[false, 'Non'], [true, 'Oui']]) {
+        if (jeSuisHote && !v.publique) {
+          const b = el('button', 'btn' + (!!v.jRetour === oui ? ' actif' : ''), libelle);
+          b.onclick = () => { ecrireJRetour(oui); envoyer({ type: 'reglages', jRetour: oui }); };
+          rj.append(b);
+        } else if (!!v.jRetour === oui) rj.append(el('strong', null, libelle));
       }
     }
     const maxJoueurs = v.jeu === 'inter8' ? SI.MAX : 9;
@@ -8137,7 +8202,7 @@ var qrcode = function() {
     const m = v.manche;
     const finale = v.restants.length === 2;
     $('info').innerHTML = '';
-    $('info').append(el('strong', null, finale ? 'Finale' : 'Manche ' + v.numeroManche), document.createTextNode(` · ${v.mode === 'delire' ? 'Délire' : 'Simple'} · ${v.code}`));
+    $('info').append(el('strong', null, finale ? 'Finale' : 'Manche ' + v.numeroManche), document.createTextNode(` · ${v.mode === 'delire' ? (v.jRetour ? 'Délire · J retour' : 'Délire') : 'Simple'} · ${v.code}`));
     const pause = m.pause;
     dessinerSieges(v);
     // Qui a annoncé, et le sens du jeu (mode délire).
@@ -8149,7 +8214,9 @@ var qrcode = function() {
     if (!pause && m.phase === 'jeu') {
       if (m.demande) { const c = el('span', 'chip demande'); c.append('Demande ', el('b', null, nomValeur(m.demande.valeur)), ` · ${qui(m.demande.par)}`); ent.append(c); }
       else if (m.libre) ent.append(el('span', 'chip', 'Jeu libre : pose la carte de ton choix'));
-      if (v.mode === 'delire' && m.enJeu.length > 2) { const c = el('span', 'chip'); c.append('Sens ', el('b', null, m.sens === 1 ? '↻' : '↺')); ent.append(c); }
+      // Plus rien à piocher : qui ne peut pas jouer passe son tour (dit à toute la table).
+      if (m.piochable === 0) ent.append(el('span', 'chip vide', 'Pioche vide : qui ne peut pas jouer passe'));
+      if (v.mode === 'delire' && v.jRetour && m.enJeu.length > 2) { const c = el('span', 'chip'); c.append('Sens ', el('b', null, m.sens === 1 ? '↻' : '↺')); ent.append(c); }
     }
 
     // Table : compte à rebours de départ, ou la carte du centre et la pioche.
@@ -8170,11 +8237,12 @@ var qrcode = function() {
       const pioche = el('div', 'pile');
       const dos = el('div', 'carte dos-carte'); dos.id = 'piocheInter';
       pioche.classList.add('pioche-inter');
-      pioche.append(dos, el('span', 'legende', String(m.pioche)));
+      if (m.piochable === 0) pioche.classList.add('vide');
+      pioche.append(dos, el('span', 'legende', m.piochable === 0 ? 'Vide' : String(m.pioche)));
       pioche.setAttribute('aria-label', `Pioche : ${m.pioche} carte${m.pioche > 1 ? 's' : ''}`);
       t.append(ref, pioche); // la carte posée au milieu, la pioche dans un coin
       // Mode délire : le sens du jeu tourne en permanence autour de la carte du centre.
-      if (v.mode === 'delire' && m.enJeu.length > 2) t.prepend(roueSens(m.sens));
+      if (v.mode === 'delire' && v.jRetour && m.enJeu.length > 2) t.prepend(roueSens(m.sens));
       poses.append(t);
     }
 
@@ -8276,7 +8344,8 @@ var qrcode = function() {
     }
     else if (choixInter.length) { const annuler = el('button', 'btn large', 'Reprendre les cartes'); annuler.onclick = () => { choixInter = []; afficherPartieInter(vueActuelle); }; act.append(annuler); }
     if (actions.some((a) => a.type === 'piocher')) {
-      const b = el('button', 'btn principal large', 'Piocher une carte');
+      // Plus rien à piocher (ni pioche, ni défausse à remélanger) : on passe son tour, et toute la table le voit.
+      const b = el('button', 'btn principal large', m.piochable === 0 ? 'Plus de cartes : passer mon tour' : 'Piocher une carte');
       b.onclick = () => { b.disabled = true; envoyer({ type: 'action', action: { type: 'piocher' } }); };
       act.append(b);
     }
@@ -8335,6 +8404,13 @@ var qrcode = function() {
     // Contestation : le joueur pris en faute pioche 1 carte d'amende.
     const fil = m.journal[m.journal.length - 1] || '';
     if (fil !== (a.journal[a.journal.length - 1] || '') && / conteste : /.test(fil)) (a.contestables || []).filter((id) => !(m.contestables || []).includes(id)).forEach((id) => bulle(id, '!', { cls: 'ko', delai: 100 }));
+    // Plus de cartes à piocher : toute la table voit qui passe son tour, et pourquoi.
+    if (m.piocheVide && (!a.piocheVide || a.piocheVide.n !== m.piocheVide.n)) {
+      const id = m.piocheVide.joueur, qui = id === moi ? 'Tu passes ton tour' : nom(N, id) + ' passe son tour';
+      tampon('PIOCHE VIDE', qui);
+      bulle(id, '⏭', { delai: 300 });
+      retardFenetre = Math.max(retardFenetre, Date.now() + 1500);
+    }
     // J retour, demande du 8 : on montre ce qui change.
     if (m.sens !== a.sens) {
       pop(document.querySelector('#entete .chip:last-child'), 1.5, 600);
@@ -10851,9 +10927,10 @@ var qrcode = function() {
     return p;
   }
   function creerPartie(p, jeu, mode) {
-    if (MODE_SERVEUR) return entrerServeur(p, { creer: true, jeu, mode });
+    const style = jeu === 'inter8' ? reglagesStyleInter(mode) : {};
+    if (MODE_SERVEUR) return entrerServeur(p, Object.assign({ creer: true, jeu }, style));
     demarrerHote(nouveauCode(), p, false, null, jeu);
-    if (jeu === 'inter8') envoyer({ type: 'reglages', mode });
+    if (jeu === 'inter8') envoyer(Object.assign({ type: 'reglages' }, style));
   }
   // Inter (8) : « Quelle partie ? » (Simple ou Délire) avant d'ouvrir la table. Le style se change encore dans le salon.
   function choisirStyleInter(p) {
@@ -10863,13 +10940,23 @@ var qrcode = function() {
       corps.append(el('b', null, titre), el('span', null, texte));
       if (puces) { const l = el('span', 'style-puces'); puces.forEach((x) => l.append(el('i', null, x))); corps.append(l); }
       b.append(el('span', 'style-carte', lettre), corps);
-      b.onclick = () => { stock.ecrire('kopo-inter8-style', mode); fermerFenetre(); creerPartie(p, 'inter8', mode); };
+      b.onclick = () => { if (!stock.lire('kopo-inter8-jretour')) ecrireJRetour(jRetourInter()); stock.ecrire('kopo-inter8-style', mode); fermerFenetre(); creerPartie(p, 'inter8', mode); };
       return b;
     };
+    // Délire : le J retour est une option (désactivée par défaut), choisie avant d'ouvrir la table.
+    const option = el('div', 'choix choix-niveau-robots option-jretour'); option.setAttribute('role', 'group'); option.setAttribute('aria-label', 'J retour en délire');
+    const majOption = () => option.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.v === 'oui') === jRetourInter())));
+    for (const [v, libelle] of [['non', 'Sans J retour'], ['oui', 'Avec J retour']]) {
+      const b = el('button', null, libelle); b.type = 'button'; b.dataset.v = v;
+      b.onclick = () => { ecrireJRetour(v === 'oui'); majOption(); };
+      option.append(b);
+    }
+    majOption();
     const annuler = el('button', 'btn large', 'Annuler'); annuler.onclick = fermerFenetre;
     ouvrirFenetre([el('h2', null, 'Quelle partie ?'), el('p', 'muted', "Inter (8), entre amis. Choisis le style avant d'inviter."),
-      carte('simple', '8', 'Simple', 'Les règles de base, de 2 à 8 joueurs.', ["1 paquet jusqu'à 4", '2 paquets (108) dès 5']),
-      carte('delire', 'J', 'Délire', 'Tout le mode simple, plus le J retour : le valet change le sens du jeu.'), annuler], 'styleInter');
+      carte('simple', '8', 'Simple', 'Les règles de base, de 2 à 8 joueurs.', ['1 paquet (54 cartes)']),
+      carte('delire', 'J', 'Délire', 'Les mêmes règles avec deux paquets, de 2 à 8 joueurs. Le J retour (le valet change le sens du jeu) en option.', ['2 paquets (108 cartes)']),
+      el('small', 'muted', 'En délire :'), option, annuler], 'styleInter');
   }
   $('btnCreer').onclick = async () => { const p = lirePseudo(); if (!p || await exigerGoogle()) return; if (jeuChoisi() === 'inter8') choisirStyleInter(p); else creerPartie(p, 'kopo'); };
   $('btnRejoindre').onclick = () => {
@@ -11210,13 +11297,21 @@ var qrcode = function() {
   $('niveauRobots').querySelectorAll('button').forEach((b) => (b.onclick = () => { stock.ecrire('kopo-niveau-robots', b.dataset.v); majNiveauRobots(); majSousTitresModes(); }));
   // Inter (8) : le style de la partie (gardé sur le téléphone), et 7 robots au plus (8 joueurs).
   const styleInter = () => (stock.lire('kopo-inter8-style') === 'delire' ? 'delire' : 'simple');
+  // J retour : option du délire, désactivée par défaut. Qui jouait déjà en délire (avant l'option) le garde.
+  const jRetourInter = () => { const j = stock.lire('kopo-inter8-jretour'); return j ? j === 'oui' : styleInter() === 'delire'; };
+  const ecrireJRetour = (oui) => stock.ecrire('kopo-inter8-jretour', oui ? 'oui' : 'non');
+  const reglagesStyleInter = (mode) => ({ mode, jRetour: mode === 'delire' && jRetourInter() });
   function majStyleRobots() {
-    const inter = jeuChoisi() === 'inter8';
+    const inter = jeuChoisi() === 'inter8', delire = styleInter() === 'delire';
     document.querySelectorAll('#voileRobots .style-inter').forEach((e) => (e.hidden = !inter));
     $('styleRobots').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === styleInter())));
+    $('aideStyleRobots').textContent = delire ? '2 paquets (108 cartes). Le J retour fait changer le sens du jeu.' : '1 paquet (54 cartes), les règles de base.';
+    $('jRetourRobots').hidden = !inter || !delire;
+    $('jRetourRobots').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.v === 'oui') === jRetourInter())));
     $('choixRobots').querySelectorAll('button').forEach((b) => (b.hidden = inter && +b.textContent > SI.MAX - 1));
   }
-  $('styleRobots').querySelectorAll('button').forEach((b) => (b.onclick = () => { stock.ecrire('kopo-inter8-style', b.dataset.v); majStyleRobots(); }));
+  $('styleRobots').querySelectorAll('button').forEach((b) => (b.onclick = () => { if (!stock.lire('kopo-inter8-jretour')) ecrireJRetour(jRetourInter()); stock.ecrire('kopo-inter8-style', b.dataset.v); majStyleRobots(); }));
+  $('jRetourRobots').querySelectorAll('button').forEach((b) => (b.onclick = () => { ecrireJRetour(b.dataset.v === 'oui'); majStyleRobots(); }));
   $('btnModeRobots').onclick = () => {
     if (!lirePseudo()) return;
     $('btnGuidee').hidden = !!lireProfil().premierePartie || jeuChoisi() === 'inter8';
@@ -11234,7 +11329,7 @@ var qrcode = function() {
       // Partie avec des robots : on crée la salle, on ajoute les robots et on lance tout de suite.
       const inter = jeuChoisi() === 'inter8';
       demarrerHote(nouveauCode(), p, false, null, inter ? 'inter8' : 'kopo');
-      envoyer(Object.assign({ type: 'reglages', robots: niveauRobots(), niveau: monNiveau() }, inter ? { mode: styleInter() } : {}));
+      envoyer(Object.assign({ type: 'reglages', robots: niveauRobots(), niveau: monNiveau() }, inter ? reglagesStyleInter(styleInter()) : {}));
       for (let i = 0; i < n; i++) envoyer({ type: 'ajouterRobot' });
       envoyer({ type: 'lancer' });
     };

@@ -67,18 +67,41 @@ test("Style de partie : l'hôte choisit Simple ou Délire dans le salon", () => 
   const s = salleAvec(3);
   assert.ok(!S.recevoir(s, 'p2', { type: 'reglages', mode: 'delire' }).ok, 'pas un invité');
   assert.ok(!S.recevoir(s, 'p1', { type: 'reglages', mode: 'fou' }).ok);
-  assert.ok(S.recevoir(s, 'p1', { type: 'reglages', mode: 'delire' }).ok);
+  assert.ok(!S.recevoir(s, 'p1', { type: 'reglages', mode: 'delire', jRetour: 'oui' }).ok);
+  assert.ok(S.recevoir(s, 'p1', { type: 'reglages', mode: 'delire', jRetour: false }).ok);
   assert.strictEqual(S.vue(s, 'p2').mode, 'delire');
+  assert.strictEqual(S.vue(s, 'p2').jRetour, false);
+  assert.ok(S.recevoir(s, 'p1', { type: 'reglages', jRetour: true }).ok);
+  assert.strictEqual(S.vue(s, 'p2').jRetour, true);
   S.recevoir(s, 'p1', { type: 'lancer' });
   assert.strictEqual(s.manche.mode, 'delire');
+  assert.strictEqual(s.manche.jRetour, true);
   assert.ok(!S.recevoir(s, 'p1', { type: 'reglages', mode: 'simple' }).ok, 'plus pendant la partie');
 });
 
-test('1 paquet jusqu\'à 4 joueurs, 2 paquets dès 5, gardés toute la partie', () => {
-  const s4 = salleAvec(4); S.recevoir(s4, 'p1', { type: 'lancer' });
-  assert.strictEqual(s4.paquets, 1);
-  const s5 = salleAvec(5); S.recevoir(s5, 'p1', { type: 'lancer' });
-  assert.strictEqual(s5.paquets, 2);
+test('J retour : seulement en délire, et une ancienne appli qui envoie « délire » seul le garde', () => {
+  const s = salleAvec(3);
+  assert.ok(S.recevoir(s, 'p1', { type: 'reglages', mode: 'simple', jRetour: true }).ok);
+  assert.strictEqual(s.jRetour, false, 'pas de J retour en simple');
+  S.recevoir(s, 'p1', { type: 'reglages', mode: 'delire' });
+  assert.strictEqual(s.jRetour, true);
+  const t = salleAvec(3);
+  S.recevoir(t, 'p1', { type: 'reglages', mode: 'delire', jRetour: true });
+  S.recevoir(t, 'p1', { type: 'lancer' });
+  const ancienne = JSON.parse(S.exporter(t));
+  delete ancienne.jRetour; delete ancienne.manche.jRetour;
+  const u = S.importer(JSON.stringify(ancienne));
+  assert.strictEqual(u.jRetour, true);
+  assert.strictEqual(u.manche.jRetour, true);
+});
+
+test('Simple : 1 paquet même à 8 joueurs ; délire : 2 paquets même à 2 joueurs', () => {
+  const s8 = salleAvec(8); S.recevoir(s8, 'p1', { type: 'lancer' });
+  assert.strictEqual(s8.paquets, 1);
+  assert.strictEqual(S.vue(s8, 'p1').manche.paquets, 1);
+  const s2 = salleAvec(2); S.recevoir(s2, 'p1', { type: 'reglages', mode: 'delire', jRetour: false }); S.recevoir(s2, 'p1', { type: 'lancer' });
+  assert.strictEqual(s2.paquets, 2);
+  assert.strictEqual(S.vue(s2, 'p1').manche.paquets, 2);
 });
 
 console.log('\nCe que voit chaque joueur');

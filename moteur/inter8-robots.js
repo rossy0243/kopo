@@ -89,7 +89,7 @@
 
   // Robot fort : il compte les cartes déjà posées, demande avec le 8 une valeur que les autres
   // n'ont probablement plus, vise le joueur qui va sortir, prépare sa sortie et conteste toujours.
-  // En mode délire, il se sert du J retour pour éloigner le tour d'un joueur qui va sortir.
+  // En mode délire avec J retour, il se sert du valet pour éloigner le tour d'un joueur qui va sortir.
   function robotFort(v, actions) {
     const h = horsTour(actions, 1, 1, () => 0);
     if (h) return h;
@@ -99,9 +99,11 @@
     const sortie = c.find((a) => sort(v, a));
     if (sortie) return sortie;
 
-    // Cartes que je ne connais pas : chez les autres ou dans la pioche.
+    // Cartes que je ne connais pas : chez les autres ou dans la pioche. Seules les cartes de la
+    // défausse (posées depuis le dernier mélange) sont sûrement hors jeu : les autres ont pu être
+    // remélangées dans la pioche.
     const connues = {};
-    for (const x of v.main.concat(v.posees)) connues[x] = true;
+    for (const x of v.main.concat(v.defausse)) connues[x] = true;
     const inconnues = I.nouveauPaquet(v.paquets || 1).filter((x) => !connues[x]);
     const restantes = (val) => inconnues.filter((x) => I.valeur(x) === val).length;
     const manquees = (val) => v.piochesDemande.filter((p) => p.valeur === val).length;
@@ -125,7 +127,7 @@
         // Le 8 se garde pour ne jamais devoir piocher. Quand il part, il demande une valeur
         // rare chez les autres, que d'autres ont déjà manquée.
         score += -40 + manquees(a.demande) * 12 - restantes(a.demande) * 6 + nb(a.demande) * 4;
-      } else if (val === 'V' && v.mode === 'delire' && v.enJeu.length > 2) {
+      } else if (val === 'V' && v.jRetour && v.enJeu.length > 2) {
         score += danger && !dangerDerriere && a.cartes.length % 2 === 1 ? 60 : 0;
       } else {
         // Carte ordinaire : se débarrasser des valeurs que les autres peuvent encore suivre le moins.
