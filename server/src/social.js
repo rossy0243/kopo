@@ -10,7 +10,7 @@ const COLONNES_CARTE = `c.equipes->>'avatar' AS apparence, c.equipes->>'cadre' A
   CASE WHEN jsonb_typeof(c.profil->'xp') = 'number' THEN floor((c.profil->>'xp')::numeric)::int END AS xp,
   CASE WHEN jsonb_typeof(c.profil->'bareme') = 'number' THEN (c.profil->>'bareme')::int END AS bareme`;
 
-function creerSocial(base) {
+function creerSocial(base, push = null) {
   async function veut(q, compteId, type) {
     const r = await q.query('SELECT notifs, statut FROM comptes WHERE id = $1', [compteId]);
     const c = r.rows[0];
@@ -22,6 +22,8 @@ function creerSocial(base) {
   async function notifier(q, compteId, type, texte, donnees = null) {
     if (!(await veut(q, compteId, type))) return false;
     await q.query('INSERT INTO notifications (compte_id, type, texte, donnees) VALUES ($1,$2,$3,$4)', [compteId, type, texte, donnees ? JSON.stringify(donnees) : null]);
+    // Certaines partent aussi en notification push (téléphone prévenu même jeu fermé) ; sans attendre la réponse.
+    if (push) push.depuisNotification(compteId, type, texte, donnees).catch((e) => console.error('Push :', e.message));
     return true;
   }
 

@@ -22,7 +22,8 @@
     "express": "^4.22.3",
     "jose": "^6.2.14",
     "nanoid": "file:vendor/nanoid",
-    "pg": "^8.23.1"
+    "pg": "^8.23.1",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.14",

@@ -34,6 +34,8 @@ Les tables sont créées toutes seules au premier démarrage (`src/schema.sql`).
 | `CONNEXION_GOOGLE` | `1` pour afficher « Se connecter avec Google » dans le jeu (après avoir activé Google dans Supabase, avec la Site URL du jeu). Rend aussi Google obligatoire pour jouer en ligne et entre amis (salles `kopo`, `kopo-mise`, `inter8`) ; sans compte, on joue contre les robots |
 | `SECRET_MATCH_JOUR` | Facultatif : graine secrète des donnes du Match du jour (sinon `SECRET_SERVEUR`). La changer change les donnes à venir |
 | `ORIGINES` | Pages autorisées à appeler l'API (séparées par des virgules) |
+| `VAPID_PUBLIC`, `VAPID_PRIVE` | Notifications push : les deux clés, créées une fois avec `node server/src/outils.js vapid` (en changer désabonne tous les téléphones). Sans elles, pas de notifications push, le reste du jeu marche normalement |
+| `VAPID_CONTACT` | Notifications push : adresse de contact donnée aux services de push (`https://…` ou `mailto:…`) |
 
 ## API (pour l'application)
 | Route | Rôle |
@@ -50,6 +52,7 @@ Les tables sont créées toutes seules au premier démarrage (`src/schema.sql`).
 | `GET /api/en-ligne` | Joueurs connectés et salles publiques ouvertes (`classee` : la salle compte pour la ligue) |
 | `GET /api/rivaux` | Mes face-à-face (qui finit devant l'autre dans les parties jouées ensemble) |
 | `GET /api/notifications`, `POST /api/notifications/lues` | Notifications dans le jeu : rivalité, invitation d'un ami, demande d'ami (et demande acceptée) ; `demandesAmi` = demandes reçues en attente. Chaque type se coupe avec `PATCH /api/moi { notifs: { rivalite: false } }` |
+| `GET /api/push`, `POST/DELETE /api/push/abonnement`, `PATCH /api/push/prefs` | Notifications push : clé publique et réglages ; abonner ce téléphone `{ abonnement, appareil }` ou le désabonner `{ endpoint }` ; couper un type `{ invitation\|ami\|match\|annonce: false }`. Envoyées : invitation d'un ami (expire après 10 min), demande d'ami et demande acceptée, rappel du Match du jour à 19 h (Kinshasa) pour ceux qui l'ont joué ces 7 derniers jours ou sont dans une Bande, annonces du tableau de bord (onglet Notifications). Rien entre 22 h et 8 h sauf les invitations et les annonces |
 | `POST /api/amis/:id/inviter` | Inviter un ami à sa table (`{ code }`) : 1 fois par ami toutes les 2 min, 15 par heure |
 | `GET /api/parcours`, `POST /api/parcours/recuperer` | Parcours de saison : XP, 30 paliers (voie gratuite et voie Kopo+), récupérer un palier `{ palier, voie: 'gratuit'\|'plus' }` |
 | `GET /api/collection`, `POST /api/collection/equiper` | Apparences possédées et équipées (avatar, dos de cartes, cadre) |

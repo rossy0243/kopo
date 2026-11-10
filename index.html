@@ -963,6 +963,11 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
 .ligue-recap .monte { color: var(--brass); font-weight: 700; }
 .ligue-fin { text-align: center; display: grid; gap: 8px; justify-items: center; }
 .ligue-fin .titre { font: 400 34px/1 var(--display); letter-spacing: 2px; color: var(--div, var(--brass)); }
+.push-bandeau { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; align-items: center; padding: 10px 12px; border: 1px solid var(--brass); border-radius: 12px; background: rgba(226,176,74,.08); text-align: left; }
+.push-bandeau > .ico { font-size: 28px; color: var(--brass); grid-row: span 2; }
+.push-bandeau p { margin: 0; font-size: 14px; }
+.push-bandeau .push-boutons { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; }
+.push-bandeau .push-boutons .btn { flex: 1; min-width: 120px; }
 .notif-carte { display: grid; gap: 10px; justify-items: center; text-align: center; }
 .notif-carte .ico { font-size: 44px; color: var(--brass); }
 /* Amis : bouton sur l'accueil (entre les pièces et le pseudo) et fenêtre Amis */
@@ -1204,6 +1209,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   <symbol id="i-menu" viewBox="0 0 32 32"><circle cx="16" cy="7" r="2.4" style="fill:currentColor"/><circle cx="16" cy="16" r="2.4" style="fill:currentColor"/><circle cx="16" cy="25" r="2.4" style="fill:currentColor"/></symbol>
   <symbol id="i-ios-partage" viewBox="0 0 32 32"><path d="M11 12H8v16h16V12h-3M16 20V3M11 8l5-5 5 5"/></symbol>
   <symbol id="i-ios-ajouter" viewBox="0 0 32 32"><rect x="5" y="5" width="22" height="22" rx="5"/><path d="M16 10.5v11M10.5 16h11"/></symbol>
+  <symbol id="i-cloche" viewBox="0 0 32 32"><path d="M9 21v-7a7 7 0 0 1 14 0v7l2.5 3h-19z"/><path d="M13.5 27.5a2.8 2.8 0 0 0 5 0"/><circle cx="23" cy="8" r="2.6" style="fill:var(--acc,#c73a3a);stroke:none"/></symbol>
   <symbol id="i-cadenas" viewBox="0 0 32 32"><rect x="8" y="14" width="16" height="13" rx="2.5"/><path d="M11.5 14v-3.5a4.5 4.5 0 0 1 9 0V14M16 19v3"/></symbol>
   </defs>
 </svg>
@@ -6870,7 +6876,7 @@ var qrcode = function() {
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = '9ee4d1f4e81f'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = '9038e6dcaa82'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
@@ -6896,6 +6902,12 @@ var qrcode = function() {
   if (/^[A-Z0-9]{6}$/.test(bandeLien)) {
     stock.ecrire('kopo-bande-lien', { code: bandeLien, le: Date.now() });
     const q = new URLSearchParams(location.search); q.delete('bande');
+    history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + location.hash);
+  }
+  // Notification push touchée, jeu fermé (?ouvrir=amis ou ?ouvrir=match) : la fenêtre s'ouvre une fois l'accueil prêt.
+  let ouvrirDemande = new URLSearchParams(location.search).get('ouvrir');
+  if (ouvrirDemande) {
+    const q = new URLSearchParams(location.search); q.delete('ouvrir');
     history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + location.hash);
   }
   function enregistrerPrefs() { stock.ecrire('kopo-prefs', prefs); appliquerPrefs(); }
@@ -7524,6 +7536,7 @@ var qrcode = function() {
     setTimeout(majCartesCompetition, 800); // Match du jour et Bande : score, place, lien d'invitation
     if (montrerBienvenue()) return;
     if (/^[A-Z]{4}$/.test(h)) { $('codeRejoindre').value = h; $('voileRejoindre').hidden = false; }
+    else if (ouvrirDemande) { const o = ouvrirDemande; ouvrirDemande = null; setTimeout(() => ouvrirDepuisNotification('./?ouvrir=' + o), 1200); }
     else setTimeout(() => { if ($('ecranAccueil').hidden || !$('voile').hidden) return; if (!bonusDuJour()) suiteAccueil(); }, 1600);
   }
   function afficherConnexion(t) { montrerEcran('ecranConnexion'); $('texteConnexion').textContent = t; }
@@ -9058,6 +9071,7 @@ var qrcode = function() {
     else if (animReduiteSysteme) choix('animations', 'Animations', 'Ton téléphone demande moins d\'animations (économie de batterie ou accessibilité). Touche « Normales » pour les voir quand même.', [['toujours', 'Normales'], ['reduites', 'Réduites']], () => (prefs.animations === 'toujours' ? 'toujours' : 'reduites'));
     else choix('animations', 'Animations', 'Réduites : plus rapide, moins de batterie', [['normales', 'Normales'], ['reduites', 'Réduites']], () => (prefs.animations === 'reduites' ? 'reduites' : 'normales'));
     bascule('quatreCouleurs', 'Cartes à 4 couleurs', 'Pique noir, cœur rouge, carreau bleu, trèfle vert', null);
+    if (MODE_SERVEUR && compteLocal()) { titre('Notifications'); const zn = el('div', 'reglages-notifs'); z.append(zn); reglagesPush(zn); }
     titre('Compte');
     // Pseudo : choisi une fois, puis 2 changements au plus sur 12 mois (le serveur fait foi s'il y a un compte).
     const ps = el('input', 'texte'); ps.maxLength = 16; ps.value = stock.lire('kopo-pseudo') || ''; ps.placeholder = 'Ex. As_de_Pique'; ps.setAttribute('aria-label', 'Pseudo');
@@ -9473,8 +9487,10 @@ var qrcode = function() {
     if (r.officiel) { const p = el('button', 'btn principal large', 'Partager'); p.onclick = () => partagerMatchJour(r); boutons.push(p); }
     const b = el('button', 'btn large', 'Voir ma Bande'); b.onclick = () => ouvrirBande();
     const f = el('button', 'btn large', 'Fermer'); f.onclick = () => { fermerFenetre(); majCartesCompetition(); };
-    ouvrirFenetre([z, ...boutons, b, f]);
+    const zonePush = el('div'); zonePush.style.display = 'contents';
+    ouvrirFenetre([z, zonePush, ...boutons, b, f]);
     majCartesCompetition();
+    if (r.officiel) bandeauPush('match').then((x) => x && zonePush.append(x));
   }
 
 
@@ -10342,8 +10358,10 @@ var qrcode = function() {
     bDem.onclick = () => { ongletAmis = 'demandes'; montrer(); };
     if (!garderOnglet) ongletAmis = demandesAmi > 0 ? 'demandes' : 'amis'; // à l'ouverture : les demandes d'abord s'il y en a
     montrer();
-    ouvrirFenetre([tete, onglets, liste, ajout, moi, bas, parrain], 'amis');
+    const zonePush = el('div'); zonePush.style.display = 'contents';
+    ouvrirFenetre([tete, zonePush, onglets, liste, ajout, moi, bas, parrain], 'amis');
     dessiner();
+    bandeauPush('amis').then((b) => b && zonePush.append(b));
   }
 
   // ------------------------------------------------------------------ parrainage (serveur)
@@ -11306,6 +11324,143 @@ var qrcode = function() {
     ouvrirFenetre([el('h2', null, 'Installer Masano'), el('p', null, 'Mets Masano sur ton écran d\'accueil : il s\'ouvre d\'un geste, en plein écran, comme une appli.'), el('p', null, texteCadeauInstallation()), oui, tard, non]);
     return true;
   }
+  // ------------------------------------------------------------------ notifications push
+  // Le téléphone est prévenu même jeu fermé : invitation d'un ami, demande d'ami, rappel du Match du jour, annonces.
+  // Jamais demandé au lancement : un bandeau propose « Activer » dans la fenêtre Amis et à la fin du premier Match du jour.
+  // « Plus tard » : de nouveau dans 7 jours au plus tôt ; après 2 « Plus tard », plus jamais (Paramètres > Notifications reste là).
+  // iPhone : seulement dans l'appli ajoutée à l'écran d'accueil, à partir d'iOS 16.4.
+  const versionIOS = (() => { const m = /OS (\d+)_(\d+)/.exec(navigator.userAgent) || /Version\/(\d+)\.(\d+)/.exec(navigator.userAgent); return m ? +m[1] + +m[2] / 100 : 0; })();
+  const PUSH_POSSIBLE = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window && !DANS_APPLI_NATIVE && !ANCIENNE_PAGE
+    && !(IOS && !LANCE_ICONE) && (location.protocol === 'https:' || location.hostname === 'localhost');
+  const IOS_A_INSTALLER = IOS && !LANCE_ICONE && !DANS_APPLI_NATIVE && versionIOS >= 16.04;
+  const lirePushLocal = () => stock.lire('kopo-push') || {};
+  const ecrirePushLocal = (o) => stock.ecrire('kopo-push', Object.assign(lirePushLocal(), o));
+  let etatPush = null; // réponse de GET /push (clé publique, réglages par type), gardée pour la session
+  async function lireEtatPush(forcer) {
+    if (!MODE_SERVEUR || !compteLocal()) return null;
+    if (etatPush && !forcer) return etatPush;
+    try { etatPush = await apiJoueur('/push'); } catch (e) { return null; }
+    return etatPush;
+  }
+  function octetsCle(b64) {
+    const t = atob((b64 + '='.repeat((4 - (b64.length % 4)) % 4)).replace(/-/g, '+').replace(/_/g, '/'));
+    return Uint8Array.from(t, (c) => c.charCodeAt(0));
+  }
+  const pushActifIci = () => PUSH_POSSIBLE && Notification.permission === 'granted' && !!lirePushLocal().actif;
+  // À appeler pendant le geste du joueur : la demande du téléphone vient en premier (Safari l'exige).
+  async function activerPush() {
+    if (!PUSH_POSSIBLE) throw new Error('Les notifications ne marchent pas sur ce navigateur.');
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') throw new Error(perm === 'denied' ? 'Notifications bloquées : autorise-les dans les réglages du téléphone pour Masano.' : 'Notifications pas activées.');
+    const e = await lireEtatPush();
+    if (!e || !e.actif || !e.cle) throw new Error('Les notifications ne sont pas encore ouvertes. Réessaie plus tard.');
+    const reg = await navigator.serviceWorker.ready;
+    let abo = await reg.pushManager.getSubscription();
+    if (abo && lirePushLocal().cle && lirePushLocal().cle !== e.cle) { await abo.unsubscribe().catch(() => {}); abo = null; } // clés changées sur le serveur
+    if (!abo) {
+      try { abo = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: octetsCle(e.cle) }); }
+      catch (err) { throw new Error('Ce navigateur refuse les notifications (navigation privée ?). Essaie depuis Chrome ou l\'appli installée.'); }
+    }
+    await apiJoueur('/push/abonnement', 'POST', { abonnement: abo.toJSON(), appareil: IOS ? 'iPhone' : /Android/.test(navigator.userAgent) ? 'Android' : 'Ordinateur' });
+    ecrirePushLocal({ actif: true, cle: e.cle });
+  }
+  async function couperPush() {
+    ecrirePushLocal({ actif: false });
+    try {
+      const reg = await navigator.serviceWorker.ready, abo = await reg.pushManager.getSubscription();
+      if (abo) { await apiJoueur('/push/abonnement', 'DELETE', { endpoint: abo.endpoint }).catch(() => {}); await abo.unsubscribe().catch(() => {}); }
+    } catch (e) {}
+  }
+  // Au lancement : l'abonnement de ce téléphone est redonné au serveur (autre compte, clés changées, abonnement renouvelé).
+  async function synchroniserPush() {
+    if (!PUSH_POSSIBLE || !lirePushLocal().actif || !compteLocal()) return;
+    if (Notification.permission !== 'granted') return ecrirePushLocal({ actif: false });
+    try {
+      const e = await lireEtatPush();
+      if (!e || !e.actif || !e.cle) return;
+      const reg = await navigator.serviceWorker.ready;
+      let abo = await reg.pushManager.getSubscription();
+      if (abo && lirePushLocal().cle !== e.cle) { await abo.unsubscribe().catch(() => {}); abo = null; }
+      if (!abo) abo = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: octetsCle(e.cle) });
+      await apiJoueur('/push/abonnement', 'POST', { abonnement: abo.toJSON(), appareil: IOS ? 'iPhone' : /Android/.test(navigator.userAgent) ? 'Android' : 'Ordinateur' });
+      ecrirePushLocal({ cle: e.cle });
+    } catch (e) {}
+  }
+  setTimeout(synchroniserPush, 8000);
+  // Bandeau « Être prévenu ? » (fenêtre Amis, fin du Match du jour) ; null s'il n'a pas lieu d'être.
+  async function bandeauPush(contexte) {
+    if (!MODE_SERVEUR || !avecGoogle() || (!PUSH_POSSIBLE && !IOS_A_INSTALLER)) return null;
+    if (PUSH_POSSIBLE && (Notification.permission !== 'default' || lirePushLocal().actif)) return null;
+    const l = lirePushLocal();
+    if ((l.plusTard || 0) >= 2 || (l.prochain && Date.now() < l.prochain) || l.coupe) return null;
+    const e = await lireEtatPush();
+    if (!e || !e.actif) return null;
+    const b = el('div', 'push-bandeau');
+    const texte = contexte === 'match'
+      ? 'Te rappeler le Match de demain ? Une notification à 19 h si tu ne l\'as pas encore joué.'
+      : 'Être prévenu quand un ami t\'invite à sa table ou te demande en ami, même jeu fermé ?';
+    b.append(icone('i-cloche'), el('p', null, texte));
+    const boutons = el('div', 'push-boutons');
+    const tard = el('button', 'btn', 'Plus tard');
+    tard.onclick = () => { const x = lirePushLocal(); ecrirePushLocal({ plusTard: (x.plusTard || 0) + 1, prochain: Date.now() + 7 * 864e5 }); b.remove(); };
+    if (IOS_A_INSTALLER) {
+      b.append(el('small', 'muted', 'Sur iPhone, les notifications marchent quand Masano est sur ton écran d\'accueil.'));
+      const inst = el('button', 'btn principal', 'Ajouter à l\'écran d\'accueil');
+      inst.onclick = () => { fermerFenetre(); guideInstallation(); };
+      boutons.append(inst, tard);
+    } else {
+      const oui = el('button', 'btn principal', 'Activer');
+      oui.onclick = async () => {
+        oui.disabled = true;
+        try { await activerPush(); b.replaceChildren(icone('i-cloche'), el('p', null, 'C\'est fait ! Tu peux tout régler dans Paramètres > Notifications.')); setTimeout(() => b.remove(), 4000); }
+        catch (err) { toast(err.message); oui.disabled = false; if (Notification.permission === 'denied') b.remove(); }
+      };
+      boutons.append(oui, tard);
+    }
+    b.append(boutons);
+    return b;
+  }
+  // Paramètres > Notifications : interrupteur pour ce téléphone, puis un par type (réglages du compte, sur le serveur).
+  async function reglagesPush(zone) {
+    const ligne = (texte, aide, controle) => {
+      const l = el('div', 'reglage-ligne'), sp = el('span', null, texte);
+      if (aide) sp.append(el('small', null, aide));
+      l.append(sp); if (controle) l.append(controle); zone.append(l); return l;
+    };
+    const interrupteur = (texte, aide, actuel, changer) => {
+      const b = el('button', 'bascule'); b.setAttribute('role', 'switch'); b.setAttribute('aria-label', texte);
+      let v = actuel; const maj = () => b.setAttribute('aria-checked', String(!!v));
+      b.onclick = async () => { b.disabled = true; try { v = await changer(!v); } catch (e) { toast(e.message); } b.disabled = false; maj(); };
+      maj(); return ligne(texte, aide, b);
+    };
+    if (IOS_A_INSTALLER) {
+      const inst = el('button', 'btn', 'Installer'); inst.onclick = () => { fermerFenetre(); guideInstallation(); };
+      return ligne('Notifications', 'Sur iPhone, ajoute d\'abord Masano à ton écran d\'accueil, puis ouvre-le depuis son icône.', inst);
+    }
+    if (!PUSH_POSSIBLE) return ligne('Notifications', IOS ? 'Il faut iOS 16.4 ou plus récent.' : 'Pas disponibles sur ce navigateur.', null);
+    if (!avecGoogle()) return ligne('Notifications', 'Connecte-toi avec Google pour être prévenu des invitations de tes amis.', null);
+    const e = await lireEtatPush(true);
+    if (!e || !e.actif) return ligne('Notifications', 'Bientôt disponibles.', null);
+    interrupteur('Sur ce téléphone', Notification.permission === 'denied' ? 'Bloquées dans les réglages du téléphone' : 'Même quand Masano est fermé', pushActifIci(), async (v) => {
+      if (v) { await activerPush(); ecrirePushLocal({ coupe: false }); return true; }
+      await couperPush(); ecrirePushLocal({ coupe: true }); return false;
+    });
+    const prefsPush = e.prefs || {};
+    for (const [t, texte, aide] of [['invitation', 'Invitations', 'Un ami t\'invite à sa table'], ['ami', 'Demandes d\'ami', 'Reçues et acceptées'], ['match', 'Rappel du Match du jour', 'À 19 h, si tu ne l\'as pas joué'], ['annonce', 'Annonces de Masano', 'Tournois, nouveautés']]) {
+      interrupteur(texte, aide, prefsPush[t] !== false, async (v) => { const r = await apiJoueur('/push/prefs', 'PATCH', { [t]: v }); etatPush = Object.assign(etatPush || {}, { prefs: r.prefs }); return r.prefs[t]; });
+    }
+  }
+  // Notification touchée : l'appli s'ouvre (ou revient au premier plan) sur la bonne fenêtre.
+  function ouvrirDepuisNotification(url) {
+    let u; try { u = new URL(url, location.href); } catch (e) { return; }
+    const code = u.hash.slice(1).toUpperCase(), o = u.searchParams.get('ouvrir');
+    if (/^[A-Z]{4}$/.test(code)) {
+      if ($('ecranAccueil').hidden) return toast('Invitation à la table ' + code + ' : termine ta partie d\'abord.');
+      fermerFenetre(); $('codeRejoindre').value = code; $('voileRejoindre').hidden = false;
+    } else if (o === 'amis' && $('ecranAccueil').hidden === false) { majPastilleAmis(); ouvrirAmis(); }
+    else if (o === 'match' && $('ecranAccueil').hidden === false) ouvrirMatchJour();
+  }
+  if (PUSH_POSSIBLE) navigator.serviceWorker.addEventListener('message', (ev) => { if (ev.data && ev.data.masano === 'ouvrir') ouvrirDepuisNotification(ev.data.url); });
   // Première ouverture depuis l'icône : le cadeau d'installation (une fois par compte, le serveur refuse les doublons).
   let cadeauInstallationTente = false;
   function fenetreCadeauInstallation(n) {

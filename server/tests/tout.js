@@ -1462,6 +1462,95 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     } finally { SalleKopo.services.googleObligatoire = false; }
     assert.ok(assise); // l'ancienne connexion a été écartée par le retour (même compte)
   });
+
+  // --- Notifications push (envoi remplacé par une liste : aucun service de push contacté)
+  const envois = [];
+  const midi = () => new Date('2026-11-20T11:00:00Z'); // 12 h à Kinshasa
+  srv.push.regler({ envoi: async (abo, charge, options) => {
+    if (abo.endpoint.includes('perime')) throw Object.assign(new Error('Gone'), { statusCode: 410 });
+    envois.push({ endpoint: abo.endpoint, ...JSON.parse(charge), options });
+  }, maintenant: midi });
+  const abo = (nom) => ({ endpoint: 'https://push.exemple.com/' + nom, keys: { p256dh: 'p' + nom, auth: 'a' + nom } });
+  const pour = (nom) => envois.filter((e) => e.endpoint.endsWith('/' + nom));
+  await test('push : abonnement, invitation et demande d\'ami envoyées au téléphone', async () => {
+    const a = await invite('PushA'), b = await invite('PushB');
+    assert.strictEqual((await api('/api/push/abonnement', { methode: 'POST', jeton: b.jeton, corps: { abonnement: { endpoint: 'http://pas-https', keys: {} } } })).statut, 400);
+    assert.strictEqual((await api('/api/push/abonnement', { methode: 'POST', jeton: b.jeton, corps: { abonnement: abo('b1'), appareil: 'Android' } })).statut, 200);
+    const e = (await api('/api/push', { jeton: b.jeton })).json;
+    assert.strictEqual(e.appareils, 1); assert.deepStrictEqual(e.prefs, { invitation: true, ami: true, match: true, annonce: true });
+    await api('/api/amis', { methode: 'POST', jeton: a.jeton, corps: { cible: b.compte.pseudo + '#' + b.compte.numero } });
+    await attendre(100);
+    const d = pour('b1').find((x) => x.type === 'ami');
+    assert.ok(d, 'demande d\'ami envoyée'); assert.match(d.texte, /PushA veut être ton ami/); assert.strictEqual(d.url, './?ouvrir=amis');
+    await api('/api/push/abonnement', { methode: 'POST', jeton: a.jeton, corps: { abonnement: abo('a1') } });
+    await api('/api/amis/demandes/' + encodeURIComponent(a.compte.id) + '/accepter', { methode: 'POST', jeton: b.jeton });
+    await attendre(100);
+    assert.ok(pour('a1').find((x) => x.type === 'ami' && /accepté/.test(x.texte)), 'acceptation envoyée');
+    await api('/api/amis/' + encodeURIComponent(b.compte.id) + '/inviter', { methode: 'POST', jeton: a.jeton, corps: { code: 'PUSH' } });
+    await attendre(100);
+    const inv = pour('b1').find((x) => x.type === 'invitation');
+    assert.ok(inv); assert.strictEqual(inv.url, './#PUSH'); assert.strictEqual(inv.options.TTL, 600); assert.strictEqual(inv.options.urgency, 'high');
+  });
+  await test('push : types coupés, nuit (sauf invitations), téléphone périmé oublié', async () => {
+    const a = await invite('PushC'), b = await invite('PushD');
+    await devenirAmis(a, b);
+    await api('/api/push/abonnement', { methode: 'POST', jeton: b.jeton, corps: { abonnement: abo('d1') } });
+    const p = await api('/api/push/prefs', { methode: 'PATCH', jeton: b.jeton, corps: { invitation: false, inconnu: true } });
+    assert.strictEqual(p.json.prefs.invitation, false);
+    await api('/api/amis/' + encodeURIComponent(b.compte.id) + '/inviter', { methode: 'POST', jeton: a.jeton, corps: { code: 'COUP' } });
+    await attendre(100);
+    assert.strictEqual(pour('d1').length, 0, 'invitation coupée : rien');
+    // La notification reste dans le jeu.
+    assert.ok((await api('/api/notifications', { jeton: b.jeton })).json.liste.some((n) => n.type === 'invitation'));
+    await api('/api/push/prefs', { methode: 'PATCH', jeton: b.jeton, corps: { invitation: true } });
+    srv.push.regler({ maintenant: () => new Date('2026-11-20T22:30:00Z') }); // 23 h 30 à Kinshasa
+    try {
+      assert.strictEqual(await srv.push.envoyer(b.compte.id, 'ami', { titre: 'x', texte: 'nuit' }), 0);
+      assert.strictEqual(await srv.push.envoyer(b.compte.id, 'invitation', { titre: 'x', texte: 'nuit' }), 1);
+    } finally { srv.push.regler({ maintenant: midi }); }
+    await api('/api/push/abonnement', { methode: 'POST', jeton: b.jeton, corps: { abonnement: abo('perime') } });
+    assert.strictEqual((await api('/api/push', { jeton: b.jeton })).json.appareils, 2);
+    await srv.push.envoyer(b.compte.id, 'ami', { titre: 'x', texte: 'y' });
+    assert.strictEqual((await api('/api/push', { jeton: b.jeton })).json.appareils, 1);
+    await api('/api/push/abonnement', { methode: 'DELETE', jeton: b.jeton, corps: { endpoint: abo('d1').endpoint } });
+    assert.strictEqual((await api('/api/push', { jeton: b.jeton })).json.appareils, 0);
+  });
+  await test('push : rappel du Match du jour à 19 h, une fois, pour les habitués pas encore venus', async () => {
+    const h = await invite('PushHabitue'), n = await invite('PushNouveau'), j = await invite('PushDejaJoue');
+    for (const [x, nom] of [[h, 'h1'], [n, 'n1'], [j, 'j1']]) await api('/api/push/abonnement', { methode: 'POST', jeton: x.jeton, corps: { abonnement: abo(nom) } });
+    await srv.base.query("INSERT INTO match_jour (compte_id, jour, statut) VALUES ($1, '2026-11-18', 'fini'), ($2, '2026-11-18', 'fini'), ($2, '2026-11-20', 'fini')", [h.compte.id, j.compte.id]);
+    srv.push.regler({ maintenant: () => new Date('2026-11-20T17:00:00Z') }); // 18 h : trop tôt
+    try {
+      assert.strictEqual(await srv.push.tic(), 0);
+      srv.push.regler({ maintenant: () => new Date('2026-11-20T18:05:00Z') }); // 19 h 05
+      await srv.push.tic();
+      assert.strictEqual(pour('h1').filter((x) => x.type === 'match').length, 1);
+      assert.match(pour('h1')[0].texte, /Match du jour n°19/);
+      assert.strictEqual(pour('n1').length, 0, 'jamais joué : pas de rappel');
+      assert.strictEqual(pour('j1').length, 0, 'déjà joué aujourd\'hui');
+      await srv.push.rappelMatchJour(); // même après un redémarrage : un seul par jour
+      assert.strictEqual(pour('h1').filter((x) => x.type === 'match').length, 1);
+    } finally { srv.push.regler({ maintenant: midi }); }
+  });
+  await test('push : annonce de l\'admin (compter, essai, envoi, limite de 10 min)', async () => {
+    const x = await invite('PushAnnonce');
+    await api('/api/push/abonnement', { methode: 'POST', jeton: x.jeton, corps: { abonnement: abo('x1') } });
+    const avant = (await api('/admin/api/push/compter', { methode: 'POST', jeton: adminJeton, corps: {} })).json.joueurs;
+    assert.ok(avant >= 1);
+    assert.strictEqual((await api('/admin/api/push/compter', { methode: 'POST', jeton: adminJeton, corps: { public: { pays: 'XYZ' } } })).statut, 400);
+    const essai = await api('/admin/api/push/annonce', { methode: 'POST', jeton: adminJeton, corps: { titre: 'Essai', texte: 'Bonjour', essai: x.compte.pseudo + '#' + x.compte.numero } });
+    assert.strictEqual(essai.json.envoyees, 1);
+    await api('/api/push/prefs', { methode: 'PATCH', jeton: x.jeton, corps: { annonce: false } });
+    assert.strictEqual((await api('/admin/api/push/compter', { methode: 'POST', jeton: adminJeton, corps: {} })).json.joueurs, avant - 1);
+    assert.strictEqual((await api('/admin/api/push/annonce', { methode: 'POST', jeton: adminJeton, corps: { titre: 'T', texte: '' } })).statut, 400);
+    const r = await api('/admin/api/push/annonce', { methode: 'POST', jeton: adminJeton, corps: { titre: 'Tournoi', texte: 'Ce soir à 20 h !' } });
+    assert.strictEqual(r.statut, 200); assert.strictEqual(r.json.joueurs, avant - 1);
+    assert.strictEqual(pour('x1').filter((e) => e.titre === 'Tournoi').length, 0, 'annonces coupées : rien');
+    assert.ok(envois.some((e) => e.titre === 'Tournoi'));
+    assert.strictEqual((await api('/admin/api/push/annonce', { methode: 'POST', jeton: adminJeton, corps: { titre: 'Encore', texte: 'x' } })).statut, 429);
+    const resume = (await api('/admin/api/push', { jeton: adminJeton })).json;
+    assert.strictEqual(resume.annonces[0].titre, 'Tournoi');
+  });
   await srv.arreter();
   console.log(`\n${reussis} tests réussis, ${echecs} en échec.`);
   process.exit(echecs ? 1 : 0);

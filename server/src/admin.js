@@ -4,7 +4,7 @@ const express = require('express');
 const { enveloppe, publicCompte } = require('./api');
 const { emailSupabase } = require('./comptes');
 
-function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainage, bande, salles, demarrage }) {
+function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainage, bande, push, salles, demarrage }) {
   const r = express.Router();
   r.use(express.json({ limit: '50kb' }));
 
@@ -203,6 +203,22 @@ function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainag
     });
     await journal('cadeau', null, { montant, motif: req.body.motif, joueurs: n2 });
     res.json({ ok: true, joueurs: n2 });
+  }));
+
+  // --- Notifications push : abonnés, annonces envoyées, nouvelle annonce (essai à un joueur d'abord)
+  r.get('/push', enveloppe(async (req, res) => res.json(n2(await push.resume()))));
+  r.post('/push/compter', enveloppe(async (req, res) => res.json(await push.compter(req.body.public))));
+  r.post('/push/annonce', enveloppe(async (req, res) => {
+    const { titre, texte } = req.body;
+    if (req.body.essai) {
+      const m = /^(.*)#(\d{4})$/.exec(String(req.body.essai).trim());
+      const c = m && (await base.query('SELECT id FROM comptes WHERE lower(pseudo) = lower($1) AND numero = $2', [m[1], m[2]])).rows[0];
+      if (!c) return res.status(404).json({ erreur: 'Joueur introuvable. Écris Pseudo#1234.' });
+      return res.json(await push.essai(c.id, { titre, texte }));
+    }
+    const x = await push.annonce({ titre, texte, public: req.body.public });
+    await journal('annonce_push', null, { titre, texte, public: req.body.public || null, joueurs: x.joueurs, envoyees: x.envoyees });
+    res.json(x);
   }));
 
   // --- Modération
