@@ -6,7 +6,7 @@ le match du jour, la bande, les missions, la boutique, les amis et les notificat
 
 ## Lancer l'appli
 
-Il faut Flutter 3.41 ou plus récent (Dart 3.13), et Android Studio (Android) ou Xcode (iOS).
+Il faut Flutter 3.47 ou plus récent (Dart 3.13), et Android Studio (Android) ou Xcode (iOS).
 
 ```bash
 cd mobile
