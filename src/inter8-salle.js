@@ -18,6 +18,8 @@
   const DUREES = { depart: 5000, mancheAuto: 10000, revanche: 15000 };
   const DELAI_ABSENT = 5;
   const DELAI_ANNONCE = 3000; // temps laissé pour annoncer avant qu'un robot ne conteste
+  // Robots entre eux (plus aucun humain dans la manche) : tout va plus vite, on voit encore les coups.
+  const RAPIDE = { pauseRobot: 400, eventail: 400, annonce: 1000, depart: 1500, mancheAuto: 3000 };
   const { NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, coupAutomatique } = R;
 
   function hasardFort() {
@@ -64,6 +66,15 @@
   }
 
   const estRobot = (s, id) => !!(s.joueurs.find((j) => j.id === id) || {}).robot;
+  // Un robot qui remplace un joueur parti compte comme un humain : le joueur peut revenir.
+  const vraiRobot = (s, id) => { const j = s.joueurs.find((x) => x.id === id); return !!j && j.robot && !j.remplace; };
+  // Robots entre eux : les humains sont éliminés, sortis de la manche ou spectateurs.
+  // En fin de manche, il faut aussi qu'aucun humain ne joue la manche suivante.
+  function entreRobots(s) {
+    if (s.etat === 'manche' && s.manche) return s.manche.phase === 'jeu' && s.manche.enJeu.every((id) => vraiRobot(s, id));
+    if (s.etat === 'finManche') return s.restants.every((id) => vraiRobot(s, id));
+    return false;
+  }
   // Chaque robot ajouté peut avoir son propre niveau (j.niveau) ; sinon, celui de la table
   // (s.robots), par exemple pour un robot qui remplace un joueur parti. Robots gentils : tous gentils.
   function niveauDuRobot(s, j) {
@@ -89,7 +100,8 @@
     const d = enCours ? delaiPour(s, m.joueurCourant) : 0;
     s.echeance = d ? s.horloge() + d * 1000 : null;
     s.chronoTotal = d * 1000;
-    s.robotPret = enCours ? s.horloge() + (s.pauseRobot >= 0 ? s.pauseRobot : PAUSE_ROBOT) : null;
+    const pause = s.pauseRobot >= 0 ? s.pauseRobot : entreRobots(s) ? RAPIDE.pauseRobot : PAUSE_ROBOT;
+    s.robotPret = enCours ? s.horloge() + pause : null;
   }
 
   // Applique une action du moteur, puis fait suivre la salle (fin de manche, chrono).
@@ -104,7 +116,7 @@
     // avant que les robots ne jouent ou ne contestent.
     const m = s.manche;
     // Plusieurs cartes posées d'un coup : elles sont d'abord montrées en éventail à toute la table.
-    if (action.type === 'jouer' && action.cartes.length > 1 && s.robotPret && !(s.pauseRobot >= 0)) s.robotPret += PAUSE_EVENTAIL;
+    if (action.type === 'jouer' && action.cartes.length > 1 && s.robotPret && !(s.pauseRobot >= 0)) s.robotPret += entreRobots(s) ? RAPIDE.eventail : PAUSE_EVENTAIL;
     // Pendant ces 3 s, personne (humain ou robot) ne peut contester ; ensuite, tout le monde peut,
     // jusqu'au prochain tour du joueur (même si d'autres ont joué entre-temps). Les robots ont
     // droit aux mêmes 3 s que les humains (règle, section 9).
@@ -112,7 +124,8 @@
     const garder = ([j]) => m && (m.contestables || []).includes(j);
     s.graces = Object.fromEntries(Object.entries(s.graces || {}).filter(garder));
     s.oublis = Object.fromEntries(Object.entries(s.oublis || {}).filter(garder));
-    for (const j of nouveaux) s.graces[j] = s.horloge() + DELAI_ANNONCE;
+    const annonce = entreRobots(s) ? RAPIDE.annonce : DELAI_ANNONCE;
+    for (const j of nouveaux) s.graces[j] = s.horloge() + annonce;
     // Un robot annonce dans la foulée de son coup, sans attendre sa pause de réflexion.
     // Un robot facile peut oublier : il ne se rattrape pas, on pourra le contester après les 3 s.
     for (const j of nouveaux.filter((x) => estRobot(s, x))) {
@@ -212,8 +225,24 @@
     const differerDepart = s.durees.depart > 0;
     s.manche = I.nouvelleManche(sieges, mains, pioche, premier, { mode: s.mode, jRetour: s.jRetour, graine: Math.floor(s.rng() * 4294967296), differerDepart });
     s.etat = 'manche';
-    s.pause = s.durees.depart > 0 ? { type: 'depart', jusqua: s.horloge() + s.durees.depart, total: s.durees.depart } : null;
+    const depart = entreRobots(s) ? Math.min(s.durees.depart, RAPIDE.depart) : s.durees.depart;
+    s.pause = depart > 0 ? { type: 'depart', jusqua: s.horloge() + depart, total: depart } : null;
     armerChrono(s);
+  }
+
+  // « Passer à la fin » : les robots finissent entre eux tout de suite, exactement comme ils l'auraient
+  // fait à l'écran (même salle, mêmes coups). On avance une horloge fictive jusqu'à ce qu'un humain
+  // doive rejouer (manche suivante) ou que la partie soit finie.
+  function passerEntreRobots(s) {
+    const vraie = s.horloge;
+    let t = vraie();
+    s.horloge = () => (t += 10000);
+    try { for (let i = 0; i < 50000 && entreRobots(s); i++) tic(s); }
+    finally { s.horloge = vraie; }
+    // Les échéances posées pendant l'avance sont dans le temps fictif : on les recale.
+    s.graces = {};
+    if (s.etat === 'finManche') { s.suiteA = s.durees.mancheAuto > 0 ? vraie() + s.durees.mancheAuto : null; s.suiteTotal = s.durees.mancheAuto; }
+    if (s.etat === 'manche') { if (s.pause) s.pause.jusqua = vraie() + s.pause.total; armerChrono(s); }
   }
 
   function reinitialiser(s) {
@@ -261,7 +290,7 @@
       s.nulles++;
       s.numeroManche--;
       s.etat = 'finManche';
-      s.suiteA = s.durees.mancheAuto > 0 ? s.horloge() + s.durees.mancheAuto : null;
+      suiteAuto(s, true);
       return;
     }
     if (m.phase !== 'terminee') return;
@@ -274,8 +303,14 @@
       s.revancheRatee = false;
     } else {
       s.etat = 'finManche';
-      s.suiteA = s.durees.mancheAuto > 0 ? s.horloge() + s.durees.mancheAuto : null;
+      suiteAuto(s, vraiRobot(s, m.elimine));
     }
+  }
+  // Manche suivante automatique : vite entre robots (sauf juste après l'élimination d'un humain).
+  function suiteAuto(s, robotSorti) {
+    const auto = entreRobots(s) && robotSorti ? Math.min(s.durees.mancheAuto, RAPIDE.mancheAuto) : s.durees.mancheAuto;
+    s.suiteA = auto > 0 ? s.horloge() + auto : null;
+    s.suiteTotal = auto;
   }
 
   // Ne garde d'une action envoyée par un joueur que ce que le moteur attend.
@@ -422,6 +457,11 @@
         verifierRevanche(s);
         return { ok: true };
       }
+      case 'passerFin': { // un humain qui ne joue plus : les robots finissent tout de suite
+        if (!joueur || joueur.robot || !entreRobots(s)) return { ok: false, erreur: 'Impossible.' };
+        passerEntreRobots(s);
+        return { ok: true };
+      }
       case 'action': {
         if (s.etat !== 'manche' || !joueur) return { ok: false, erreur: 'Pas de manche en cours.' };
         if (s.pause) return { ok: false, erreur: 'Attends la fin du compte à rebours.' };
@@ -481,10 +521,11 @@
       publique: !!s.publique,
       taille: s.taille,
       chrono: s.echeance && s.etat === 'manche' ? { resteMs: Math.max(0, s.echeance - s.horloge()), totalMs: s.chronoTotal || s.delai * 1000 } : null,
-      suite: s.etat === 'finManche' && s.suiteA ? { resteMs: Math.max(0, s.suiteA - s.horloge()), totalMs: s.durees.mancheAuto } : null,
+      suite: s.etat === 'finManche' && s.suiteA ? { resteMs: Math.max(0, s.suiteA - s.horloge()), totalMs: s.suiteTotal || s.durees.mancheAuto } : null,
       revanche: s.etat === 'finPartie' && s.revanche ? { oui: s.revanche.oui.slice(), non: s.revanche.non.slice(), resteMs: s.revanche.jusqua ? Math.max(0, s.revanche.jusqua - s.horloge()) : null, totalMs: s.durees.revanche === undefined ? DUREES.revanche : s.durees.revanche } : null,
       revancheRatee: s.etat === 'finPartie' && !!s.revancheRatee,
       robots: s.robots || 'normaux',
+      entreRobots: entreRobots(s), // les robots jouent vite ; un humain peut passer à la fin
       restants: s.restants.slice(),
       elimines: s.elimines.slice(),
       numeroManche: s.numeroManche,
@@ -547,7 +588,7 @@
     return s;
   }
 
-  const Inter8Salle = { JEU, MIN, MAX, MODES, DELAIS, PAUSE_ROBOT, DUREES, DELAI_ABSENT, DELAI_ANNONCE, NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, niveauDuRobot, creerSalle, rendrePublique, choixRobot, reconnecter, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
+  const Inter8Salle = { JEU, MIN, MAX, MODES, DELAIS, PAUSE_ROBOT, DUREES, DELAI_ABSENT, DELAI_ANNONCE, RAPIDE, entreRobots, NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, niveauDuRobot, creerSalle, rendrePublique, choixRobot, reconnecter, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
   if (enNode) module.exports = Inter8Salle;
   else root.Inter8Salle = Inter8Salle;
 })(typeof window !== 'undefined' ? window : globalThis);

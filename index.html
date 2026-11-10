@@ -460,6 +460,8 @@ body.salon:has(#voile:not([hidden])) #filChat { display: none; } /* fenêtre du 
 .main .carte.recue { box-shadow: 0 0 0 3px var(--good), 0 6px 14px rgba(0,0,0,.45); }
 .trophee { font-size: 64px; text-align: center; line-height: 1; animation: saut 1s ease-in-out infinite; }
 .consigne:empty { display: none; }
+.passer-fin { display: block; margin: 6px auto 0; padding: 6px 16px; min-height: 0; font-size: 14px; }
+.passer-fin[hidden] { display: none; }
 /* Animations coupées (réglage « Réduites », ou téléphone qui en demande moins) */ html.sans-anim .siege.courant .ligne, html.sans-anim .siege.courant, html.sans-anim .siege.meneur .ligne::after, html.sans-anim .pose .carte.gagnante, html.sans-anim .trophee { animation: none; }
 
 /* Accueil : profil, grandes cartes de modes, barre du bas. */
@@ -1392,6 +1394,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       <div class="table-entete" id="entete"></div>
       <div class="poses" id="poses"></div>
       <div class="consigne" id="consigne" aria-live="polite"></div>
+      <button class="btn passer-fin" id="btnPasserFin" hidden>Passer à la fin</button>
       <div class="chrono" id="barreChrono" hidden><span></span></div>
     </section>
     <section class="zone-main" id="zoneMain" aria-label="Ta main">
@@ -4200,6 +4203,8 @@ var qrcode = function() {
   const PAUSE_ROBOT = 1200; // un robot réfléchit 1,2 s avant de jouer
   const DUREES = { depart: 5000, finTour: 5000, mancheAuto: 10000, revanche: 15000 }; // compte à rebours de départ, cartes laissées sur la table, manche suivante automatique, temps pour accepter la revanche
   const DELAI_ABSENT = 5; // secondes accordées à un joueur déconnecté ou absent (2 temps écoulés d'affilée)
+  // Robots entre eux (plus aucun humain dans la manche) : tout va plus vite, on voit encore les coups.
+  const RAPIDE = { pauseRobot: 300, finTour: 1500, depart: 1500, mancheAuto: 3000 };
 
   // Hasard de qualité cryptographique quand le navigateur le permet.
   function hasardFort() {
@@ -4241,6 +4246,15 @@ var qrcode = function() {
   }
 
   const estRobot = (s, id) => !!(s.joueurs.find((j) => j.id === id) || {}).robot;
+  // Un robot qui remplace un joueur parti compte comme un humain : le joueur peut revenir.
+  const vraiRobot = (s, id) => { const j = s.joueurs.find((x) => x.id === id); return !!j && j.robot && !j.remplace; };
+  // Robots entre eux : les humains sont éliminés, qualifiés pour la manche ou spectateurs.
+  // En fin de manche, il faut aussi qu'aucun humain ne joue la manche suivante.
+  function entreRobots(s) {
+    if (s.etat === 'manche' && s.manche) return s.manche.enJeu.every((id) => vraiRobot(s, id));
+    if (s.etat === 'finManche') return s.restants.every((id) => vraiRobot(s, id));
+    return false;
+  }
 
   // Niveaux des robots. Chaque robot ne voit que ce qu'un joueur voit (K.vuePublique) :
   // sa main, la table, le nombre de cartes de chacun et les cartes déjà montrées.
@@ -4354,7 +4368,8 @@ var qrcode = function() {
     const d = enCours ? delaiPour(s, m.joueurCourant) : 0;
     s.echeance = d ? s.horloge() + d * 1000 : null;
     s.chronoTotal = d * 1000;
-    s.robotPret = enCours ? s.horloge() + (s.pauseRobot >= 0 ? s.pauseRobot : PAUSE_ROBOT) : null; // pauseRobot : tests du serveur seulement
+    const pause = s.pauseRobot >= 0 ? s.pauseRobot : entreRobots(s) ? RAPIDE.pauseRobot : PAUSE_ROBOT; // pauseRobot : tests du serveur seulement
+    s.robotPret = enCours ? s.horloge() + pause : null;
   }
 
   // Un joueur déconnecté, ou dont le temps s'est écoulé deux fois d'affilée, n'a plus
@@ -4415,8 +4430,10 @@ var qrcode = function() {
     } else if (phaseAvant === 'ouverture' && action.type === 'toutPoser') {
       fin = { table: [{ joueur: j, cartes: mainAvant, compte: false }], annonce: { type: 'sortie', joueur: j, meneur: m.phase === 'terminee' ? null : m.meneur } };
     }
-    if (fin && s.durees.finTour > 0) {
-      s.pause = { type: 'finTour', jusqua: s.horloge() + s.durees.finTour, total: s.durees.finTour, table: fin.table, annonce: fin.annonce };
+    // Un humain qui vient de jouer (ou de se qualifier) voit la fin du tour au rythme normal.
+    const finTour = entreRobots(s) && vraiRobot(s, j) ? Math.min(s.durees.finTour, RAPIDE.finTour) : s.durees.finTour;
+    if (fin && finTour > 0) {
+      s.pause = { type: 'finTour', jusqua: s.horloge() + finTour, total: finTour, table: fin.table, annonce: fin.annonce };
     } else finirMancheSiBesoin(s);
     armerChrono(s);
   }
@@ -4520,8 +4537,23 @@ var qrcode = function() {
     s.manche = K.nouvelleManche(sieges, mains, premier, redistributions);
     s.etat = 'manche';
     // Compte à rebours : chacun découvre ses cartes et qui commence.
-    s.pause = s.durees.depart > 0 ? { type: 'depart', jusqua: s.horloge() + s.durees.depart, total: s.durees.depart } : null;
+    const depart = entreRobots(s) ? Math.min(s.durees.depart, RAPIDE.depart) : s.durees.depart;
+    s.pause = depart > 0 ? { type: 'depart', jusqua: s.horloge() + depart, total: depart } : null;
     armerChrono(s);
+  }
+
+  // « Passer à la fin » : les robots finissent entre eux tout de suite, exactement comme ils l'auraient
+  // fait à l'écran (même salle, mêmes coups). On avance une horloge fictive jusqu'à ce qu'un humain
+  // doive rejouer (manche suivante) ou que la partie soit finie.
+  function passerEntreRobots(s) {
+    const vraie = s.horloge;
+    let t = vraie();
+    s.horloge = () => (t += 10000);
+    try { for (let i = 0; i < 50000 && entreRobots(s); i++) tic(s); }
+    finally { s.horloge = vraie; }
+    // Les échéances posées pendant l'avance sont dans le temps fictif : on les recale.
+    if (s.etat === 'finManche') { s.suiteA = s.durees.mancheAuto > 0 ? vraie() + s.durees.mancheAuto : null; s.suiteTotal = s.durees.mancheAuto; }
+    if (s.etat === 'manche') { if (s.pause) s.pause.jusqua = vraie() + s.pause.total; armerChrono(s); }
   }
 
   // Remet la salle à zéro pour une nouvelle partie (mêmes joueurs).
@@ -4575,7 +4607,10 @@ var qrcode = function() {
       s.revancheRatee = false;
     } else {
       s.etat = 'finManche';
-      s.suiteA = s.durees.mancheAuto > 0 ? s.horloge() + s.durees.mancheAuto : null; // l'hôte peut lancer plus tôt
+      // Robots entre eux : la manche suivante part vite (sauf juste après l'élimination d'un humain).
+      const auto = entreRobots(s) && vraiRobot(s, m.elimine) ? Math.min(s.durees.mancheAuto, RAPIDE.mancheAuto) : s.durees.mancheAuto;
+      s.suiteA = auto > 0 ? s.horloge() + auto : null; // l'hôte peut lancer plus tôt
+      s.suiteTotal = auto;
     }
   }
 
@@ -4703,6 +4738,11 @@ var qrcode = function() {
         verifierRevanche(s);
         return { ok: true };
       }
+      case 'passerFin': { // un humain qui ne joue plus : les robots finissent tout de suite
+        if (!joueur || joueur.robot || !entreRobots(s)) return { ok: false, erreur: 'Impossible.' };
+        passerEntreRobots(s);
+        return { ok: true };
+      }
       case 'action': {
         if (s.etat !== 'manche' || !joueur) return { ok: false, erreur: 'Pas de manche en cours.' };
         if (s.pause) return { ok: false, erreur: s.pause.type === 'depart' ? 'Attends la fin du compte à rebours.' : 'Attends le tour suivant.' };
@@ -4754,10 +4794,11 @@ var qrcode = function() {
       publique: !!s.publique,
       taille: s.taille,
       chrono: s.echeance && s.etat === 'manche' ? { resteMs: Math.max(0, s.echeance - s.horloge()), totalMs: s.chronoTotal || s.delai * 1000 } : null,
-      suite: s.etat === 'finManche' && s.suiteA ? { resteMs: Math.max(0, s.suiteA - s.horloge()), totalMs: s.durees.mancheAuto } : null,
+      suite: s.etat === 'finManche' && s.suiteA ? { resteMs: Math.max(0, s.suiteA - s.horloge()), totalMs: s.suiteTotal || s.durees.mancheAuto } : null,
       revanche: s.etat === 'finPartie' && s.revanche ? { oui: s.revanche.oui.slice(), non: s.revanche.non.slice(), resteMs: s.revanche.jusqua ? Math.max(0, s.revanche.jusqua - s.horloge()) : null, totalMs: s.durees.revanche === undefined ? DUREES.revanche : s.durees.revanche } : null,
       revancheRatee: s.etat === 'finPartie' && !!s.revancheRatee,
       robots: s.robots || 'normaux',
+      entreRobots: entreRobots(s), // les robots jouent vite ; un humain peut passer à la fin
       restants: s.restants.slice(),
       elimines: s.elimines.slice(),
       numeroManche: s.numeroManche,
@@ -4799,7 +4840,7 @@ var qrcode = function() {
     return s;
   }
 
-  const KopoSalle = { MIN, MAX, hasardManche, placerDonne, DELAIS, PAUSE_ROBOT, DUREES, creerSalle, rendrePublique, choixRobot, NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, niveauDuRobot, robotGentil, robotNormal, robotFort, reconnecter, DELAI_ABSENT, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
+  const KopoSalle = { MIN, MAX, hasardManche, placerDonne, DELAIS, PAUSE_ROBOT, DUREES, creerSalle, rendrePublique, choixRobot, NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, niveauDuRobot, robotGentil, robotNormal, robotFort, reconnecter, DELAI_ABSENT, RAPIDE, entreRobots, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
   if (typeof module !== 'undefined' && module.exports) module.exports = KopoSalle;
   else root.KopoSalle = KopoSalle;
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -5572,6 +5613,8 @@ var qrcode = function() {
   const DUREES = { depart: 5000, mancheAuto: 10000, revanche: 15000 };
   const DELAI_ABSENT = 5;
   const DELAI_ANNONCE = 3000; // temps laissé pour annoncer avant qu'un robot ne conteste
+  // Robots entre eux (plus aucun humain dans la manche) : tout va plus vite, on voit encore les coups.
+  const RAPIDE = { pauseRobot: 400, eventail: 400, annonce: 1000, depart: 1500, mancheAuto: 3000 };
   const { NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, coupAutomatique } = R;
 
   function hasardFort() {
@@ -5618,6 +5661,15 @@ var qrcode = function() {
   }
 
   const estRobot = (s, id) => !!(s.joueurs.find((j) => j.id === id) || {}).robot;
+  // Un robot qui remplace un joueur parti compte comme un humain : le joueur peut revenir.
+  const vraiRobot = (s, id) => { const j = s.joueurs.find((x) => x.id === id); return !!j && j.robot && !j.remplace; };
+  // Robots entre eux : les humains sont éliminés, sortis de la manche ou spectateurs.
+  // En fin de manche, il faut aussi qu'aucun humain ne joue la manche suivante.
+  function entreRobots(s) {
+    if (s.etat === 'manche' && s.manche) return s.manche.phase === 'jeu' && s.manche.enJeu.every((id) => vraiRobot(s, id));
+    if (s.etat === 'finManche') return s.restants.every((id) => vraiRobot(s, id));
+    return false;
+  }
   // Chaque robot ajouté peut avoir son propre niveau (j.niveau) ; sinon, celui de la table
   // (s.robots), par exemple pour un robot qui remplace un joueur parti. Robots gentils : tous gentils.
   function niveauDuRobot(s, j) {
@@ -5643,7 +5695,8 @@ var qrcode = function() {
     const d = enCours ? delaiPour(s, m.joueurCourant) : 0;
     s.echeance = d ? s.horloge() + d * 1000 : null;
     s.chronoTotal = d * 1000;
-    s.robotPret = enCours ? s.horloge() + (s.pauseRobot >= 0 ? s.pauseRobot : PAUSE_ROBOT) : null;
+    const pause = s.pauseRobot >= 0 ? s.pauseRobot : entreRobots(s) ? RAPIDE.pauseRobot : PAUSE_ROBOT;
+    s.robotPret = enCours ? s.horloge() + pause : null;
   }
 
   // Applique une action du moteur, puis fait suivre la salle (fin de manche, chrono).
@@ -5658,7 +5711,7 @@ var qrcode = function() {
     // avant que les robots ne jouent ou ne contestent.
     const m = s.manche;
     // Plusieurs cartes posées d'un coup : elles sont d'abord montrées en éventail à toute la table.
-    if (action.type === 'jouer' && action.cartes.length > 1 && s.robotPret && !(s.pauseRobot >= 0)) s.robotPret += PAUSE_EVENTAIL;
+    if (action.type === 'jouer' && action.cartes.length > 1 && s.robotPret && !(s.pauseRobot >= 0)) s.robotPret += entreRobots(s) ? RAPIDE.eventail : PAUSE_EVENTAIL;
     // Pendant ces 3 s, personne (humain ou robot) ne peut contester ; ensuite, tout le monde peut,
     // jusqu'au prochain tour du joueur (même si d'autres ont joué entre-temps). Les robots ont
     // droit aux mêmes 3 s que les humains (règle, section 9).
@@ -5666,7 +5719,8 @@ var qrcode = function() {
     const garder = ([j]) => m && (m.contestables || []).includes(j);
     s.graces = Object.fromEntries(Object.entries(s.graces || {}).filter(garder));
     s.oublis = Object.fromEntries(Object.entries(s.oublis || {}).filter(garder));
-    for (const j of nouveaux) s.graces[j] = s.horloge() + DELAI_ANNONCE;
+    const annonce = entreRobots(s) ? RAPIDE.annonce : DELAI_ANNONCE;
+    for (const j of nouveaux) s.graces[j] = s.horloge() + annonce;
     // Un robot annonce dans la foulée de son coup, sans attendre sa pause de réflexion.
     // Un robot facile peut oublier : il ne se rattrape pas, on pourra le contester après les 3 s.
     for (const j of nouveaux.filter((x) => estRobot(s, x))) {
@@ -5766,8 +5820,24 @@ var qrcode = function() {
     const differerDepart = s.durees.depart > 0;
     s.manche = I.nouvelleManche(sieges, mains, pioche, premier, { mode: s.mode, jRetour: s.jRetour, graine: Math.floor(s.rng() * 4294967296), differerDepart });
     s.etat = 'manche';
-    s.pause = s.durees.depart > 0 ? { type: 'depart', jusqua: s.horloge() + s.durees.depart, total: s.durees.depart } : null;
+    const depart = entreRobots(s) ? Math.min(s.durees.depart, RAPIDE.depart) : s.durees.depart;
+    s.pause = depart > 0 ? { type: 'depart', jusqua: s.horloge() + depart, total: depart } : null;
     armerChrono(s);
+  }
+
+  // « Passer à la fin » : les robots finissent entre eux tout de suite, exactement comme ils l'auraient
+  // fait à l'écran (même salle, mêmes coups). On avance une horloge fictive jusqu'à ce qu'un humain
+  // doive rejouer (manche suivante) ou que la partie soit finie.
+  function passerEntreRobots(s) {
+    const vraie = s.horloge;
+    let t = vraie();
+    s.horloge = () => (t += 10000);
+    try { for (let i = 0; i < 50000 && entreRobots(s); i++) tic(s); }
+    finally { s.horloge = vraie; }
+    // Les échéances posées pendant l'avance sont dans le temps fictif : on les recale.
+    s.graces = {};
+    if (s.etat === 'finManche') { s.suiteA = s.durees.mancheAuto > 0 ? vraie() + s.durees.mancheAuto : null; s.suiteTotal = s.durees.mancheAuto; }
+    if (s.etat === 'manche') { if (s.pause) s.pause.jusqua = vraie() + s.pause.total; armerChrono(s); }
   }
 
   function reinitialiser(s) {
@@ -5815,7 +5885,7 @@ var qrcode = function() {
       s.nulles++;
       s.numeroManche--;
       s.etat = 'finManche';
-      s.suiteA = s.durees.mancheAuto > 0 ? s.horloge() + s.durees.mancheAuto : null;
+      suiteAuto(s, true);
       return;
     }
     if (m.phase !== 'terminee') return;
@@ -5828,8 +5898,14 @@ var qrcode = function() {
       s.revancheRatee = false;
     } else {
       s.etat = 'finManche';
-      s.suiteA = s.durees.mancheAuto > 0 ? s.horloge() + s.durees.mancheAuto : null;
+      suiteAuto(s, vraiRobot(s, m.elimine));
     }
+  }
+  // Manche suivante automatique : vite entre robots (sauf juste après l'élimination d'un humain).
+  function suiteAuto(s, robotSorti) {
+    const auto = entreRobots(s) && robotSorti ? Math.min(s.durees.mancheAuto, RAPIDE.mancheAuto) : s.durees.mancheAuto;
+    s.suiteA = auto > 0 ? s.horloge() + auto : null;
+    s.suiteTotal = auto;
   }
 
   // Ne garde d'une action envoyée par un joueur que ce que le moteur attend.
@@ -5976,6 +6052,11 @@ var qrcode = function() {
         verifierRevanche(s);
         return { ok: true };
       }
+      case 'passerFin': { // un humain qui ne joue plus : les robots finissent tout de suite
+        if (!joueur || joueur.robot || !entreRobots(s)) return { ok: false, erreur: 'Impossible.' };
+        passerEntreRobots(s);
+        return { ok: true };
+      }
       case 'action': {
         if (s.etat !== 'manche' || !joueur) return { ok: false, erreur: 'Pas de manche en cours.' };
         if (s.pause) return { ok: false, erreur: 'Attends la fin du compte à rebours.' };
@@ -6035,10 +6116,11 @@ var qrcode = function() {
       publique: !!s.publique,
       taille: s.taille,
       chrono: s.echeance && s.etat === 'manche' ? { resteMs: Math.max(0, s.echeance - s.horloge()), totalMs: s.chronoTotal || s.delai * 1000 } : null,
-      suite: s.etat === 'finManche' && s.suiteA ? { resteMs: Math.max(0, s.suiteA - s.horloge()), totalMs: s.durees.mancheAuto } : null,
+      suite: s.etat === 'finManche' && s.suiteA ? { resteMs: Math.max(0, s.suiteA - s.horloge()), totalMs: s.suiteTotal || s.durees.mancheAuto } : null,
       revanche: s.etat === 'finPartie' && s.revanche ? { oui: s.revanche.oui.slice(), non: s.revanche.non.slice(), resteMs: s.revanche.jusqua ? Math.max(0, s.revanche.jusqua - s.horloge()) : null, totalMs: s.durees.revanche === undefined ? DUREES.revanche : s.durees.revanche } : null,
       revancheRatee: s.etat === 'finPartie' && !!s.revancheRatee,
       robots: s.robots || 'normaux',
+      entreRobots: entreRobots(s), // les robots jouent vite ; un humain peut passer à la fin
       restants: s.restants.slice(),
       elimines: s.elimines.slice(),
       numeroManche: s.numeroManche,
@@ -6101,7 +6183,7 @@ var qrcode = function() {
     return s;
   }
 
-  const Inter8Salle = { JEU, MIN, MAX, MODES, DELAIS, PAUSE_ROBOT, DUREES, DELAI_ABSENT, DELAI_ANNONCE, NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, niveauDuRobot, creerSalle, rendrePublique, choixRobot, reconnecter, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
+  const Inter8Salle = { JEU, MIN, MAX, MODES, DELAIS, PAUSE_ROBOT, DUREES, DELAI_ABSENT, DELAI_ANNONCE, RAPIDE, entreRobots, NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, niveauDuRobot, creerSalle, rendrePublique, choixRobot, reconnecter, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
   if (enNode) module.exports = Inter8Salle;
   else root.Inter8Salle = Inter8Salle;
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -6889,7 +6971,7 @@ var qrcode = function() {
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = 'c85a91d4531e'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = 'c77be448cd36'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
@@ -7583,6 +7665,9 @@ var qrcode = function() {
     if (logo.lastChild.textContent !== nomJeu) { logo.lastChild.textContent = nomJeu; logo.classList.toggle('long', v.jeu === 'inter8'); logo.firstChild.src = v.jeu === 'inter8' ? 'icons/masano-logo.svg' : 'icons/kopo-logo.svg'; }
     garderEcranAllume();
     vocal.maj(v);
+    // Plus aucun humain en jeu : on peut sauter la fin (de la manche, si on est qualifié pour la suivante).
+    $('btnPasserFin').hidden = !v.entreRobots;
+    $('btnPasserFin').textContent = v.restants && v.restants.includes(v.moi) ? 'Passer à la fin de la manche' : 'Passer à la fin';
     const finAvant = finChrono;
     demarrerChrono(v);
     if (!ancienne || ancienne.etat !== v.etat || ancienne.numeroManche !== v.numeroManche) { carteChoisie = null; choixInter = []; cartesRecues.clear(); }
@@ -8114,7 +8199,8 @@ var qrcode = function() {
     const monTour = m.joueurCourant === v.moi;
     const jeJoue = m.enJeu.includes(v.moi);
     // Ce qui se passe est montré par les animations ; on n'écrit que ce que tu dois faire.
-    if (pause || m.phase === 'terminee') {}
+    if (v.entreRobots) cons.append(ico('oeil'), v.restants.includes(v.moi) ? ' Les robots finissent la manche entre eux, en accéléré.' : ' Les robots finissent entre eux, en accéléré.');
+    else if (pause || m.phase === 'terminee') {}
     else if (!v.restants.includes(v.moi) || !jeJoue) cons.append(ico('oeil'), ' Tu regardes la partie.');
     else if (monTour) { if (v.chrono) cons.append(el('span', 'secondes', ''), ' '); cons.append(el('em', null, 'À toi !')); }
     if (v.robots === 'gentils') {
@@ -8340,7 +8426,8 @@ var qrcode = function() {
     const jeJoue = m.enJeu.includes(v.moi);
     const actions = m.actions;
     const coups = actions.filter((a) => a.type === 'jouer');
-    if (pause || m.phase !== 'jeu') {}
+    if (v.entreRobots) cons.append(ico('oeil'), v.restants.includes(v.moi) ? ' Les robots finissent la manche entre eux, en accéléré.' : ' Les robots finissent entre eux, en accéléré.');
+    else if (pause || m.phase !== 'jeu') {}
     else if (!v.restants.includes(v.moi) || !jeJoue) cons.append(ico('oeil'), ' Tu regardes la partie.');
     else if (monTour) {
       if (v.chrono) cons.append(el('span', 'secondes', ''), ' ');
@@ -8728,8 +8815,13 @@ var qrcode = function() {
       p.append(suivants === 2 ? 'La finale démarre dans ' : 'La manche suivante démarre dans ', el('strong', 'decompte-suite', String(Math.ceil(v.suite.resteMs / 1000))), ' s.');
       contenu.push(p);
     }
+    if (v.entreRobots) { // il ne reste que des robots : inutile d'attendre la fin
+      const b = el('button', 'btn principal large', 'Passer à la fin');
+      b.onclick = () => envoyer({ type: 'passerFin' });
+      contenu.push(b);
+    }
     if (v.hote === v.moi) {
-      const b = el('button', 'btn principal large', 'Lancer maintenant' + (suivants === 2 ? ' la finale' : ''));
+      const b = el('button', 'btn' + (v.entreRobots ? '' : ' principal') + ' large', 'Lancer maintenant' + (suivants === 2 ? ' la finale' : ''));
       b.onclick = () => envoyer({ type: 'mancheSuivante' });
       contenu.push(b);
     } else if (!v.suite) contenu.push(el('p', null, "En attente de l'hôte pour la manche suivante…"));
@@ -11769,6 +11861,7 @@ var qrcode = function() {
     envoyer({ type: 'ajouterRobot', niveau: S.NIVEAUX_ROBOTS.includes(n) ? n : niveauRobots() });
   };
   $('btnAnnuler').onclick = quitter;
+  $('btnPasserFin').onclick = () => { $('btnPasserFin').hidden = true; envoyer({ type: 'passerFin' }); };
   $('btnQuitter').onclick = () => demanderConfirmation(
     hote ? "Tu es l'hôte : si tu quittes, la partie s'arrête pour tout le monde." : (vueActuelle && vueActuelle.etat === 'manche' ? 'Tu ne pourras pas revenir dans cette partie avec un autre code.' : 'Tu quittes la partie.'),
     () => { if (client && vueActuelle && vueActuelle.etat === 'salon') {} quitter(); });

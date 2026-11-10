@@ -231,7 +231,7 @@ class SalleKopo extends Room {
     msg = Object.assign({}, msg && typeof msg === 'object' ? msg : {}, { type });
     if (type === 'rejoindre') return; // l'entrée passe par onJoin
     // Match du jour : la table est fixée par le serveur (robots, donne), pas de revanche ni de réglages.
-    if (this.jour && ['lancer', 'ajouterRobot', 'niveauRobot', 'retirer', 'remplacerParRobot', 'reglages', 'revanche', 'revancheNon', 'rejouer'].includes(type)) { client.send('erreur', 'Pas pendant le Match du jour.'); return; }
+    if (this.jour && ['lancer', 'ajouterRobot', 'niveauRobot', 'retirer', 'remplacerParRobot', 'reglages', 'revanche', 'revancheNon', 'rejouer', 'passerFin'].includes(type)) { client.send('erreur', 'Pas pendant le Match du jour.'); return; }
     if (type === 'sync') { client.send('vue', this.S.vue(this.salle, id)); return; } // la page demande sa vue dès qu'elle écoute
     if (type === 'reaction') { // chat : seulement les messages choisis dans le tableau de bord
       const liste = SalleKopo.services.reglages.get('messagesRapides') || [];

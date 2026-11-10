@@ -402,5 +402,54 @@ test('Une partie avec des robots de trois niveaux va au bout', () => {
   assert.strictEqual(s.elimines.length, 3);
 });
 
+console.log('\nRobots entre eux');
+function salleRobots(graine, nbRobots, mode) {
+  const s = S.creerSalle('ROBO', I.hasard(graine));
+  const h = horloge(); s.horloge = h;
+  S.recevoir(s, 'p1', { type: 'rejoindre', nom: 'Moi' });
+  if (mode) S.recevoir(s, 'p1', { type: 'reglages', mode });
+  for (let i = 0; i < nbRobots; i++) S.recevoir(s, 'p1', { type: 'ajouterRobot' });
+  assert.ok(S.recevoir(s, 'p1', { type: 'lancer' }).ok);
+  return s;
+}
+function pas(s, ms) {
+  s.horloge.avancer(ms);
+  const m = s.manche;
+  if (s.etat === 'manche' && !s.pause && m.joueurCourant === 'p1') {
+    const a = S.coupAutomatique(m, 'p1');
+    if (a) S.recevoir(s, 'p1', { type: 'action', action: a });
+  }
+  S.tic(s);
+}
+test('Dès que je ne joue plus la manche, les robots jouent vite', () => {
+  const s = salleRobots(5, 3);
+  assert.strictEqual(S.vue(s, 'p1').entreRobots, false);
+  assert.ok(!S.recevoir(s, 'p1', { type: 'passerFin' }).ok, 'pas tant que je joue');
+  let k = 0;
+  while (s.etat === 'manche' && s.manche.enJeu.includes('p1') && k++ < 50000) pas(s, 100);
+  assert.ok(k < 50000);
+  if (s.etat === 'manche') {
+    assert.strictEqual(S.vue(s, 'p1').entreRobots, true);
+    pas(s, 100);
+    assert.ok(!s.robotPret || s.robotPret - s.horloge() <= S.RAPIDE.pauseRobot + S.RAPIDE.eventail);
+  }
+});
+test('« Passer à la fin » donne le même classement qu\'à vitesse normale', () => {
+  for (const [graine, mode] of [[1, 'simple'], [2, 'simple'], [3, 'delire'], [4, 'delire']]) {
+    const a = salleRobots(graine, 5, mode), b = salleRobots(graine, 5, mode);
+    let k = 0;
+    while (a.etat !== 'finPartie' && k++ < 300000) pas(a, 100);
+    k = 0;
+    while (b.etat !== 'finPartie' && k++ < 300000) {
+      if (S.vue(b, 'p1').entreRobots) assert.ok(S.recevoir(b, 'p1', { type: 'passerFin' }).ok);
+      else pas(b, 100);
+    }
+    assert.strictEqual(a.etat, 'finPartie');
+    assert.strictEqual(b.etat, 'finPartie');
+    assert.deepStrictEqual(b.elimines, a.elimines, 'graine ' + graine);
+    assert.strictEqual(b.vainqueur, a.vainqueur);
+  }
+});
+
 console.log(`\n${ok} test(s) réussi(s), ${ko} échec(s).`);
 if (ko) process.exit(1);
