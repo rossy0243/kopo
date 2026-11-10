@@ -890,5 +890,86 @@ test('Une partie avec des robots de trois niveaux va au bout', () => {
   assert.strictEqual(s.etat, 'finPartie');
 });
 
+console.log('\nRobots entre eux');
+// Un humain (p1) et des robots ; l'humain joue son coup automatique, le temps avance de pas en pas.
+function salleRobots(graine, nbRobots) {
+  const s = S.creerSalle('ROBO', K.hasard(graine));
+  let t = 1000; s.horloge = () => t; s.avancer = (ms) => (t += ms);
+  S.recevoir(s, 'p1', { type: 'rejoindre', nom: 'Moi' });
+  for (let i = 0; i < nbRobots; i++) S.recevoir(s, 'p1', { type: 'ajouterRobot' });
+  assert.ok(S.recevoir(s, 'p1', { type: 'lancer' }).ok);
+  return s;
+}
+function pas(s, ms) {
+  s.avancer(ms);
+  const m = s.manche;
+  if (s.etat === 'manche' && !s.pause && m.joueurCourant === 'p1') {
+    const a = S.coupAutomatique(m, 'p1');
+    if (a) S.recevoir(s, 'p1', { type: 'action', action: { type: a.type, carte: a.carte } });
+  }
+  S.tic(s);
+}
+test('Tant que je joue la manche, rythme normal ; dès que je n\'y suis plus, tout va plus vite', () => {
+  const s = salleRobots(5, 4);
+  assert.strictEqual(S.entreRobots(s), false);
+  assert.strictEqual(S.vue(s, 'p1').entreRobots, false);
+  assert.ok(!S.recevoir(s, 'p1', { type: 'passerFin' }).ok, 'pas tant que je joue');
+  let k = 0;
+  while (s.etat === 'manche' && s.manche.enJeu.includes('p1') && k++ < 20000) pas(s, 100);
+  assert.ok(k < 20000);
+  if (s.etat === 'manche') {
+    assert.strictEqual(S.entreRobots(s), true);
+    assert.strictEqual(S.vue(s, 'p1').entreRobots, true);
+    while (s.pause) pas(s, 100);
+    assert.ok(s.robotPret - s.horloge() <= S.RAPIDE.pauseRobot, 'les robots jouent vite');
+  }
+});
+test('Un robot qui remplace un joueur parti ne compte pas comme un robot', () => {
+  const s2 = S.creerSalle('ROB2', K.hasard(6));
+  S.recevoir(s2, 'p1', { type: 'rejoindre', nom: 'Moi' });
+  S.recevoir(s2, 'p2', { type: 'rejoindre', nom: 'Ami' });
+  S.recevoir(s2, 'p1', { type: 'ajouterRobot' });
+  S.recevoir(s2, 'p1', { type: 'lancer' });
+  S.recevoir(s2, 'p1', { type: 'remplacerParRobot', cible: 'p2' });
+  s2.manche.enJeu = s2.manche.enJeu.filter((j) => j !== 'p1'); // p1 ne joue plus la manche
+  assert.strictEqual(S.entreRobots(s2), false);
+  assert.ok(!S.recevoir(s2, 'p1', { type: 'passerFin' }).ok);
+});
+test('« Passer à la fin » donne le même classement qu\'à vitesse normale', () => {
+  for (const graine of [1, 2, 3, 4, 7]) {
+    const a = salleRobots(graine, 6), b = salleRobots(graine, 6);
+    let k = 0;
+    // a : on regarde jusqu'au bout, au rythme accéléré
+    while (a.etat !== 'finPartie' && k++ < 200000) pas(a, 100);
+    // b : dès qu'il ne reste que des robots, on passe
+    k = 0;
+    while (b.etat !== 'finPartie' && k++ < 200000) {
+      if (S.entreRobots(b)) assert.ok(S.recevoir(b, 'p1', { type: 'passerFin' }).ok);
+      else pas(b, 100);
+    }
+    assert.strictEqual(a.etat, 'finPartie');
+    assert.strictEqual(b.etat, 'finPartie');
+    assert.deepStrictEqual(b.elimines, a.elimines, 'graine ' + graine);
+    assert.strictEqual(b.vainqueur, a.vainqueur);
+    assert.ok(!S.recevoir(b, 'p1', { type: 'passerFin' }).ok, 'plus rien à passer');
+  }
+});
+test('Entre robots, pauses plus courtes ; juste après mon élimination, rythme normal', () => {
+  const s = salleRobots(9, 4);
+  let vuFinTourRapide = false, vuSuiteRapide = false, vuSuiteNormale = false;
+  for (let k = 0; k < 200000 && s.etat !== 'finPartie'; k++) {
+    const avant = s.etat;
+    pas(s, 100);
+    if (s.pause && s.pause.type === 'finTour' && S.entreRobots(s)) { assert.ok(s.pause.total <= S.RAPIDE.finTour); vuFinTourRapide = true; }
+    if (avant === 'manche' && s.etat === 'finManche') {
+      const total = S.vue(s, 'p1').suite.totalMs;
+      if (s.elimines[s.elimines.length - 1] === 'p1') { assert.strictEqual(total, S.DUREES.mancheAuto); vuSuiteNormale = true; }
+      else if (!s.restants.includes('p1')) { assert.strictEqual(total, S.RAPIDE.mancheAuto); vuSuiteRapide = true; }
+    }
+  }
+  assert.ok(vuFinTourRapide);
+  assert.ok(vuSuiteNormale || vuSuiteRapide || s.vainqueur === 'p1');
+});
+
 console.log(`\n${ok} tests réussis, ${ko} en échec.`);
 process.exit(ko ? 1 : 0);

@@ -460,6 +460,8 @@ body.salon:has(#voile:not([hidden])) #filChat { display: none; } /* fenêtre du 
 .main .carte.recue { box-shadow: 0 0 0 3px var(--good), 0 6px 14px rgba(0,0,0,.45); }
 .trophee { font-size: 64px; text-align: center; line-height: 1; animation: saut 1s ease-in-out infinite; }
 .consigne:empty { display: none; }
+.passer-fin { display: block; margin: 6px auto 0; padding: 6px 16px; min-height: 0; font-size: 14px; }
+.passer-fin[hidden] { display: none; }
 /* Animations coupées (réglage « Réduites », ou téléphone qui en demande moins) */ html.sans-anim .siege.courant .ligne, html.sans-anim .siege.courant, html.sans-anim .siege.meneur .ligne::after, html.sans-anim .pose .carte.gagnante, html.sans-anim .trophee { animation: none; }
 
 /* Accueil : profil, grandes cartes de modes, barre du bas. */
@@ -1392,6 +1394,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       <div class="table-entete" id="entete"></div>
       <div class="poses" id="poses"></div>
       <div class="consigne" id="consigne" aria-live="polite"></div>
+      <button class="btn passer-fin" id="btnPasserFin" hidden>Passer à la fin</button>
       <div class="chrono" id="barreChrono" hidden><span></span></div>
     </section>
     <section class="zone-main" id="zoneMain" aria-label="Ta main">
@@ -2267,6 +2270,9 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     if (logo.lastChild.textContent !== nomJeu) { logo.lastChild.textContent = nomJeu; logo.classList.toggle('long', v.jeu === 'inter8'); logo.firstChild.src = v.jeu === 'inter8' ? 'icons/masano-logo.svg' : 'icons/kopo-logo.svg'; }
     garderEcranAllume();
     vocal.maj(v);
+    // Plus aucun humain en jeu : on peut sauter la fin (de la manche, si on est qualifié pour la suivante).
+    $('btnPasserFin').hidden = !v.entreRobots;
+    $('btnPasserFin').textContent = v.restants && v.restants.includes(v.moi) ? 'Passer à la fin de la manche' : 'Passer à la fin';
     const finAvant = finChrono;
     demarrerChrono(v);
     if (!ancienne || ancienne.etat !== v.etat || ancienne.numeroManche !== v.numeroManche) { carteChoisie = null; choixInter = []; cartesRecues.clear(); }
@@ -2798,7 +2804,8 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     const monTour = m.joueurCourant === v.moi;
     const jeJoue = m.enJeu.includes(v.moi);
     // Ce qui se passe est montré par les animations ; on n'écrit que ce que tu dois faire.
-    if (pause || m.phase === 'terminee') {}
+    if (v.entreRobots) cons.append(ico('oeil'), v.restants.includes(v.moi) ? ' Les robots finissent la manche entre eux, en accéléré.' : ' Les robots finissent entre eux, en accéléré.');
+    else if (pause || m.phase === 'terminee') {}
     else if (!v.restants.includes(v.moi) || !jeJoue) cons.append(ico('oeil'), ' Tu regardes la partie.');
     else if (monTour) { if (v.chrono) cons.append(el('span', 'secondes', ''), ' '); cons.append(el('em', null, 'À toi !')); }
     if (v.robots === 'gentils') {
@@ -3024,7 +3031,8 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     const jeJoue = m.enJeu.includes(v.moi);
     const actions = m.actions;
     const coups = actions.filter((a) => a.type === 'jouer');
-    if (pause || m.phase !== 'jeu') {}
+    if (v.entreRobots) cons.append(ico('oeil'), v.restants.includes(v.moi) ? ' Les robots finissent la manche entre eux, en accéléré.' : ' Les robots finissent entre eux, en accéléré.');
+    else if (pause || m.phase !== 'jeu') {}
     else if (!v.restants.includes(v.moi) || !jeJoue) cons.append(ico('oeil'), ' Tu regardes la partie.');
     else if (monTour) {
       if (v.chrono) cons.append(el('span', 'secondes', ''), ' ');
@@ -3412,8 +3420,13 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       p.append(suivants === 2 ? 'La finale démarre dans ' : 'La manche suivante démarre dans ', el('strong', 'decompte-suite', String(Math.ceil(v.suite.resteMs / 1000))), ' s.');
       contenu.push(p);
     }
+    if (v.entreRobots) { // il ne reste que des robots : inutile d'attendre la fin
+      const b = el('button', 'btn principal large', 'Passer à la fin');
+      b.onclick = () => envoyer({ type: 'passerFin' });
+      contenu.push(b);
+    }
     if (v.hote === v.moi) {
-      const b = el('button', 'btn principal large', 'Lancer maintenant' + (suivants === 2 ? ' la finale' : ''));
+      const b = el('button', 'btn' + (v.entreRobots ? '' : ' principal') + ' large', 'Lancer maintenant' + (suivants === 2 ? ' la finale' : ''));
       b.onclick = () => envoyer({ type: 'mancheSuivante' });
       contenu.push(b);
     } else if (!v.suite) contenu.push(el('p', null, "En attente de l'hôte pour la manche suivante…"));
@@ -6453,6 +6466,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     envoyer({ type: 'ajouterRobot', niveau: S.NIVEAUX_ROBOTS.includes(n) ? n : niveauRobots() });
   };
   $('btnAnnuler').onclick = quitter;
+  $('btnPasserFin').onclick = () => { $('btnPasserFin').hidden = true; envoyer({ type: 'passerFin' }); };
   $('btnQuitter').onclick = () => demanderConfirmation(
     hote ? "Tu es l'hôte : si tu quittes, la partie s'arrête pour tout le monde." : (vueActuelle && vueActuelle.etat === 'manche' ? 'Tu ne pourras pas revenir dans cette partie avec un autre code.' : 'Tu quittes la partie.'),
     () => { if (client && vueActuelle && vueActuelle.etat === 'salon') {} quitter(); });
