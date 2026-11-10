@@ -5144,6 +5144,13 @@ var qrcode = function() {
     return coups;
   }
 
+  // On pioche quand on ne peut pas jouer. Le joker et le 8 ne forcent jamais à jouer : si ce sont
+  // les seules cartes jouables, on peut les garder et piocher (pendant une demande comme en jeu normal).
+  function piochePermise(m, joueur, coups) {
+    if (m.aPioche) return false;
+    return (coups || coupsJouer(m, joueur)).every((a) => ['8', JOKER].includes(valeur(a.cartes[0])));
+  }
+
   // Actions possibles pour un joueur, dans l'état actuel.
   function actionsPossibles(m, joueur) {
     const actions = [];
@@ -5154,7 +5161,7 @@ var qrcode = function() {
     const coups = coupsJouer(m, joueur);
     actions.push(...coups);
     if (m.aPioche) actions.push({ type: 'passer', joueur });
-    else if (!coups.length) actions.push({ type: 'piocher', joueur });
+    else if (piochePermise(m, joueur, coups)) actions.push({ type: 'piocher', joueur });
     return actions;
   }
 
@@ -5187,7 +5194,7 @@ var qrcode = function() {
     delete m.contestable;
 
     if (action.type === 'piocher') {
-      if (m.aPioche || coupsJouer(m, j).length) throw new Error(`Action interdite : ${JSON.stringify(action)}`);
+      if (!piochePermise(m, j)) throw new Error(`Action interdite : ${JSON.stringify(action)}`);
       const tirees = piocherCartes(m, j, 1);
       if (!tirees.length) {
         // Rien à piocher : le joueur passe. Match nul seulement si toute la table passe ainsi
@@ -6876,7 +6883,7 @@ var qrcode = function() {
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = '9038e6dcaa82'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = 'c1dcc60a29f8'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
