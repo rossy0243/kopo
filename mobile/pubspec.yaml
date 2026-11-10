@@ -1,0 +1,43 @@
+name: masano
+description: "Masano : Kopo et Inter (8), entre amis, en ligne ou contre les robots."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.7
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  http: ^1.6.0
+  web_socket_channel: ^3.0.3
+  shared_preferences: ^2.5.6
+  flutter_svg: ^2.3.2
+  audioplayers: ^6.8.1
+  qr_flutter: ^4.1.0
+  share_plus: ^13.3.1
+  url_launcher: ^6.3.3
+  firebase_core: ^5.1.0
+  firebase_messaging: ^17.0.1
+  package_info_plus: ^10.2.2
+  app_links: ^7.2.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/img/
+    - assets/sons/
+  fonts:
+    - family: Bebas
+      fonts:
+        - asset: assets/fonts/BebasNeue-Regular.ttf
+    - family: Outfit
+      fonts:
+        - asset: assets/fonts/Outfit.ttf
