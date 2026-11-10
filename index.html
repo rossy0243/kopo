@@ -379,6 +379,16 @@ body.salon .app { display: flex; flex-direction: column; min-height: 100vh; min-
 #listeJoueurs li > span:first-child { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 #listeJoueurs .pastille { font-size: 10px; padding: 1px 6px; }
 #listeJoueurs li .btn.retirer { padding: 2px 8px; font-size: 14px; line-height: 1.4; }
+/* Niveau de chaque robot : l'hôte touche la pastille pour passer Facile → Normal → Fort */
+.niveau-robot { flex: none; border: 1px solid var(--line); border-radius: 99px; background: rgba(255,255,255,.07); color: var(--ink); font-size: 11px; font-weight: 700; padding: 2px 8px; line-height: 1.4; }
+span.niveau-robot { border-color: transparent; }
+.niveau-robot.faciles { color: #7fd1a6; } .niveau-robot.forts { color: #ef8a6b; }
+.table-robots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.table-robots .btn { display: grid; justify-items: center; gap: 2px; padding: 8px 2px; font-size: 12px; }
+.table-robots .btn .ico { width: 26px; height: 26px; }
+.table-robots .btn.faciles { color: #7fd1a6; } .table-robots .btn.forts { color: #ef8a6b; }
+.table-robots .btn.ajout { border-style: dashed; color: var(--muted); font-size: 26px; align-content: center; }
+.lien-texte { background: none; border: 0; color: var(--brass); text-decoration: underline; font-size: 14px; padding: 4px; }
 .salon-bas { display: flex; gap: 8px; margin-top: auto; }
 .salon-bas .btn.large { font-size: 15px; padding: 13px 10px; }
 .salon-bas #btnRobot { width: auto; padding: 13px 14px; flex: none; }
@@ -1288,6 +1298,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
         <small class="muted" id="niveauRobotsAide"></small>
         <p>Combien de robots autour de la table ?</p>
         <div class="choix-robots" id="choixRobots"></div>
+        <button type="button" class="lien-texte" id="btnComposerTable">Composer ma table robot par robot</button>
         <button class="btn principal large" id="btnGuidee" hidden>Première partie guidée (2 robots gentils)</button>
         <button class="btn large" id="btnFermerRobots">Annuler</button>
       </div>
@@ -4226,9 +4237,15 @@ var qrcode = function() {
   // Force de 0 (gentil) à 2 (fort). Dans chaque niveau, elle monte avec le niveau du joueur
   // (niveau 1 : bas de la plage, niveau 20 et plus : haut de la plage).
   const PLAGES_FORCE = { faciles: [0, 0.7], normaux: [1, 1.5], forts: [1.6, 2] };
-  function forceRobots(s) {
+  // Chaque robot ajouté peut avoir son propre niveau (j.niveau) ; sinon, celui de la table
+  // (s.robots), par exemple pour un robot qui remplace un joueur parti.
+  function niveauDuRobot(s, j) {
+    const r = j && s.joueurs ? s.joueurs.find((x) => x.id === j) : null;
+    return r && !r.remplace && NIVEAUX_ROBOTS.includes(r.niveau) ? r.niveau : s.robots;
+  }
+  function forceRobots(s, j) {
     if (s.robots === 'gentils') return 0;
-    const plage = PLAGES_FORCE[s.robots] || PLAGES_FORCE.normaux;
+    const plage = PLAGES_FORCE[niveauDuRobot(s, j)] || PLAGES_FORCE.normaux;
     const n = s.niveauJoueur > 1 ? s.niveauJoueur : 1;
     const t = Math.min(1, (n - 1) / 19);
     return plage[0] + (plage[1] - plage[0]) * t;
@@ -4239,7 +4256,7 @@ var qrcode = function() {
   function choixRobot(s, j) {
     const v = K.vuePublique(s.manche, j);
     const actions = K.actionsPossibles(s.manche, j);
-    const f = forceRobots(s);
+    const f = forceRobots(s, j);
     const cerveau = f < 1 ? (s.rng() < f ? robotNormal : robotGentil) : (s.rng() < f - 1 ? robotFort : robotNormal);
     return cerveau(v, actions, s.rng);
   }
@@ -4581,7 +4598,16 @@ var qrcode = function() {
         if (s.joueurs.length >= MAX) return { ok: false, erreur: 'La table est pleine (9 joueurs).' };
         let n = 1;
         while (s.joueurs.some((j) => j.nom === 'Robot ' + n)) n++;
-        s.joueurs.push({ id: 'robot-' + n + '-' + Math.floor(s.rng() * 1e6), nom: 'Robot ' + n, connecte: true, robot: true, voix: false, muet: true });
+        if (msg.niveau !== undefined && !NIVEAUX_ROBOTS.includes(msg.niveau)) return { ok: false, erreur: 'Impossible.' };
+        const robot = { id: 'robot-' + n + '-' + Math.floor(s.rng() * 1e6), nom: 'Robot ' + n, connecte: true, robot: true, voix: false, muet: true };
+        if (msg.niveau) robot.niveau = msg.niveau; // sinon, le niveau de la table
+        s.joueurs.push(robot);
+        return { ok: true };
+      }
+      case 'niveauRobot': { // l'hôte change le niveau d'un robot ajouté, dans le salon
+        const cible = s.joueurs.find((j) => j.id === msg.cible);
+        if (id !== s.hote || s.etat !== 'salon' || s.publique || !cible || !cible.robot || cible.remplace || !NIVEAUX_ROBOTS.includes(msg.niveau)) return { ok: false, erreur: 'Impossible.' };
+        cible.niveau = msg.niveau;
         return { ok: true };
       }
       case 'remplacerParRobot': {
@@ -4711,7 +4737,7 @@ var qrcode = function() {
       etat: s.etat,
       moi: id,
       hote: s.hote,
-      joueurs: s.joueurs.map((j) => ({ id: j.id, nom: j.nom, connecte: j.connecte, peerId: j.peerId || null, voix: !!j.voix, muet: j.muet !== false, robot: !!j.robot, pret: !!j.pret || !!j.robot, remplace: !!j.remplace, absent: estAbsent(s, j.id) })),
+      joueurs: s.joueurs.map((j) => ({ id: j.id, nom: j.nom, connecte: j.connecte, peerId: j.peerId || null, voix: !!j.voix, muet: j.muet !== false, robot: !!j.robot, niveau: j.robot && !j.remplace ? niveauDuRobot(s, j.id) : null, pret: !!j.pret || !!j.robot, remplace: !!j.remplace, absent: estAbsent(s, j.id) })),
       delai: s.delai,
       publique: !!s.publique,
       taille: s.taille,
@@ -4761,7 +4787,7 @@ var qrcode = function() {
     return s;
   }
 
-  const KopoSalle = { MIN, MAX, hasardManche, placerDonne, DELAIS, PAUSE_ROBOT, DUREES, creerSalle, rendrePublique, choixRobot, NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, robotGentil, robotNormal, robotFort, reconnecter, DELAI_ABSENT, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
+  const KopoSalle = { MIN, MAX, hasardManche, placerDonne, DELAIS, PAUSE_ROBOT, DUREES, creerSalle, rendrePublique, choixRobot, NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, niveauDuRobot, robotGentil, robotNormal, robotFort, reconnecter, DELAI_ABSENT, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
   if (typeof module !== 'undefined' && module.exports) module.exports = KopoSalle;
   else root.KopoSalle = KopoSalle;
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -5573,7 +5599,14 @@ var qrcode = function() {
   }
 
   const estRobot = (s, id) => !!(s.joueurs.find((j) => j.id === id) || {}).robot;
-  const choixRobot = (s, j) => R.choixRobot(s.manche, j, s.robots, s.niveauJoueur, s.rng);
+  // Chaque robot ajouté peut avoir son propre niveau (j.niveau) ; sinon, celui de la table
+  // (s.robots), par exemple pour un robot qui remplace un joueur parti. Robots gentils : tous gentils.
+  function niveauDuRobot(s, j) {
+    if (s.robots === 'gentils') return 'gentils';
+    const r = s.joueurs.find((x) => x.id === j);
+    return r && !r.remplace && NIVEAUX_ROBOTS.includes(r.niveau) ? r.niveau : s.robots;
+  }
+  const choixRobot = (s, j) => R.choixRobot(s.manche, j, niveauDuRobot(s, j), s.niveauJoueur, s.rng);
 
   function estAbsent(s, id) {
     const j = s.joueurs.find((x) => x.id === id);
@@ -5618,7 +5651,7 @@ var qrcode = function() {
     // Un robot annonce dans la foulée de son coup, sans attendre sa pause de réflexion.
     // Un robot facile peut oublier : il ne se rattrape pas, on pourra le contester après les 3 s.
     for (const j of nouveaux.filter((x) => estRobot(s, x))) {
-      if (R.robotAnnonce(s.robots, s.niveauJoueur, s.rng)) {
+      if (R.robotAnnonce(niveauDuRobot(s, j), s.niveauJoueur, s.rng)) {
         I.jouer(m, { type: 'annoncer', joueur: j });
         delete s.graces[j];
       } else s.oublis[j] = true;
@@ -5823,7 +5856,16 @@ var qrcode = function() {
         if (s.joueurs.length >= MAX) return { ok: false, erreur: `La table est pleine (${MAX} joueurs).` };
         let n = 1;
         while (s.joueurs.some((j) => j.nom === 'Robot ' + n)) n++;
-        s.joueurs.push({ id: 'robot-' + n + '-' + Math.floor(s.rng() * 1e6), nom: 'Robot ' + n, connecte: true, robot: true, voix: false, muet: true });
+        if (msg.niveau !== undefined && !NIVEAUX_ROBOTS.includes(msg.niveau)) return { ok: false, erreur: 'Impossible.' };
+        const robot = { id: 'robot-' + n + '-' + Math.floor(s.rng() * 1e6), nom: 'Robot ' + n, connecte: true, robot: true, voix: false, muet: true };
+        if (msg.niveau) robot.niveau = msg.niveau; // sinon, le niveau de la table
+        s.joueurs.push(robot);
+        return { ok: true };
+      }
+      case 'niveauRobot': { // l'hôte change le niveau d'un robot ajouté, dans le salon
+        const cible = s.joueurs.find((j) => j.id === msg.cible);
+        if (id !== s.hote || s.etat !== 'salon' || s.publique || !cible || !cible.robot || cible.remplace || !NIVEAUX_ROBOTS.includes(msg.niveau)) return { ok: false, erreur: 'Impossible.' };
+        cible.niveau = msg.niveau;
         return { ok: true };
       }
       case 'remplacerParRobot': {
@@ -5969,7 +6011,7 @@ var qrcode = function() {
       hote: s.hote,
       mode: s.mode,
       jRetour: !!s.jRetour,
-      joueurs: s.joueurs.map((j) => ({ id: j.id, nom: j.nom, connecte: j.connecte, peerId: j.peerId || null, voix: !!j.voix, muet: j.muet !== false, robot: !!j.robot, pret: !!j.pret || !!j.robot, remplace: !!j.remplace, absent: estAbsent(s, j.id) })),
+      joueurs: s.joueurs.map((j) => ({ id: j.id, nom: j.nom, connecte: j.connecte, peerId: j.peerId || null, voix: !!j.voix, muet: j.muet !== false, robot: !!j.robot, niveau: j.robot && !j.remplace ? niveauDuRobot(s, j.id) : null, pret: !!j.pret || !!j.robot, remplace: !!j.remplace, absent: estAbsent(s, j.id) })),
       delai: s.delai,
       publique: !!s.publique,
       taille: s.taille,
@@ -6040,7 +6082,7 @@ var qrcode = function() {
     return s;
   }
 
-  const Inter8Salle = { JEU, MIN, MAX, MODES, DELAIS, PAUSE_ROBOT, DUREES, DELAI_ABSENT, DELAI_ANNONCE, NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, creerSalle, rendrePublique, choixRobot, reconnecter, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
+  const Inter8Salle = { JEU, MIN, MAX, MODES, DELAIS, PAUSE_ROBOT, DUREES, DELAI_ABSENT, DELAI_ANNONCE, NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, niveauDuRobot, creerSalle, rendrePublique, choixRobot, reconnecter, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
   if (enNode) module.exports = Inter8Salle;
   else root.Inter8Salle = Inter8Salle;
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -6828,7 +6870,7 @@ var qrcode = function() {
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = '9da5fb2ef2f9'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = '9ee4d1f4e81f'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
@@ -7895,12 +7937,16 @@ var qrcode = function() {
     for (const j of v.joueurs) {
       const li = el('li');
       li.dataset.id = j.id;
-      li.append(j.robot ? avecIco(el('span'), 'robots', j.nom) : el('span', null, j.nom));
+      // Robot avec son niveau : l'icône dit déjà « robot », on garde le numéro pour laisser la place au niveau.
+      const avecNiveau = j.robot && j.niveau && v.robots !== 'gentils';
+      li.append(j.robot ? avecIco(el('span'), 'robots', avecNiveau ? j.nom.replace(/^Robot /, '') : j.nom) : el('span', null, j.nom));
+      if (avecNiveau) li.firstChild.setAttribute('aria-label', j.nom);
       if (j.id === v.hote) li.append(el('span', 'pastille tour', 'hôte'));
       if (j.id === v.moi) li.append(el('span', 'pastille neutre', 'toi'));
       if (!j.connecte && !j.robot) li.append(el('span', 'pastille ko', 'déconnecté'));
       else if (j.pret && !j.robot && j.id !== v.hote && !v.publique) li.append(el('span', 'pastille ok', 'prêt'));
       if (j.voix) li.append(avecIco(el('span'), j.muet ? 'micro-coupe' : 'micro'));
+      if (avecNiveau) li.append(pastilleNiveauRobot(j, jeSuisHote && !v.publique));
       if (jeSuisHote && j.id !== v.moi && !v.publique) {
         const b = el('button', 'btn retirer', '✕');
         b.setAttribute('aria-label', 'Retirer ' + j.nom);
@@ -7923,6 +7969,22 @@ var qrcode = function() {
     $('attenteHote').hidden = jeSuisHote || v.publique;
     $('attenteHote').classList.toggle('pret', !!moi.pret);
     $('attenteHote').textContent = moi.pret ? 'Tu es prêt. La partie part dès que l\'hôte lance.' : 'L\'hôte peut lancer à tout moment.';
+  }
+
+  // Niveau d'un robot dans le salon : l'hôte le change d'un toucher, les autres le voient.
+  const ORDRE_NIVEAUX_ROBOTS = ['faciles', 'normaux', 'forts'];
+  const NOM_NIVEAU_ROBOT = { faciles: 'Facile', normaux: 'Normal', forts: 'Fort' };
+  function pastilleNiveauRobot(j, modifiable) {
+    const b = el(modifiable ? 'button' : 'span', 'niveau-robot ' + j.niveau, NOM_NIVEAU_ROBOT[j.niveau]);
+    if (!modifiable) return b;
+    b.type = 'button';
+    b.setAttribute('aria-label', `Niveau de ${j.nom} : ${NOM_NIVEAU_ROBOT[j.niveau]}. Toucher pour changer.`);
+    b.onclick = () => {
+      const n = ORDRE_NIVEAUX_ROBOTS[(ORDRE_NIVEAUX_ROBOTS.indexOf(j.niveau) + 1) % 3];
+      stock.ecrire('kopo-niveau-dernier-robot', n); // le prochain robot ajouté arrive à ce niveau
+      envoyer({ type: 'niveauRobot', cible: j.id, niveau: n });
+    };
+    return b;
   }
 
   // Sièges autour de la table (Kopo et Inter (8)).
@@ -11335,6 +11397,58 @@ var qrcode = function() {
     };
     $('choixRobots').append(b);
   }
+  // « Composer ma table » : un niveau pour chaque robot, gardé sur le téléphone pour la prochaine fois (une table par jeu).
+  const cleTableRobots = (inter) => (inter ? 'kopo-inter8-table-robots' : 'kopo-table-robots');
+  const maxRobots = (inter) => (inter ? SI.MAX - 1 : 8);
+  function lireTableRobots(inter) {
+    let t = stock.lire(cleTableRobots(inter));
+    t = Array.isArray(t) ? t.filter((n) => S.NIVEAUX_ROBOTS.includes(n)).slice(0, maxRobots(inter)) : [];
+    return t.length ? t : [niveauRobots(), niveauRobots(), niveauRobots()];
+  }
+  function composerTable() {
+    $('voileRobots').hidden = true;
+    const inter = jeuChoisi() === 'inter8', table = lireTableRobots(inter);
+    const grille = el('div', 'table-robots'), jouer = el('button', 'btn principal large'), retour = el('button', 'btn large', 'Retour');
+    const garder = () => stock.ecrire(cleTableRobots(inter), table);
+    function dessiner() {
+      grille.replaceChildren();
+      table.forEach((n, i) => {
+        const b = el('button', 'btn ' + n);
+        b.append(ico('robots'), el('span', null, NOM_NIVEAU_ROBOT[n]));
+        b.setAttribute('aria-label', `Robot ${i + 1} : ${NOM_NIVEAU_ROBOT[n]}. Toucher pour changer.`);
+        b.onclick = () => { // Facile → Normal → Fort → retiré
+          const k = ORDRE_NIVEAUX_ROBOTS.indexOf(n);
+          if (k < 2) table[i] = ORDRE_NIVEAUX_ROBOTS[k + 1];
+          else if (table.length > 1) table.splice(i, 1);
+          else table[i] = 'faciles'; // il faut au moins un robot
+          garder(); dessiner();
+        };
+        grille.append(b);
+      });
+      if (table.length < maxRobots(inter)) {
+        const plus = el('button', 'btn ajout', '+');
+        plus.setAttribute('aria-label', 'Ajouter un robot');
+        plus.onclick = () => { table.push(niveauRobots()); garder(); dessiner(); };
+        grille.append(plus);
+      }
+      jouer.textContent = `Jouer · ${table.length} robot${table.length > 1 ? 's' : ''}`;
+    }
+    jouer.onclick = () => {
+      const p = lirePseudo(); if (!p) return;
+      fermerFenetre(); garder();
+      demarrerHote(nouveauCode(), p, false, null, inter ? 'inter8' : 'kopo');
+      // Niveau de la table : pour un robot qui remplace un joueur. Inter (8) : le style choisi dans la fenêtre robots.
+      envoyer(Object.assign({ type: 'reglages', robots: niveauRobots(), niveau: monNiveau() }, inter ? reglagesStyleInter(styleInter()) : {}));
+      for (const n of table) envoyer({ type: 'ajouterRobot', niveau: n });
+      envoyer({ type: 'lancer' });
+    };
+    retour.onclick = () => { fermerFenetre(); $('btnModeRobots').click(); };
+    dessiner();
+    const style = inter ? el('small', 'muted', `Inter (8) · ${styleInter() === 'delire' ? 'Délire' + (jRetourInter() ? ' avec J retour' : ' sans J retour') : 'Simple'}`) : null;
+    ouvrirFenetre([el('h2', null, 'Ma table'), ...(style ? [style] : []), el('p', 'muted', 'Touche un robot pour changer son niveau, + pour en ajouter.'), grille,
+      el('small', 'muted', 'Facile → Normal → Fort → retiré. Ta table est gardée pour la prochaine fois.'), jouer, retour]);
+  }
+  $('btnComposerTable').onclick = composerTable;
   function montrerRegles() {
     const ok = el('button', 'btn principal large', "C'est compris");
     ok.onclick = fermerFenetre;
@@ -11443,7 +11557,11 @@ var qrcode = function() {
   $('btnLancer').onclick = () => envoyer({ type: 'lancer' });
   $('btnPleinEcran').onclick = pleinEcran;
   $('btnPleinEcranEntete').onclick = pleinEcran;
-  $('btnRobot').onclick = () => envoyer({ type: 'ajouterRobot' });
+  // Un nouveau robot arrive au niveau du dernier ajouté (ou changé), sinon à celui choisi pour « Contre les robots ».
+  $('btnRobot').onclick = () => {
+    const n = stock.lire('kopo-niveau-dernier-robot');
+    envoyer({ type: 'ajouterRobot', niveau: S.NIVEAUX_ROBOTS.includes(n) ? n : niveauRobots() });
+  };
   $('btnAnnuler').onclick = quitter;
   $('btnQuitter').onclick = () => demanderConfirmation(
     hote ? "Tu es l'hôte : si tu quittes, la partie s'arrête pour tout le monde." : (vueActuelle && vueActuelle.etat === 'manche' ? 'Tu ne pourras pas revenir dans cette partie avec un autre code.' : 'Tu quittes la partie.'),
