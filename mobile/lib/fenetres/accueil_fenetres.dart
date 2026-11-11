@@ -309,7 +309,7 @@ void montrerReglesInter() {
         titre('Annoncer et sortir'),
         li(['Quand tu peux finir au coup suivant, touche ', ["J'annonce"], ' dans les 3 secondes. Sinon, les autres peuvent te ', ['contester'], ' : tu pioches 1 carte.']),
         li(["Tu peux sortir avec n'importe quelle carte. Si c'est une carte spéciale, son effet s'applique quand même au suivant."]),
-        li(["Pioche vide : on remélange la défausse. S'il n'y a plus rien du tout, celui qui ne peut pas jouer passe son tour. Si toute la table passe, la manche est rejouée."]),
+        li(["Pioche vide : la défausse (sauf la carte du centre) est remélangée et recharge la pioche, pour toute pioche, pénalités comprises. S'il n'y a plus rien du tout, celui qui ne peut pas jouer passe son tour. Si toute la table passe, la manche est rejouée."]),
         titre('Les styles'),
         li([['Simple'], ' : 1 paquet avec jokers (54 cartes), de 2 à 8 joueurs.']),
         li([['Délire'], ' : 2 paquets (108 cartes). En option, le ', ['J retour'], ' : chaque valet posé inverse le sens du jeu (sans effet à 2 joueurs).']),

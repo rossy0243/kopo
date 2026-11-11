@@ -166,13 +166,21 @@
     if (!(cle in d)) d[cle] = f >= 1 || rng() < f ? true : rng() < CONTESTE_FACILE;
     return d[cle];
   }
+  const MANCHE_LONGUE = 3;
   function choixRobot(m, j, niveauRobots, niveauJoueur, rng) {
     const v = I.vuePublique(m, j);
     const f = forceRobots(niveauRobots, niveauJoueur);
     // On oublie les décisions sur les joueurs qu'on ne peut plus contester (amende payée, ou leur tour revenu).
     const cibles = v.contestables || [];
     if (m.robotsContestent) for (const cle of Object.keys(m.robotsContestent)) if (!cibles.some((c) => cle.includes('>' + c + '>'))) delete m.robotsContestent[cle];
-    const actions = I.actionsPossibles(m, j).filter((a) => a.type !== 'contester' || veutContester(m, j, a.cible, f, rng));
+    let actions = I.actionsPossibles(m, j).filter((a) => a.type !== 'contester' || veutContester(m, j, a.cible, f, rng));
+    // Manche qui s'éternise (la défausse a déjà rechargé la pioche plusieurs fois) : les robots gardent
+    // leurs 2, 10 et jokers s'ils ont un autre coup, sauf pour sortir. Sinon, la défausse rechargeant
+    // aussi les pénalités, des robots peuvent se les renvoyer sans fin.
+    if ((m.remelanges || 0) >= MANCHE_LONGUE) {
+      const penalite = (a) => a.type === 'jouer' && a.cartes.some((x) => I.PENALITES[I.valeur(x)]) && a.cartes.length < v.main.length;
+      if (actions.some((a) => a.type === 'jouer' && !penalite(a))) actions = actions.filter((a) => !penalite(a));
+    }
     const cerveau = f < 1 ? (rng() < f ? robotNormal : robotGentil) : (rng() < f - 1 ? robotFort : robotNormal);
     return cerveau(v, actions, rng);
   }
