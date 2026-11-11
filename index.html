@@ -1364,7 +1364,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       <ul class="regles">
         <li>Quand tu peux finir au coup suivant, touche <b>J'annonce</b> dans les 3 secondes. Sinon, les autres peuvent te <b>contester</b> : tu pioches 1 carte.</li>
         <li>Tu peux sortir avec n'importe quelle carte. Si c'est une carte spéciale, son effet s'applique quand même au suivant.</li>
-        <li>Pioche vide : on remélange la défausse. S'il n'y a plus rien du tout, celui qui ne peut pas jouer passe son tour. Si toute la table passe, la manche est rejouée.</li>
+        <li>Pioche vide : la défausse (sauf la carte du centre) est remélangée et recharge la pioche, pour toute pioche, pénalités comprises. S'il n'y a plus rien du tout, celui qui ne peut pas jouer passe son tour. Si toute la table passe, la manche est rejouée.</li>
       </ul>
       <p class="regles-titre">Les styles</p>
       <ul class="regles">
@@ -5037,17 +5037,21 @@ var qrcode = function() {
     m.pioche = melanger(m.defausse, rng).concat(m.pioche);
     m.graine = Math.floor(rng() * 4294967296) >>> 0 || 1;
     m.defausse = [dessus];
+    m.remelanges = (m.remelanges || 0) + 1;
     noter(m, 'La pioche est vide : on remélange la défausse.');
     return true;
   }
 
   // Pioche n cartes (moins s'il n'en reste pas assez). Piocher annule l'annonce.
-  // sansMelange : une pénalité ne fait pas remélanger la défausse (sinon, avec un seul paquet,
-  // les pénalités tournent en rond et la manche ne finit jamais).
-  function piocherCartes(m, joueur, n, sansMelange) {
+  // Décision du 11/11 : dès que la pioche s'épuise, la défausse (sauf la carte du centre) la
+  // recharge, tant qu'elle a des cartes, pour toute pioche (pénalité et amende comprises).
+  // Garde-fou : passé LIMITE_REMELANGES remélanges dans la manche, une pénalité ou une amende ne
+  // remélange plus (sinon les pénalités peuvent tourner en rond sans fin entre quelques joueurs).
+  const LIMITE_REMELANGES = 5;
+  function piocherCartes(m, joueur, n, penalite) {
     const tirees = [];
     for (let k = 0; k < n; k++) {
-      if (!m.pioche.length && (sansMelange || !remelanger(m))) break;
+      if (!m.pioche.length && ((penalite && (m.remelanges || 0) >= LIMITE_REMELANGES) || !remelanger(m))) break;
       tirees.push(m.pioche.pop());
     }
     m.mains[joueur].push(...tirees);
@@ -5106,7 +5110,7 @@ var qrcode = function() {
     if (!tirees.length) {
       noter(m, `Plus de cartes à piocher : ${cible} ne pioche rien et passe son tour.`);
       signalerPiocheVide(m, cible, 'penalite');
-    } else noter(m, `${cible} pioche ${tirees.length} carte${tirees.length > 1 ? 's' : ''}${tirees.length < n ? ` sur ${n} (pioche vide)` : ''} et passe son tour.`);
+    } else noter(m, `${cible} pioche ${tirees.length} carte${tirees.length > 1 ? 's' : ''}${tirees.length < n ? ` sur ${n} (plus rien à piocher)` : ''} et passe son tour.`);
     return suivant(m, cible);
   }
 
@@ -5275,8 +5279,7 @@ var qrcode = function() {
       const liste = contestables(m).filter((c) => c !== j);
       const cible = action.cible || liste[0];
       if (!cible || !liste.includes(cible)) throw new Error(`Action interdite : ${JSON.stringify(action)}`);
-      // L'amende ne fait pas remélanger la défausse (section 9 : seul le joueur qui ne peut pas
-      // jouer la fait remélanger) : pioche vide, le contesté ne pioche rien.
+      // L'amende se pioche comme une pénalité : la défausse recharge la pioche (voir le garde-fou).
       piocherCartes(m, cible, 1, true);
       // Une seule amende par oubli, même s'il peut encore finir avec la carte piochée.
       m.contestables = contestables(m).filter((c) => c !== cible);
@@ -7053,7 +7056,7 @@ var qrcode = function() {
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = '3cbe28db3154'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = '3f966feadad4'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
@@ -8497,8 +8500,10 @@ var qrcode = function() {
       const dos = el('div', 'carte dos-carte'); dos.id = 'piocheInter';
       pioche.classList.add('pioche-inter');
       if (m.piochable === 0) pioche.classList.add('vide');
-      pioche.append(dos, el('span', 'legende', m.piochable === 0 ? 'Vide' : String(m.pioche)));
-      pioche.setAttribute('aria-label', `Pioche : ${m.pioche} carte${m.pioche > 1 ? 's' : ''}`);
+      // La défausse recharge la pioche dès qu'elle s'épuise : on compte ce qu'il reste à piocher.
+      const nbPioche = m.piochable != null ? m.piochable : m.pioche;
+      pioche.append(dos, el('span', 'legende', nbPioche === 0 ? 'Vide' : String(nbPioche)));
+      pioche.setAttribute('aria-label', `Pioche : ${nbPioche} carte${nbPioche > 1 ? 's' : ''}`);
       t.append(ref, pioche); // la carte posée au milieu, la pioche dans un coin
       // Mode délire : le sens du jeu tourne en permanence autour de la carte du centre.
       if (v.mode === 'delire' && v.jRetour && m.enJeu.length > 2) t.prepend(roueSens(m.sens));

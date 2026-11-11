@@ -1364,7 +1364,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       <ul class="regles">
         <li>Quand tu peux finir au coup suivant, touche <b>J'annonce</b> dans les 3 secondes. Sinon, les autres peuvent te <b>contester</b> : tu pioches 1 carte.</li>
         <li>Tu peux sortir avec n'importe quelle carte. Si c'est une carte spéciale, son effet s'applique quand même au suivant.</li>
-        <li>Pioche vide : on remélange la défausse. S'il n'y a plus rien du tout, celui qui ne peut pas jouer passe son tour. Si toute la table passe, la manche est rejouée.</li>
+        <li>Pioche vide : la défausse (sauf la carte du centre) est remélangée et recharge la pioche, pour toute pioche, pénalités comprises. S'il n'y a plus rien du tout, celui qui ne peut pas jouer passe son tour. Si toute la table passe, la manche est rejouée.</li>
       </ul>
       <p class="regles-titre">Les styles</p>
       <ul class="regles">
@@ -3051,8 +3051,10 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       const dos = el('div', 'carte dos-carte'); dos.id = 'piocheInter';
       pioche.classList.add('pioche-inter');
       if (m.piochable === 0) pioche.classList.add('vide');
-      pioche.append(dos, el('span', 'legende', m.piochable === 0 ? 'Vide' : String(m.pioche)));
-      pioche.setAttribute('aria-label', `Pioche : ${m.pioche} carte${m.pioche > 1 ? 's' : ''}`);
+      // La défausse recharge la pioche dès qu'elle s'épuise : on compte ce qu'il reste à piocher.
+      const nbPioche = m.piochable != null ? m.piochable : m.pioche;
+      pioche.append(dos, el('span', 'legende', nbPioche === 0 ? 'Vide' : String(nbPioche)));
+      pioche.setAttribute('aria-label', `Pioche : ${nbPioche} carte${nbPioche > 1 ? 's' : ''}`);
       t.append(ref, pioche); // la carte posée au milieu, la pioche dans un coin
       // Mode délire : le sens du jeu tourne en permanence autour de la carte du centre.
       if (v.mode === 'delire' && v.jRetour && m.enJeu.length > 2) t.prepend(roueSens(m.sens));

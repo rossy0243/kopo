@@ -479,29 +479,50 @@ test('Plus rien à piocher : le joueur passe son tour', () => {
   assert.strictEqual(m.passesVides, 0);
 });
 
-test('Pénalité avec la pioche vide : la table voit que le joueur ne pioche rien', () => {
+test('Pénalité avec la pioche vide : la défausse recharge la pioche', () => {
   const m = manche({ A: ['2C', '4C', '5C', '6C'], B: ['3P', '4P', '5P', '6P'], C: ['3K', '4K', '5K', '6K'] }, ['9C'], 'A');
+  m.defausse = ['DK', 'RK', '7T', '9C'];
   J(m, 'A', ['2C']);
-  assert.strictEqual(m.mains.B.length, 4, 'une pénalité ne fait pas remélanger la défausse');
-  assert.strictEqual(m.defausse.length, 2);
-  assert.ok(m.journal.some((t) => t === 'Plus de cartes à piocher : B ne pioche rien et passe son tour.'));
-  assert.strictEqual(I.vuePublique(m, 'C').piocheVide.joueur, 'B');
+  assert.strictEqual(m.mains.B.length, 6, 'B pioche ses 2 cartes dans la défausse remélangée');
+  assert.deepStrictEqual(m.defausse, ['2C'], 'seule la carte du centre reste');
+  assert.strictEqual(m.pioche.length, 2);
+  assert.ok(m.journal.some((t) => t === 'La pioche est vide : on remélange la défausse.'));
   assert.strictEqual(m.joueurCourant, 'C');
+});
+
+test('Pénalité avec pioche et défausse vides : la table voit que le joueur ne pioche rien', () => {
+  const m = manche({ A: ['2C', '4C', '5C', '6C'], B: ['3P', '4P', '5P', '6P'], C: ['3K', '4K', '5K', '6K'] }, ['9C'], 'A');
+  J(m, 'A', ['2C']); // la défausse n'a que 9♣ sous le 2♣ : B en reçoit une, pas deux
+  assert.strictEqual(m.mains.B.length, 5);
+  assert.ok(m.journal.some((t) => t === 'B pioche 1 carte sur 2 (plus rien à piocher) et passe son tour.'));
   // Carte de départ 2♣ et plus rien d'autre : le premier joueur ne pioche rien.
   const m2 = manche({ A: ['3C', '4C', '5C', '6C'], B: ['3P', '4P', '5P', '6P'], C: ['3K', '4K', '5K', '6K'] }, ['2C'], 'B');
   assert.strictEqual(m2.mains.B.length, 4);
+  assert.ok(m2.journal.some((t) => t === 'Plus de cartes à piocher : B ne pioche rien et passe son tour.'));
   assert.strictEqual(I.vuePublique(m2, 'A').piocheVide.joueur, 'B');
   assert.strictEqual(I.vuePublique(m2, 'A').piocheVide.motif, 'penalite');
   assert.strictEqual(m2.joueurCourant, 'C');
 });
 
-test("Amende de contestation avec la pioche vide : elle ne fait pas remélanger la défausse", () => {
+test('Garde-fou : après 5 remélanges dans la manche, une pénalité ne remélange plus (la pioche normale si)', () => {
+  const m = manche({ A: ['2C', '4C', '5C', '6C'], B: ['3P', '4P', '5P', '6P'], C: ['3K', '4K', '5K', '6K'] }, ['9C'], 'A');
+  m.defausse = ['DK', 'RK', '7T', '9C'];
+  m.remelanges = 5;
+  J(m, 'A', ['2C']);
+  assert.strictEqual(m.mains.B.length, 4, 'la pénalité ne remélange plus');
+  assert.strictEqual(m.defausse.length, 5);
+  P(m, 'C'); // C ne peut pas jouer : sa pioche remélange toujours
+  assert.strictEqual(m.mains.C.length, 5);
+  assert.deepStrictEqual(m.defausse, ['2C']);
+});
+
+test("Amende de contestation avec la pioche vide : la défausse recharge la pioche", () => {
   const m = manche({ A: ['3C', '4C'], B: ['5P', '6P', '7P'], C: ['3T', '6T', '7T'] }, ['5C'], 'A');
   m.defausse = ['DK', 'RK', '5C'];
   J(m, 'A', ['3C']); // A peut finir au prochain coup et n'annonce pas
   CO(m, 'B');
-  assert.strictEqual(m.mains.A.length, 1, 'rien à piocher : pas de carte d\'amende');
-  assert.strictEqual(m.defausse.length, 4, 'la défausse n\'est pas remélangée');
+  assert.strictEqual(m.mains.A.length, 2, 'A pioche son amende dans la défausse remélangée');
+  assert.deepStrictEqual(m.defausse, ['3C']);
 });
 
 test('Plus de pioche ni de défausse, et toute la table passe : match nul', () => {
@@ -512,11 +533,13 @@ test('Plus de pioche ni de défausse, et toute la table passe : match nul', () =
   assert.strictEqual(m.phase, 'nulle');
 });
 
-test('Une pénalité plus grande que la pioche : on pioche ce qu\'il y a, sans remélanger', () => {
+test('Une pénalité plus grande que la pioche : la défausse complète, puis on pioche ce qu\'il y a', () => {
   const m = manche({ A: ['10C', '4C', '5C', '6C'], B: ['3P', '4P', '5P', '6P'] }, ['3T', '9C'], 'A');
+  m.defausse = ['DK', '9C'];
   J(m, 'A', ['10C']);
-  assert.strictEqual(m.mains.B.length, 5, '1 carte de pioche, la défausse reste en place');
-  assert.ok(m.journal.some((t) => /B pioche 1 carte sur 4 \(pioche vide\)/.test(t)));
+  assert.strictEqual(m.mains.B.length, 7, '1 carte de la pioche + 2 de la défausse remélangée (DK, 9C)');
+  assert.deepStrictEqual(m.defausse, ['10C']);
+  assert.ok(m.journal.some((t) => /B pioche 3 cartes sur 4 \(plus rien à piocher\)/.test(t)));
   assert.strictEqual(m.phase, 'jeu');
 });
 

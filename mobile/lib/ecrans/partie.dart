@@ -331,7 +331,7 @@ class _CentreInter extends StatelessWidget {
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               const DosCarte(l: 44),
               const SizedBox(height: 3),
-              Text(m['piochable'] == 0 ? 'Vide' : '${m['pioche']}', style: K.texte(11, couleur: K.muted)),
+              Text(m['piochable'] == 0 ? 'Vide' : '${m['piochable'] ?? m['pioche']}', style: K.texte(11, couleur: K.muted)), // la défausse recharge la pioche
             ]),
           ),
         ]),
