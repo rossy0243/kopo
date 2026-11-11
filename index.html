@@ -7056,7 +7056,7 @@ var qrcode = function() {
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = '3f966feadad4'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = '8adccfd6075d'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
@@ -8500,10 +8500,8 @@ var qrcode = function() {
       const dos = el('div', 'carte dos-carte'); dos.id = 'piocheInter';
       pioche.classList.add('pioche-inter');
       if (m.piochable === 0) pioche.classList.add('vide');
-      // La défausse recharge la pioche dès qu'elle s'épuise : on compte ce qu'il reste à piocher.
-      const nbPioche = m.piochable != null ? m.piochable : m.pioche;
-      pioche.append(dos, el('span', 'legende', nbPioche === 0 ? 'Vide' : String(nbPioche)));
-      pioche.setAttribute('aria-label', `Pioche : ${nbPioche} carte${nbPioche > 1 ? 's' : ''}`);
+      pioche.append(dos, el('span', 'legende', m.piochable === 0 ? 'Vide' : String(m.pioche)));
+      pioche.setAttribute('aria-label', `Pioche : ${m.pioche} carte${m.pioche > 1 ? 's' : ''}`);
       t.append(ref, pioche); // la carte posée au milieu, la pioche dans un coin
       // Mode délire : le sens du jeu tourne en permanence autour de la carte du centre.
       if (v.mode === 'delire' && v.jRetour && m.enJeu.length > 2) t.prepend(roueSens(m.sens));

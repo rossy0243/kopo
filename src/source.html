@@ -3051,10 +3051,8 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       const dos = el('div', 'carte dos-carte'); dos.id = 'piocheInter';
       pioche.classList.add('pioche-inter');
       if (m.piochable === 0) pioche.classList.add('vide');
-      // La défausse recharge la pioche dès qu'elle s'épuise : on compte ce qu'il reste à piocher.
-      const nbPioche = m.piochable != null ? m.piochable : m.pioche;
-      pioche.append(dos, el('span', 'legende', nbPioche === 0 ? 'Vide' : String(nbPioche)));
-      pioche.setAttribute('aria-label', `Pioche : ${nbPioche} carte${nbPioche > 1 ? 's' : ''}`);
+      pioche.append(dos, el('span', 'legende', m.piochable === 0 ? 'Vide' : String(m.pioche)));
+      pioche.setAttribute('aria-label', `Pioche : ${m.pioche} carte${m.pioche > 1 ? 's' : ''}`);
       t.append(ref, pioche); // la carte posée au milieu, la pioche dans un coin
       // Mode délire : le sens du jeu tourne en permanence autour de la carte du centre.
       if (v.mode === 'delire' && v.jRetour && m.enJeu.length > 2) t.prepend(roueSens(m.sens));
