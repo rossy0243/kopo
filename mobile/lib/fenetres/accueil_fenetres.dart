@@ -301,7 +301,7 @@ void montrerReglesInter() {
         titre('À ton tour'),
         li(['Pose une carte de la ', ['même couleur'], ' ou de la ', ['même valeur'], ' que la carte du centre. Elle devient la nouvelle carte du centre.']),
         li(['Tu peux poser ensemble plusieurs cartes de ', ['même valeur'], ' si la première va. La dernière donne la nouvelle couleur, et elle doit ', ['changer'], ' la couleur du centre.']),
-        li(['Rien ne va ? ', ['Pioche'], " une carte. Si elle va, tu peux la poser tout de suite (avec d'autres de même valeur) ou la garder. Le joker et le 8 ne t'obligent pas à jouer, sauf quand il n'y a plus rien à piocher."]),
+        li(['Rien ne va ? ', ['Pioche'], " une carte. Si elle va, tu peux la poser tout de suite (avec d'autres de même valeur) ou la garder. Tu peux aussi piocher exprès même si une carte va (bluff), sauf quand il n'y a plus rien à piocher : là, tu dois poser ce qui va."]),
         titre('Les cartes spéciales'),
         li([['2'], ' : le suivant pioche 2 cartes et passe son tour. ', ['10'], ' : 4 cartes. ', ['Joker'], " : 5 cartes, et il se pose sur tout ; ensuite on pose la carte de son choix. Les pénalités posées ensemble s'additionnent, et on ne peut pas les contrer."]),
         li([['As'], " : chaque As fait passer le tour d'un joueur (jamais celui qui le pose)."]),

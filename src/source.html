@@ -1352,7 +1352,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       <ul class="regles">
         <li>Pose une carte de la <b>même couleur</b> ou de la <b>même valeur</b> que la carte du centre. Elle devient la nouvelle carte du centre.</li>
         <li>Tu peux poser ensemble plusieurs cartes de <b>même valeur</b> si la première va. La dernière donne la nouvelle couleur, et elle doit <b>changer</b> la couleur du centre.</li>
-        <li>Rien ne va ? <b>Pioche</b> une carte. Si elle va, tu peux la poser tout de suite (avec d'autres de même valeur) ou la garder. Le joker et le 8 ne t'obligent pas à jouer, sauf quand il n'y a plus rien à piocher.</li>
+        <li>Rien ne va ? <b>Pioche</b> une carte. Si elle va, tu peux la poser tout de suite (avec d'autres de même valeur) ou la garder. Tu peux aussi piocher exprès même si une carte va (bluff), sauf quand il n'y a plus rien à piocher : là, tu dois poser ce qui va.</li>
       </ul>
       <p class="regles-titre">Les cartes spéciales</p>
       <ul class="regles">
@@ -3165,7 +3165,8 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     else if (choixInter.length) { const annuler = el('button', 'btn large', 'Reprendre les cartes'); annuler.onclick = () => { choixInter = []; afficherPartieInter(vueActuelle); }; act.append(annuler); }
     if (actions.some((a) => a.type === 'piocher')) {
       // Plus rien à piocher (ni pioche, ni défausse à remélanger) : on passe son tour, et toute la table le voit.
-      const b = el('button', 'btn principal large', m.piochable === 0 ? 'Plus de cartes : passer mon tour' : 'Piocher une carte');
+      // Bluff : on peut piocher même avec une carte jouable, pour se donner une chance.
+      const b = el('button', 'btn large' + (coups.length ? '' : ' principal'), m.piochable === 0 ? 'Plus de cartes : passer mon tour' : coups.length ? 'Piocher une carte (bluff)' : 'Piocher une carte');
       b.onclick = () => { b.disabled = true; envoyer({ type: 'action', action: { type: 'piocher' } }); };
       act.append(b);
     }

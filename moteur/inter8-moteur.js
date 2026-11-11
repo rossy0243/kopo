@@ -353,16 +353,19 @@
     return coups;
   }
 
-  // On pioche quand on ne peut pas jouer. Le joker et le 8 ne forcent jamais à jouer : si ce sont
-  // les seules cartes jouables, on peut les garder et piocher (pendant une demande comme en jeu normal).
-  // Sauf quand il n'y a plus rien à piocher (pioche et défausse vides) : celui qui a un joker ou un 8
-  // jouable doit le poser, sinon la manche serait déclarée nulle alors qu'il pouvait la relancer.
+  // Bluff libre (décision du 11/11) : on peut toujours piocher au lieu de jouer, même avec une carte
+  // jouable, pour se donner une chance. Exceptions :
+  // - le demandeur d'un 8, quand le tour lui revient, pose la valeur qu'il a demandée (joker compris) ;
+  // - plus rien à piocher (ni pioche, ni défausse à remélanger) : « piocher » veut alors dire passer
+  //   son tour, permis seulement à qui ne peut rien poser. Un joker ou un 8 jouable doit alors être
+  //   posé (audit du 11/11), sinon la manche serait déclarée nulle alors qu'il pouvait la relancer.
   const rienAPiocher = (m) => !m.pioche.length && m.defausse.length <= 1;
   function piochePermise(m, joueur, coups) {
     if (m.aPioche) return false;
-    const liste = coups || coupsJouer(m, joueur);
-    if (rienAPiocher(m)) return !liste.length;
-    return liste.every((a) => ['8', JOKER].includes(valeur(a.cartes[0])));
+    const liste = () => coups || coupsJouer(m, joueur);
+    if (m.demande && m.demande.par === joueur) return !liste().length;
+    if (!rienAPiocher(m)) return true;
+    return !liste().length;
   }
 
   // Actions possibles pour un joueur, dans l'état actuel.
@@ -394,7 +397,9 @@
       const liste = contestables(m).filter((c) => c !== j);
       const cible = action.cible || liste[0];
       if (!cible || !liste.includes(cible)) throw new Error(`Action interdite : ${JSON.stringify(action)}`);
-      piocherCartes(m, cible, 1);
+      // L'amende ne fait pas remélanger la défausse (section 9 : seul le joueur qui ne peut pas
+      // jouer la fait remélanger) : pioche vide, le contesté ne pioche rien.
+      piocherCartes(m, cible, 1, true);
       // Une seule amende par oubli, même s'il peut encore finir avec la carte piochée.
       m.contestables = contestables(m).filter((c) => c !== cible);
       delete m.contestable;
@@ -570,6 +575,11 @@
   function strategieHasard(rng) {
     return function (m, joueur, actions) {
       if (joueur !== m.joueurCourant) return actions.length && rng() < 0.3 ? actions[Math.floor(rng() * actions.length)] : null;
+      // Bluff de temps en temps (piocher alors qu'on peut jouer), comme un vrai joueur : à chaque
+      // fois au hasard, la manche pourrait durer sans fin.
+      const coups = actions.filter((a) => a.type === 'jouer');
+      const pioche = actions.find((a) => a.type === 'piocher');
+      if (coups.length && pioche) return rng() < 0.05 ? pioche : coups[Math.floor(rng() * coups.length)];
       return actions[Math.floor(rng() * actions.length)];
     };
   }
