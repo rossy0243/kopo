@@ -159,7 +159,7 @@
     m.pioche = melanger(m.defausse, rng).concat(m.pioche);
     m.graine = Math.floor(rng() * 4294967296) >>> 0 || 1;
     m.defausse = [dessus];
-    m.remelanges = (m.remelanges || 0) + 1;
+    m.remelanges = (m.remelanges || 0) + 1; // nombre de remélanges dans la manche (les robots s'en servent)
     noter(m, 'La pioche est vide : on remélange la défausse.');
     return true;
   }
@@ -167,13 +167,12 @@
   // Pioche n cartes (moins s'il n'en reste pas assez). Piocher annule l'annonce.
   // Décision du 11/11 : dès que la pioche s'épuise, la défausse (sauf la carte du centre) la
   // recharge, tant qu'elle a des cartes, pour toute pioche (pénalité et amende comprises).
-  // Garde-fou : passé LIMITE_REMELANGES remélanges dans la manche, une pénalité ou une amende ne
-  // remélange plus (sinon les pénalités peuvent tourner en rond sans fin entre quelques joueurs).
-  const LIMITE_REMELANGES = 5;
-  function piocherCartes(m, joueur, n, penalite) {
+  // La défausse n'est remélangée qu'une fois la pioche épuisée (pour qu'elle ait assez de cartes
+  // à bien mélanger), puis autant de fois qu'il le faut (décision du créateur, 11/11).
+  function piocherCartes(m, joueur, n) {
     const tirees = [];
     for (let k = 0; k < n; k++) {
-      if (!m.pioche.length && ((penalite && (m.remelanges || 0) >= LIMITE_REMELANGES) || !remelanger(m))) break;
+      if (!m.pioche.length && !remelanger(m)) break;
       tirees.push(m.pioche.pop());
     }
     m.mains[joueur].push(...tirees);
@@ -228,7 +227,7 @@
 
   // Le joueur « cible » pioche une pénalité et passe son tour. Renvoie le joueur d'après.
   function penaliser(m, cible, n) {
-    const tirees = piocherCartes(m, cible, n, true);
+    const tirees = piocherCartes(m, cible, n);
     if (!tirees.length) {
       noter(m, `Plus de cartes à piocher : ${cible} ne pioche rien et passe son tour.`);
       signalerPiocheVide(m, cible, 'penalite');
@@ -401,8 +400,8 @@
       const liste = contestables(m).filter((c) => c !== j);
       const cible = action.cible || liste[0];
       if (!cible || !liste.includes(cible)) throw new Error(`Action interdite : ${JSON.stringify(action)}`);
-      // L'amende se pioche comme une pénalité : la défausse recharge la pioche (voir le garde-fou).
-      piocherCartes(m, cible, 1, true);
+      // L'amende se pioche comme le reste : la défausse recharge la pioche si elle est vide.
+      piocherCartes(m, cible, 1);
       // Une seule amende par oubli, même s'il peut encore finir avec la carte piochée.
       m.contestables = contestables(m).filter((c) => c !== cible);
       delete m.contestable;

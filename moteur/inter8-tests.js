@@ -504,18 +504,6 @@ test('Pénalité avec pioche et défausse vides : la table voit que le joueur ne
   assert.strictEqual(m2.joueurCourant, 'C');
 });
 
-test('Garde-fou : après 5 remélanges dans la manche, une pénalité ne remélange plus (la pioche normale si)', () => {
-  const m = manche({ A: ['2C', '4C', '5C', '6C'], B: ['3P', '4P', '5P', '6P'], C: ['3K', '4K', '5K', '6K'] }, ['9C'], 'A');
-  m.defausse = ['DK', 'RK', '7T', '9C'];
-  m.remelanges = 5;
-  J(m, 'A', ['2C']);
-  assert.strictEqual(m.mains.B.length, 4, 'la pénalité ne remélange plus');
-  assert.strictEqual(m.defausse.length, 5);
-  P(m, 'C'); // C ne peut pas jouer : sa pioche remélange toujours
-  assert.strictEqual(m.mains.C.length, 5);
-  assert.deepStrictEqual(m.defausse, ['2C']);
-});
-
 test("Amende de contestation avec la pioche vide : la défausse recharge la pioche", () => {
   const m = manche({ A: ['3C', '4C'], B: ['5P', '6P', '7P'], C: ['3T', '6T', '7T'] }, ['5C'], 'A');
   m.defausse = ['DK', 'RK', '5C'];

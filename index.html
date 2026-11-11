@@ -5037,7 +5037,7 @@ var qrcode = function() {
     m.pioche = melanger(m.defausse, rng).concat(m.pioche);
     m.graine = Math.floor(rng() * 4294967296) >>> 0 || 1;
     m.defausse = [dessus];
-    m.remelanges = (m.remelanges || 0) + 1;
+    m.remelanges = (m.remelanges || 0) + 1; // nombre de remélanges dans la manche (les robots s'en servent)
     noter(m, 'La pioche est vide : on remélange la défausse.');
     return true;
   }
@@ -5045,13 +5045,12 @@ var qrcode = function() {
   // Pioche n cartes (moins s'il n'en reste pas assez). Piocher annule l'annonce.
   // Décision du 11/11 : dès que la pioche s'épuise, la défausse (sauf la carte du centre) la
   // recharge, tant qu'elle a des cartes, pour toute pioche (pénalité et amende comprises).
-  // Garde-fou : passé LIMITE_REMELANGES remélanges dans la manche, une pénalité ou une amende ne
-  // remélange plus (sinon les pénalités peuvent tourner en rond sans fin entre quelques joueurs).
-  const LIMITE_REMELANGES = 5;
-  function piocherCartes(m, joueur, n, penalite) {
+  // La défausse n'est remélangée qu'une fois la pioche épuisée (pour qu'elle ait assez de cartes
+  // à bien mélanger), puis autant de fois qu'il le faut (décision du créateur, 11/11).
+  function piocherCartes(m, joueur, n) {
     const tirees = [];
     for (let k = 0; k < n; k++) {
-      if (!m.pioche.length && ((penalite && (m.remelanges || 0) >= LIMITE_REMELANGES) || !remelanger(m))) break;
+      if (!m.pioche.length && !remelanger(m)) break;
       tirees.push(m.pioche.pop());
     }
     m.mains[joueur].push(...tirees);
@@ -5106,7 +5105,7 @@ var qrcode = function() {
 
   // Le joueur « cible » pioche une pénalité et passe son tour. Renvoie le joueur d'après.
   function penaliser(m, cible, n) {
-    const tirees = piocherCartes(m, cible, n, true);
+    const tirees = piocherCartes(m, cible, n);
     if (!tirees.length) {
       noter(m, `Plus de cartes à piocher : ${cible} ne pioche rien et passe son tour.`);
       signalerPiocheVide(m, cible, 'penalite');
@@ -5279,8 +5278,8 @@ var qrcode = function() {
       const liste = contestables(m).filter((c) => c !== j);
       const cible = action.cible || liste[0];
       if (!cible || !liste.includes(cible)) throw new Error(`Action interdite : ${JSON.stringify(action)}`);
-      // L'amende se pioche comme une pénalité : la défausse recharge la pioche (voir le garde-fou).
-      piocherCartes(m, cible, 1, true);
+      // L'amende se pioche comme le reste : la défausse recharge la pioche si elle est vide.
+      piocherCartes(m, cible, 1);
       // Une seule amende par oubli, même s'il peut encore finir avec la carte piochée.
       m.contestables = contestables(m).filter((c) => c !== cible);
       delete m.contestable;
@@ -5643,13 +5642,21 @@ var qrcode = function() {
     if (!(cle in d)) d[cle] = f >= 1 || rng() < f ? true : rng() < CONTESTE_FACILE;
     return d[cle];
   }
+  const MANCHE_LONGUE = 3;
   function choixRobot(m, j, niveauRobots, niveauJoueur, rng) {
     const v = I.vuePublique(m, j);
     const f = forceRobots(niveauRobots, niveauJoueur);
     // On oublie les décisions sur les joueurs qu'on ne peut plus contester (amende payée, ou leur tour revenu).
     const cibles = v.contestables || [];
     if (m.robotsContestent) for (const cle of Object.keys(m.robotsContestent)) if (!cibles.some((c) => cle.includes('>' + c + '>'))) delete m.robotsContestent[cle];
-    const actions = I.actionsPossibles(m, j).filter((a) => a.type !== 'contester' || veutContester(m, j, a.cible, f, rng));
+    let actions = I.actionsPossibles(m, j).filter((a) => a.type !== 'contester' || veutContester(m, j, a.cible, f, rng));
+    // Manche qui s'éternise (la défausse a déjà rechargé la pioche plusieurs fois) : les robots gardent
+    // leurs 2, 10 et jokers s'ils ont un autre coup, sauf pour sortir. Sinon, la défausse rechargeant
+    // aussi les pénalités, des robots peuvent se les renvoyer sans fin.
+    if ((m.remelanges || 0) >= MANCHE_LONGUE) {
+      const penalite = (a) => a.type === 'jouer' && a.cartes.some((x) => I.PENALITES[I.valeur(x)]) && a.cartes.length < v.main.length;
+      if (actions.some((a) => a.type === 'jouer' && !penalite(a))) actions = actions.filter((a) => !penalite(a));
+    }
     const cerveau = f < 1 ? (rng() < f ? robotNormal : robotGentil) : (rng() < f - 1 ? robotFort : robotNormal);
     return cerveau(v, actions, rng);
   }
@@ -7056,7 +7063,7 @@ var qrcode = function() {
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = '8adccfd6075d'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = '7d9e48042b1a'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
