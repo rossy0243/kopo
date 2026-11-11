@@ -17,6 +17,7 @@
   }
 
   const SPECIALES = new Set(['2', '10', 'X', 'A', '8']);
+  const JOKER_V = 'X';
   const coups = (actions) => actions.filter((a) => a.type === 'jouer');
   const sort = (v, a) => a.cartes.length === v.main.length;
   const valeurDe = (a) => I.valeur(a.cartes[0]);
@@ -63,8 +64,8 @@
   }
 
   // Robot normal : annonce toujours, conteste quand il le voit, sort dès qu'il peut, pose ensemble
-  // ses cartes de même valeur, garde ses pénalités pour le joueur qui va sortir,
-  // et demande avec le 8 la valeur qu'il a en plus grand nombre.
+  // ses cartes de même valeur (en finissant sur la couleur qu'il a le plus), garde ses pénalités
+  // pour le joueur qui va sortir, et demande avec le 8 la valeur qu'il a en plus grand nombre.
   function robotNormal(v, actions) {
     const h = horsTour(actions, 1, 1, () => 0);
     if (h) return h;
@@ -82,6 +83,11 @@
       if (SPECIALES.has(val)) score += danger && val !== '8' ? 40 : -30;
       if (val === '8') score += (a.demande ? nb(a.demande) : 0) * 3 - 10;
       if (!SPECIALES.has(val) && a.cartes.length === nb(val)) score += 5; // vide toute la valeur
+      // Plusieurs cartes : finir sur la couleur qu'il a le plus en main (il pourra la suivre ensuite).
+      if (a.cartes.length > 1 && val !== JOKER_V) {
+        const fin = I.couleur(a.cartes[a.cartes.length - 1]);
+        score += v.main.filter((x) => !a.cartes.includes(x) && I.couleur(x) === fin).length;
+      }
       if (score > meilleur) { meilleur = score; choix = a; }
     }
     return choix;
@@ -136,6 +142,8 @@
         // Laisser au suivant une couleur qu'il a peu de chances de suivre.
         const fin = a.cartes[a.cartes.length - 1];
         score -= inconnues.filter((x) => I.couleur(x) === I.couleur(fin)).length * 1;
+        // et qu'il pourra suivre lui-même avec ce qui lui reste en main.
+        if (a.cartes.length > 1) score += reste.filter((x) => I.couleur(x) === I.couleur(fin)).length * 2;
       }
       if (score > meilleur) { meilleur = score; choix = a; }
     }

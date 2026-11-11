@@ -499,6 +499,34 @@ test('Ce qu\'un joueur voit ne montre jamais les mains des autres', () => {
   assert.ok(!JSON.stringify(v).includes('4P'));
 });
 
+test('Couleur : deux cartes dont aucune n\'est de la couleur du centre, les deux fins sont permises (le joueur choisit)', () => {
+  const m = manche({ A: ['7C', '7P', '9T'], B: ['3T', '4T'], C: ['3P', '4P'] }, ['RT', 'RP', '7K']);
+  const fins = I.actionsPossibles(m, 'A').filter((a) => a.type === 'jouer' && a.cartes.length === 2).map((a) => I.couleur(a.cartes[1])).sort();
+  assert.deepStrictEqual(fins, ['C', 'P']);
+});
+
+test('Couleur : pendant une demande, la couleur du 8 au centre n\'est pas imposée', () => {
+  const m = manche({ A: ['8C', '5C', '9T'], B: ['5C*', '5P', '9K'], C: ['3P', '4P', '6P'] }, ['RT', 'RP', '4C'], 'A', 'delire');
+  J(m, 'A', ['8C'], '5');
+  J(m, 'B', ['5P', '5C*']); // finit sur ♥, la couleur du 8 : permis
+  assert.strictEqual(m.defausse[m.defausse.length - 1], '5C*');
+  assert.strictEqual(m.demande, null);
+});
+
+test('Couleur : après une sortie sur un 8, jeu libre, la couleur du 8 n\'est pas imposée', () => {
+  const m = manche({ A: ['8C'], B: ['5C', '5P', '9K'], C: ['3P', '4P', '6P'] }, ['RT', 'RP', '4C']);
+  J(m, 'A', ['8C']);
+  assert.ok(m.libre);
+  J(m, 'B', ['5P', '5C']);
+  assert.strictEqual(m.defausse[m.defausse.length - 1], '5C');
+});
+
+test('Couleur : hors 8, la dernière carte ne peut toujours pas être de la couleur du centre', () => {
+  const m = manche({ A: ['7P', '7C*', '9T'], B: ['3T', '4T'], C: ['3P', '6P'] }, ['RT', 'RP', '7C'], 'A', 'delire');
+  assert.throws(() => J(m, 'A', ['7P', '7C*']), /changer la couleur/);
+  J(m, 'A', ['7C*', '7P']);
+});
+
 test('2 000 parties au hasard (2 à 8 joueurs, simple et délire) : jamais bloquées, aucune carte perdue', () => {
   const rng = I.hasard(42);
   for (let n = 0; n < 2000; n++) {

@@ -499,8 +499,10 @@ class _Bas extends StatelessWidget {
       final val = InterCartes.valeur(choix[0]);
       boutons.add(Btn.principal(choix.length == 1 ? 'Poser le ${InterCartes.afficher(choix[0])}' : 'Poser ${choix.length} cartes (${InterCartes.nomValeur(val)})', large: true, onTap: () => poserInter(choisis)));
       boutons.add(Btn('Reprendre ${choix.length > 1 ? 'les cartes' : 'la carte'}', large: true, onTap: () => changer([])));
-      if (choix.length == 2) boutons.add(const Muet('Plusieurs cartes : la couleur change toute seule.', align: TextAlign.center, taille: 12));
-      if (choix.length > 2) boutons.add(const Muet('Tu choisiras la nouvelle couleur.', align: TextAlign.center, taille: 12));
+      if (choix.length > 1 && val != '8' && val != 'X') {
+        final nbCouleurs = {for (final a in choisis) InterCartes.couleur(((a['cartes'] as List).last) as String)}.length;
+        boutons.add(Muet(nbCouleurs > 1 ? 'Tu choisiras la nouvelle couleur.' : 'Plusieurs cartes : la couleur change toute seule.', align: TextAlign.center, taille: 12));
+      }
     } else if (choix.isNotEmpty) {
       boutons.add(Btn('Reprendre les cartes', large: true, onTap: () => changer([])));
     }

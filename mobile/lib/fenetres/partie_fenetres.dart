@@ -64,10 +64,15 @@ void poserInter(List<Map> coups) {
   void envoyerCoup(Map a) { app.choixInter = []; app.action({'type': 'jouer', 'cartes': a['cartes'], 'demande': a['demande']}); }
   final couleurs = <String>{for (final a in coups) _couleurFinale(a)}.toList();
   final premier = (coups[0]['cartes'] as List).cast<String>();
-  if (demandes.isEmpty && premier.length > 2 && couleurs.length > 1 && InterCartes.valeur(premier[0]) != '8') {
+  // Plusieurs cartes : dès que deux couleurs (ou plus) sont possibles pour la dernière carte, même
+  // avec 2 cartes, on choisit la nouvelle couleur. Une seule possible : l'ordre est pris tout seul.
+  if (demandes.isEmpty && premier.length > 1 && couleurs.length > 1 && !['8', 'X'].contains(InterCartes.valeur(premier[0]))) {
     final presentes = InterCartes.couleurs.where((k) => premier.any((c) => InterCartes.couleur(c) == k)).toList();
+    // Un 8 (demande, ou sortie sur un 8) ou un joker au centre n'impose aucune couleur.
+    final ref = (app.vue?['manche'] as Map?)?['reference'] as String?;
+    final centreImpose = ref != null && InterCartes.valeur(ref) != '8' && InterCartes.valeur(ref) != 'X';
     app.ouvrirFenetre((context) => Fenetre(titre: 'Quelle couleur ensuite ?', enfants: [
-          const Muet("Ta dernière carte donne la nouvelle couleur. Celle du centre n'est pas permise."),
+          Muet(centreImpose ? "Ta dernière carte donne la nouvelle couleur. Celle du centre n'est pas permise." : 'Ta dernière carte donne la nouvelle couleur.'),
           const Ecart(12),
           Row(children: [
             for (final k in presentes)

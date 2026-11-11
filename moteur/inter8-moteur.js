@@ -1,4 +1,4 @@
-// Inter (8) — moteur de règles (règlement v1.0 du 06/11/2026)
+// Inter (8) — moteur de règles (règlement v1.2 du 11/11/2026)
 // Utilisable dans le navigateur (window.Inter8) et avec Node (require).
 // Indépendant du moteur de Kopo : aucun fichier de Kopo n'est touché.
 //
@@ -297,9 +297,13 @@
   // Plusieurs cartes ensemble : la dernière doit changer la couleur du centre. Exceptions : les
   // doublons du 2e paquet de la couleur du centre (deux 5♦ sur du carreau), et les derniers 8
   // posés pour sortir (le suivant joue de toute façon la carte de son choix).
+  // Un 8 au centre n'impose aucune couleur (décision du 11/11) : pendant sa demande seule la valeur
+  // compte, et quand un joueur est sorti sur un 8 le jeu est libre. Le joker n'a pas de couleur.
   function changeCouleur(m, cartes) {
     if (cartes.length < 2 || valeur(cartes[0]) === '8') return null;
-    const coul = couleur(m.defausse[m.defausse.length - 1]);
+    const centre = m.defausse[m.defausse.length - 1];
+    if (valeur(centre) === '8') return null;
+    const coul = couleur(centre);
     if (coul && couleur(cartes[cartes.length - 1]) === coul && !cartes.every((c) => couleur(c) === coul)) {
       return `Avec plusieurs cartes, la dernière doit changer la couleur (pas de ${NOMS_COULEURS[coul]} en dernier).`;
     }

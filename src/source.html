@@ -2933,12 +2933,14 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     if (!coups.length) return;
     const demandes = [...new Set(coups.map((a) => a.demande).filter(Boolean))];
     const envoyerCoup = (a) => { choixInter = []; envoyer({ type: 'action', action: { type: 'jouer', cartes: a.cartes, demande: a.demande } }); };
-    // Plusieurs cartes : à 2, l'ordre qui change la couleur est pris tout seul ; à 3 ou plus,
-    // on choisit la nouvelle couleur (celle du centre est grisée).
+    // Plusieurs cartes : dès que deux couleurs (ou plus) sont possibles pour la dernière carte,
+    // même avec 2 cartes, on choisit la nouvelle couleur (celle du centre est grisée).
+    // Une seule couleur possible : l'ordre est pris tout seul.
     const couleurs = [...new Set(coups.map(couleurFinale).filter(Boolean))];
-    if (!demandes.length && coups[0].cartes.length > 2 && couleurs.length > 1 && I8.valeur(coups[0].cartes[0]) !== '8') {
+    if (!demandes.length && coups[0].cartes.length > 1 && couleurs.length > 1 && I8.valeur(coups[0].cartes[0]) !== '8') {
       const m = vueActuelle && vueActuelle.manche;
-      const auCentre = m && m.reference && I8.couleur(m.reference);
+      // Un 8 (demande, ou sortie sur un 8) ou un joker au centre n'impose aucune couleur.
+      const auCentre = m && m.reference && I8.valeur(m.reference) !== '8' && I8.couleur(m.reference);
       const presentes = I8.COULEURS.filter((k) => coups[0].cartes.some((c) => I8.couleur(c) === k));
       const grille = el('div', 'choix-demande choix-couleur');
       for (const k of presentes) {
@@ -2951,7 +2953,8 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       }
       const annuler = el('button', 'btn large', 'Annuler');
       annuler.onclick = fermerFenetre;
-      return ouvrirFenetre([el('h2', null, 'Quelle couleur ensuite ?'), el('p', 'muted', 'Ta dernière carte donne la nouvelle couleur. Celle du centre n\'est pas permise.'), grille, annuler], 'couleur8');
+      const aide = 'Ta dernière carte donne la nouvelle couleur.' + (auCentre ? ' Celle du centre n\'est pas permise.' : '');
+      return ouvrirFenetre([el('h2', null, 'Quelle couleur ensuite ?'), el('p', 'muted', aide), grille, annuler], 'couleur8');
     }
     if (!demandes.length) return envoyerCoup(coups[0]);
     // Le 8 : on choisit la valeur demandée parmi celles qu'on a encore en main.
@@ -3119,8 +3122,10 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       const annuler = el('button', 'btn large', 'Reprendre ' + (choixInter.length > 1 ? 'les cartes' : 'la carte'));
       annuler.onclick = () => { choixInter = []; afficherPartieInter(vueActuelle); };
       act.append(annuler);
-      if (choixInter.length === 2) act.append(el('small', 'muted', 'Plusieurs cartes : la couleur change toute seule.'));
-      else if (choixInter.length > 2) act.append(el('small', 'muted', 'Tu choisiras la nouvelle couleur.'));
+      if (choixInter.length > 1 && val !== '8' && val !== 'X') {
+        const nbCouleurs = new Set(choisis.map(couleurFinale)).size;
+        act.append(el('small', 'muted', nbCouleurs > 1 ? 'Tu choisiras la nouvelle couleur.' : 'Plusieurs cartes : la couleur change toute seule.'));
+      }
     }
     else if (choixInter.length) { const annuler = el('button', 'btn large', 'Reprendre les cartes'); annuler.onclick = () => { choixInter = []; afficherPartieInter(vueActuelle); }; act.append(annuler); }
     if (actions.some((a) => a.type === 'piocher')) {

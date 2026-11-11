@@ -4845,7 +4845,7 @@ var qrcode = function() {
   else root.KopoSalle = KopoSalle;
 })(typeof window !== 'undefined' ? window : globalThis);
 </script>
-<script>// Inter (8) — moteur de règles (règlement v1.0 du 06/11/2026)
+<script>// Inter (8) — moteur de règles (règlement v1.2 du 11/11/2026)
 // Utilisable dans le navigateur (window.Inter8) et avec Node (require).
 // Indépendant du moteur de Kopo : aucun fichier de Kopo n'est touché.
 //
@@ -5144,9 +5144,13 @@ var qrcode = function() {
   // Plusieurs cartes ensemble : la dernière doit changer la couleur du centre. Exceptions : les
   // doublons du 2e paquet de la couleur du centre (deux 5♦ sur du carreau), et les derniers 8
   // posés pour sortir (le suivant joue de toute façon la carte de son choix).
+  // Un 8 au centre n'impose aucune couleur (décision du 11/11) : pendant sa demande seule la valeur
+  // compte, et quand un joueur est sorti sur un 8 le jeu est libre. Le joker n'a pas de couleur.
   function changeCouleur(m, cartes) {
     if (cartes.length < 2 || valeur(cartes[0]) === '8') return null;
-    const coul = couleur(m.defausse[m.defausse.length - 1]);
+    const centre = m.defausse[m.defausse.length - 1];
+    if (valeur(centre) === '8') return null;
+    const coul = couleur(centre);
     if (coul && couleur(cartes[cartes.length - 1]) === coul && !cartes.every((c) => couleur(c) === coul)) {
       return `Avec plusieurs cartes, la dernière doit changer la couleur (pas de ${NOMS_COULEURS[coul]} en dernier).`;
     }
@@ -5436,6 +5440,7 @@ var qrcode = function() {
   }
 
   const SPECIALES = new Set(['2', '10', 'X', 'A', '8']);
+  const JOKER_V = 'X';
   const coups = (actions) => actions.filter((a) => a.type === 'jouer');
   const sort = (v, a) => a.cartes.length === v.main.length;
   const valeurDe = (a) => I.valeur(a.cartes[0]);
@@ -5482,8 +5487,8 @@ var qrcode = function() {
   }
 
   // Robot normal : annonce toujours, conteste quand il le voit, sort dès qu'il peut, pose ensemble
-  // ses cartes de même valeur, garde ses pénalités pour le joueur qui va sortir,
-  // et demande avec le 8 la valeur qu'il a en plus grand nombre.
+  // ses cartes de même valeur (en finissant sur la couleur qu'il a le plus), garde ses pénalités
+  // pour le joueur qui va sortir, et demande avec le 8 la valeur qu'il a en plus grand nombre.
   function robotNormal(v, actions) {
     const h = horsTour(actions, 1, 1, () => 0);
     if (h) return h;
@@ -5501,6 +5506,11 @@ var qrcode = function() {
       if (SPECIALES.has(val)) score += danger && val !== '8' ? 40 : -30;
       if (val === '8') score += (a.demande ? nb(a.demande) : 0) * 3 - 10;
       if (!SPECIALES.has(val) && a.cartes.length === nb(val)) score += 5; // vide toute la valeur
+      // Plusieurs cartes : finir sur la couleur qu'il a le plus en main (il pourra la suivre ensuite).
+      if (a.cartes.length > 1 && val !== JOKER_V) {
+        const fin = I.couleur(a.cartes[a.cartes.length - 1]);
+        score += v.main.filter((x) => !a.cartes.includes(x) && I.couleur(x) === fin).length;
+      }
       if (score > meilleur) { meilleur = score; choix = a; }
     }
     return choix;
@@ -5555,6 +5565,8 @@ var qrcode = function() {
         // Laisser au suivant une couleur qu'il a peu de chances de suivre.
         const fin = a.cartes[a.cartes.length - 1];
         score -= inconnues.filter((x) => I.couleur(x) === I.couleur(fin)).length * 1;
+        // et qu'il pourra suivre lui-même avec ce qui lui reste en main.
+        if (a.cartes.length > 1) score += reste.filter((x) => I.couleur(x) === I.couleur(fin)).length * 2;
       }
       if (score > meilleur) { meilleur = score; choix = a; }
     }
@@ -6971,7 +6983,7 @@ var qrcode = function() {
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = 'c77be448cd36'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = '2818d616690d'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
@@ -8328,12 +8340,14 @@ var qrcode = function() {
     if (!coups.length) return;
     const demandes = [...new Set(coups.map((a) => a.demande).filter(Boolean))];
     const envoyerCoup = (a) => { choixInter = []; envoyer({ type: 'action', action: { type: 'jouer', cartes: a.cartes, demande: a.demande } }); };
-    // Plusieurs cartes : à 2, l'ordre qui change la couleur est pris tout seul ; à 3 ou plus,
-    // on choisit la nouvelle couleur (celle du centre est grisée).
+    // Plusieurs cartes : dès que deux couleurs (ou plus) sont possibles pour la dernière carte,
+    // même avec 2 cartes, on choisit la nouvelle couleur (celle du centre est grisée).
+    // Une seule couleur possible : l'ordre est pris tout seul.
     const couleurs = [...new Set(coups.map(couleurFinale).filter(Boolean))];
-    if (!demandes.length && coups[0].cartes.length > 2 && couleurs.length > 1 && I8.valeur(coups[0].cartes[0]) !== '8') {
+    if (!demandes.length && coups[0].cartes.length > 1 && couleurs.length > 1 && I8.valeur(coups[0].cartes[0]) !== '8') {
       const m = vueActuelle && vueActuelle.manche;
-      const auCentre = m && m.reference && I8.couleur(m.reference);
+      // Un 8 (demande, ou sortie sur un 8) ou un joker au centre n'impose aucune couleur.
+      const auCentre = m && m.reference && I8.valeur(m.reference) !== '8' && I8.couleur(m.reference);
       const presentes = I8.COULEURS.filter((k) => coups[0].cartes.some((c) => I8.couleur(c) === k));
       const grille = el('div', 'choix-demande choix-couleur');
       for (const k of presentes) {
@@ -8346,7 +8360,8 @@ var qrcode = function() {
       }
       const annuler = el('button', 'btn large', 'Annuler');
       annuler.onclick = fermerFenetre;
-      return ouvrirFenetre([el('h2', null, 'Quelle couleur ensuite ?'), el('p', 'muted', 'Ta dernière carte donne la nouvelle couleur. Celle du centre n\'est pas permise.'), grille, annuler], 'couleur8');
+      const aide = 'Ta dernière carte donne la nouvelle couleur.' + (auCentre ? ' Celle du centre n\'est pas permise.' : '');
+      return ouvrirFenetre([el('h2', null, 'Quelle couleur ensuite ?'), el('p', 'muted', aide), grille, annuler], 'couleur8');
     }
     if (!demandes.length) return envoyerCoup(coups[0]);
     // Le 8 : on choisit la valeur demandée parmi celles qu'on a encore en main.
@@ -8514,8 +8529,10 @@ var qrcode = function() {
       const annuler = el('button', 'btn large', 'Reprendre ' + (choixInter.length > 1 ? 'les cartes' : 'la carte'));
       annuler.onclick = () => { choixInter = []; afficherPartieInter(vueActuelle); };
       act.append(annuler);
-      if (choixInter.length === 2) act.append(el('small', 'muted', 'Plusieurs cartes : la couleur change toute seule.'));
-      else if (choixInter.length > 2) act.append(el('small', 'muted', 'Tu choisiras la nouvelle couleur.'));
+      if (choixInter.length > 1 && val !== '8' && val !== 'X') {
+        const nbCouleurs = new Set(choisis.map(couleurFinale)).size;
+        act.append(el('small', 'muted', nbCouleurs > 1 ? 'Tu choisiras la nouvelle couleur.' : 'Plusieurs cartes : la couleur change toute seule.'));
+      }
     }
     else if (choixInter.length) { const annuler = el('button', 'btn large', 'Reprendre les cartes'); annuler.onclick = () => { choixInter = []; afficherPartieInter(vueActuelle); }; act.append(annuler); }
     if (actions.some((a) => a.type === 'piocher')) {
