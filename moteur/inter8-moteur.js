@@ -1,4 +1,4 @@
-// Inter (8) — moteur de règles (règlement v1.2 du 11/11/2026)
+// Inter (8) — moteur de règles (règlement v1.3 du 11/11/2026)
 // Utilisable dans le navigateur (window.Inter8) et avec Node (require).
 // Indépendant du moteur de Kopo : aucun fichier de Kopo n'est touché.
 //
@@ -22,7 +22,8 @@
   const brut = (carte) => carte.replace('*', '');
   const valeur = (carte) => (brut(carte)[0] === JOKER ? JOKER : brut(carte).slice(0, -1));
   const couleur = (carte) => (valeur(carte) === JOKER ? null : brut(carte).slice(-1));
-  const NOMS_VALEURS = { A: 'A', V: 'J', D: 'Q', R: 'K' }; // à l'écran : J (valet), Q (dame), K (roi), comme sur les cartes
+  const NOMS_VALEURS = { A: 'A', V: 'J', D: 'Q', R: 'K', X: 'Joker' }; // à l'écran : J (valet), Q (dame), K (roi), comme sur les cartes
+  const nomValeur = (v) => NOMS_VALEURS[v] || v;
   function afficher(carte) {
     if (valeur(carte) === JOKER) return 'Joker';
     return (NOMS_VALEURS[valeur(carte)] || valeur(carte)) + SYMBOLES[couleur(carte)];
@@ -207,7 +208,11 @@
   function finDeTour(m, joueur, prochain) {
     m.aPioche = null;
     majContestables(m);
-    if (m.enJeu.includes(joueur) && !m.annonces.includes(joueur) && finissable(m.mains[joueur]) && !m.contestables.includes(joueur)) m.contestables.push(joueur);
+    if (m.enJeu.includes(joueur) && !m.annonces.includes(joueur) && finissable(m.mains[joueur]) && !m.contestables.includes(joueur)) {
+      m.contestables.push(joueur);
+      m.oublis = m.oublis || {}; // numéro de l'oubli, par joueur (les robots décident une fois par oubli)
+      m.oublis[joueur] = (m.oublis[joueur] || 0) + 1;
+    }
     m.joueurCourant = prochain;
   }
 
@@ -253,11 +258,11 @@
     }
   }
 
-  // Valeurs qu'un joueur peut demander avec un 8 : toutes sauf le 8 (et pas le joker),
+  // Valeurs qu'un joueur peut demander avec un 8 : toutes sauf le 8, joker compris (décision du 11/11),
   // à condition d'en garder au moins une en main.
   function valeursDemandables(resteMain) {
     const vs = new Set(resteMain.map(valeur));
-    return VALEURS.filter((v) => v !== '8' && vs.has(v));
+    return VALEURS.concat(JOKER).filter((v) => v !== '8' && vs.has(v));
   }
 
   // Vérifie un coup « jouer ». Renvoie null s'il est permis, sinon la raison.
@@ -280,11 +285,11 @@
     }
     if (m.demande) {
       if (joueur === m.demande.par) {
-        if (v !== m.demande.valeur) return `Pose la valeur que tu as demandée (${m.demande.valeur}).`;
+        if (v !== m.demande.valeur) return `Pose la valeur que tu as demandée (${nomValeur(m.demande.valeur)}).`;
       } else if (m.aPioche) {
-        if (v !== m.demande.valeur) return `Seule la valeur demandée (${m.demande.valeur}) peut être posée.`;
+        if (v !== m.demande.valeur) return `Seule la valeur demandée (${nomValeur(m.demande.valeur)}) peut être posée.`;
       } else if (v !== m.demande.valeur && v !== '8' && v !== JOKER) {
-        return `Inter demande ${m.demande.valeur} : pose ce ${m.demande.valeur}, un 8 ou un joker, sinon pioche.`;
+        return m.demande.valeur === JOKER ? 'Inter demande un joker : pose un joker ou un 8, sinon pioche.' : `Inter demande ${nomValeur(m.demande.valeur)} : pose ce ${nomValeur(m.demande.valeur)}, un 8 ou un joker, sinon pioche.`;
       }
       return changeCouleur(m, cartes);
     }
@@ -350,9 +355,14 @@
 
   // On pioche quand on ne peut pas jouer. Le joker et le 8 ne forcent jamais à jouer : si ce sont
   // les seules cartes jouables, on peut les garder et piocher (pendant une demande comme en jeu normal).
+  // Sauf quand il n'y a plus rien à piocher (pioche et défausse vides) : celui qui a un joker ou un 8
+  // jouable doit le poser, sinon la manche serait déclarée nulle alors qu'il pouvait la relancer.
+  const rienAPiocher = (m) => !m.pioche.length && m.defausse.length <= 1;
   function piochePermise(m, joueur, coups) {
     if (m.aPioche) return false;
-    return (coups || coupsJouer(m, joueur)).every((a) => ['8', JOKER].includes(valeur(a.cartes[0])));
+    const liste = coups || coupsJouer(m, joueur);
+    if (rienAPiocher(m)) return !liste.length;
+    return liste.every((a) => ['8', JOKER].includes(valeur(a.cartes[0])));
   }
 
   // Actions possibles pour un joueur, dans l'état actuel.
@@ -440,7 +450,7 @@
     m.vu.dernier = j; // qui a posé la carte du centre (affichage)
     m.libre = false;
     const finit = m.mains[j].length === 0;
-    noter(m, `${j} pose ${cartes.map(afficher).join(' ')}${v === '8' && !finit ? ` : « Inter demande ${NOMS_VALEURS[action.demande] || action.demande} »` : ''}.`);
+    noter(m, `${j} pose ${cartes.map(afficher).join(' ')}${v === '8' && !finit ? ` : « Inter demande ${nomValeur(action.demande)} »` : ''}.`);
 
     // La demande en cours s'arrête dès que la valeur demandée est posée, ou qu'un joker la coupe.
     if (m.demande && (v === m.demande.valeur || v === JOKER)) m.demande = null;
@@ -566,7 +576,7 @@
 
   const Inter8 = {
     COULEURS, NOMS_COULEURS, SYMBOLES, VALEURS, PENALITES, MAX_JOUEURS,
-    valeur, couleur, afficher, finissable, nombrePaquets, nouveauPaquet, hasard, melanger, distribuer,
+    valeur, couleur, afficher, nomValeur, finissable, nombrePaquets, nouveauPaquet, hasard, melanger, distribuer,
     nouvelleManche, appliquerDepart, actionsPossibles, refus, jouer, jouerPartie, vuePublique,
     strategieSimple, strategieHasard,
   };

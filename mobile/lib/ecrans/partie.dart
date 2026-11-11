@@ -392,7 +392,7 @@ class _Bas extends StatelessWidget {
       consigne.add(const TextSpan(text: 'À toi !', style: TextStyle(fontStyle: FontStyle.italic, color: K.brass, fontWeight: FontWeight.w700)));
       if (inter && !actions.any((a) => a['type'] == 'jouer')) consigne.add(TextSpan(text: m['aPioche'] == true ? ' Tu ne peux pas jouer la carte piochée : passe.' : ' Aucune carte ne va : pioche.'));
     }
-    final aide = !inter && v['robots'] == 'gentils' ? aideGuidee(v) : null;
+    final aide = v['robots'] == 'gentils' ? (inter ? aideGuideeInter(v) : aideGuidee(v)) : null;
     final barre = (v['chrono'] != null && monTour) || pause != null;
 
     return Padding(
@@ -649,4 +649,40 @@ List<String>? aideGuidee(Vue v) {
   if (tout) return ["Tu n'as plus que des ${sym(m['couleurTour'])} : ", 'tout poser', ' te fait sortir.'];
   if (jouables.isNotEmpty) return ['Suis la couleur : joue un ', sym(m['couleurTour']), '. Une carte de moins pour toi.'];
   return ['Pas de ${sym(m['couleurTour'])} en main : tu dois ', 'ramasser', ' la plus forte carte de la table.'];
+}
+
+// ---------------------------------------------------------------- partie guidée d'Inter (8)
+List<String>? aideGuideeInter(Vue v) {
+  final m = v['manche'] as Map;
+  final a = ((m['actions'] as List?) ?? []).cast<Map>();
+  final coups = a.where((x) => x['type'] == 'jouer').toList();
+  final moiId = v['moi'];
+  final main = ((m['main'] as List?) ?? []).cast<String>();
+  final pause = m['pause'] as Map?;
+  String val(Map x) => InterCartes.valeur((x['cartes'] as List).first as String);
+  if (!(v['restants'] as List).contains(moiId)) return ['Éliminé : tu avais encore des cartes quand les autres étaient sortis. Regarde la fin, puis ', 'rejoue', ' !'];
+  if (pause?['type'] == 'depart') return v['numeroManche'] == 1 ? ['Voici tes 4 cartes. Pose une carte de la ', 'même couleur ou de la même valeur', ' que celle du centre.'] : ['Nouvelle manche : le dernier qui garde des cartes est ', 'éliminé', '.'];
+  if (pause != null || m['phase'] != 'jeu') return null;
+  if (!(m['enJeu'] as List).contains(moiId)) return ['Qualifié ! Le dernier qui garde des cartes sera ', 'éliminé', '.'];
+  if (a.any((x) => x['type'] == 'annoncer')) return ['Tu pourras finir au prochain coup : touche ', "J'annonce", ' tout de suite, sinon on peut te contester.'];
+  final co = a.where((x) => x['type'] == 'contester').firstOrNull;
+  if (co != null) return ['${app.nomDe(v, co['cible'])} peut finir sans avoir annoncé : touche ', 'Contester', ', il pioche une carte.'];
+  if (m['joueurCourant'] != moiId) return null;
+  final d = m['demande'] as Map?;
+  final videPioche = m['piochable'] == 0;
+  if (coups.any((x) => (x['cartes'] as List).length == main.length)) return ['Tu peux ', main.length > 1 ? 'poser toutes tes cartes' : 'poser ta dernière carte', ' et te qualifier.'];
+  if (d != null) {
+    final dv = d['valeur'] == 'X' ? 'un joker' : InterCartes.nomValeur(d['valeur'].toString());
+    if (d['par'] == moiId) return ["Personne n'a posé $dv : la demande te revient, ", 'pose-le', '.'];
+    if (coups.any((x) => val(x) == d['valeur'])) return ['Inter demande $dv : ', 'pose-le', ' pour arrêter la demande.'];
+    if (coups.isEmpty) return ["Inter demande $dv et tu n'en as pas : ", videPioche ? 'passe ton tour' : 'pioche une carte', '.'];
+    return ['Inter demande $dv : tu peux poser un ', '8 ou un joker', ', ou piocher une carte.'];
+  }
+  if (m['aPioche'] != null && coups.isNotEmpty) return ['La carte piochée va : ', 'pose-la', ', ou garde-la avec Passer.'];
+  if (coups.isEmpty) return videPioche ? ['Plus rien à piocher : ', 'passe ton tour', '.'] : ['Aucune carte ne va : ', 'pioche', ' une carte.'];
+  if (m['libre'] == true) return ['Jeu libre : pose ', 'la carte de ton choix', '.'];
+  if (coups.any((x) => (x['cartes'] as List).length > 1)) return ['Tu peux poser ensemble tes cartes de ', 'même valeur', ' : touche-les une par une, puis Poser.'];
+  if (coups.any((x) => ['2', '10', 'X', 'A'].contains(val(x)))) return ['Carte spéciale : le ', '2, le 10 et le joker', " font piocher le suivant, l'As lui fait passer son tour."];
+  if (coups.any((x) => val(x) == '8')) return ['Le ', '8', ' se pose sur tout : tu demandes une valeur que tu as encore en main.'];
+  return ['Pose une carte de la ', 'même couleur ou de la même valeur', ' que celle du centre.'];
 }

@@ -1342,6 +1342,37 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       </ul>
       <p class="regles-note">36 cartes, du 2 au 10 dans les 4 couleurs. Le 10 est la plus forte. On tourne dans le sens des aiguilles d'une montre.</p>
     </template>
+    <template id="modeleReglesInter">
+      <p class="regles-titre">Le but</p>
+      <ul class="regles">
+        <li>Chacun reçoit 4 cartes. Débarrasse-toi de toutes tes cartes : tu es <b>qualifié</b>.</li>
+        <li>Le dernier joueur qui garde des cartes est <b>éliminé</b>. On rejoue une manche sans lui, jusqu'au vainqueur.</li>
+      </ul>
+      <p class="regles-titre">À ton tour</p>
+      <ul class="regles">
+        <li>Pose une carte de la <b>même couleur</b> ou de la <b>même valeur</b> que la carte du centre. Elle devient la nouvelle carte du centre.</li>
+        <li>Tu peux poser ensemble plusieurs cartes de <b>même valeur</b> si la première va. La dernière donne la nouvelle couleur, et elle doit <b>changer</b> la couleur du centre.</li>
+        <li>Rien ne va ? <b>Pioche</b> une carte. Si elle va, tu peux la poser tout de suite (avec d'autres de même valeur) ou la garder. Le joker et le 8 ne t'obligent pas à jouer, sauf quand il n'y a plus rien à piocher.</li>
+      </ul>
+      <p class="regles-titre">Les cartes spéciales</p>
+      <ul class="regles">
+        <li><b>2</b> : le suivant pioche 2 cartes et passe son tour. <b>10</b> : 4 cartes. <b>Joker</b> : 5 cartes, et il se pose sur tout ; ensuite on pose la carte de son choix. Les pénalités posées ensemble s'additionnent, et on ne peut pas les contrer.</li>
+        <li><b>As</b> : chaque As fait passer le tour d'un joueur (jamais celui qui le pose).</li>
+        <li><b>8</b> : il se pose sur tout. Tu <b>demandes une valeur</b> que tu as en main (le joker aussi, pas le 8). Chacun à son tour pose cette valeur, un 8 ou un joker, sinon pioche une carte. Si personne ne la pose, le tour te revient et tu la poses. On ne pose qu'un 8 à la fois, sauf pour sortir avec ses derniers 8.</li>
+      </ul>
+      <p class="regles-titre">Annoncer et sortir</p>
+      <ul class="regles">
+        <li>Quand tu peux finir au coup suivant, touche <b>J'annonce</b> dans les 3 secondes. Sinon, les autres peuvent te <b>contester</b> : tu pioches 1 carte.</li>
+        <li>Tu peux sortir avec n'importe quelle carte. Si c'est une carte spéciale, son effet s'applique quand même au suivant.</li>
+        <li>Pioche vide : on remélange la défausse. S'il n'y a plus rien du tout, celui qui ne peut pas jouer passe son tour. Si toute la table passe, la manche est rejouée.</li>
+      </ul>
+      <p class="regles-titre">Les styles</p>
+      <ul class="regles">
+        <li><b>Simple</b> : 1 paquet avec jokers (54 cartes), de 2 à 8 joueurs.</li>
+        <li><b>Délire</b> : 2 paquets (108 cartes). En option, le <b>J retour</b> : chaque valet posé inverse le sens du jeu (sans effet à 2 joueurs).</li>
+      </ul>
+      <p class="regles-note">La carte de départ n'est jamais un 8. Si c'est un 2, un 10, un As, un joker (ou un valet avec le J retour), son effet s'applique au premier joueur. On tourne dans le sens des aiguilles d'une montre.</p>
+    </template>
   </section>
 
   <!-- Connexion -->
@@ -3041,6 +3072,10 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       if (v.chrono) cons.append(el('span', 'secondes', ''), ' ');
       cons.append(el('em', null, 'À toi !'));
       if (!coups.length) cons.append(m.aPioche ? ' Tu ne peux pas jouer la carte piochée : passe.' : ' Aucune carte ne va : pioche.');
+    }
+    if (v.robots === 'gentils') {
+      const aide = aideGuideeInter(v);
+      if (aide) { const b = el('div', 'aide-guidee'); aide.forEach((t, i) => b.append(i % 2 ? el('b', null, t) : t)); cons.append(b); }
     }
     $('barreChrono').hidden = !(v.chrono && monTour) && !pause;
     $('barreChrono').classList.toggle('barre-pause', !!pause);
@@ -5439,11 +5474,14 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
 
   // ------------------------------------------------------------------ première partie guidée
   // Contre 2 robots gentils, sans chrono, avec des bulles d'aide (retention §3.9).
-  function lancerPartieGuidee() {
+  // Inter (8) : même principe, en style simple (1 paquet, sans J retour).
+  function lancerPartieGuidee(jeu) {
     const p = lirePseudo(); if (!p) return;
     fermerFenetre(); $('voileRobots').hidden = true;
-    demarrerHote(nouveauCode(), p, false);
-    envoyer({ type: 'reglages', robots: 'gentils', delai: 0 });
+    const inter = jeu === 'inter8';
+    if (inter) { stock.ecrire('kopo-inter8-guidee', 'faite'); demarrerHote(nouveauCode(), p, false, null, 'inter8'); }
+    else demarrerHote(nouveauCode(), p, false);
+    envoyer(Object.assign({ type: 'reglages', robots: 'gentils', delai: 0 }, inter ? { mode: 'simple', jRetour: false } : {}));
     envoyer({ type: 'ajouterRobot' }); envoyer({ type: 'ajouterRobot' });
     envoyer({ type: 'lancer' });
   }
@@ -5475,6 +5513,36 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     if (tout) return ['Tu n\'as plus que des ' + sym(m.couleurTour) + ' : ', 'tout poser', ' te fait sortir.'];
     if (jouables.length) return ['Suis la couleur : joue un ', sym(m.couleurTour), '. Une carte de moins pour toi.'];
     return ['Pas de ' + sym(m.couleurTour) + ' en main : tu dois ', 'ramasser', ' la plus forte carte de la table.'];
+  }
+
+  // Inter (8) : la bulle d'aide de la partie guidée (morceaux en alternance : texte, mot en gras…).
+  function aideGuideeInter(v) {
+    const m = v.manche, a = m.actions || [];
+    const coups = a.filter((x) => x.type === 'jouer');
+    if (!v.restants.includes(v.moi)) return ['Éliminé : tu avais encore des cartes quand les autres étaient sortis. Regarde la fin, puis ', 'rejoue', ' !'];
+    if (m.pause && m.pause.type === 'depart') return v.numeroManche === 1 ? ['Voici tes 4 cartes. Pose une carte de la ', 'même couleur ou de la même valeur', ' que celle du centre.'] : ['Nouvelle manche : le dernier qui garde des cartes est ', 'éliminé', '.'];
+    if (m.pause || m.phase !== 'jeu') return null;
+    if (!m.enJeu.includes(v.moi)) return ['Qualifié ! Le dernier qui garde des cartes sera ', 'éliminé', '.'];
+    if (a.some((x) => x.type === 'annoncer')) return ['Tu pourras finir au prochain coup : touche ', 'J\'annonce', ' tout de suite, sinon on peut te contester.'];
+    const co = a.find((x) => x.type === 'contester');
+    if (co) return [nom(v, co.cible) + ' peut finir sans avoir annoncé : touche ', 'Contester', ', il pioche une carte.'];
+    if (m.joueurCourant !== v.moi) return null;
+    const d = m.demande, val = (x) => I8.valeur(x.cartes[0]);
+    const dv = d && (d.valeur === 'X' ? 'un joker' : nomValeur(d.valeur));
+    if (coups.some((x) => x.cartes.length === m.main.length)) return ['Tu peux ', m.main.length > 1 ? 'poser toutes tes cartes' : 'poser ta dernière carte', ' et te qualifier.'];
+    if (d) {
+      if (d.par === v.moi) return ['Personne n\'a posé ' + dv + ' : la demande te revient, ', 'pose-le', '.'];
+      if (coups.some((x) => val(x) === d.valeur)) return ['Inter demande ' + dv + ' : ', 'pose-le', ' pour arrêter la demande.'];
+      if (!coups.length) return ['Inter demande ' + dv + ' et tu n\'en as pas : ', m.piochable === 0 ? 'passe ton tour' : 'pioche une carte', '.'];
+      return ['Inter demande ' + dv + ' : tu peux poser un ', '8 ou un joker', ', ou piocher une carte.'];
+    }
+    if (m.aPioche && coups.length) return ['La carte piochée va : ', 'pose-la', ', ou garde-la avec Passer.'];
+    if (!coups.length) return m.piochable === 0 ? ['Plus rien à piocher : ', 'passe ton tour', '.'] : ['Aucune carte ne va : ', 'pioche', ' une carte.'];
+    if (m.libre) return ['Jeu libre : pose ', 'la carte de ton choix', '.'];
+    if (coups.some((x) => x.cartes.length > 1)) return ['Tu peux poser ensemble tes cartes de ', 'même valeur', ' : touche-les une par une, puis Poser.'];
+    if (coups.some((x) => ['2', '10', 'X', 'A'].includes(val(x)))) return ['Carte spéciale : le ', '2, le 10 et le joker', ' font piocher le suivant, l\'As lui fait passer son tour.'];
+    if (coups.some((x) => val(x) === '8')) return ['Le ', '8', ' se pose sur tout : tu demandes une valeur que tu as encore en main.'];
+    return ['Pose une carte de la ', 'même couleur ou de la même valeur', ' que celle du centre.'];
   }
 
   // ------------------------------------------------------------------ missions, défi, collection
@@ -6284,12 +6352,12 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   $('jRetourRobots').querySelectorAll('button').forEach((b) => (b.onclick = () => { ecrireJRetour(b.dataset.v === 'oui'); majStyleRobots(); }));
   $('btnModeRobots').onclick = () => {
     if (!lirePseudo()) return;
-    $('btnGuidee').hidden = !!lireProfil().premierePartie || jeuChoisi() === 'inter8';
+    $('btnGuidee').hidden = jeuChoisi() === 'inter8' ? !!stock.lire('kopo-inter8-guidee') : !!lireProfil().premierePartie;
     majNiveauRobots(); majStyleRobots();
     $('voileRobots').hidden = false;
   };
   $('btnFermerRobots').onclick = () => ($('voileRobots').hidden = true);
-  $('btnGuidee').onclick = lancerPartieGuidee;
+  $('btnGuidee').onclick = () => lancerPartieGuidee(jeuChoisi());
   for (let n = 1; n <= 8; n++) {
     const b = el('button', 'btn', String(n));
     b.setAttribute('aria-label', n + ' robot' + (n > 1 ? 's' : ''));
@@ -6360,6 +6428,11 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   function montrerRegles() {
     const ok = el('button', 'btn principal large', "C'est compris");
     ok.onclick = fermerFenetre;
+    if (jeuChoisi() === 'inter8') {
+      const guidee = el('button', 'btn large', 'Jouer une partie guidée');
+      guidee.onclick = () => lancerPartieGuidee('inter8');
+      return ouvrirFenetre([el('h2', null, 'Règles d\'Inter (8)'), $('modeleReglesInter').content.cloneNode(true), ok, guidee]);
+    }
     const tuto = el('button', 'btn large', 'Apprendre en jouant (1 min)');
     tuto.onclick = ouvrirTutoriel;
     const extra = [];
@@ -6370,7 +6443,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
 
   // ------------------------------------------------------------------ Masano : choix du jeu
   // L'accueil propose Kopo ou Inter (8). Le choix est gardé sur le téléphone. Tant que la table
-  // Inter (8) : Créer, En ligne, Rejoindre et Contre les robots sont ouverts ; Match du jour, Bande, Ligue et ses règles affichent « bientôt ».
+  // Inter (8) : Créer, En ligne, Rejoindre, Contre les robots et les règles sont ouverts ; Match du jour, Bande et Ligue affichent « bientôt ».
   var JEUX_HUB = ['kopo', 'inter8'];
   const textesModes = {
     kopo: { btnCreer: 'Entre amis, de 2 à 9', btnModeRobots: 'Partie rapide, seul' },
@@ -6418,13 +6491,12 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   $('modes').addEventListener('click', jeuEnMaintenance, true);
   const interBientot = (e) => {
     if (jeuChoisi() !== 'inter8') return;
-    const cible = e.target.closest('#modes .mode, #btnRegles');
+    const cible = e.target.closest('#modes .mode');
     if (!cible || ['btnModeRejoindre', 'btnModeRobots', 'btnCreer', 'btnInconnus'].includes(cible.id)) return; // ouverts pour Inter (8)
     e.preventDefault(); e.stopImmediatePropagation();
     toast("Ce mode arrive très bientôt pour Inter (8). En attendant : entre amis, en ligne ou contre les robots !");
   };
   $('modes').addEventListener('click', interBientot, true);
-  $('btnRegles').addEventListener('click', interBientot, true);
   majChoixJeu();
   $('btnMissions').onclick = ouvrirMissions;
   $('btnPleinEcranAccueil').onclick = pleinEcran;

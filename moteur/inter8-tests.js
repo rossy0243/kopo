@@ -527,6 +527,76 @@ test('Couleur : hors 8, la dernière carte ne peut toujours pas être de la coul
   J(m, 'A', ['7C*', '7P']);
 });
 
+console.log('\nDécisions du 11/11 (audit)');
+
+test('Le 8 peut demander un joker si on en garde un ; les autres posent un joker, un 8, ou piochent', () => {
+  const m = manche({ A: ['8C', 'XR', '9P'], B: ['XN', '3P'], C: ['3T', '5T'] }, remplir('7C'));
+  const demandes = I.actionsPossibles(m, 'A').filter((a) => a.type === 'jouer' && a.cartes[0] === '8C').map((a) => a.demande).sort();
+  assert.deepStrictEqual(demandes, ['9', 'X']);
+  J(m, 'A', ['8C'], 'X');
+  assert.deepStrictEqual(m.demande, { valeur: 'X', par: 'A' });
+  interdit(() => J(m, 'B', ['3P']), 'joker');
+  J(m, 'B', ['XN']); // le joker demandé : la demande s'arrête, C pioche 5 et passe
+  assert.strictEqual(m.demande, null);
+  assert.strictEqual(m.mains.C.length, 7);
+  assert.strictEqual(m.joueurCourant, 'A');
+  assert.ok(m.libre);
+});
+
+test('Demande de joker : si personne n\'en pose, le demandeur pose son joker', () => {
+  const m = manche({ A: ['8C', 'XR', '9P'], B: ['3P', '4P'], C: ['3T', '5T'] }, remplir('7C'));
+  J(m, 'A', ['8C'], 'X');
+  P(m, 'B'); if (m.joueurCourant === 'B') PA(m, 'B');
+  P(m, 'C'); if (m.joueurCourant === 'C') PA(m, 'C');
+  assert.strictEqual(m.joueurCourant, 'A');
+  interdit(() => J(m, 'A', ['9P']), 'Joker');
+  J(m, 'A', ['XR']);
+  assert.strictEqual(m.demande, null);
+});
+
+test('Main 8 + joker : le 8 se pose en demandant le joker', () => {
+  const m = manche({ A: ['8C', 'XR'], B: ['3P', '4P'] }, remplir('7K'));
+  assert.ok(I.actionsPossibles(m, 'A').some((a) => a.type === 'jouer' && a.cartes[0] === '8C' && a.demande === 'X'));
+});
+
+test('Pioche et défausse vides : un joker ou un 8 jouable doit être posé (pas de match nul possible)', () => {
+  const m = manche({ A: ['XR', '3P'], B: ['4T', '6T'] }, ['7C']);
+  assert.strictEqual(m.pioche.length, 0);
+  assert.ok(!peut(m, 'A', 'piocher'));
+  interdit(() => P(m, 'A'));
+  J(m, 'A', ['XR']);
+  assert.strictEqual(m.phase, 'jeu');
+});
+
+test('Pioche et défausse vides, rien de jouable : on passe, et toute la table qui passe = match nul', () => {
+  const m = manche({ A: ['3P', '4P'], B: ['4T', '6T'] }, ['7C']);
+  P(m, 'A');
+  assert.strictEqual(m.joueurCourant, 'B');
+  P(m, 'B');
+  assert.strictEqual(m.phase, 'nulle');
+});
+
+test('Avec de quoi piocher, le joker et le 8 ne forcent toujours pas à jouer', () => {
+  const m = manche({ A: ['XR', '3P'], B: ['4T', '6T'] }, remplir('7C'));
+  assert.ok(peut(m, 'A', 'piocher'));
+});
+
+test('Carte de départ valet avec J retour (3 joueurs ou plus) : le sens change avant le premier coup', () => {
+  const m = manche({ A: ['3C', '4C'], B: ['3P', '4P'], C: ['3T', '4T'] }, remplir('VC'), 'A', 'delire+J');
+  assert.strictEqual(m.sens, -1);
+  assert.strictEqual(m.joueurCourant, 'A');
+  J(m, 'A', ['3C']);
+  assert.strictEqual(m.joueurCourant, 'C');
+});
+
+test('Après avoir pioché, on peut poser la carte piochée avec d\'autres de même valeur', () => {
+  const m = manche({ A: ['5P', 'RK', '2T'], B: ['3P', '4P'] }, ['9T', '9P', '5C', '7C']);
+  P(m, 'A');
+  assert.strictEqual(m.aPioche, '5C');
+  J(m, 'A', ['5C', '5P']);
+  assert.deepStrictEqual(m.mains.A.sort(), ['2T', 'RK']);
+});
+
 test('2 000 parties au hasard (2 à 8 joueurs, simple et délire) : jamais bloquées, aucune carte perdue', () => {
   const rng = I.hasard(42);
   for (let n = 0; n < 2000; n++) {

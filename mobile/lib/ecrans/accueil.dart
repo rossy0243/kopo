@@ -320,7 +320,7 @@ class _BarreBas extends StatelessWidget {
       onglet('missions', 'Missions', ouvrirMissions, point: app.pointMissions),
       onglet('partager', 'Partager', partagerAccueil),
       onglet('regles', inter ? 'Règles Inter' : 'Règles', () {
-        if (inter) { app.toast('Ce mode arrive très bientôt pour Inter (8). En attendant : entre amis, en ligne ou contre les robots !'); return; }
+        if (inter) { montrerReglesInter(); return; }
         montrerRegles();
       }),
       onglet('reglages', 'Paramètres', ouvrirParametres, demandes: app.demandesAmi),
