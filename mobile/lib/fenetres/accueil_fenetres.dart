@@ -169,7 +169,7 @@ void ouvrirRobots() {
     final inter = app.jeu == 'inter8';
     final delire = app.styleInter == 'delire';
     final n = app.niveauRobots;
-    final guidee = app.lireProfil()['premierePartie'] == null && !inter;
+    final guidee = inter ? Stock.lire('kopo-inter8-guidee') == null : app.lireProfil()['premierePartie'] == null;
     final max = inter ? App.maxInter - 1 : 8;
     return Fenetre(titre: 'Contre les robots', enfants: [
       if (inter) ...[
@@ -194,7 +194,7 @@ void ouvrirRobots() {
       ]),
       const Ecart(8),
       Center(child: TextButton(onPressed: composerTable, child: Text('Composer ma table robot par robot', style: K.texte(14, couleur: K.brass).copyWith(decoration: TextDecoration.underline, decorationColor: K.brass)))),
-      if (guidee) ...[const Ecart(4), Btn.principal('Première partie guidée (2 robots gentils)', large: true, onTap: app.partieGuidee)],
+      if (guidee) ...[const Ecart(4), Btn.principal('Première partie guidée (2 robots gentils)', large: true, onTap: () => app.partieGuidee(inter: inter))],
       const Ecart(8),
       Btn('Annuler', large: true, onTap: app.fermerFenetre),
     ]);
@@ -281,6 +281,44 @@ void montrerRegles() {
         Btn('Apprendre en jouant (1 min)', large: true, onTap: ouvrirTutoriel),
         const Ecart(8),
         Btn('Match du jour et Bande', large: true, onTap: () => fenetreNouveaute(0)),
+      ]), 'regles');
+}
+
+// ---------------------------------------------------------------- Règles d'Inter (8)
+void montrerReglesInter() {
+  Widget titre(String t) => Padding(padding: const EdgeInsets.only(top: 12, bottom: 4), child: Text(t.toUpperCase(), style: K.texte(13, couleur: K.brass, poids: FontWeight.w700).copyWith(letterSpacing: 1.5)));
+  Widget li(List<Object> m) => Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          SizedBox(width: 22, child: Text('•', style: K.texte(14, couleur: K.brass, poids: FontWeight.w700))),
+          Expanded(child: Text.rich(TextSpan(style: K.texte(14), children: [for (final x in m) x is List ? TextSpan(text: x[0] as String, style: const TextStyle(fontWeight: FontWeight.w700, color: K.brass)) : TextSpan(text: x as String)]))),
+        ]),
+      );
+  app.ouvrirFenetre((context) => Fenetre(titre: "Règles d'Inter (8)", enfants: [
+        titre('Le but'),
+        li(['Chacun reçoit 4 cartes. Débarrasse-toi de toutes tes cartes : tu es ', ['qualifié'], '.']),
+        li(['Le dernier joueur qui garde des cartes est ', ['éliminé'], ". On rejoue une manche sans lui, jusqu'au vainqueur."]),
+        titre('À ton tour'),
+        li(['Pose une carte de la ', ['même couleur'], ' ou de la ', ['même valeur'], ' que la carte du centre. Elle devient la nouvelle carte du centre.']),
+        li(['Tu peux poser ensemble plusieurs cartes de ', ['même valeur'], ' si la première va. La dernière donne la nouvelle couleur, et elle doit ', ['changer'], ' la couleur du centre.']),
+        li(['Rien ne va ? ', ['Pioche'], " une carte. Si elle va, tu peux la poser tout de suite (avec d'autres de même valeur) ou la garder. Tu peux aussi piocher exprès même si une carte va (bluff), sauf quand il n'y a plus rien à piocher : là, tu dois poser ce qui va."]),
+        titre('Les cartes spéciales'),
+        li([['2'], ' : le suivant pioche 2 cartes et passe son tour. ', ['10'], ' : 4 cartes. ', ['Joker'], " : 5 cartes, et il se pose sur tout ; ensuite on pose la carte de son choix. Les pénalités posées ensemble s'additionnent, et on ne peut pas les contrer."]),
+        li([['As'], " : chaque As fait passer le tour d'un joueur (jamais celui qui le pose)."]),
+        li([['8'], ' : il se pose sur tout. Tu ', ['demandes une valeur'], " que tu as en main (le joker aussi, pas le 8). Chacun à son tour pose cette valeur, un 8 ou un joker, sinon pioche une carte. Si personne ne la pose, le tour te revient et tu la poses. On ne pose qu'un 8 à la fois, sauf pour sortir avec ses derniers 8."]),
+        titre('Annoncer et sortir'),
+        li(['Quand tu peux finir au coup suivant, touche ', ["J'annonce"], ' dans les 3 secondes. Sinon, les autres peuvent te ', ['contester'], ' : tu pioches 1 carte.']),
+        li(["Tu peux sortir avec n'importe quelle carte. Si c'est une carte spéciale, son effet s'applique quand même au suivant."]),
+        li(["Pioche vide : on remélange la défausse. S'il n'y a plus rien du tout, celui qui ne peut pas jouer passe son tour. Si toute la table passe, la manche est rejouée."]),
+        titre('Les styles'),
+        li([['Simple'], ' : 1 paquet avec jokers (54 cartes), de 2 à 8 joueurs.']),
+        li([['Délire'], ' : 2 paquets (108 cartes). En option, le ', ['J retour'], ' : chaque valet posé inverse le sens du jeu (sans effet à 2 joueurs).']),
+        const Ecart(6),
+        const Muet("La carte de départ n'est jamais un 8. Si c'est un 2, un 10, un As, un joker (ou un valet avec le J retour), son effet s'applique au premier joueur. On tourne dans le sens des aiguilles d'une montre.", taille: 12),
+        const Ecart(14),
+        Btn.principal("C'est compris", large: true, onTap: app.fermerFenetre),
+        const Ecart(8),
+        Btn('Jouer une partie guidée', large: true, onTap: () => app.partieGuidee(inter: true)),
       ]), 'regles');
 }
 

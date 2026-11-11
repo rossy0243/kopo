@@ -49,13 +49,17 @@
 
   // Robot gentil (première partie guidée, et robots faciles) : il pose une carte au hasard,
   // lâche ses pénalités sans viser, oublie parfois d'annoncer et ne conteste presque jamais.
+  // (La décision de contester est prise une seule fois par oubli : voir choixRobot.)
   function robotGentil(v, actions, rng) {
-    const h = horsTour(actions, 0.5, 0.1, rng);
+    const h = horsTour(actions, 0.5, 1, rng);
     if (h) return h;
     if (v.moi !== v.joueurCourant) return null;
     const c = coups(actions);
     if (c.length) {
       if (v.aPioche && rng() < 0.3) return actions.find((a) => a.type === 'passer');
+      // Il lâche ses 2, 10 et jokers dès qu'il peut, sans viser personne.
+      const penalites = c.filter((a) => ['2', '10', 'X'].includes(valeurDe(a)));
+      if (penalites.length && rng() < 0.8) return penalites[Math.floor(rng() * penalites.length)];
       const seules = c.filter((a) => a.cartes.length === 1);
       const liste = seules.length && rng() < 0.8 ? seules : c;
       return liste[Math.floor(rng() * liste.length)];
@@ -152,10 +156,23 @@
 
   // À chaque coup, le robot joue comme le niveau du dessous ou du dessus de sa force :
   // force 1,3 = coup normal 7 fois sur 10, coup fort 3 fois sur 10.
+  // Contester un oubli d'annonce : chaque robot décide une seule fois par oubli (sinon un robot facile,
+  // interrogé à chaque coup, finirait presque toujours par contester). Facile : 1 fois sur 10 ;
+  // normal et fort : toujours. Un robot entre deux niveaux suit le même tirage que pour ses coups.
+  const CONTESTE_FACILE = 0.1;
+  function veutContester(m, j, cible, f, rng) {
+    const d = (m.robotsContestent = m.robotsContestent || {});
+    const cle = j + '>' + cible + '>' + ((m.oublis && m.oublis[cible]) || 0);
+    if (!(cle in d)) d[cle] = f >= 1 || rng() < f ? true : rng() < CONTESTE_FACILE;
+    return d[cle];
+  }
   function choixRobot(m, j, niveauRobots, niveauJoueur, rng) {
     const v = I.vuePublique(m, j);
-    const actions = I.actionsPossibles(m, j);
     const f = forceRobots(niveauRobots, niveauJoueur);
+    // On oublie les décisions sur les joueurs qu'on ne peut plus contester (amende payée, ou leur tour revenu).
+    const cibles = v.contestables || [];
+    if (m.robotsContestent) for (const cle of Object.keys(m.robotsContestent)) if (!cibles.some((c) => cle.includes('>' + c + '>'))) delete m.robotsContestent[cle];
+    const actions = I.actionsPossibles(m, j).filter((a) => a.type !== 'contester' || veutContester(m, j, a.cible, f, rng));
     const cerveau = f < 1 ? (rng() < f ? robotNormal : robotGentil) : (rng() < f - 1 ? robotFort : robotNormal);
     return cerveau(v, actions, rng);
   }

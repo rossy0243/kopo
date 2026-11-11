@@ -1052,10 +1052,13 @@ class App extends ChangeNotifier {
     }
     envoyer({'type': 'lancer'});
   }
-  void partieGuidee() {
+  /// Première partie guidée : 2 robots gentils, sans chrono, avec des bulles d'aide.
+  /// Inter (8) : en style simple (1 paquet, sans J retour).
+  void partieGuidee({bool inter = false}) {
     final p = lirePseudo(); if (p == null) return;
     fermerFenetre();
-    entrerServeur(p, {'robots': {'jeu': 'kopo', 'robots': 2, 'niveau': 'gentils', 'delai': 0, 'lancer': true}});
+    if (inter) Stock.ecrire('kopo-inter8-guidee', 'faite');
+    entrerServeur(p, {'robots': {'jeu': inter ? 'inter8' : 'kopo', 'robots': 2, 'niveau': 'gentils', 'delai': 0, 'lancer': true, if (inter) 'mode': 'simple', if (inter) 'jRetour': false}});
   }
   void jouerMatchJour() { final p = lirePseudo(); if (p == null) return; fermerFenetre(); entrerServeur(p, {'matchJour': true}); }
   void rejoindreCode(String code) { final p = lirePseudo(); if (p == null) return; fermerFenetre(); entrerServeur(p, {'code': code}); }

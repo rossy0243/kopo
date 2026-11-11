@@ -128,6 +128,38 @@ test('Normal : avec plusieurs cartes, il finit sur la couleur qu\'il a le plus e
   assert.deepStrictEqual(a.cartes, ['7C', '7P']);
 });
 
+test('Facile : lâche ses 2, 10 et jokers dès qu\'il peut', () => {
+  const m = manche({ a: ['2C', '5C', '9P', 'RT'], b: ['3T', '4T', '5T'] }, '7C', 'a');
+  let n = 0;
+  const rng = I.hasard(5);
+  for (let k = 0; k < 200; k++) if (decide(R.robotGentil, m, 'a', rng).cartes[0] === '2C') n++;
+  assert.ok(n > 140, `2 posé ${n} fois sur 200`);
+});
+
+test('Facile : décide une seule fois par oubli de contester (environ 1 fois sur 10), même interrogé à chaque coup', () => {
+  let contestes = 0;
+  const essais = 400;
+  const rng = I.hasard(9);
+  for (let k = 0; k < essais; k++) {
+    const m = manche({ a: ['3C', '9P'], b: ['3T', '4T', '5T'], c: ['6P'] }, '7K', 'b');
+    m.contestables = ['c'];
+    m.oublis = { c: 1 };
+    let fait = false;
+    for (let t = 0; t < 10 && !fait; t++) { const a = R.choixRobot(m, 'a', 'faciles', 1, rng); if (a && a.type === 'contester') fait = true; }
+    if (fait) contestes++;
+  }
+  assert.ok(contestes > 10 && contestes < 80, `${contestes} contestations sur ${essais}`);
+});
+
+test('Normal et fort contestent toujours un oubli', () => {
+  for (const niveau of ['normaux', 'forts']) {
+    const m = manche({ a: ['3C', '9P'], b: ['3T', '4T', '5T'], c: ['6P'] }, '7K', 'b');
+    m.contestables = ['c'];
+    const a = R.choixRobot(m, 'a', niveau, 1, I.hasard(1));
+    assert.strictEqual(a && a.type, 'contester');
+  }
+});
+
 test('Normal bat nettement Facile en duel', () => {
   const t = victoires(R.robotNormal, R.robotGentil, 400, 21);
   assert.ok(t > 0.7, `Normal gagne ${Math.round(t * 100)} %`);
