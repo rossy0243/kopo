@@ -499,12 +499,18 @@ class _Bas extends StatelessWidget {
       final val = InterCartes.valeur(choix[0]);
       boutons.add(Btn.principal(choix.length == 1 ? 'Poser le ${InterCartes.afficher(choix[0])}' : 'Poser ${choix.length} cartes (${InterCartes.nomValeur(val)})', large: true, onTap: () => poserInter(choisis)));
       boutons.add(Btn('Reprendre ${choix.length > 1 ? 'les cartes' : 'la carte'}', large: true, onTap: () => changer([])));
-      if (choix.length == 2) boutons.add(const Muet('Plusieurs cartes : la couleur change toute seule.', align: TextAlign.center, taille: 12));
-      if (choix.length > 2) boutons.add(const Muet('Tu choisiras la nouvelle couleur.', align: TextAlign.center, taille: 12));
+      if (choix.length > 1 && val != '8' && val != 'X') {
+        final nbCouleurs = {for (final a in choisis) InterCartes.couleur(((a['cartes'] as List).last) as String)}.length;
+        boutons.add(Muet(nbCouleurs > 1 ? 'Tu choisiras la nouvelle couleur.' : 'Plusieurs cartes : la couleur change toute seule.', align: TextAlign.center, taille: 12));
+      }
     } else if (choix.isNotEmpty) {
       boutons.add(Btn('Reprendre les cartes', large: true, onTap: () => changer([])));
     }
-    if (actions.any((a) => a['type'] == 'piocher')) boutons.add(Btn.principal(m['piochable'] == 0 ? 'Plus de cartes : passer mon tour' : 'Piocher une carte', large: true, onTap: () => app.action({'type': 'piocher'})));
+    // Bluff : on peut piocher même avec une carte jouable, pour se donner une chance.
+    if (actions.any((a) => a['type'] == 'piocher')) {
+      boutons.add(Btn(m['piochable'] == 0 ? 'Plus de cartes : passer mon tour' : coups.isNotEmpty ? 'Piocher une carte (bluff)' : 'Piocher une carte',
+          style: coups.isEmpty ? StyleBtn.principal : StyleBtn.normal, large: true, onTap: () => app.action({'type': 'piocher'})));
+    }
     if (actions.any((a) => a['type'] == 'passer')) boutons.add(Btn('Passer', style: coups.isEmpty ? StyleBtn.principal : StyleBtn.normal, large: true, onTap: () { app.choixInter = []; app.action({'type': 'passer'}); }));
 
     return [

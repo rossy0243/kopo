@@ -106,8 +106,27 @@ test("Sans carte jouable, on pioche une carte ; si elle se joue, on peut la pose
   assert.strictEqual(m.joueurCourant, 'B');
 });
 
-test('On ne peut pas piocher quand on peut jouer', () => {
+test('Bluff libre : on peut piocher même quand on peut jouer', () => {
   const m = manche({ A: ['3C', '9P', '5C', '6C'], B: ['3P', '4P', '5P', '6P'] }, remplir('9T'), 'A');
+  assert.ok(peut(m, 'A', 'jouer'));
+  assert.ok(peut(m, 'A', 'piocher'));
+  P(m, 'A');
+  assert.strictEqual(m.mains.A.length, 5);
+  assert.ok(m.mains.A.includes('9P'), 'il garde sa carte jouable');
+});
+
+test('Bluff libre : plus rien à piocher, on ne peut pas passer si on peut jouer', () => {
+  const m = manche({ A: ['3C', '9P', '5C', '6C'], B: ['3P', '4P', '5P', '6P'] }, ['9T'], 'A');
+  assert.ok(!peut(m, 'A', 'piocher'));
+  interdit(() => P(m, 'A'));
+});
+
+test('Bluff libre : le demandeur, quand le tour lui revient, pose la valeur demandée', () => {
+  const m = manche({ A: ['8T', '4C', '5K', '6K'], B: ['3P', '9P', '5P', '6P'] }, remplir('DC'), 'A');
+  J(m, 'A', ['8T'], '4');
+  P(m, 'B');
+  if (m.aPioche) PA(m, 'B');
+  assert.strictEqual(m.joueurCourant, 'A');
   assert.ok(!peut(m, 'A', 'piocher'));
   interdit(() => P(m, 'A'));
 });
@@ -133,11 +152,13 @@ test("Pendant une demande, un joueur qui n'a pas la valeur demandée peut garder
   assert.deepStrictEqual(m.demande, { valeur: '4', par: 'A' });
 });
 
-test('Avec la valeur demandée en main, on la pose : pas de pioche', () => {
+test('Bluff libre : avec la valeur demandée en main, on peut aussi la garder et piocher', () => {
   const m = manche({ A: ['8T', '4C', '5K', '6K'], B: ['XN', '4P', '5P', '6P'], C: ['3T', '9T', '5T', '6T'] }, remplir('DC'), 'A');
   J(m, 'A', ['8T'], '4');
-  assert.ok(!peut(m, 'B', 'piocher'));
-  interdit(() => P(m, 'B'));
+  assert.ok(peut(m, 'B', 'piocher'));
+  P(m, 'B');
+  assert.ok(m.mains.B.includes('4P'));
+  assert.deepStrictEqual(m.demande, { valeur: '4', par: 'A' });
 });
 
 test("Après avoir pioché, on peut garder la carte et passer ; si elle ne se joue pas, le tour passe seul", () => {
@@ -474,6 +495,15 @@ test('Pénalité avec la pioche vide : la table voit que le joueur ne pioche rie
   assert.strictEqual(m2.joueurCourant, 'C');
 });
 
+test("Amende de contestation avec la pioche vide : elle ne fait pas remélanger la défausse", () => {
+  const m = manche({ A: ['3C', '4C'], B: ['5P', '6P', '7P'], C: ['3T', '6T', '7T'] }, ['5C'], 'A');
+  m.defausse = ['DK', 'RK', '5C'];
+  J(m, 'A', ['3C']); // A peut finir au prochain coup et n'annonce pas
+  CO(m, 'B');
+  assert.strictEqual(m.mains.A.length, 1, 'rien à piocher : pas de carte d\'amende');
+  assert.strictEqual(m.defausse.length, 4, 'la défausse n\'est pas remélangée');
+});
+
 test('Plus de pioche ni de défausse, et toute la table passe : match nul', () => {
   const m = manche({ A: ['3C', '4C', '5C', '6C'], B: ['3P', '4P', '5P', '6P'] }, ['9T'], 'A');
   P(m, 'A');
@@ -497,6 +527,34 @@ test('Ce qu\'un joueur voit ne montre jamais les mains des autres', () => {
   const v = I.vuePublique(m, 'A');
   assert.deepStrictEqual(v.main, ['3C', '4C', '5C', '6C']);
   assert.ok(!JSON.stringify(v).includes('4P'));
+});
+
+test('Couleur : deux cartes dont aucune n\'est de la couleur du centre, les deux fins sont permises (le joueur choisit)', () => {
+  const m = manche({ A: ['7C', '7P', '9T'], B: ['3T', '4T'], C: ['3P', '4P'] }, ['RT', 'RP', '7K']);
+  const fins = I.actionsPossibles(m, 'A').filter((a) => a.type === 'jouer' && a.cartes.length === 2).map((a) => I.couleur(a.cartes[1])).sort();
+  assert.deepStrictEqual(fins, ['C', 'P']);
+});
+
+test('Couleur : pendant une demande, la couleur du 8 au centre n\'est pas imposée', () => {
+  const m = manche({ A: ['8C', '5C', '9T'], B: ['5C*', '5P', '9K'], C: ['3P', '4P', '6P'] }, ['RT', 'RP', '4C'], 'A', 'delire');
+  J(m, 'A', ['8C'], '5');
+  J(m, 'B', ['5P', '5C*']); // finit sur ♥, la couleur du 8 : permis
+  assert.strictEqual(m.defausse[m.defausse.length - 1], '5C*');
+  assert.strictEqual(m.demande, null);
+});
+
+test('Couleur : après une sortie sur un 8, jeu libre, la couleur du 8 n\'est pas imposée', () => {
+  const m = manche({ A: ['8C'], B: ['5C', '5P', '9K'], C: ['3P', '4P', '6P'] }, ['RT', 'RP', '4C']);
+  J(m, 'A', ['8C']);
+  assert.ok(m.libre);
+  J(m, 'B', ['5P', '5C']);
+  assert.strictEqual(m.defausse[m.defausse.length - 1], '5C');
+});
+
+test('Couleur : hors 8, la dernière carte ne peut toujours pas être de la couleur du centre', () => {
+  const m = manche({ A: ['7P', '7C*', '9T'], B: ['3T', '4T'], C: ['3P', '6P'] }, ['RT', 'RP', '7C'], 'A', 'delire');
+  assert.throws(() => J(m, 'A', ['7P', '7C*']), /changer la couleur/);
+  J(m, 'A', ['7C*', '7P']);
 });
 
 test('2 000 parties au hasard (2 à 8 joueurs, simple et délire) : jamais bloquées, aucune carte perdue', () => {

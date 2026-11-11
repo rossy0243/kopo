@@ -1,4 +1,4 @@
-// Inter (8) — moteur de règles (règlement v1.0 du 06/11/2026)
+// Inter (8) — moteur de règles (règlement v1.2 du 11/11/2026)
 // Utilisable dans le navigateur (window.Inter8) et avec Node (require).
 // Indépendant du moteur de Kopo : aucun fichier de Kopo n'est touché.
 //
@@ -297,9 +297,13 @@
   // Plusieurs cartes ensemble : la dernière doit changer la couleur du centre. Exceptions : les
   // doublons du 2e paquet de la couleur du centre (deux 5♦ sur du carreau), et les derniers 8
   // posés pour sortir (le suivant joue de toute façon la carte de son choix).
+  // Un 8 au centre n'impose aucune couleur (décision du 11/11) : pendant sa demande seule la valeur
+  // compte, et quand un joueur est sorti sur un 8 le jeu est libre. Le joker n'a pas de couleur.
   function changeCouleur(m, cartes) {
     if (cartes.length < 2 || valeur(cartes[0]) === '8') return null;
-    const coul = couleur(m.defausse[m.defausse.length - 1]);
+    const centre = m.defausse[m.defausse.length - 1];
+    if (valeur(centre) === '8') return null;
+    const coul = couleur(centre);
     if (coul && couleur(cartes[cartes.length - 1]) === coul && !cartes.every((c) => couleur(c) === coul)) {
       return `Avec plusieurs cartes, la dernière doit changer la couleur (pas de ${NOMS_COULEURS[coul]} en dernier).`;
     }
@@ -344,11 +348,17 @@
     return coups;
   }
 
-  // On pioche quand on ne peut pas jouer. Le joker et le 8 ne forcent jamais à jouer : si ce sont
-  // les seules cartes jouables, on peut les garder et piocher (pendant une demande comme en jeu normal).
+  // Bluff libre (décision du 11/11) : on peut toujours piocher au lieu de jouer, même avec une carte
+  // jouable, pour se donner une chance. Exceptions :
+  // - le demandeur d'un 8, quand le tour lui revient, pose la valeur qu'il a demandée ;
+  // - plus rien à piocher (ni pioche, ni défausse à remélanger) : « piocher » veut alors dire passer
+  //   son tour, permis seulement à qui ne peut pas jouer (le joker et le 8 ne forcent jamais à jouer).
   function piochePermise(m, joueur, coups) {
     if (m.aPioche) return false;
-    return (coups || coupsJouer(m, joueur)).every((a) => ['8', JOKER].includes(valeur(a.cartes[0])));
+    const rienQue8OuJoker = () => (coups || coupsJouer(m, joueur)).every((a) => ['8', JOKER].includes(valeur(a.cartes[0])));
+    if (m.demande && m.demande.par === joueur) return rienQue8OuJoker();
+    if (m.pioche.length || m.defausse.length > 1) return true;
+    return rienQue8OuJoker();
   }
 
   // Actions possibles pour un joueur, dans l'état actuel.
@@ -380,7 +390,9 @@
       const liste = contestables(m).filter((c) => c !== j);
       const cible = action.cible || liste[0];
       if (!cible || !liste.includes(cible)) throw new Error(`Action interdite : ${JSON.stringify(action)}`);
-      piocherCartes(m, cible, 1);
+      // L'amende ne fait pas remélanger la défausse (section 9 : seul le joueur qui ne peut pas
+      // jouer la fait remélanger) : pioche vide, le contesté ne pioche rien.
+      piocherCartes(m, cible, 1, true);
       // Une seule amende par oubli, même s'il peut encore finir avec la carte piochée.
       m.contestables = contestables(m).filter((c) => c !== cible);
       delete m.contestable;
@@ -556,6 +568,11 @@
   function strategieHasard(rng) {
     return function (m, joueur, actions) {
       if (joueur !== m.joueurCourant) return actions.length && rng() < 0.3 ? actions[Math.floor(rng() * actions.length)] : null;
+      // Bluff de temps en temps (piocher alors qu'on peut jouer), comme un vrai joueur : à chaque
+      // fois au hasard, la manche pourrait durer sans fin.
+      const coups = actions.filter((a) => a.type === 'jouer');
+      const pioche = actions.find((a) => a.type === 'piocher');
+      if (coups.length && pioche) return rng() < 0.05 ? pioche : coups[Math.floor(rng() * coups.length)];
       return actions[Math.floor(rng() * actions.length)];
     };
   }

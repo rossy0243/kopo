@@ -122,13 +122,19 @@ function victoires(a, b, n, graine) {
   return gagnees / n;
 }
 
+test('Normal : avec plusieurs cartes, il finit sur la couleur qu\'il a le plus en main', () => {
+  const m = manche({ a: ['7C', '7P', '3P', '9P', 'DT'], b: ['3T', '4T', '5T'] }, '7K', 'a');
+  const a = decide(R.robotNormal, m, 'a');
+  assert.deepStrictEqual(a.cartes, ['7C', '7P']);
+});
+
 test('Normal bat nettement Facile en duel', () => {
   const t = victoires(R.robotNormal, R.robotGentil, 400, 21);
   assert.ok(t > 0.7, `Normal gagne ${Math.round(t * 100)} %`);
 });
 
 test('Fort bat Normal en duel', () => {
-  const t = victoires(R.robotFort, R.robotNormal, 600, 22);
+  const t = victoires(R.robotFort, R.robotNormal, 1500, 22);
   assert.ok(t > 0.52, `Fort gagne ${Math.round(t * 100)} %`);
 });
 
