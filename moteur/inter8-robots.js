@@ -169,12 +169,14 @@
     return rng() < f || rng() < 0.5;
   }
 
-  // Coup joué automatiquement quand le temps est écoulé (ou le joueur hors ligne) :
-  // il pioche, ou passe après avoir pioché, sinon pose le coup le plus simple.
+  // Coup joué automatiquement quand le temps est écoulé (ou le joueur hors ligne) : il pose le coup
+  // le plus simple s'il a une carte ordinaire jouable (pas de bluff automatique, sinon un joueur
+  // absent piocherait sans fin) ; sinon il pioche, ou passe après avoir pioché, ou pose son 8 ou joker.
   function coupAutomatique(m, joueur) {
     if (joueur !== m.joueurCourant) return null;
     const actions = I.actionsPossibles(m, joueur);
-    return actions.find((a) => a.type === 'piocher') || actions.find((a) => a.type === 'passer') || coups(actions)[0] || null;
+    const ordinaire = coups(actions).find((a) => !['8', 'X'].includes(valeurDe(a)));
+    return ordinaire || actions.find((a) => a.type === 'piocher') || actions.find((a) => a.type === 'passer') || coups(actions)[0] || null;
   }
 
   const Inter8Robots = { NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, robotGentil, robotNormal, robotFort, choixRobot, robotAnnonce, coupAutomatique };

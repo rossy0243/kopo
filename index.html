@@ -5195,11 +5195,17 @@ var qrcode = function() {
     return coups;
   }
 
-  // On pioche quand on ne peut pas jouer. Le joker et le 8 ne forcent jamais à jouer : si ce sont
-  // les seules cartes jouables, on peut les garder et piocher (pendant une demande comme en jeu normal).
+  // Bluff libre (décision du 11/11) : on peut toujours piocher au lieu de jouer, même avec une carte
+  // jouable, pour se donner une chance. Exceptions :
+  // - le demandeur d'un 8, quand le tour lui revient, pose la valeur qu'il a demandée ;
+  // - plus rien à piocher (ni pioche, ni défausse à remélanger) : « piocher » veut alors dire passer
+  //   son tour, permis seulement à qui ne peut pas jouer (le joker et le 8 ne forcent jamais à jouer).
   function piochePermise(m, joueur, coups) {
     if (m.aPioche) return false;
-    return (coups || coupsJouer(m, joueur)).every((a) => ['8', JOKER].includes(valeur(a.cartes[0])));
+    const rienQue8OuJoker = () => (coups || coupsJouer(m, joueur)).every((a) => ['8', JOKER].includes(valeur(a.cartes[0])));
+    if (m.demande && m.demande.par === joueur) return rienQue8OuJoker();
+    if (m.pioche.length || m.defausse.length > 1) return true;
+    return rienQue8OuJoker();
   }
 
   // Actions possibles pour un joueur, dans l'état actuel.
@@ -5231,7 +5237,9 @@ var qrcode = function() {
       const liste = contestables(m).filter((c) => c !== j);
       const cible = action.cible || liste[0];
       if (!cible || !liste.includes(cible)) throw new Error(`Action interdite : ${JSON.stringify(action)}`);
-      piocherCartes(m, cible, 1);
+      // L'amende ne fait pas remélanger la défausse (section 9 : seul le joueur qui ne peut pas
+      // jouer la fait remélanger) : pioche vide, le contesté ne pioche rien.
+      piocherCartes(m, cible, 1, true);
       // Une seule amende par oubli, même s'il peut encore finir avec la carte piochée.
       m.contestables = contestables(m).filter((c) => c !== cible);
       delete m.contestable;
@@ -5407,6 +5415,11 @@ var qrcode = function() {
   function strategieHasard(rng) {
     return function (m, joueur, actions) {
       if (joueur !== m.joueurCourant) return actions.length && rng() < 0.3 ? actions[Math.floor(rng() * actions.length)] : null;
+      // Bluff de temps en temps (piocher alors qu'on peut jouer), comme un vrai joueur : à chaque
+      // fois au hasard, la manche pourrait durer sans fin.
+      const coups = actions.filter((a) => a.type === 'jouer');
+      const pioche = actions.find((a) => a.type === 'piocher');
+      if (coups.length && pioche) return rng() < 0.05 ? pioche : coups[Math.floor(rng() * coups.length)];
       return actions[Math.floor(rng() * actions.length)];
     };
   }
@@ -5592,12 +5605,14 @@ var qrcode = function() {
     return rng() < f || rng() < 0.5;
   }
 
-  // Coup joué automatiquement quand le temps est écoulé (ou le joueur hors ligne) :
-  // il pioche, ou passe après avoir pioché, sinon pose le coup le plus simple.
+  // Coup joué automatiquement quand le temps est écoulé (ou le joueur hors ligne) : il pose le coup
+  // le plus simple s'il a une carte ordinaire jouable (pas de bluff automatique, sinon un joueur
+  // absent piocherait sans fin) ; sinon il pioche, ou passe après avoir pioché, ou pose son 8 ou joker.
   function coupAutomatique(m, joueur) {
     if (joueur !== m.joueurCourant) return null;
     const actions = I.actionsPossibles(m, joueur);
-    return actions.find((a) => a.type === 'piocher') || actions.find((a) => a.type === 'passer') || coups(actions)[0] || null;
+    const ordinaire = coups(actions).find((a) => !['8', 'X'].includes(valeurDe(a)));
+    return ordinaire || actions.find((a) => a.type === 'piocher') || actions.find((a) => a.type === 'passer') || coups(actions)[0] || null;
   }
 
   const Inter8Robots = { NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, robotGentil, robotNormal, robotFort, choixRobot, robotAnnonce, coupAutomatique };
@@ -6983,7 +6998,7 @@ var qrcode = function() {
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = '2818d616690d'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = 'e403e0c1e3ae'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
@@ -8537,7 +8552,8 @@ var qrcode = function() {
     else if (choixInter.length) { const annuler = el('button', 'btn large', 'Reprendre les cartes'); annuler.onclick = () => { choixInter = []; afficherPartieInter(vueActuelle); }; act.append(annuler); }
     if (actions.some((a) => a.type === 'piocher')) {
       // Plus rien à piocher (ni pioche, ni défausse à remélanger) : on passe son tour, et toute la table le voit.
-      const b = el('button', 'btn principal large', m.piochable === 0 ? 'Plus de cartes : passer mon tour' : 'Piocher une carte');
+      // Bluff : on peut piocher même avec une carte jouable, pour se donner une chance.
+      const b = el('button', 'btn large' + (coups.length ? '' : ' principal'), m.piochable === 0 ? 'Plus de cartes : passer mon tour' : coups.length ? 'Piocher une carte (bluff)' : 'Piocher une carte');
       b.onclick = () => { b.disabled = true; envoyer({ type: 'action', action: { type: 'piocher' } }); };
       act.append(b);
     }

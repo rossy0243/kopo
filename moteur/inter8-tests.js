@@ -106,8 +106,27 @@ test("Sans carte jouable, on pioche une carte ; si elle se joue, on peut la pose
   assert.strictEqual(m.joueurCourant, 'B');
 });
 
-test('On ne peut pas piocher quand on peut jouer', () => {
+test('Bluff libre : on peut piocher même quand on peut jouer', () => {
   const m = manche({ A: ['3C', '9P', '5C', '6C'], B: ['3P', '4P', '5P', '6P'] }, remplir('9T'), 'A');
+  assert.ok(peut(m, 'A', 'jouer'));
+  assert.ok(peut(m, 'A', 'piocher'));
+  P(m, 'A');
+  assert.strictEqual(m.mains.A.length, 5);
+  assert.ok(m.mains.A.includes('9P'), 'il garde sa carte jouable');
+});
+
+test('Bluff libre : plus rien à piocher, on ne peut pas passer si on peut jouer', () => {
+  const m = manche({ A: ['3C', '9P', '5C', '6C'], B: ['3P', '4P', '5P', '6P'] }, ['9T'], 'A');
+  assert.ok(!peut(m, 'A', 'piocher'));
+  interdit(() => P(m, 'A'));
+});
+
+test('Bluff libre : le demandeur, quand le tour lui revient, pose la valeur demandée', () => {
+  const m = manche({ A: ['8T', '4C', '5K', '6K'], B: ['3P', '9P', '5P', '6P'] }, remplir('DC'), 'A');
+  J(m, 'A', ['8T'], '4');
+  P(m, 'B');
+  if (m.aPioche) PA(m, 'B');
+  assert.strictEqual(m.joueurCourant, 'A');
   assert.ok(!peut(m, 'A', 'piocher'));
   interdit(() => P(m, 'A'));
 });
@@ -133,11 +152,13 @@ test("Pendant une demande, un joueur qui n'a pas la valeur demandée peut garder
   assert.deepStrictEqual(m.demande, { valeur: '4', par: 'A' });
 });
 
-test('Avec la valeur demandée en main, on la pose : pas de pioche', () => {
+test('Bluff libre : avec la valeur demandée en main, on peut aussi la garder et piocher', () => {
   const m = manche({ A: ['8T', '4C', '5K', '6K'], B: ['XN', '4P', '5P', '6P'], C: ['3T', '9T', '5T', '6T'] }, remplir('DC'), 'A');
   J(m, 'A', ['8T'], '4');
-  assert.ok(!peut(m, 'B', 'piocher'));
-  interdit(() => P(m, 'B'));
+  assert.ok(peut(m, 'B', 'piocher'));
+  P(m, 'B');
+  assert.ok(m.mains.B.includes('4P'));
+  assert.deepStrictEqual(m.demande, { valeur: '4', par: 'A' });
 });
 
 test("Après avoir pioché, on peut garder la carte et passer ; si elle ne se joue pas, le tour passe seul", () => {
@@ -472,6 +493,15 @@ test('Pénalité avec la pioche vide : la table voit que le joueur ne pioche rie
   assert.strictEqual(I.vuePublique(m2, 'A').piocheVide.joueur, 'B');
   assert.strictEqual(I.vuePublique(m2, 'A').piocheVide.motif, 'penalite');
   assert.strictEqual(m2.joueurCourant, 'C');
+});
+
+test("Amende de contestation avec la pioche vide : elle ne fait pas remélanger la défausse", () => {
+  const m = manche({ A: ['3C', '4C'], B: ['5P', '6P', '7P'], C: ['3T', '6T', '7T'] }, ['5C'], 'A');
+  m.defausse = ['DK', 'RK', '5C'];
+  J(m, 'A', ['3C']); // A peut finir au prochain coup et n'annonce pas
+  CO(m, 'B');
+  assert.strictEqual(m.mains.A.length, 1, 'rien à piocher : pas de carte d\'amende');
+  assert.strictEqual(m.defausse.length, 4, 'la défausse n\'est pas remélangée');
 });
 
 test('Plus de pioche ni de défausse, et toute la table passe : match nul', () => {

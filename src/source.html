@@ -3130,7 +3130,8 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     else if (choixInter.length) { const annuler = el('button', 'btn large', 'Reprendre les cartes'); annuler.onclick = () => { choixInter = []; afficherPartieInter(vueActuelle); }; act.append(annuler); }
     if (actions.some((a) => a.type === 'piocher')) {
       // Plus rien à piocher (ni pioche, ni défausse à remélanger) : on passe son tour, et toute la table le voit.
-      const b = el('button', 'btn principal large', m.piochable === 0 ? 'Plus de cartes : passer mon tour' : 'Piocher une carte');
+      // Bluff : on peut piocher même avec une carte jouable, pour se donner une chance.
+      const b = el('button', 'btn large' + (coups.length ? '' : ' principal'), m.piochable === 0 ? 'Plus de cartes : passer mon tour' : coups.length ? 'Piocher une carte (bluff)' : 'Piocher une carte');
       b.onclick = () => { b.disabled = true; envoyer({ type: 'action', action: { type: 'piocher' } }); };
       act.append(b);
     }
