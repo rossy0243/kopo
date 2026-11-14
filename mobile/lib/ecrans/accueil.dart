@@ -31,7 +31,11 @@ class Accueil extends StatelessWidget {
         child: Column(children: [
           const _Haut(),
           const SizedBox(height: 10),
-          if (app.jeuxVisibles.length > 1) const _ChoixJeu(),
+          Row(children: [
+            if (app.jeuxVisibles.length > 1) const Expanded(child: _ChoixJeu()) else const Spacer(),
+            const SizedBox(width: 8),
+            const _BoutonSon(),
+          ]),
           const SizedBox(height: 10),
           Expanded(
             child: paysage
@@ -240,6 +244,28 @@ class _Haut extends StatelessWidget {
         ),
       ),
     ]);
+  }
+}
+
+// Couper ou remettre la musique des menus, d'un toucher (le réglage est gardé sur le téléphone).
+class _BoutonSon extends StatelessWidget {
+  const _BoutonSon();
+  @override
+  Widget build(BuildContext context) {
+    final on = app.prefs['musique'] == true;
+    return Semantics(
+      button: true,
+      label: on ? 'Couper la musique' : 'Remettre la musique',
+      child: GestureDetector(
+        onTap: () { app.prefs['musique'] = !on; app.enregistrerPrefs(); },
+        child: Container(
+          width: 40, height: 40,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(color: const Color(0x4D000000), shape: BoxShape.circle, border: Border.all(color: on ? const Color(0x73E2B04A) : K.line)),
+          child: Ico(on ? 'son' : 'son-coupe', taille: 24, couleur: on ? null : K.muted),
+        ),
+      ),
+    );
   }
 }
 

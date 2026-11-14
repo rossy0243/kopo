@@ -1013,6 +1013,10 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
 .btn-amis .ico { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 .btn-amis .compte { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--red); color: #fff; font: 700 11px/18px var(--body); font-style: normal; box-shadow: 0 0 0 2px var(--table); }
 .btn-amis:not([hidden]) + .profil { margin-left: 0; }
+.ligne-jeu { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.ligne-jeu .choix-jeu { flex: 1; min-width: 0; }
+@media (max-height: 500px) { .ligne-jeu .btn-son { width: 38px; height: 38px; } .ligne-jeu .btn-son .ico { width: 21px; height: 21px; } }
+.btn-son[aria-pressed="false"] { color: var(--muted, #9aa); border-color: var(--line); }
 @media (max-width: 420px) { .btn-amis { width: 38px; height: 38px; } .btn-amis .ico { width: 21px; height: 21px; } .hub-haut:has(.btn-amis:not([hidden])) { gap: 6px; } .hub-haut:has(.btn-amis:not([hidden])) .logo { font-size: 26px; } }
 .fenetre[data-type="amis"] { width: min(460px, 100%); gap: 10px; padding: 16px 16px 14px; }
 .fenetre[data-type="amis"] .amis-tete { display: flex; align-items: center; justify-content: space-between; }
@@ -1318,9 +1322,12 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
         <span class="profil-champ"><small>Ton pseudo</small><input id="pseudo" maxlength="16" autocomplete="nickname" placeholder="Ex. As_de_Pique"><span class="xp-mini" id="xpMini" hidden><span></span></span></span>
       </label>
     </div>
+    <div class="ligne-jeu">
     <div class="choix-jeu" id="choixJeu" role="group" aria-label="Jeu">
       <button type="button" data-jeu="kopo" aria-pressed="true"><i aria-hidden="true">K</i>KOPO</button>
       <button type="button" data-jeu="inter8" aria-pressed="false"><i aria-hidden="true">8</i>INTER (8)</button>
+    </div>
+    <button class="btn-amis btn-son" id="btnSon" title="Couper la musique" aria-label="Couper la musique" aria-pressed="true"><svg class="ico"><use href="#i-son"/></svg></button>
     </div>
     <div class="modes" id="modes">
       <button class="mode mode-creer" data-coin="♠" id="btnCreer"><span class="mode-icone"><svg class="ico"><use href="#i-creer"/></svg></span><b>Créer une partie</b><small>Entre amis, de 2 à 9</small></button>
@@ -6986,12 +6993,13 @@ var qrcode = function() {
 <script>// Kopo — sons du jeu, entièrement générés par le téléphone (Web Audio) : aucun fichier,
 // aucune licence à respecter, rien à télécharger.
 // Deux réglages indépendants : les effets (cartes, tour, Katapss…) et la musique d'ambiance.
+// La musique ne joue que sur les menus (accueil, salon) : elle s'efface quand une partie commence.
 // L'audio ne démarre qu'après un premier toucher (règle des navigateurs) et se met en veille
 // quand la page est cachée.
 (function (root) {
   'use strict';
 
-  const etat = { effets: true, musique: false };
+  const etat = { effets: true, musique: false, menu: true };
   let ctx = null, sortie = null, busEffets = null, busMusique = null, bruitBlanc = null;
   let toucheRecue = false;
   const VOL_EFFETS = 0.55, VOL_MUSIQUE = 0.22;
@@ -7015,6 +7023,7 @@ var qrcode = function() {
     return ctx;
   }
   const actif = () => etat.effets || etat.musique;
+  const musiqueVoulue = () => etat.musique && etat.menu;
   // Prêt à jouer : contexte créé, débloqué par un toucher, page visible.
   function pret() {
     if (!toucheRecue || !actif()) return null;
@@ -7032,7 +7041,7 @@ var qrcode = function() {
     if (c.state !== 'running') c.resume().catch(() => {});
     // iOS : un son muet joué pendant le toucher déverrouille la sortie audio.
     try { const b = c.createBufferSource(); b.buffer = c.createBuffer(1, 1, 22050); b.connect(c.destination); b.start(0); } catch (e) {}
-    if (etat.musique) Musique.demarrer();
+    if (musiqueVoulue()) Musique.demarrer();
   }
 
   // ------------------------------------------------------------------ briques sonores
@@ -7172,11 +7181,11 @@ var qrcode = function() {
         minuteur = setInterval(() => { try { planifier(); } catch (e) {} }, 100);
         planifier();
       },
-      arreter() {
+      arreter(lent) {
         if (!enMarche) return;
         enMarche = false;
         clearInterval(minuteur); minuteur = null;
-        if (ctx) { busMusique.gain.cancelScheduledValues(ctx.currentTime); busMusique.gain.setTargetAtTime(0, ctx.currentTime, 0.15); }
+        if (ctx) { busMusique.gain.cancelScheduledValues(ctx.currentTime); busMusique.gain.setTargetAtTime(0, ctx.currentTime, lent ? 0.5 : 0.15); }
       },
       get enMarche() { return enMarche; },
     };
@@ -7187,8 +7196,15 @@ var qrcode = function() {
     if ('effets' in o) etat.effets = !!o.effets;
     if ('musique' in o) etat.musique = !!o.musique;
     if (ctx) busEffets.gain.setTargetAtTime(etat.effets ? VOL_EFFETS : 0, ctx.currentTime, 0.05);
-    if (etat.musique) Musique.demarrer(); else Musique.arreter();
+    if (musiqueVoulue()) Musique.demarrer(); else Musique.arreter();
     if (ctx && !actif() && ctx.state === 'running') ctx.suspend().catch(() => {});
+  }
+  // Menus (true) ou partie en cours (false) : la musique s'efface en douceur pendant le jeu.
+  function surMenu(oui) {
+    oui = !!oui;
+    if (oui === etat.menu) return;
+    etat.menu = oui;
+    if (musiqueVoulue()) Musique.demarrer(); else Musique.arreter(true);
   }
 
   if (typeof document !== 'undefined') {
@@ -7196,11 +7212,11 @@ var qrcode = function() {
     document.addEventListener('visibilitychange', () => {
       if (!ctx) return;
       if (document.visibilityState === 'hidden') { Musique.arreter(); ctx.suspend().catch(() => {}); }
-      else if (actif()) { ctx.resume().catch(() => {}); if (etat.musique) Musique.demarrer(); }
+      else if (actif()) { ctx.resume().catch(() => {}); if (musiqueVoulue()) Musique.demarrer(); }
     });
   }
 
-  const KopoSons = { jouer, regler, debloquer, effets: Object.keys(EFFETS) };
+  const KopoSons = { jouer, regler, surMenu, debloquer, effets: Object.keys(EFFETS) };
   if (typeof module !== 'undefined' && module.exports) module.exports = KopoSons;
   else root.KopoSons = KopoSons;
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -7691,9 +7707,11 @@ svg .vb { transform-box: view-box; }
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = '8ad7c5de5abc'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
-  const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
+  const BUILD = '1ef198f3f70f'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: true };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
+  // La musique des menus était coupée par défaut : on l'allume une fois pour tous (le joueur peut la recouper).
+  if (!prefs.musiqueMenus) { prefs.musique = true; prefs.musiqueMenus = 1; try { stock.ecrire('kopo-prefs', prefs); } catch (e) {} }
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
   // On le met de côté et on nettoie l'adresse avant que le jeu ne lise un code de partie.
   const retourGoogle = /access_token=/.test(location.hash);
@@ -7731,6 +7749,8 @@ svg .vb { transform-box: view-box; }
     sansAnim = calculerSansAnim();
     document.documentElement.classList.toggle('sans-anim', sansAnim);
     Sons.regler({ effets: prefs.effetsSonores, musique: prefs.musique });
+    const bs = $('btnSon');
+    if (bs) { bs.setAttribute('aria-pressed', String(!!prefs.musique)); bs.title = prefs.musique ? 'Couper la musique' : 'Remettre la musique'; bs.setAttribute('aria-label', bs.title); bs.firstChild.firstChild.setAttribute('href', prefs.musique ? '#i-son' : '#i-son-coupe'); }
   }
   function vibrer(ms) { if (prefs.vibrations && navigator.vibrate) try { navigator.vibrate(ms); } catch (e) {} }
   // Identifiant du joueur : par onglet en mode local, par appareil sinon.
@@ -8293,7 +8313,7 @@ svg .vb { transform-box: view-box; }
 
   // ------------------------------------------------------------------ affichage
   const ecrans = ['ecranAccueil', 'ecranConnexion', 'ecranSalon', 'ecranPartie'];
-  function montrerEcran(nom) { for (const e of ecrans) $(e).hidden = e !== nom; $('btnQuitter').hidden = nom === 'ecranAccueil'; document.body.classList.toggle('en-jeu', nom === 'ecranPartie'); document.body.classList.toggle('accueil', nom === 'ecranAccueil'); document.body.classList.toggle('salon', nom === 'ecranSalon'); if (nom !== 'ecranSalon') { $('ecranSalon').classList.remove('qr-ouvert'); $('nonLusSalon').hidden = true; $('nonLusSalon').dataset.n = 0; } if (nom !== 'ecranAccueil') $('voileRejoindre').hidden = $('voileRobots').hidden = $('voileSalles').hidden = true; majPleinEcran(); if (nom !== 'ecranPartie') { tournerVu = false; fermerInvitationPaysage(); $('btnPause').hidden = $('voilePause').hidden = true; } }
+  function montrerEcran(nom) { for (const e of ecrans) $(e).hidden = e !== nom; $('btnQuitter').hidden = nom === 'ecranAccueil'; document.body.classList.toggle('en-jeu', nom === 'ecranPartie'); Sons.surMenu(nom !== 'ecranPartie'); document.body.classList.toggle('accueil', nom === 'ecranAccueil'); document.body.classList.toggle('salon', nom === 'ecranSalon'); if (nom !== 'ecranSalon') { $('ecranSalon').classList.remove('qr-ouvert'); $('nonLusSalon').hidden = true; $('nonLusSalon').dataset.n = 0; } if (nom !== 'ecranAccueil') $('voileRejoindre').hidden = $('voileRobots').hidden = $('voileSalles').hidden = true; majPleinEcran(); if (nom !== 'ecranPartie') { tournerVu = false; fermerInvitationPaysage(); $('btnPause').hidden = $('voilePause').hidden = true; } }
   // Plein écran (Android) : cache les barres du navigateur et bloque le téléphone en paysage.
   const peutPleinEcran = !!(document.fullscreenEnabled && document.documentElement.requestFullscreen);
   function majPleinEcran() {
@@ -10135,7 +10155,7 @@ svg .vb { transform-box: view-box; }
     };
     titre('Son et vibrations');
     bascule('effetsSonores', 'Effets sonores', 'Cartes, tour, Katapss, chat', () => Sons.jouer('essai'));
-    bascule('musique', 'Musique d\'ambiance', 'Douce, en fond', null);
+    bascule('musique', 'Musique d\'ambiance', 'Sur les menus, coupée pendant les parties', null);
     bascule('vibrations', 'Vibrations', 'Quand c\'est à toi de jouer', () => vibrer(60));
     bascule('sonAutresCoupe', 'Couper le micro des autres', 'Au début de chaque partie', null);
     titre('Jeu');
@@ -13047,6 +13067,7 @@ svg .vb { transform-box: view-box; }
   majChoixJeu();
   $('btnMissions').onclick = ouvrirMissions;
   $('btnPleinEcranAccueil').onclick = pleinEcran;
+  $('btnSon').onclick = () => { prefs.musique = !prefs.musique; enregistrerPrefs(); };
   // Paramètres (fil version 1) : visible dès que window.ouvrirParametres existe.
   $('btnParametresAccueil').onclick = () => window.ouvrirParametres && window.ouvrirParametres();
   setTimeout(() => ($('btnParametresAccueil').hidden = typeof window.ouvrirParametres !== 'function'), 0);

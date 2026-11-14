@@ -46,7 +46,7 @@ class App extends ChangeNotifier {
 
   static const lettresCode = 'ABCDEFGHJKMNPQRSTUVWXYZ';
   static const reactions = ['👏', '😂', '😮', '🔥', '😡', '👍', '😭', '🙏', 'Bien joué !', 'Bravo !', 'Joli coup !', 'Belle carte !', 'Bien vu !', 'Trop fort !', 'Merci !', 'Désolé !', 'Oups !', 'Aïe !', 'Pas de chance !', 'Je ramasse…', 'Je t’ai eu !', 'Katapss !', 'Vite !', 'Prends ton temps', 'À toi !', 'Encore une !', 'Bonne chance !', 'Bonne partie !', 'GG !', 'Revanche ?', 'On en refait une ?', 'Je reviens', 'Salut tout le monde !', 'À la prochaine !'];
-  static const prefsDefaut = {'vibrations': true, 'animations': 'normales', 'tri': 'couleur', 'confirmerToutPoser': false, 'quatreCouleurs': false, 'sonAutresCoupe': false, 'effetsSonores': true, 'musique': false};
+  static const prefsDefaut = {'vibrations': true, 'animations': 'normales', 'tri': 'couleur', 'confirmerToutPoser': false, 'quatreCouleurs': false, 'sonAutresCoupe': false, 'effetsSonores': true, 'musique': true};
   static const niveauxRobots = ['faciles', 'normaux', 'forts'];
   static const nomsNiveauxRobots = {'faciles': 'Facile', 'normaux': 'Normal', 'forts': 'Fort'};
   static const delaisKopo = [0, 3, 5, 10, 15], delaisInter = [0, 5, 10, 15, 20];
@@ -118,7 +118,7 @@ class App extends ChangeNotifier {
   Timer? _tNotifs, _tCompet, _tEnLigne, _tConfig, _tSauvegarde;
 
   // ---------------------------------------------------------------- utilitaires
-  void maj() => notifyListeners();
+  void maj() { Sons.surMenu(ecran != 'partie'); notifyListeners(); }
   String jourLocal([DateTime? d]) => R.jourDe(d ?? DateTime.now());
   String get pseudo => (Stock.lire('kopo-pseudo') as String?) ?? '';
   Map<String, dynamic>? get compte => Api.compte?['compte'] is Map ? (Api.compte!['compte'] as Map).cast<String, dynamic>() : null;
@@ -174,6 +174,8 @@ class App extends ChangeNotifier {
     final p = Stock.lire('kopo-prefs');
     prefs = Map.of(prefsDefaut);
     if (p is Map) prefs.addAll(p.cast<String, dynamic>());
+    // La musique des menus était coupée par défaut : on l'allume une fois pour tous (le joueur peut la recouper).
+    if (prefs['musiqueMenus'] == null) { prefs['musique'] = true; prefs['musiqueMenus'] = 1; Stock.ecrire('kopo-prefs', prefs); }
     appliquerPrefs();
   }
   void enregistrerPrefs() { Stock.ecrire('kopo-prefs', prefs); appliquerPrefs(); maj(); }
