@@ -49,6 +49,7 @@ class SalleKopo extends Room {
       this.salle = this.S.creerSalle(this.code, K.hasard((d.graine ^ 0x5bd1e995) >>> 0)); // robots reproductibles aussi
       this.salle.robots = d.robots;
       this.salle.niveauJoueur = d.niveauRobots;
+      this.salle.sansPause = true; // même temps pour tous : pas de pause
     } else this.salle = this.S.creerSalle(this.code);
     // Inter (8) : le style choisi à la création (« Quelle partie ? »), modifiable ensuite dans le salon.
     // Délire : 2 paquets, J retour en option (une ancienne appli qui ne l'envoie pas jouait avec).
@@ -261,7 +262,7 @@ class SalleKopo extends Room {
     msg = Object.assign({}, msg && typeof msg === 'object' ? msg : {}, { type });
     if (type === 'rejoindre') return; // l'entrée passe par onJoin
     // Match du jour : la table est fixée par le serveur (robots, donne), pas de revanche ni de réglages.
-    if (this.jour && ['lancer', 'ajouterRobot', 'niveauRobot', 'retirer', 'remplacerParRobot', 'reglages', 'revanche', 'revancheNon', 'rejouer', 'passerFin'].includes(type)) { client.send('erreur', 'Pas pendant le Match du jour.'); return; }
+    if (this.jour && ['lancer', 'ajouterRobot', 'niveauRobot', 'retirer', 'remplacerParRobot', 'reglages', 'revanche', 'revancheNon', 'rejouer', 'passerFin', 'enPause'].includes(type)) { client.send('erreur', 'Pas pendant le Match du jour.'); return; }
     if (type === 'sync') { client.send('vue', this.S.vue(this.salle, id)); return; } // la page demande sa vue dès qu'elle écoute
     if (type === 'reaction') { // chat : seulement les messages choisis dans le tableau de bord
       const liste = SalleKopo.services.reglages.get('messagesRapides') || [];

@@ -1659,6 +1659,27 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
       assert.strictEqual((await api('/api/v1/salles/' + fin.code)).statut, 404, 'une salle d\'entraînement ne se rejoint pas par son code');
     } finally { SalleKopo.services.googleObligatoire = false; if (salle) await salle.leave().catch(() => {}); }
   });
+  await test('entraînement : pause et reprise (robots et chrono arrêtés)', async () => {
+    const x = await invite('PauseSolo');
+    const client = new Client(URL_.replace('http', 'ws'));
+    const salle = await client.create('entrainement', { jeton: x.jeton, robots: 2, lancer: true });
+    let v = null, err = null; salle.onMessage('vue', (w) => { v = w; }); salle.onMessage('erreur', (e) => { err = e; });
+    try {
+      for (let t = 0; t < 80 && !(v && v.etat === 'manche'); t++) await attendre(25);
+      assert.strictEqual(v.pausePossible, true);
+      salle.send('enPause', { pause: true });
+      for (let t = 0; t < 40 && !v.enPause; t++) await attendre(25);
+      assert.strictEqual(v.enPause, true);
+      const fige = JSON.stringify(v.manche);
+      await attendre(1500);
+      salle.send('sync'); await attendre(150);
+      assert.strictEqual(JSON.stringify(v.manche), fige, 'rien ne bouge pendant la pause');
+      salle.send('enPause', { pause: false });
+      for (let t = 0; t < 40 && v.enPause; t++) await attendre(25);
+      assert.strictEqual(v.enPause, false);
+      assert.strictEqual(err, null);
+    } finally { await salle.leave().catch(() => {}); }
+  });
   await test('mobile : push FCM (Android et iOS) avec action, jeton périmé oublié', async () => {
     const fcm = [];
     const { privateKey } = await jose.generateKeyPair('RS256', { extractable: true });

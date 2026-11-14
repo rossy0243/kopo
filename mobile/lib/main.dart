@@ -45,6 +45,9 @@ class _MasanoState extends State<Masano> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState s) {
     Sons.pause(s != AppLifecycleState.resumed);
+    // Contre les robots : l'appli passée en arrière-plan met la partie en pause.
+    final v = app.vue;
+    if (s == AppLifecycleState.paused && v != null && v['pausePossible'] == true && v['enPause'] != true && (v['etat'] == 'manche' || v['etat'] == 'finManche')) app.envoyer({'type': 'enPause', 'pause': true});
     if (s == AppLifecycleState.resumed) app.relireConfig();
   }
 

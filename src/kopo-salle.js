@@ -261,7 +261,7 @@
 
   // Pause (partie contre les robots) : seul humain de la table, il peut tout arrêter.
   // Pendant la pause rien n'avance ; à la reprise, toutes les échéances sont décalées du temps passé.
-  const seulHumain = (s, id) => { const h = s.joueurs.filter((j) => !j.robot || j.remplace); return h.length === 1 && h[0].id === id && !s.publique; };
+  const seulHumain = (s, id) => { const h = s.joueurs.filter((j) => !j.robot || j.remplace); return h.length === 1 && h[0].id === id && !s.publique && !s.sansPause; }; // sansPause : Match du jour (même temps pour tous)
   const maintenant = (s) => (s.enPause ? s.enPause.depuis : s.horloge());
   function reprendre(s) {
     const d = s.horloge() - s.enPause.depuis;
