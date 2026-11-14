@@ -72,7 +72,7 @@ final r = await Supabase.instance.client.auth.signInWithIdToken(
 | Écran | Routes |
 |---|---|
 | Accueil | `GET /config`, `GET /moi`, `GET /en-ligne` (compteur, salles ouvertes), `GET /notifications`, `POST /bonus-du-jour`, `GET /match-jour` |
-| Jouer en ligne | salle `kopo` / `inter8` avec `joinOrCreate({ publique: true, taille })` ; tables à mise : `kopo-mise` |
+| Jouer en ligne | salle `kopo` / `inter8` avec `joinOrCreate({ publique: true, taille })` ; tables à mise : `kopo-mise` (Kopo) / `inter8-mise` (Inter (8)) |
 | Créer une table entre amis | `create('kopo'|'inter8', { jeton, code?, mode?, jRetour? })`, partager `vue.code`, `POST /amis/{id}/inviter { code }` |
 | Rejoindre avec un code | `GET /salles/{code}` puis `join(salle, { jeton, code })` |
 | Contre les robots | salle `entrainement` (`jeu`, `robots`, `niveau`, `niveauJoueur`, `delai`, `mode`) ; première partie guidée : `niveau: 'gentils'`, 2 robots |

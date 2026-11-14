@@ -10,6 +10,7 @@ import '../commun/retention.dart';
 import '../commun/stickers.dart';
 import '../commun/theme.dart';
 import '../etat.dart';
+import 'cahier.dart';
 import 'communes.dart';
 
 // ---------------------------------------------------------------- chat
@@ -175,6 +176,11 @@ void poserInter(List<Map> coups) {
 
 // ---------------------------------------------------------------- fin de manche
 void afficherFinManche(Vue v0) {
+  // Inter (8), mode Cahier : fin de donne (points de chacun), sauf si le cahier complet est ouvert par-dessus.
+  if (cahierDe(v0) != null) {
+    if (app.fenetreType != 'cahier') afficherFinDonne(v0, resultat: _resultatCahier);
+    return;
+  }
   app.ouvrirFenetre((context) {
     final v = app.vue ?? v0;
     if (v['etat'] != 'finManche') return const SizedBox();
@@ -261,7 +267,14 @@ class _DeuxColonnes extends StatelessWidget {
 // ---------------------------------------------------------------- fin de partie : le récap
 String _cleRecap(Vue v) => '${v['code']}|${v['vainqueur']}|${(v['elimines'] as List).join(',')}';
 
-void afficherFinPartie(Vue v0) {
+void _resultatCahier(Vue v) => afficherFinPartie(v, apresCahier: true);
+
+void afficherFinPartie(Vue v0, {bool apresCahier = false}) {
+  // Mode Cahier : la dernière donne se compte d'abord, puis vient le résultat.
+  if (cahierDe(v0) != null && !apresCahier) {
+    if (!donnesMontrees.contains(cleDonne(v0))) { afficherFinDonne(v0, finDePartie: true, resultat: _resultatCahier); return; }
+    if (app.fenetreType == 'findonne' || app.fenetreType == 'cahier') return;
+  }
   final cle = _cleRecap(v0);
   if (app.fenetreType == 'recap' && _recapCle == cle) { app.maj(); return; }
   final dejaVu = app.recapsAnimes.contains(cle);
@@ -346,12 +359,13 @@ class _Recap extends StatelessWidget {
       Row(children: [
         if (gagne || r?.titre != null) ...[Expanded(child: Btn('Partager', icone: 'partager', onTap: () => partagerVictoire(v, r))), const SizedBox(width: 6)],
         if (v['hote'] == v['moi'] && v['publique'] != true) ...[Expanded(child: Btn('Changer', onTap: () { app.arreterSuiteAuto(); app.envoyer({'type': 'rejouer'}); })), const SizedBox(width: 6)],
+        if (cahierDe(v) != null) ...[Expanded(child: Btn('Cahier', onTap: () => ouvrirCahier(v, retour: _resultatCahier))), const SizedBox(width: 6)],
         Expanded(child: Btn('Quitter', onTap: () { app.arreterSuiteAuto(); app.quitter(); })),
       ]),
       const Ecart(10),
       _DeuxColonnes([
         for (var i = 0; i < classement.length; i++)
-          _LigneBilan('${i + 1}. ${app.nomDe(v, classement[i])}', Pastille(i == 0 ? 'vainqueur' : '${classement.length >= 5 ? '' : 'éliminé '}manche ${(v['elimines'] as List).length - i + 1}', type: i == 0 ? TypePastille.ok : TypePastille.neutre), moi: classement[i] == v['moi']),
+          _LigneBilan('${i + 1}. ${app.nomDe(v, classement[i])}', Pastille(cahierDe(v) != null ? '${i == 0 ? 'vainqueur · ' : ''}${(cahierDe(v)!['scores'] as Map)[classement[i]]} pts' : i == 0 ? 'vainqueur' : '${classement.length >= 5 ? '' : 'éliminé '}manche ${(v['elimines'] as List).length - i + 1}', type: i == 0 ? TypePastille.ok : TypePastille.neutre), moi: classement[i] == v['moi']),
       ], deux: classement.length >= 5),
     ];
 

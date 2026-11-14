@@ -89,12 +89,15 @@ class Accueil extends StatelessWidget {
     final creerSous = inter ? 'Entre amis, de 2 à 8 · simple ou délire' : 'Entre amis, de 2 à 9';
     return [
       CarteMode('creer', 'Créer une partie', creerSous, coin: '♠', creer: true, amis: app.amisEnLigne, onTap: garde(() => creer(), ouvertInter: true)),
-      CarteMode('jour', 'Match du jour', resumeJour ?? 'La même partie pour tous', coin: '♦', point: app.pointJour, onTap: garde(ouvrirMatchJour)),
-      CarteMode('bande', 'La Bande', resumeBande ?? 'Défie tes amis', coin: '♥', onTap: garde(() => ouvrirBande())),
+      // Match du jour et Bande : Kopo seulement, les cartes disparaissent avec Inter (8), comme sur le site.
+      if (!inter) CarteMode('jour', 'Match du jour', resumeJour ?? 'La même partie pour tous', coin: '♦', point: app.pointJour, onTap: garde(ouvrirMatchJour)),
+      if (!inter) CarteMode('bande', 'La Bande', resumeBande ?? 'Défie tes amis', coin: '♥', onTap: garde(() => ouvrirBande())),
       CarteMode('enligne', 'En ligne', 'Avec des inconnus', coin: '♦', enLigne: app.nbEnLigne, onTap: garde(ouvrirEnLigne, ouvertInter: true)),
       CarteMode('rejoindre', 'Rejoindre', 'Avec un code', coin: '♥', onTap: garde(ouvrirRejoindre, ouvertInter: true)),
       CarteMode('robots', 'Contre les robots', inter ? 'Pour apprendre Inter (8)' : 'Partie rapide · niveau ${(App.nomsNiveauxRobots[app.niveauRobots] ?? 'Normal').toLowerCase()}', coin: '♣', onTap: garde(ouvrirRobots, ouvertInter: true)),
-      CarteMode('couronne', 'Ligue', app.ligueResume ?? 'Saison classée', coin: '♠', point: app.pointLigue, onTap: garde(ouvrirLigue)),
+      // Inter (8) : le mode Cahier prend la place de la Ligue (Kopo garde sa Ligue), comme sur le site.
+      if (inter) CarteMode('cahier', 'Cahier', 'On compte les points entre amis', coin: '♣', onTap: garde(() => creer(formule: 'cahier'), ouvertInter: true))
+      else CarteMode('couronne', 'Ligue', app.ligueResume ?? 'Saison classée', coin: '♠', point: app.pointLigue, onTap: garde(ouvrirLigue)),
     ];
   }
 }
@@ -362,10 +365,10 @@ void boutonAmis() {
       extra: (_) => [Btn('Inviter sur WhatsApp', large: true, onTap: () => ouvrirWhatsApp('Viens jouer avec moi sur Masano (Kopo et Inter (8)) !\n$lienJeu'))]);
 }
 
-void creer() {
+void creer({String? formule}) {
   final p = app.lirePseudo(); if (p == null) return;
   if (app.exigerGoogle()) return;
-  if (app.jeu == 'inter8') { choisirStyleInter(p); } else { app.creerPartie(p, 'kopo'); }
+  if (app.jeu == 'inter8') { choisirStyleInter(p, formule: formule); } else { app.creerPartie(p, 'kopo'); }
 }
 
 // Gardé pour l'écran : la Bande vue depuis un lien (?bande=) une fois l'accueil prêt.

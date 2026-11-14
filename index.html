@@ -1442,7 +1442,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       <ul class="regles">
         <li><b>2</b> : le suivant pioche 2 cartes et passe son tour. <b>10</b> : 4 cartes. <b>Joker</b> : 5 cartes, et il se pose sur tout ; ensuite on pose la carte de son choix. Les pénalités posées ensemble s'additionnent, et on ne peut pas les contrer.</li>
         <li><b>As</b> : chaque As fait passer le tour d'un joueur (jamais celui qui le pose).</li>
-        <li><b>8</b> : il se pose sur tout. Tu <b>demandes une valeur</b> que tu as en main (le joker aussi, pas le 8). Chacun à son tour pose cette valeur, un 8 ou un joker, sinon pioche une carte. Si personne ne la pose, le tour te revient et tu la poses. On ne pose qu'un 8 à la fois, sauf pour sortir avec ses derniers 8.</li>
+        <li><b>8</b> : il se pose sur tout. Tu <b>demandes une valeur</b> que tu as en main (le joker aussi, pas le 8). Chacun à son tour pose cette valeur, un 8 ou un joker, sinon pioche une carte (si c'est cette valeur, un 8 ou un joker, tu peux la poser tout de suite). Si personne ne la pose, le tour te revient et tu la poses. On ne pose qu'un 8 à la fois, sauf pour sortir avec ses derniers 8.</li>
       </ul>
       <p class="regles-titre">Annoncer et sortir</p>
       <ul class="regles">
@@ -5309,8 +5309,8 @@ var qrcode = function() {
     if (m.demande) {
       if (joueur === m.demande.par) {
         if (v !== m.demande.valeur) return `Pose la valeur que tu as demandée (${nomValeur(m.demande.valeur)}).`;
-      } else if (m.aPioche) {
-        if (v !== m.demande.valeur) return `Seule la valeur demandée (${nomValeur(m.demande.valeur)}) peut être posée.`;
+      // Carte piochée pendant une demande (14/11, retour des joueurs) : comme une carte de la main,
+      // la valeur demandée, un 8 (nouvelle demande) ou un joker (qui casse la demande) peut être posé.
       } else if (v !== m.demande.valeur && v !== '8' && v !== JOKER) {
         return m.demande.valeur === JOKER ? 'Inter demande un joker : pose un joker ou un 8, sinon pioche.' : `Inter demande ${nomValeur(m.demande.valeur)} : pose ce ${nomValeur(m.demande.valeur)}, un 8 ou un joker, sinon pioche.`;
       }
@@ -7707,7 +7707,7 @@ svg .vb { transform-box: view-box; }
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = '1ef198f3f70f'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = 'c083427d832a'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: true };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // La musique des menus était coupée par défaut : on l'allume une fois pour tous (le joueur peut la recouper).
@@ -7946,12 +7946,11 @@ svg .vb { transform-box: view-box; }
   const seuilMise = (n) => (tablesMise()[n] || 0) * ((configServeur && configServeur.deblocage) || 10);
   // Le niveau choisi (retenu sur le téléphone), ou null pour une table gratuite. Un niveau devenu trop cher repasse en gratuit.
   function miseActive() {
-    if (jeuChoisi() !== 'kopo') return null; // Inter (8) : pas encore de tables à mise
     const t = tablesMise(), n = stock.lire('kopo-mise');
     return t && t[n] > 0 && soldeAffiche() >= seuilMise(n) ? n : null;
   }
   function dessinerMises() {
-    const t = jeuChoisi() === 'kopo' && tablesMise(), box = $('choixMise'), aide = $('aideMise');
+    const t = tablesMise(), box = $('choixMise'), aide = $('aideMise');
     box.hidden = aide.hidden = !t;
     if (!t) return;
     const active = miseActive();
@@ -8077,7 +8076,7 @@ svg .vb { transform-box: view-box; }
       else if (facon.creer) room = await cli.create(facon.jeu === 'inter8' ? 'inter8' : 'kopo', Object.assign({ jeton: c.jeton, code: nouveauCode() }, facon.jeu === 'inter8' ? { mode: facon.mode, jRetour: !!facon.jRetour, formule: facon.formule, total: facon.total } : {}));
       // Par le code : la table peut être de Kopo ou d'Inter (8), on cherche dans les deux.
       else if (facon.code) room = (await reprendreServeur(cli, c.jeton, facon.code)) || await cli.join('kopo', { jeton: c.jeton, code: facon.code }).catch((e) => cli.join('inter8', { jeton: c.jeton, code: facon.code }).catch(() => { throw e; }));
-      else if (facon.mise) room = await cli.joinOrCreate('kopo-mise', { jeton: c.jeton, publique: true, taille: facon.taille, mise: facon.mise });
+      else if (facon.mise) room = await cli.joinOrCreate(facon.jeu === 'inter8' ? 'inter8-mise' : 'kopo-mise', { jeton: c.jeton, publique: true, taille: facon.taille, mise: facon.mise });
       else room = await cli.joinOrCreate(facon.jeu === 'inter8' ? 'inter8' : 'kopo', { jeton: c.jeton, publique: true, taille: facon.taille });
       clearTimeout(reveil);
       brancherSalleServeur(cli, room, nom, facon);
@@ -9550,7 +9549,8 @@ svg .vb { transform-box: view-box; }
   // ------------------------------------------------------------------ micro
   // Chaque téléphone appelle directement les autres (audio seulement). Le micro est coupé
   // tant que le joueur ne l'a pas activé, et chacun peut le couper à tout moment.
-  const MICRO_EN_MAINTENANCE = true;
+  // Micro désactivé partout (14/11) : trop de réglages (relais audio) pour l'instant. Le bouton n'apparaît plus.
+  const MICRO_ACTIF = false;
   const vocal = {
     actif: false, muet: true, sonCoupe: !!prefs.sonAutresCoupe, flux: null, appels: new Map(), vue: null,
     pair: null,
@@ -9570,11 +9570,7 @@ svg .vb { transform-box: view-box; }
       this.pair.on('error', () => {});
     },
     async activer() {
-      // Micro en maintenance, le temps d'avoir notre propre relais audio (les relais gratuits ne passent pas en 4G).
-      if (MICRO_EN_MAINTENANCE) {
-        toast('Micro en maintenance : il revient très vite, avec une meilleure connexion. En attendant, utilise les messages du chat.');
-        return;
-      }
+      if (!MICRO_ACTIF) return;
       try {
         this.flux = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false });
         this.muet = false;
@@ -9651,7 +9647,7 @@ svg .vb { transform-box: view-box; }
       box.hidden = !this.vue;
       if (!this.vue) return;
       box.replaceChildren();
-      if (LOCAL) { box.hidden = true; return; }
+      if (LOCAL || !MICRO_ACTIF) { box.hidden = true; return; }
       const etiquette = (b, texte) => { b.title = texte; b.setAttribute('aria-label', texte); return b; };
       if (!this.actif) {
         const b = etiquette(avecIco(el('button', 'btn'), 'micro', 'Micro'), 'Activer le micro pour discuter avec les autres');
@@ -10157,7 +10153,7 @@ svg .vb { transform-box: view-box; }
     bascule('effetsSonores', 'Effets sonores', 'Cartes, tour, Katapss, chat', () => Sons.jouer('essai'));
     bascule('musique', 'Musique d\'ambiance', 'Sur les menus, coupée pendant les parties', null);
     bascule('vibrations', 'Vibrations', 'Quand c\'est à toi de jouer', () => vibrer(60));
-    bascule('sonAutresCoupe', 'Couper le micro des autres', 'Au début de chaque partie', null);
+    if (MICRO_ACTIF) bascule('sonAutresCoupe', 'Couper le micro des autres', 'Au début de chaque partie', null);
     titre('Jeu');
     choix('tri', 'Ranger ma main', null, [['couleur', 'Par couleur'], ['valeur', 'Par valeur']]);
     bascule('confirmerToutPoser', 'Confirmer avant « Tout poser »', 'Évite de sortir par erreur', null);
@@ -10453,7 +10449,7 @@ svg .vb { transform-box: view-box; }
 
   // Cartes de l'accueil : « Match du jour » (score, ou temps restant) et « La Bande » (ma place).
   async function majCartesCompetition() {
-    $('btnMatchJour').hidden = $('btnBande').hidden = !MODE_SERVEUR;
+    $('btnMatchJour').hidden = $('btnBande').hidden = !MODE_SERVEUR || jeuChoisi() === 'inter8'; // Kopo seulement
     if (!MODE_SERVEUR) return;
     if (!compteLocal()) return proposerLienBande(); // lien de Bande ouvert sur un téléphone sans compte
     try {
@@ -13044,6 +13040,8 @@ svg .vb { transform-box: view-box; }
     // Inter (8) : la Ligue et la saison sont remplacées par le mode Cahier (14/11). Kopo garde sa Ligue.
     $('btnCahier').hidden = jeu !== 'inter8';
     $('btnLigue').hidden = jeu === 'inter8' || !MODE_SERVEUR;
+    // Match du jour et Bande : Kopo seulement, les cartes disparaissent avec Inter (8) (14/11).
+    $('btnMatchJour').hidden = $('btnBande').hidden = jeu === 'inter8' || !MODE_SERVEUR;
     const r = $('btnRegles'); if (r && r.lastChild) r.lastChild.textContent = jeu === 'inter8' ? 'Règles Inter' : 'Règles';
   }
   $('choixJeu').querySelectorAll('button').forEach((b) => (b.onclick = () => { stock.ecrire('kopo-jeu', b.dataset.jeu); majChoixJeu(); }));

@@ -29,7 +29,7 @@ class SalleKopo extends Room {
     // Pour les applis qui ne font pas tourner le moteur sur le téléphone (appli Flutter). Sans compte Google,
     // sans pièces, sans ligue, sans XP de parcours : comme « Contre les robots » sur le site.
     this.entrainement = this.roomName === 'entrainement';
-    this.jeu = this.roomName === 'inter8' || (this.entrainement && options.jeu === 'inter8') ? 'inter8' : 'kopo';
+    this.jeu = this.roomName === 'inter8' || this.roomName === 'inter8-mise' || (this.entrainement && options.jeu === 'inter8') ? 'inter8' : 'kopo';
     this.S = this.jeu === 'inter8' ? SI : SK;
     this.maxClients = this.S.MAX;
     this.autoDispose = true;
@@ -65,10 +65,10 @@ class SalleKopo extends Room {
     // Salle publique : N joueurs inconnus, elle démarre seule quand elle est pleine.
     this.taille = this.publique ? Math.min(this.S.MAX, Math.max(this.S.MIN, Number(options.taille) || this.S.MAX)) : null;
     if (this.publique) { this.S.rendrePublique(this.salle, this.taille); this.maxClients = this.taille; }
-    // Table à mise : salles « kopo-mise », publiques seulement (inconnus placés au hasard, pas de code : strategie-pieces §6.3).
+    // Table à mise : salles « kopo-mise » et « inter8-mise », publiques seulement (inconnus placés au hasard, pas de code : strategie-pieces §6.3).
     // Le montant est fixé à l'ouverture de la salle (un changement dans le tableau de bord vaut pour les salles suivantes).
     this.mise = null;
-    if (this.roomName === 'kopo-mise') {
+    if (this.roomName === 'kopo-mise' || this.roomName === 'inter8-mise') {
       const tables = SalleKopo.services.reglages.get('tables') || {};
       const montant = Math.trunc(Number(tables[options.mise]));
       if (!this.publique || !NOMS_TABLES[options.mise] || !(montant > 0)) throw new Error('Table à mise inconnue.');

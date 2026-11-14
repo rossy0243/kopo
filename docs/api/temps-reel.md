@@ -12,11 +12,12 @@ Un client Dart de référence, sans dépendance et testé contre le serveur, est
 |---|---|---|
 | `kopo` | Kopo entre amis (code à 4 lettres) ou en ligne (salle publique) | `jeton` ; **entre amis** : `create` (avec `code` de 4 lettres majuscules, ou sans : le serveur en choisit un, lu dans `vue.code`), les amis font `join` avec le même `code` ; **en ligne** : `joinOrCreate` avec `publique: true, taille: 2..9` |
 | `kopo-mise` | Tables à mise (Bronze, Argent, Or, Diamant), en ligne seulement | `jeton`, `publique: true`, `taille`, `mise: 'bronze'\|'argent'\|'or'\|'diamant'`. Il faut 10 fois la mise en solde (`/config`: `tables`, `deblocage`) |
+| `inter8-mise` | Tables à mise d'Inter (8) (Bronze, Argent, Or, Diamant), en ligne seulement | `jeton`, `publique: true`, `taille`, `mise: 'bronze'\|'argent'\|'or'\|'diamant'`. Il faut 10 fois la mise en solde (`/config`: `tables`, `deblocage`) |
 | `inter8` | Inter (8) entre amis ou en ligne (2 à 8 joueurs, gratuit) | comme `kopo`, plus `mode: 'simple'\|'delire'` et `jRetour: bool` (Délire seulement) à la création |
 | `entrainement` | Seul contre des robots (Kopo ou Inter (8)). **Pas besoin de Google**, ni pièces, ni ligue, ni XP de parcours | `jeton`, `jeu: 'kopo'\|'inter8'`, `robots` (1 à 8 en Kopo, 1 à 7 en Inter (8), 2 par défaut), `niveau: 'faciles'\|'normaux'\|'forts'\|'gentils'`, `niveauJoueur: 1..1000` (les robots se renforcent avec le niveau du joueur, plafond 20), `delai` (secondes du chrono), `mode`, `jRetour` (Inter (8)), `lancer: true` pour démarrer tout de suite. Une seule personne par salle |
 | `kopo-jour` | Match du jour : seul contre 8 robots Forts, même donne pour tous | `jeton` seulement (`create`). Compte Google obligatoire, un essai officiel par jour |
 
-Pour rejoindre un ami avec un code, demander d'abord **`GET /api/v1/salles/{code}`** : la réponse donne `salle` (`kopo`, `kopo-mise` ou `inter8`), puis `join(salle, { jeton, code })`.
+Pour rejoindre un ami avec un code, demander d'abord **`GET /api/v1/salles/{code}`** : la réponse donne `salle` (`kopo`, `kopo-mise`, `inter8` ou `inter8-mise`), puis `join(salle, { jeton, code })`.
 
 Refus à l'entrée (message à afficher tel quel) : `Connexion requise.`, `Ce compte est banni.`, `Compte suspendu jusqu'au …`, `Kopo est en maintenance…`, `… n'est pas encore ouvert.` (jeu réservé aux testeurs), `Connecte-toi avec Google pour jouer en ligne ou entre amis…` (quand `googleObligatoire`), `La partie a déjà commencé.`, `La table est pleine.`, `Il te faut au moins N pièces pour la table …`, `Cette partie n'est pas la tienne.`
 

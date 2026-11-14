@@ -32,7 +32,24 @@ Pour une version à installer : `flutter build apk --release` (Android) ou `flut
 3. **Identifiant de l'appli** : `com.masano.masano` (Android `applicationId` et iOS bundle id).
    Pour le changer : `android/app/build.gradle.kts`, `ios/Runner.xcodeproj`, et `retourAppli` dans
    `lib/reseau/google.dart` (et l'URL de retour dans Supabase).
-4. **Publication** : signer l'APK (clé de signature Android) et régler l'équipe Apple dans Xcode.
+4. **Publication Android (Play Store)** : la version « release » se signe avec ta clé de publication, lue dans
+   `android/key.properties` (ce fichier et la clé ne vont jamais sur GitHub, ils sont ignorés). Une seule fois :
+   ```bash
+   keytool -genkey -v -keystore ~/masano-publication.jks -keyalg RSA -keysize 2048 -validity 10000 -alias masano
+   ```
+   puis créer `mobile/android/key.properties` :
+   ```
+   storePassword=<mot de passe de la clé>
+   keyPassword=<mot de passe de la clé>
+   keyAlias=masano
+   storeFile=/chemin/vers/masano-publication.jks
+   ```
+   `flutter build appbundle --release` donne alors le fichier à envoyer au Play Store. **Garde la clé et ses mots
+   de passe en lieu sûr** : sans eux, plus de mise à jour possible de l'appli. Sans `key.properties`, la version
+   « release » est signée avec la clé de test (elle s'installe sur un téléphone, mais le Play Store la refuse).
+5. **Liens des stores** : une fois l'appli publiée, coller les liens Play Store et App Store dans le tableau de bord,
+   onglet *Pilotage*, « Applis mobiles » (ils servent au message « mets à jour »).
+6. **iOS** : régler l'équipe Apple dans Xcode (*Signing & Capabilities*).
 
 ## Organisation du code
 
