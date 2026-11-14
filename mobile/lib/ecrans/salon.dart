@@ -108,6 +108,14 @@ class Salon extends StatelessWidget {
                 app.envoyer({'type': 'reglages', ...app.reglagesStyleInter(m)});
               })
             : Text(v['mode'] == 'delire' ? 'Délire · 2 paquets' : 'Simple · 1 paquet', style: K.texte(15, poids: FontWeight.w700))),
+      // Mode Cahier : partie normale, ou comptage des points jusqu'à 500 ou 1000. Pas en salle publique.
+      if (inter && v['publique'] != true)
+        ligne('Formule', hote
+            ? Choix(App.formulesInter, v['formule'] == 'cahier' ? '${v['totalCahier'] ?? 500}' : 'normale', (f) {
+                app.choisirFormule(f);
+                app.envoyer(f == 'normale' ? {'type': 'reglages', 'formule': 'normale'} : {'type': 'reglages', 'formule': 'cahier', 'total': int.parse(f)});
+              })
+            : Text(v['formule'] == 'cahier' ? 'Cahier · éliminé à ${v['totalCahier'] ?? 500} points' : 'Partie normale', style: K.texte(15, poids: FontWeight.w700))),
       if (inter && v['mode'] == 'delire')
         ligne('J retour', hote
             ? Choix(const [(false, 'Non'), (true, 'Oui')], v['jRetour'] == true, (o) {

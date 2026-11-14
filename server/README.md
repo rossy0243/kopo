@@ -31,7 +31,7 @@ Les tables sont créées toutes seules au premier démarrage (`src/schema.sql`).
 | `SUPABASE_JWT_SECRET` | Facultatif, si le projet Supabase utilise encore l'ancien secret partagé |
 | `SUPABASE_SERVICE_ROLE_KEY` | Clé secrète *service_role* : efface aussi l'utilisateur Google dans Supabase quand un joueur supprime son compte. Sans elle, le serveur le signale dans les journaux et il faut l'effacer à la main (Authentication → Users) |
 | `ADMIN_MOT_DE_PASSE`, `ADMIN_TOTP` | Accès au tableau de bord (mot de passe + code à 6 chiffres) |
-| `CONNEXION_GOOGLE` | `1` pour afficher « Se connecter avec Google » dans le jeu (après avoir activé Google dans Supabase, avec la Site URL du jeu). Rend aussi Google obligatoire pour jouer en ligne et entre amis (salles `kopo`, `kopo-mise`, `inter8`) ; sans compte, on joue contre les robots |
+| `CONNEXION_GOOGLE` | `1` pour afficher « Se connecter avec Google » dans le jeu (après avoir activé Google dans Supabase, avec la Site URL du jeu). Rend aussi Google obligatoire pour jouer en ligne et entre amis (salles `kopo`, `kopo-mise`, `inter8`, `inter8-mise`) ; sans compte, on joue contre les robots |
 | `SECRET_MATCH_JOUR` | Facultatif : graine secrète des donnes du Match du jour (sinon `SECRET_SERVEUR`). La changer change les donnes à venir |
 | `ORIGINES` | Pages autorisées à appeler l'API (séparées par des virgules) |
 | `VAPID_PUBLIC`, `VAPID_PRIVE` | Notifications push : les deux clés, créées une fois avec `node server/src/outils.js vapid` (en changer désabonne tous les téléphones). Sans elles, pas de notifications push, le reste du jeu marche normalement |
@@ -76,6 +76,7 @@ Toutes les routes ci-dessous existent sous `/api` (site) et `/api/v1` (applis). 
 | `GET/PATCH /api/bandes/:id`, `POST /api/bandes/:id/miser\|auto\|demander\|quitter`, `POST /api/bandes/:id/demandes/:compte`, `DELETE /api/bandes/:id/membres/:compte` | Une Bande : membres, semaine en cours (mise, inscrits, classement, ce que gagne le Chef), titres de la semaine passée ; miser pour la semaine (jusqu'au mercredi 23 h, jours déjà passés = pire note du jour - 10), mise automatique chaque lundi, demandes pour les Bandes ouvertes (le créateur accepte ou refuse). Fin de semaine le dimanche à minuit : 15 % détruits, le 2e récupère sa mise (3 joueurs en règle ou plus), le Chef prend le reste ; moins de 5 Matchs joués = mise perdue |
 | WebSocket, salle `entrainement` | Seul contre des robots, Kopo ou Inter (8), sans compte Google, sans pièces ni ligue. Options : `{ jeton, jeu, robots, niveau, niveauJoueur, delai, mode, jRetour, lancer }` |
 | WebSocket, salle `kopo-jour` | Le Match du jour. Options : `{ jeton }`. Le serveur envoie `matchJour` (`{ debut, numero, officiel }` puis `{ fin, manches, victoire, score, officiel }`) |
+| WebSocket, salles `kopo-mise` et `inter8-mise` | Tables à mise de Kopo et d'Inter (8), publiques seulement. Options : `{ jeton, publique: true, taille, mise: 'bronze'\|'argent'\|'or'\|'diamant' }` |
 | WebSocket, salle `kopo` | La partie. Options : `{ jeton, code?, publique? }`. Messages : les mêmes que `kopo-salle.js`. Le serveur envoie `vue`, `erreur`, `solde`, `exclu`, `classee` (au début : `{ classee }`) et `ligue` (fin de partie classée : `{ delta, points, division, divisionAvant, promu, relegue, protection, prochaine, saison }`). |
 
 ## Ligue classée et saisons

@@ -8,6 +8,7 @@ import '../commun/cartes.dart';
 import '../commun/sons.dart';
 import '../commun/theme.dart';
 import '../etat.dart';
+import '../fenetres/cahier.dart';
 import '../fenetres/communes.dart';
 import '../fenetres/parametres.dart';
 import '../fenetres/partie_fenetres.dart';
@@ -24,6 +25,7 @@ class Partie extends StatelessWidget {
     final inter = v['jeu'] == 'inter8';
     final finale = (v['restants'] as List).length == 2;
     final style = inter ? ' · ${v['mode'] == 'delire' ? (v['jRetour'] == true ? 'Délire · J retour' : 'Délire') : 'Simple'}' : '';
+    final cahier = cahierDe(v);
     final jeJoue = (m['enJeu'] as List).contains(v['moi']);
     final paysage = MediaQuery.of(context).orientation == Orientation.landscape;
 
@@ -38,13 +40,20 @@ class Partie extends StatelessWidget {
             IconButton(onPressed: demanderQuitter, icon: const Icon(Icons.arrow_back, color: K.muted), tooltip: 'Quitter'),
             Expanded(
               child: Text.rich(TextSpan(style: K.texte(15, couleur: K.muted), children: [
-                TextSpan(text: finale ? 'Finale' : 'Manche ${v['numeroManche']}', style: const TextStyle(color: K.ink, fontWeight: FontWeight.w700)),
-                TextSpan(text: '$style · ${v['code']}'),
+                TextSpan(text: cahier != null ? 'Donne ${v['numeroManche']}' : finale ? 'Finale' : 'Manche ${v['numeroManche']}', style: const TextStyle(color: K.ink, fontWeight: FontWeight.w700)),
+                TextSpan(text: '${cahier != null ? ' · Cahier ${cahier['total']}' : ''}$style · ${v['code']}'),
               ]), overflow: TextOverflow.ellipsis),
             ),
             // Contre les robots (seul humain) : pause. Le serveur arrête robots, chrono et comptes à rebours.
             if (v['pausePossible'] == true && v['enPause'] != true)
               IconButton(onPressed: () => app.envoyer({'type': 'enPause', 'pause': true}), icon: const Icon(Icons.pause_rounded, color: K.brass), tooltip: 'Pause'),
+            // Mode Cahier : mes points, et le cahier complet d'un geste.
+            if (cahier != null)
+              TextButton(
+                onPressed: () => ouvrirCahier(v),
+                style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 6), minimumSize: const Size(0, 36)),
+                child: Text('${(cahier['scores'] as Map)[v['moi']] ?? '–'} / ${cahier['total']}', style: K.texte(14, couleur: K.brass, poids: FontWeight.w700)),
+              ),
             IconButton(onPressed: ouvrirChat, icon: const Icon(Icons.chat_bubble_outline, color: K.brass), tooltip: 'Chat'),
             IconButton(onPressed: ouvrirParametres, icon: const Ico('reglages', taille: 22), tooltip: 'Paramètres'),
           ]),

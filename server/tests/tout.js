@@ -504,6 +504,41 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     }
     for (const s of salles) await s.leave();
   });
+  await test('Inter (8) à mise : salle « inter8-mise », chacun paie, le pot est partagé comme au Kopo', async () => {
+    const client = new Client(URL_.replace('http', 'ws'));
+    const js = [await invite('MiseI1'), await invite('MiseI2'), await invite('MiseI3')];
+    const salles = [], pots = new Map(), mises = new Map();
+    let fin = null;
+    for (const j of js) {
+      const salle = await client.joinOrCreate('inter8-mise', { jeton: j.jeton, publique: true, taille: 3, mise: 'bronze', rapide: true });
+      salle.onMessage('erreur', () => {}); salle.onMessage('solde', () => {}); salle.onMessage('classee', () => {});
+      salle.onMessage('mise', (m) => mises.set(j.compte.id, m));
+      salle.onMessage('pot', (m) => pots.set(j.compte.id, m));
+      salle.onMessage('vue', (v) => {
+        if (v.etat === 'finPartie') fin = fin || v;
+        const a = v.manche && v.manche.actions[0];
+        if (v.etat === 'manche' && a) setTimeout(() => salle.send('action', { action: a }), 5);
+      });
+      salles.push(salle);
+      await attendre(80);
+    }
+    assert.ok(salles.every((x) => x.roomId === salles[0].roomId), 'même salle');
+    const enLigne = (await api('/api/en-ligne')).json.sallesOuvertes;
+    const ouverte = enLigne.find((x) => x.id === salles[0].roomId);
+    if (ouverte) assert.strictEqual(ouverte.mise, 'bronze');
+    for (let t = 0; t < 2400 && !fin; t++) await attendre(50);
+    assert.ok(fin, 'la partie doit se terminer');
+    assert.strictEqual(fin.jeu, 'inter8');
+    for (let t = 0; t < 40 && pots.size < 3; t++) await attendre(50);
+    assert.deepStrictEqual(mises.get(js[0].compte.id), { niveau: 'bronze', mise: 50, pot: 150 });
+    const ordre = [fin.vainqueur, ...fin.elimines.slice().reverse()];
+    const attendu = [75, 37, 15];
+    for (let i = 0; i < 3; i++) {
+      const moi = await api('/api/moi', { jeton: js.find((j) => j.compte.id === ordre[i]).jeton });
+      assert.strictEqual(moi.json.compte.solde, 500 - 50 + attendu[i], 'solde de la place ' + (i + 1));
+    }
+    for (const s of salles) await s.leave();
+  });
   await test('table à mise : refusée sans assez de pièces, ou avec un code ; jamais trouvée par une ancienne version', async () => {
     const client = new Client(URL_.replace('http', 'ws'));
     const pauvre = await invite('MisePauvre');

@@ -976,7 +976,7 @@ paths:
                 properties:
                   code: { type: string }
                   jeu: { $ref: '#/components/schemas/Jeu' }
-                  salle: { enum: [kopo, kopo-mise, inter8], description: Nom de la salle temps réel }
+                  salle: { enum: [kopo, kopo-mise, inter8, inter8-mise], description: Nom de la salle temps réel }
                   roomId: { type: string }
                   etat: { enum: [salon, manche, finManche, finPartie] }
                   publique: { type: boolean }

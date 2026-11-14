@@ -333,7 +333,6 @@ class App extends ChangeNotifier {
   Map? get tablesMise => config?['tables'] is Map ? config!['tables'] as Map : null;
   int seuilMise(String n) => (((tablesMise?[n] as num?) ?? 0) * ((config?['deblocage'] as num?) ?? 10)).toInt();
   String? get miseActive {
-    if (jeu != 'kopo') return null;
     final t = tablesMise, n = Stock.lire('kopo-mise');
     return t != null && n is String && ((t[n] as num?) ?? 0) > 0 && solde >= seuilMise(n) ? n : null;
   }
@@ -344,7 +343,15 @@ class App extends ChangeNotifier {
   String get styleInter => Stock.lire('kopo-inter8-style') == 'delire' ? 'delire' : 'simple';
   bool get jRetourInter { final j = Stock.lire('kopo-inter8-jretour'); return j != null ? j == 'oui' : styleInter == 'delire'; }
   void ecrireJRetour(bool oui) => Stock.ecrire('kopo-inter8-jretour', oui ? 'oui' : 'non');
-  Map<String, dynamic> reglagesStyleInter(String mode) => {'mode': mode, 'jRetour': mode == 'delire' && jRetourInter};
+  // Mode Cahier (comptage des points) : formule et total d'élimination (500 ou 1000), gardés sur le téléphone, comme sur le site.
+  static const formulesInter = [('normale', 'Partie normale'), ('500', 'Cahier 500'), ('1000', 'Cahier 1000')];
+  String get formuleInter => Stock.lire('kopo-inter8-formule') == 'cahier' ? 'cahier' : 'normale';
+  int get totalInter => '${Stock.lire('kopo-inter8-total')}' == '1000' ? 1000 : 500;
+  void ecrireFormule(String formule, [int? total]) { Stock.ecrire('kopo-inter8-formule', formule); if (total != null) Stock.ecrire('kopo-inter8-total', total); }
+  /// Boutons « Partie normale · Cahier 500 · Cahier 1000 » : 'normale', '500' ou '1000'.
+  String get valeurFormule => formuleInter == 'cahier' ? '$totalInter' : 'normale';
+  void choisirFormule(String v) => v == 'normale' ? ecrireFormule('normale') : ecrireFormule('cahier', int.parse(v));
+  Map<String, dynamic> reglagesStyleInter(String mode) => {'mode': mode, 'jRetour': mode == 'delire' && jRetourInter, 'formule': formuleInter, 'total': totalInter};
 
   // ---------------------------------------------------------------- démarrage
   Future<void> demarrer() async {
@@ -586,7 +593,7 @@ class App extends ChangeNotifier {
         room = await srv.creer('entrainement', {'jeton': j, ...(facon['robots'] as Map).cast<String, Object?>()});
       } else if (facon['creer'] != null) {
         final inter = facon['jeu'] == 'inter8';
-        room = await srv.creer(inter ? 'inter8' : 'kopo', {'jeton': j, 'code': nouveauCode(), if (inter) 'mode': facon['mode'], if (inter) 'jRetour': facon['jRetour'] == true});
+        room = await srv.creer(inter ? 'inter8' : 'kopo', {'jeton': j, 'code': nouveauCode(), if (inter) 'mode': facon['mode'], if (inter) 'jRetour': facon['jRetour'] == true, if (inter) 'formule': facon['formule'], if (inter) 'total': facon['total']});
       } else if (facon['code'] != null) {
         final code = facon['code'] as String;
         final r = await srv.reprendre(j, code);
@@ -597,7 +604,7 @@ class App extends ChangeNotifier {
           catch (e) { try { room = await srv.rejoindre('inter8', {'jeton': j, 'code': code}); } catch (_) { rethrow; } }
         }
       } else if (facon['mise'] != null) {
-        room = await srv.rejoindreOuCreer('kopo-mise', {'jeton': j, 'publique': true, 'taille': facon['taille'], 'mise': facon['mise']});
+        room = await srv.rejoindreOuCreer(facon['jeu'] == 'inter8' ? 'inter8-mise' : 'kopo-mise', {'jeton': j, 'publique': true, 'taille': facon['taille'], 'mise': facon['mise']});
       } else {
         room = await srv.rejoindreOuCreer(facon['jeu'] == 'inter8' ? 'inter8' : 'kopo', {'jeton': j, 'publique': true, 'taille': facon['taille']});
       }
@@ -759,7 +766,7 @@ class App extends ChangeNotifier {
       final attente = retardFenetre.difference(DateTime.now()).inMilliseconds;
       _minuteurFenetre?.cancel();
       if (attente > 0) {
-        if (fenetreType != 'recap' && fenetreType != 'finManche') fenetre = null;
+        if (!const ['recap', 'finManche', 'findonne', 'cahier'].contains(fenetreType)) fenetre = null;
         _minuteurFenetre = Timer(Duration(milliseconds: attente), () {
           final w = vue;
           if (w != null && w['etat'] == 'finManche') { finMancheUi?.call(w); }
@@ -769,7 +776,7 @@ class App extends ChangeNotifier {
       else { finPartieUi?.call(v); }
     } else {
       final aMoi = m != null && m['joueurCourant'] == v['moi'];
-      final garder = (fenetreType == 'chat' && !aMoi) || ((fenetreType == 'demande8' || fenetreType == 'couleur8') && aMoi) || fenetreType == 'fiche' || fenetreType == 'parametres';
+      final garder = (fenetreType == 'chat' && !aMoi) || ((fenetreType == 'demande8' || fenetreType == 'couleur8') && aMoi) || fenetreType == 'fiche' || fenetreType == 'parametres' || fenetreType == 'cahier';
       if (!garder) fenetre = null;
     }
     maj();

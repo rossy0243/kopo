@@ -16,7 +16,9 @@ import 'progres.dart';
 import 'social.dart';
 
 // ---------------------------------------------------------------- Inter (8) : quelle partie ?
-void choisirStyleInter(String p) {
+void choisirStyleInter(String p, {String? formule}) {
+  // Carte « Cahier » de l'accueil : la formule Cahier est choisie d'office (500 ou 1000 se change ici).
+  if (formule == 'cahier' && app.formuleInter != 'cahier') app.ecrireFormule('cahier');
   app.ouvrirFenetre((context) => StatefulBuilder(builder: (context, setState) {
         Widget carte(String mode, String lettre, String titre, String texte, String puce) => Padding(
               padding: const EdgeInsets.only(bottom: 8),
@@ -55,6 +57,10 @@ void choisirStyleInter(String p) {
           const Muet('En délire :', taille: 12),
           const SizedBox(height: 4),
           Choix(const [(false, 'Sans J retour'), (true, 'Avec J retour')], app.jRetourInter, (v) { app.ecrireJRetour(v); setState(() {}); }),
+          const SizedBox(height: 8),
+          const Muet('Formule (Cahier : on compte les points de chaque donne, éliminé au total) :', taille: 12),
+          const SizedBox(height: 4),
+          Choix(App.formulesInter, app.valeurFormule, (v) { app.choisirFormule(v); setState(() {}); }),
           const Ecart(12),
           Btn('Annuler', large: true, onTap: app.fermerFenetre),
         ]);
@@ -87,7 +93,7 @@ void ouvrirEnLigne() {
   app.lireEnLigneServeur();
   app.ouvrirFenetre((context) {
     final inter = app.jeu == 'inter8';
-    final t = !inter ? app.tablesMise : null;
+    final t = app.tablesMise;
     final active = app.miseActive;
     final grande = inter ? App.maxInter : App.maxKopo;
     final n = app.nbEnLigne;
@@ -179,6 +185,8 @@ void ouvrirRobots() {
         const SizedBox(height: 4),
         Muet(delire ? '2 paquets (108 cartes). Le J retour fait changer le sens du jeu.' : '1 paquet (54 cartes), les règles de base.', taille: 12),
         if (delire) ...[const SizedBox(height: 6), Choix(const [(false, 'Sans J retour'), (true, 'Avec J retour')], app.jRetourInter, (v) { app.ecrireJRetour(v); app.maj(); })],
+        const SizedBox(height: 6),
+        Choix(App.formulesInter, app.valeurFormule, (v) { app.choisirFormule(v); app.maj(); }),
         const Ecart(10),
       ],
       Text('Quel niveau ?', style: K.texte(15)),
