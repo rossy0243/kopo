@@ -971,5 +971,34 @@ test('Entre robots, pauses plus courtes ; juste après mon élimination, rythme 
   assert.ok(vuSuiteNormale || vuSuiteRapide || s.vainqueur === 'p1');
 });
 
+test('Pause contre les robots : rien n\'avance, puis tout reprend décalé', () => {
+  const SP = require('./kopo-salle.js');
+  let t = 1000000;
+  const s = SP.creerSalle('PAUS');
+  s.horloge = () => t;
+  assert.ok(SP.recevoir(s, 'p1', { type: 'rejoindre', nom: 'Moi' }).ok);
+  assert.ok(SP.recevoir(s, 'p1', { type: 'ajouterRobot' }).ok);
+  assert.ok(SP.recevoir(s, 'p1', { type: 'ajouterRobot' }).ok);
+  assert.ok(!SP.recevoir(s, 'p1', { type: 'enPause', pause: true }).ok, 'pas dans le salon');
+  assert.ok(SP.recevoir(s, 'p1', { type: 'lancer' }).ok);
+  assert.ok(SP.vue(s, 'p1').pausePossible);
+  const fin = s.pause.jusqua, reste = SP.vue(s, 'p1').manche.pause.resteMs;
+  assert.ok(SP.recevoir(s, 'p1', { type: 'enPause', pause: true }).ok);
+  assert.ok(SP.vue(s, 'p1').enPause);
+  t += 60000;
+  assert.strictEqual(SP.tic(s), false, 'rien ne bouge en pause');
+  assert.strictEqual(SP.vue(s, 'p1').manche.pause.resteMs, reste, 'le compte à rebours est figé');
+  assert.ok(!SP.recevoir(s, 'p1', { type: 'action', action: { type: 'jouer' } }).ok);
+  assert.ok(SP.recevoir(s, 'p1', { type: 'enPause', pause: false }).ok);
+  assert.strictEqual(s.pause.jusqua, fin + 60000);
+  assert.strictEqual(SP.vue(s, 'p1').manche.pause.resteMs, reste);
+  // Deux humains : pas de pause.
+  const d = SP.creerSalle('DEUX');
+  SP.recevoir(d, 'p1', { type: 'rejoindre', nom: 'A' }); SP.recevoir(d, 'p2', { type: 'rejoindre', nom: 'B' });
+  SP.recevoir(d, 'p1', { type: 'lancer' });
+  assert.ok(!SP.vue(d, 'p1').pausePossible);
+  assert.ok(!SP.recevoir(d, 'p1', { type: 'enPause', pause: true }).ok);
+});
+
 console.log(`\n${ok} tests réussis, ${ko} en échec.`);
 process.exit(ko ? 1 : 0);
