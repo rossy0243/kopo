@@ -1772,10 +1772,10 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     const acheter = (corps) => api('/api/v1/stickers/acheter', { methode: 'POST', jeton: j.jeton, corps });
     const E = (await api('/api/v1/stickers', { jeton: j.jeton })).json;
     assert.strictEqual(E.vente, false);
-    // Prix des packs : 6 stickers = 33 % de moins que 6 × 300 ; 2 stickers = 400 au lieu de 600 ; un pack d'un seul sticker ne se vend pas.
-    assert.deepStrictEqual(E.offres.sticker.map((o) => o.pieces), [300, 600]);
-    assert.deepStrictEqual(E.offres.packs.emotions.map((o) => [o.pieces, o.francs]), [[1200, 2000], [2400, 4000]]);
-    assert.deepStrictEqual(E.offres.packs.ambiance.map((o) => [o.pieces, o.francs]), [[400, 700], [800, 1300]]);
+    // Prix des packs : 6 stickers = 33 % de moins que 6 × 200 ; 2 stickers = 250 au lieu de 400 ; un pack d'un seul sticker ne se vend pas.
+    assert.deepStrictEqual(E.offres.sticker.map((o) => [o.pieces, o.francs]), [[200, 500], [400, 1000]], 'pièces et francs au même taux');
+    assert.deepStrictEqual(E.offres.packs.emotions.map((o) => [o.pieces, o.francs]), [[800, 2000], [1600, 4000]]);
+    assert.deepStrictEqual(E.offres.packs.ambiance.map((o) => [o.pieces, o.francs]), [[250, 600], [550, 1400]]);
     assert.deepStrictEqual(E.offres.packs.supporters, []);
     assert.strictEqual((await acheter({ sticker: 'ouf', offre: 0 })).statut, 403, 'vente éteinte');
     const r0 = (await api('/admin/api/reglages', { jeton: adminJeton })).json.stickers;
@@ -1789,16 +1789,17 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
       assert.strictEqual((await acheter({ pack: 'supporters', offre: 0 })).statut, 400, 'pas de pack d\'un seul sticker');
       const a = await acheter({ sticker: 'ouf', offre: 0, pieces: 1 }); // le prix envoyé par le téléphone est ignoré
       assert.strictEqual(a.statut, 200, JSON.stringify(a.json));
-      assert.deepStrictEqual([a.json.solde, a.json.pieces, a.json.soldes], [4700, 300, { ouf: 20 }]);
+      assert.deepStrictEqual([a.json.solde, a.json.pieces, a.json.soldes], [4800, 200, { ouf: 20 }]);
       const p = await acheter({ pack: 'emotions', offre: 1 });
-      assert.strictEqual(p.statut, 200); assert.strictEqual(p.json.solde, 2300);
+      assert.strictEqual(p.statut, 200); assert.strictEqual(p.json.solde, 3200);
       assert.deepStrictEqual(p.json.soldes, { ouf: 70, rire: 50, louche: 50, encore: 50, katapss: 50, grrr: 50 });
+      await acheter({ pack: 'table', offre: 1 }); await acheter({ pack: 'coupsDurs', offre: 0 }); // 3200 - 1600 - 800 = 800
       const trop = await acheter({ pack: 'coupsDurs', offre: 1 });
-      assert.strictEqual(trop.statut, 402); assert.match(trop.json.erreur, /2400 pièces/);
-      assert.strictEqual(await solde(j.compte.id), 2300, 'rien débité');
-      assert.deepStrictEqual((await api('/api/v1/stickers', { jeton: j.jeton })).json.soldes.quoi, undefined);
+      assert.strictEqual(trop.statut, 402); assert.match(trop.json.erreur, /1600 pièces/);
+      assert.strictEqual(await solde(j.compte.id), 800, 'rien débité');
+      assert.strictEqual((await api('/api/v1/stickers', { jeton: j.jeton })).json.soldes.quoi, 20);
       const reg2 = await srv.base.query("SELECT montant, motif FROM registre_pieces WHERE compte_id = $1 AND motif = 'stickers' ORDER BY id", [j.compte.id]);
-      assert.deepStrictEqual(reg2.rows.map((l) => Number(l.montant)), [-300, -2400]);
+      assert.deepStrictEqual(reg2.rows.map((l) => Number(l.montant)), [-200, -1600, -1600, -800]);
       assert.strictEqual((await reg({ actif: true, vente: true, remisePack: 80 })).statut, 400);
     } finally { await reg(r0); }
   });

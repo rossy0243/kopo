@@ -61,12 +61,17 @@ const erreur = (m, statut = 400) => Object.assign(new Error(m), { statut });
 
 // Réglage « stickers » : deux interrupteurs éteints au départ, `actif` (les stickers s'envoient) et `vente`
 // (on peut les acheter en pièces), et les offres. Une offre donne `utilisations` envois d'un sticker, pour un prix
-// en pièces et un prix en argent réel (francs congolais, mobile money : pas encore branché).
+// en pièces ; le prix en francs congolais (mobile money : pas encore branché) en découle, au taux des pièces
+// (strategie-pieces §5.3 : 200 pièces ≈ 500 FC), pour que payer en pièces ou en francs revienne au même.
 // Un pack (2 stickers ou plus) se vend avec les mêmes offres, pour chacun de ses stickers, avec `remisePack` % de moins
 // que les stickers achetés un par un : le prix suit donc la taille du pack.
+const FC_PAR_PIECE = 2.5;
+const enFrancs = (pieces) => Math.max(100, Math.round(pieces * FC_PAR_PIECE / 100) * 100);
 const OFFRES_DEFAUT = {
-  sticker: [{ utilisations: 20, pieces: 300, francs: 500 }, { utilisations: 50, pieces: 600, francs: 1000 }],
+  sticker: [{ utilisations: 20, pieces: 200, francs: 500 }, { utilisations: 50, pieces: 400, francs: 1000 }],
 };
+// Premiers prix (14/11), où les francs revenaient moins cher que les pièces : remplacés par les nouveaux.
+const ANCIENNES_OFFRES = JSON.stringify([{ utilisations: 20, pieces: 300, francs: 500 }, { utilisations: 50, pieces: 600, francs: 1000 }]);
 const REMISE_PACK = 33;
 function verifierReglage(v) {
   v = v || {};
@@ -76,10 +81,10 @@ function verifierReglage(v) {
   const l = Array.isArray(v.offres && v.offres.sticker) ? v.offres.sticker : OFFRES_DEFAUT.sticker;
   if (!l.length || l.length > 4) throw erreur('Entre 1 et 4 offres.');
   out.offres.sticker = l.map((o) => {
-    const x = { utilisations: Math.trunc(Number(o && o.utilisations)), pieces: Math.trunc(Number(o && o.pieces)), francs: Math.trunc(Number(o && o.francs)) };
+    const x = { utilisations: Math.trunc(Number(o && o.utilisations)), pieces: Math.trunc(Number(o && o.pieces)) };
     if (!(x.utilisations >= 1 && x.utilisations <= UTILISATIONS_MAX)) throw erreur(`Utilisations entre 1 et ${UTILISATIONS_MAX}.`);
-    if (!(x.pieces >= 1 && x.pieces <= 1e6) || !(x.francs >= 0 && x.francs <= 1e7)) throw erreur('Prix invalide.');
-    return x;
+    if (!(x.pieces >= 1 && x.pieces <= 1e6)) throw erreur('Prix invalide.');
+    return { ...x, francs: enFrancs(x.pieces) };
   });
   return out;
 }
@@ -89,7 +94,7 @@ function offresPack(r, pack) {
   const n = stickersDuPack(pack).length;
   if (n < 2) return [];
   const k = n * (1 - (r.remisePack == null ? REMISE_PACK : r.remisePack) / 100);
-  return r.offres.sticker.map((o) => ({ utilisations: o.utilisations, pieces: Math.min(n * o.pieces, arrondi(o.pieces * k, 50)), francs: Math.min(n * o.francs, arrondi(o.francs * k, 100)) }));
+  return r.offres.sticker.map((o) => { const pieces = Math.min(n * o.pieces, arrondi(o.pieces * k, 50)); return { utilisations: o.utilisations, pieces, francs: enFrancs(pieces) }; });
 }
 
 // cible : { type: 'joueur', joueur: 'Pseudo#1234' ou identifiant } | { type: 'tous' } | { type: 'groupe', criteres: { anciennete: 30, google: true, … } }
@@ -131,7 +136,8 @@ async function conditionCible(base, cible) {
 }
 
 function creerStickers(base, reglages, comptes) {
-  const reglage = () => { const r = reglages.get('stickers') || {}; return { actif: false, vente: false, remisePack: REMISE_PACK, ...r, offres: { sticker: (r.offres && r.offres.sticker) || OFFRES_DEFAUT.sticker } }; };
+  const reglage = () => { const r = reglages.get('stickers') || {}; return { actif: false, vente: false, remisePack: REMISE_PACK, ...r, offres: { sticker: lireOffres(r.offres && r.offres.sticker) } }; };
+  const lireOffres = (l) => (!Array.isArray(l) || !l.length || JSON.stringify(l) === ANCIENNES_OFFRES ? OFFRES_DEFAUT.sticker : l.map((o) => ({ ...o, francs: enFrancs(o.pieces) })));
   const offres = (r) => ({ sticker: r.offres.sticker, packs: Object.fromEntries(Object.keys(PACKS).map((p) => [p, offresPack(r, p)])) });
   const catalogue = () => Object.entries(STICKERS).map(([id, s]) => ({ id, nom: s.nom, pack: s.pack }));
   const packs = () => Object.entries(PACKS).map(([id, p]) => ({ id, nom: p.nom, stickers: stickersDuPack(id) }));
