@@ -1,7 +1,8 @@
 // Kopo — sons du jeu, entièrement générés par le téléphone (Web Audio) : aucun fichier,
 // aucune licence à respecter, rien à télécharger.
 // Deux réglages indépendants : les effets (cartes, tour, Katapss…) et la musique d'ambiance.
-// La musique ne joue que sur les menus (accueil, salon) : elle s'efface quand une partie commence.
+// La musique joue partout : normale sur les menus (accueil, salon), plus basse pendant la partie pour laisser
+// passer les effets.
 // L'audio ne démarre qu'après un premier toucher (règle des navigateurs) et se met en veille
 // quand la page est cachée.
 (function (root) {
@@ -10,7 +11,7 @@
   const etat = { effets: true, musique: false, menu: true };
   let ctx = null, sortie = null, busEffets = null, busMusique = null, bruitBlanc = null;
   let toucheRecue = false;
-  const VOL_EFFETS = 0.55, VOL_MUSIQUE = 0.22;
+  const VOL_EFFETS = 0.55, VOL_MUSIQUE = 0.22, PART_EN_PARTIE = 0.35; // musique à table : 35 % du volume des menus
 
   // ------------------------------------------------------------------ contexte audio
   function contexte() {
@@ -31,7 +32,8 @@
     return ctx;
   }
   const actif = () => etat.effets || etat.musique;
-  const musiqueVoulue = () => etat.musique && etat.menu;
+  const musiqueVoulue = () => etat.musique;
+  const volMusique = () => VOL_MUSIQUE * (etat.menu ? 1 : PART_EN_PARTIE);
   // Prêt à jouer : contexte créé, débloqué par un toucher, page visible.
   function pret() {
     if (!toucheRecue || !actif()) return null;
@@ -185,10 +187,12 @@
         prochaine = c.currentTime + 0.1; pas = 0;
         busMusique.gain.cancelScheduledValues(c.currentTime);
         busMusique.gain.setValueAtTime(0.0001, c.currentTime);
-        busMusique.gain.exponentialRampToValueAtTime(VOL_MUSIQUE, c.currentTime + 2);
+        busMusique.gain.exponentialRampToValueAtTime(volMusique(), c.currentTime + 2);
         minuteur = setInterval(() => { try { planifier(); } catch (e) {} }, 100);
         planifier();
       },
+      // Nouveau volume en douceur (menu ↔ partie), sans couper la boucle.
+      volume() { if (enMarche && ctx) { busMusique.gain.cancelScheduledValues(ctx.currentTime); busMusique.gain.setTargetAtTime(volMusique(), ctx.currentTime, 0.6); } },
       arreter(lent) {
         if (!enMarche) return;
         enMarche = false;
@@ -207,12 +211,12 @@
     if (musiqueVoulue()) Musique.demarrer(); else Musique.arreter();
     if (ctx && !actif() && ctx.state === 'running') ctx.suspend().catch(() => {});
   }
-  // Menus (true) ou partie en cours (false) : la musique s'efface en douceur pendant le jeu.
+  // Menus (true) ou partie en cours (false) : la musique baisse en douceur pendant le jeu.
   function surMenu(oui) {
     oui = !!oui;
     if (oui === etat.menu) return;
     etat.menu = oui;
-    if (musiqueVoulue()) Musique.demarrer(); else Musique.arreter(true);
+    Musique.volume();
   }
 
   if (typeof document !== 'undefined') {

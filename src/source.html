@@ -4145,7 +4145,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     };
     titre('Son et vibrations');
     bascule('effetsSonores', 'Effets sonores', 'Cartes, tour, Katapss, chat', () => Sons.jouer('essai'));
-    bascule('musique', 'Musique d\'ambiance', 'Sur les menus, coupée pendant les parties', null);
+    bascule('musique', 'Musique d\'ambiance', 'Plus basse pendant les parties', null);
     bascule('vibrations', 'Vibrations', 'Quand c\'est à toi de jouer', () => vibrer(60));
     if (MICRO_ACTIF) bascule('sonAutresCoupe', 'Couper le micro des autres', 'Au début de chaque partie', null);
     titre('Jeu');
