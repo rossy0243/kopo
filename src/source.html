@@ -852,6 +852,30 @@ body.en-jeu #filChat { display: flex; }
 /* Animations coupées (réglage « Réduites », ou téléphone qui en demande moins) */ html.sans-anim .msg-chat { animation: none; transition: none; }
 .histo-chat { max-height: 28vh; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
 .histo-chat .msg-chat { animation: none; align-self: flex-start; }
+.histo-chat .msg-chat .st-mini, #filChat .msg-chat .st-mini { display: inline-block; width: 30px; height: 30px; vertical-align: middle; }
+.st-mini svg, .st-case svg, .st-bulle svg { width: 100%; height: 100%; overflow: visible; display: block; }
+/* Stickers animés (ergonomie/stickers) : onglets du chat, grille, sticker qui joue près du siège de l'envoyeur. */
+.onglets-chat { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; background: rgba(0,0,0,.28); border-radius: 99px; padding: 4px; margin-bottom: 10px; }
+.onglets-chat button { border: 0; background: none; color: var(--muted); font-family: inherit; font-weight: 600; font-size: 14px; padding: 7px 0; border-radius: 99px; cursor: pointer; }
+.onglets-chat button[aria-selected="true"] { background: var(--brass); color: #1D1606; }
+.st-zone { display: grid; gap: 8px; margin-bottom: 10px; }
+.st-packs { display: flex; gap: 6px; flex-wrap: wrap; }
+.st-packs button { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 99px; border: 1px solid var(--line); color: var(--muted); background: none; cursor: pointer; }
+.st-packs button[aria-pressed="true"] { border-color: var(--brass); color: var(--brass); }
+.st-grille { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+@media (orientation: landscape) and (max-height: 560px) { .st-grille { grid-template-columns: repeat(9, 1fr); } }
+.st-case { aspect-ratio: 1; border-radius: 12px; background: rgba(0,0,0,.25); border: 1px solid var(--line); display: grid; place-items: center; position: relative; padding: 10%; cursor: pointer; }
+.st-case.verrou svg { filter: grayscale(1) brightness(.5); }
+.st-case.verrou::after { content: "🔒"; position: absolute; right: 3px; top: 2px; font-size: 11px; }
+.st-case .reste { position: absolute; right: 2px; bottom: 2px; background: var(--brass); color: #1D1606; font-size: 10px; font-weight: 700; border-radius: 99px; padding: 0 5px; line-height: 15px; }
+.st-note { font-size: 12px; color: var(--muted); text-align: center; margin: 0; }
+.st-bulle { position: fixed; z-index: 40; pointer-events: none; display: grid; justify-items: center; filter: drop-shadow(0 6px 12px rgba(0,0,0,.55)); transition: left .3s, top .3s, width .3s; }
+.st-bulle .anim-st { width: 100%; aspect-ratio: 1; }
+.st-bulle .qui { margin-top: -6px; background: #1D1606; color: var(--brass); font-size: 11px; font-weight: 600; line-height: 1.5; padding: 0 8px; border-radius: 99px; white-space: nowrap; }
+.siege.st-envoie { box-shadow: 0 0 0 2px var(--brass), 0 0 16px 2px rgba(226,176,74,.55) !important; transition: box-shadow .2s; }
+.boutique .st-offres { display: grid; gap: 6px; }
+.boutique .st-offre { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 8px 10px; border: 1px dashed var(--line); border-radius: 10px; color: var(--muted); font-size: 13px; }
+.boutique .st-offre b { color: var(--ink); }
 .liste-k { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .liste-k li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; }
 .liste-k small { color: var(--muted); }
@@ -1528,6 +1552,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
 <script>/*RETENTION*/</script>
 <script>kopoChargement(63, 0, 64)</script>
 <script>/*SONS*/</script>
+<script>/*STICKERS*/</script>
 <script>kopoChargement(64, 0, 72)</script>
 <script>
 (function () {
@@ -2025,6 +2050,8 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     room.onMessage('parcours', (d) => window.dispatchEvent(new CustomEvent('kopo-parcours', { detail: d })));
     room.onMessage('faceAFace', (d) => window.dispatchEvent(new CustomEvent('kopo-face-a-face', { detail: d })));
     room.onMessage('reaction', (e) => window.dispatchEvent(new CustomEvent('kopo-reaction', { detail: e })));
+    room.onMessage('sticker', (e) => window.dispatchEvent(new CustomEvent('kopo-sticker', { detail: e })));
+    room.onMessage('stickers', (e) => window.dispatchEvent(new CustomEvent('kopo-stickers', { detail: e })));
     room.onMessage('exclu', (raison) => { quitter(); toast(raison || 'Tu as été exclu de la partie.'); });
     // Match du jour : au début, essai officiel ou entraînement ; à la fin (éliminé, vainqueur), le score sur 100.
     room.onMessage('matchJour', (d) => {
@@ -4605,6 +4632,18 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       const couper = el('button', 'btn', 'Ne plus recevoir les rivalités');
       couper.onclick = async () => { try { await apiJoueur('/moi', 'PATCH', { notifs: { rivalite: false } }); toast('Notifications de rivalité coupées.'); } catch (e) { toast(e.message); } fermerFenetre(); };
       boutons.push(fermer('À moi de jouer !'), couper);
+    } else if (a.type === 'cadeau') {
+      // Stickers offerts par l'équipe : le message dit pourquoi, puis ce qui est reçu.
+      z.append(icone('i-cadeau'), el('h2', null, 'Cadeau de l\'équipe Masano'));
+      if (d.message) z.append(el('p', null, d.message));
+      const ids = Array.isArray(d.stickers) ? d.stickers.filter((id) => KopoStickers.ST[id]) : [];
+      if (ids.length) {
+        const g = el('div', 'st-grille');
+        for (const id of ids.slice(0, 10)) { const c = el('div', 'st-case anim'); c.innerHTML = KopoStickers.svg(id, nomSticker(id)); c.append(el('span', 'reste', '×' + d.utilisations)); g.append(c); }
+        z.append(g);
+      }
+      z.append(el('small', 'muted', `${d.utilisations || ''} utilisation${d.utilisations > 1 ? 's' : ''} de chaque sticker, à envoyer depuis le chat en partie${configServeur && configServeur.stickers && configServeur.stickers.actif ? '' : ' dès que les stickers seront ouverts'}.`));
+      boutons.push(fermer('Merci !'));
     } else if (a.type === 'parrainage') {
       z.append(icone('i-cadeau'), el('h2', null, 'Parrainage'), el('p', null, a.texte));
       if (d.titre) z.append(el('b', 'titre-parrain', '« ' + d.titre + ' »'));
@@ -4800,6 +4839,27 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       }
       z.append(g);
     }
+    // Stickers animés : on vendra des utilisations (par sticker ou par pack, en pièces ou en argent réel). Pas encore en vente.
+    const E = await chargerStickers();
+    if (E) {
+      z.append(el('h3', null, 'Stickers animés'), el('small', 'muted', 'Chaque envoi en partie utilise une fois le sticker. À 0, il se reverrouille.'));
+      for (const p of E.packs) {
+        z.append(el('p', 'muted', 'Pack ' + p.nom));
+        const g = el('div', 'st-grille');
+        for (const id of p.stickers) {
+          const reste = (E.soldes || {})[id] || 0, c = el('div', 'st-case' + (reste > 0 && E.actif ? ' anim' : ' verrou'));
+          c.innerHTML = KopoStickers.svg(id, nomSticker(id));
+          if (reste > 0) c.append(el('span', 'reste', '×' + reste));
+          g.append(c);
+        }
+        z.append(g);
+      }
+      const offres = el('div', 'st-offres');
+      const ligne = (titre, o) => { const d = el('div', 'st-offre'); d.append(el('span', null, titre), el('span', null, `${formatPieces(o.pieces)} pièces ou ${formatPieces(o.francs)} FC · Bientôt`)); d.firstChild.prepend(el('b', null, o.utilisations + ' utilisations ')); return d; };
+      for (const o of E.offres.sticker) offres.append(ligne('d\'un sticker', o));
+      for (const o of E.offres.pack) offres.append(ligne('de tout un pack', o));
+      z.append(offres);
+    }
     const fermer = el('button', 'btn principal large', 'Fermer'); fermer.onclick = fermerFenetre;
     ouvrirFenetre([el('h2', null, 'Boutique'), z, fermer], 'boutique');
   }
@@ -4842,7 +4902,9 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   const historiqueChat = []; // { code, nom, texte, moi } : les 30 derniers messages de la partie en cours
   function ligneChat(m) {
     const d = el('div', 'msg-chat' + (m.moi ? ' moi' : ''));
-    d.append(el('b', null, m.moi ? 'Moi' : m.nom), estPhrase(m.texte) ? document.createTextNode(m.texte) : el('span', 'emo', m.texte));
+    d.append(el('b', null, m.moi ? 'Moi' : m.nom));
+    if (m.sticker) { const t = el('span', 'st-mini'); t.innerHTML = KopoStickers.svg(m.sticker, nomSticker(m.sticker)); d.append(t); } // ligne écrite une fois le sticker sorti de l'écran
+    else d.append(estPhrase(m.texte) ? document.createTextNode(m.texte) : el('span', 'emo', m.texte));
     return d;
   }
   function majNonLus(n) { const b = $('nonLusSalon'); b.dataset.n = n; b.hidden = !n; b.textContent = n > 9 ? '9+' : String(n); } // messages reçus dans le salon, chat fermé
@@ -4865,11 +4927,137 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       (estPhrase(r) ? ph : z).append(b);
     }
     const f = el('button', 'btn large', 'Fermer'); f.onclick = () => { fermerFenetre(); if (vueActuelle) afficher(vueActuelle); };
+    // Deux onglets : « Messages » (émojis et phrases) et « Stickers » (animés, verrouillés sans utilisations).
+    const ong = el('div', 'onglets-chat'), zSt = zoneStickers();
+    ong.setAttribute('role', 'tablist');
+    const montrer = (o) => {
+      ongletChat = o;
+      ong.querySelectorAll('button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.o === o)));
+      z.hidden = ph.hidden = o !== 'msg'; zSt.hidden = o !== 'st';
+    };
+    for (const [o, t] of [['msg', 'Messages'], ['st', 'Stickers']]) { const b = el('button', null, t); b.dataset.o = o; b.setAttribute('role', 'tab'); b.onclick = () => montrer(o); ong.append(b); }
+    contenu.push(ong);
     if (z.children.length) contenu.push(z);
     if (ph.children.length) contenu.push(ph);
-    contenu.push(f);
+    contenu.push(zSt, f);
+    montrer(ongletChat);
     ouvrirFenetre(contenu, 'chat');
+    chargerStickers().then(() => zSt.isConnected && remplirStickers(zSt));
   };
+
+  // ------------------------------------------------------------------ stickers animés
+  // On vend des utilisations : chaque envoi en décompte une (vérifié par le serveur) ; à 0 le sticker se reverrouille.
+  // Tant que l'admin ne les a pas allumés, tout est grisé et rien ne s'envoie.
+  let ongletChat = 'msg', stickersEtat = null, packChoisi = 'emotions';
+  (() => { const st = document.createElement('style'); st.textContent = KopoStickers.CSS; document.head.append(st); })();
+  const nomSticker = (id) => { const x = stickersEtat && stickersEtat.stickers.find((y) => y.id === id); return x ? x.nom : (KopoStickers.ST[id] ? KopoStickers.ST[id].nom : id); };
+  async function chargerStickers() {
+    if (!MODE_SERVEUR || !compteLocal()) return stickersEtat;
+    try { stickersEtat = await apiJoueur('/stickers'); } catch (e) {}
+    return stickersEtat;
+  }
+  function zoneStickers() { const z = el('div', 'st-zone'); remplirStickers(z); return z; }
+  function remplirStickers(z) {
+    const E = stickersEtat || { actif: false, soldes: {}, stickers: KopoStickers.IDS.map((id) => ({ id, nom: KopoStickers.ST[id].nom, pack: KopoStickers.ST[id].pack ? (KopoStickers.ST[id].pack === 'Ambiance' ? 'ambiance' : 'supporters') : 'emotions' })), packs: [{ id: 'emotions', nom: 'Émotions' }, { id: 'ambiance', nom: 'Ambiance' }, { id: 'supporters', nom: 'Supporters' }] };
+    const enLigne = !!(client && client.serveur);
+    z.replaceChildren();
+    const packs = el('div', 'st-packs');
+    for (const p of E.packs) { const b = el('button', null, p.nom); b.setAttribute('aria-pressed', String(p.id === packChoisi)); b.onclick = () => { packChoisi = p.id; remplirStickers(z); }; packs.append(b); }
+    const g = el('div', 'st-grille');
+    for (const x of E.stickers.filter((y) => y.pack === packChoisi)) {
+      const reste = (E.soldes || {})[x.id] || 0, ouvert = E.actif && reste > 0;
+      const b = el('button', 'st-case' + (ouvert ? ' anim' : ' verrou'));
+      b.innerHTML = KopoStickers.svg(x.id, x.nom + (ouvert ? ` (${reste} restant${reste > 1 ? 's' : ''})` : ' (verrouillé)'));
+      if (reste > 0) b.append(el('span', 'reste', '×' + reste));
+      b.onclick = () => {
+        if (!E.actif) return toast('Les stickers arrivent bientôt.');
+        if (!reste) return toast(`« ${x.nom} » est verrouillé : il arrive bientôt en boutique.`);
+        if (!enLigne) return toast('Les stickers s\'envoient pendant une partie en ligne.');
+        fermerFenetre(); if (vueActuelle) afficher(vueActuelle);
+        client.reseau.envoyer({ type: 'sticker', sticker: x.id });
+      };
+      g.append(b);
+    }
+    z.append(packs, g, el('p', 'st-note', !E.actif ? 'Les stickers animés arrivent bientôt.' : 'Les stickers grisés arrivent bientôt en boutique.'));
+  }
+  // Ce qu'il reste après un envoi (message « stickers » du serveur).
+  window.addEventListener('kopo-stickers', (e) => {
+    const d = e.detail || {};
+    if (!stickersEtat || !d.sticker) return;
+    stickersEtat.soldes = stickersEtat.soldes || {};
+    if (d.restants > 0) stickersEtat.soldes[d.sticker] = d.restants; else delete stickersEtat.soldes[d.sticker];
+    if (d.restants === 0) toast(`Plus d'utilisations pour « ${nomSticker(d.sticker)} » : il se reverrouille.`);
+  });
+
+  // Règle de foule (choisie le 11/11) : 6 stickers au plus à l'écran, les suivants attendent qu'une place se libère ;
+  // dès 4 en même temps ils rapetissent ; en portrait ils se rangent en grille de 3 sous la table ;
+  // en paysage, sous le siège (joueurs du haut) ou au-dessus (joueurs du bas), écartés vers le centre s'ils se chevauchent.
+  const ST_MAX = 6, stActifs = [], stAttente = [];
+  const portraitSt = () => innerHeight > innerWidth;
+  const tailleSt = (n) => (n >= 4 ? (portraitSt() ? 78 : 70) : (portraitSt() ? 104 : 92));
+  function placerStickers() {
+    const n = stActifs.length, S = tailleSt(n);
+    if (portraitSt()) {
+      const t = document.querySelector('#ecranPartie .table'), bas = t ? t.getBoundingClientRect().bottom : innerHeight * 0.45;
+      const cols = n > 2 ? 3 : 2, larg = innerWidth / cols;
+      stActifs.forEach((x, i) => {
+        let cx, ligne;
+        if (cols === 2) { const r = rectSiege(x.joueur); cx = r ? r.left + r.width / 2 : innerWidth / 2; ligne = stActifs.slice(0, i).filter((y) => Math.abs(y.cx - cx) < 10).length; }
+        else { cx = larg * (i % cols) + larg / 2; ligne = Math.floor(i / cols); }
+        x.cx = cx; x.pos(cx, bas + 12 + ligne * (S + 18), S);
+      });
+    } else {
+      const pl = [];
+      stActifs.forEach((x) => {
+        const r = rectSiege(x.joueur) || { left: innerWidth / 2, width: 0, top: innerHeight / 2, height: 0, bottom: innerHeight / 2 };
+        let cx = Math.max(S / 2 + 6, Math.min(innerWidth - S / 2 - 6, r.left + r.width / 2));
+        const top = (r.top + r.height / 2 < innerHeight / 2) ? r.bottom + 4 : r.top - S - 12;
+        for (let k = 0; k < 6; k++) {
+          const g = pl.find((q) => Math.abs(q.cx - cx) < S * 0.95 && Math.abs(q.top - top) < S + 10); if (!g) break;
+          cx = g.cx + (cx <= innerWidth / 2 ? 1 : -1) * S * 1.02;
+        }
+        pl.push({ cx, top }); x.pos(cx, top, S);
+      });
+    }
+  }
+  function jouerSticker(joueur, sticker) {
+    if (stActifs.length >= ST_MAX) { stAttente.push([joueur, sticker]); return; }
+    const v = vueActuelle, moi = !!v && joueur === v.moi, qui = moi ? 'Moi' : (v ? nom(v, joueur) : '?');
+    const b = el('div', 'st-bulle'), pop = el('div', 'st-pop'), a = el('div', 'anim-st' + (sansAnim ? '' : ' anim'));
+    a.innerHTML = KopoStickers.svg(sticker, nomSticker(sticker));
+    pop.style.cssText = 'display:grid;justify-items:center';
+    pop.append(a, el('span', 'qui', qui)); b.append(pop);
+    const x = { joueur, b, pos(cx, top, S) { cx = Math.max(S / 2 + 6, Math.min(innerWidth - S / 2 - 6, cx)); b.style.left = (cx - S / 2) + 'px'; b.style.top = top + 'px'; b.style.width = S + 'px'; } };
+    stActifs.push(x); document.body.append(b);
+    b.style.transition = 'none'; placerStickers(); void b.offsetWidth; b.style.transition = '';
+    const suivre = () => { if (!b.isConnected) return; placerStickers(); const s = siegeEl(joueur); if (s) s.classList.add('st-envoie'); requestAnimationFrame(suivre); };
+    requestAnimationFrame(suivre);
+    const fin = () => {
+      b.remove(); stActifs.splice(stActifs.indexOf(x), 1);
+      const s = siegeEl(joueur); if (s && !stActifs.some((y) => y.joueur === joueur)) s.classList.remove('st-envoie');
+      ecrireStickerChat(joueur, sticker, moi, qui); // le fil du chat attend que le sticker ait quitté l'écran
+      if (stAttente.length) jouerSticker(...stAttente.shift());
+    };
+    if (sansAnim) { setTimeout(fin, 2400); return; }
+    // Une seule fois : il apparaît, joue son mouvement et sort pendant sa pose finale.
+    pop.animate([{ transform: 'scale(.2) translateY(20px)', opacity: 0 }, { transform: 'scale(1.1)', opacity: 1, offset: 0.07 }, { transform: 'scale(1)', opacity: 1, offset: 0.11 }, { transform: 'scale(1)', opacity: 1, offset: 0.86 }, { transform: 'scale(.4) translateY(30px)', opacity: 0 }],
+      { duration: KopoStickers.duree(sticker), easing: 'ease-out' }).onfinish = fin;
+  }
+  function ecrireStickerChat(joueur, sticker, moi, qui) {
+    const m = { code: vueActuelle && vueActuelle.code, nom: qui, sticker, moi };
+    historiqueChat.push(m); if (historiqueChat.length > 30) historiqueChat.shift();
+    const fil = $('filChat'), ligne = ligneChat(m);
+    fil.append(ligne);
+    while (fil.children.length > (vueActuelle && vueActuelle.etat === 'salon' ? 2 : 4)) fil.firstChild.remove();
+    if (chatOuvert()) { let h = $('fenetre').querySelector('.histo-chat'); if (!h) { h = el('div', 'histo-chat'); $('fenetre').firstChild.after(h); } h.append(ligneChat(m)); h.scrollTop = h.scrollHeight; }
+    setTimeout(() => { ligne.classList.add('part'); setTimeout(() => ligne.remove(), 650); }, 6000);
+  }
+  window.addEventListener('kopo-sticker', (e) => {
+    const d = e.detail || {};
+    if (!d.joueur || !KopoStickers.ST[d.sticker] || bloques.has(d.joueur)) return;
+    if (vueActuelle && d.joueur !== vueActuelle.moi) Sons.jouer('chat');
+    jouerSticker(d.joueur, d.sticker);
+  });
   window.addEventListener('kopo-reaction', (e) => {
     const d = e.detail || {};
     if (!d.joueur || bloques.has(d.joueur)) return;

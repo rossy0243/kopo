@@ -7,20 +7,25 @@ import 'package:share_plus/share_plus.dart';
 
 import '../commun/cartes.dart';
 import '../commun/retention.dart';
+import '../commun/stickers.dart';
 import '../commun/theme.dart';
 import '../etat.dart';
 import 'communes.dart';
 
 // ---------------------------------------------------------------- chat
+// Onglet du chat ouvert la dernière fois : « Messages » (émojis et phrases) ou « Stickers ».
+var _ongletChat = 'msg', _packChoisi = 'emotions';
+
 void ouvrirChat() {
   app.nonLus = 0;
+  if (app.stickers == null) app.chargerStickers();
   app.ouvrirFenetre((context) {
     final code = app.vue?['code'];
     final anciens = app.historiqueChat.where((m) => m.code == code).toList();
     final msgs = app.messagesChat;
     final emojis = msgs.where((r) => !App.estPhrase(r)).toList(), phrases = msgs.where(App.estPhrase).toList();
     void envoyer(String r) { app.fermerFenetre(); app.reagir(r); }
-    return Fenetre(titre: 'Chat', onFermer: app.fermerFenetre, enfants: [
+    return StatefulBuilder(builder: (context, setState) => Fenetre(titre: 'Chat', onFermer: app.fermerFenetre, enfants: [
       if (anciens.isNotEmpty)
         Container(
           constraints: const BoxConstraints(maxHeight: 180),
@@ -32,26 +37,86 @@ void ouvrirChat() {
           ),
         ),
       const Ecart(10),
-      if (emojis.isNotEmpty)
+      _Onglets(_ongletChat, (o) => setState(() => _ongletChat = o)),
+      const Ecart(10),
+      if (_ongletChat == 'st') _zoneStickers(() => setState(() {})),
+      if (_ongletChat == 'msg' && emojis.isNotEmpty)
         Wrap(spacing: 6, runSpacing: 6, children: [
           for (final e in emojis) SizedBox(width: 48, height: 48, child: Btn(null, enfant: Text(e, style: const TextStyle(fontSize: 24)), marge: EdgeInsets.zero, onTap: () => envoyer(e))),
         ]),
       const Ecart(10),
-      if (phrases.isNotEmpty)
+      if (_ongletChat == 'msg' && phrases.isNotEmpty)
         Wrap(spacing: 6, runSpacing: 6, children: [
           for (final p in phrases) Btn(p, taille: 13, marge: const EdgeInsets.symmetric(horizontal: 12, vertical: 7), onTap: () => envoyer(p)),
         ]),
       const Ecart(12),
       Btn('Fermer', large: true, onTap: app.fermerFenetre),
-    ]);
+    ]));
   }, 'chat');
+}
+
+class _Onglets extends StatelessWidget {
+  final String actif;
+  final void Function(String) choisir;
+  const _Onglets(this.actif, this.choisir);
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(color: const Color(0x47000000), borderRadius: BorderRadius.circular(99)),
+        child: Row(children: [
+          for (final (o, t) in [('msg', 'Messages'), ('st', 'Stickers')])
+            Expanded(child: GestureDetector(
+              onTap: () => choisir(o),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 7),
+                decoration: BoxDecoration(color: actif == o ? K.brass : Colors.transparent, borderRadius: BorderRadius.circular(99)),
+                child: Text(t, textAlign: TextAlign.center, style: K.texte(14, couleur: actif == o ? K.encre : K.muted, poids: FontWeight.w600)),
+              ),
+            )),
+        ]),
+      );
+}
+
+// Stickers : grisés et cadenassés sans utilisations, ou tant que l'admin ne les a pas allumés.
+Widget _zoneStickers(VoidCallback rafraichir) {
+  final actif = app.stickersActifs;
+  final ids = Stickers.packDe.entries.where((e) => e.value == _packChoisi).map((e) => e.key).toList();
+  return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+    Wrap(spacing: 6, runSpacing: 6, children: [
+      for (final (id, nom) in Stickers.packs)
+        GestureDetector(
+          onTap: () { _packChoisi = id; rafraichir(); },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+            decoration: BoxDecoration(borderRadius: BorderRadius.circular(99), border: Border.all(color: _packChoisi == id ? K.brass : K.line)),
+            child: Text(nom, style: K.texte(12, couleur: _packChoisi == id ? K.brass : K.muted, poids: FontWeight.w600)),
+          ),
+        ),
+    ]),
+    const Ecart(8),
+    Wrap(spacing: 6, runSpacing: 6, children: [
+      for (final id in ids)
+        Builder(builder: (_) {
+          final reste = app.resteSticker(id), ouvert = actif && reste > 0;
+          return CaseSticker(id, verrou: !ouvert, reste: reste, onTap: () {
+            if (!actif) { app.toast('Les stickers arrivent bientôt.'); return; }
+            if (reste <= 0) { app.toast('« ${app.nomSticker(id)} » est verrouillé : il arrive bientôt en boutique.'); return; }
+            app.fermerFenetre();
+            app.envoyerSticker(id);
+          });
+        }),
+    ]),
+    const Ecart(6),
+    Muet(actif ? 'Les stickers grisés arrivent bientôt en boutique.' : 'Les stickers animés arrivent bientôt.', taille: 12, align: TextAlign.center),
+  ]);
 }
 
 Widget ligneChat(MessageChat m) => Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Text.rich(TextSpan(style: K.texte(14), children: [
         TextSpan(text: '${m.moi ? 'Moi' : m.nom} ', style: TextStyle(fontWeight: FontWeight.w700, color: m.moi ? K.brass : K.ink)),
-        TextSpan(text: m.texte, style: App.estPhrase(m.texte ?? '') ? null : const TextStyle(fontSize: 20)),
+        if (m.sticker != null) WidgetSpan(alignment: PlaceholderAlignment.middle, child: StickerImage(m.sticker!, taille: 30))
+        else TextSpan(text: m.texte, style: App.estPhrase(m.texte ?? '') ? null : const TextStyle(fontSize: 20)),
       ])),
     );
 

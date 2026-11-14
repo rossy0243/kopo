@@ -13,6 +13,7 @@ const rempl = {
   SALLE: lire('src/kopo-salle.js'),
   RETENTION: lire('src/kopo-retention.js'),
   SONS: lire('src/kopo-sons.js'),
+  STICKERS: lire('src/kopo-stickers.js'),
   MOTEUR_INTER8: lire('moteur/inter8-moteur.js'),
   ROBOTS_INTER8: lire('moteur/inter8-robots.js'),
   SALLE_INTER8: lire('src/inter8-salle.js'),

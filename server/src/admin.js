@@ -4,7 +4,7 @@ const express = require('express');
 const { enveloppe, publicCompte } = require('./api');
 const { emailSupabase } = require('./comptes');
 
-function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainage, bande, push, salles, demarrage }) {
+function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainage, bande, push, stickers, salles, demarrage }) {
   const r = express.Router();
   r.use(express.json({ limit: '50kb' }));
 
@@ -136,6 +136,7 @@ function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainag
       inventaire: await q(`SELECT objet, source, cree_le FROM inventaire WHERE compte_id = $1 ORDER BY cree_le DESC LIMIT ${FICHE.inventaire}`),
       parcours: (await q(`SELECT p.xp, cardinality(p.gratuits)::int AS gratuits, cardinality(p.plus)::int AS plus FROM parcours p JOIN saisons s ON s.numero = p.saison AND s.statut = 'en_cours' WHERE p.compte_id = $1`))[0] || null,
       parrainages: parrainage ? n(await parrainage.resumeAdmin(c.id, FICHE.parrainages)) : [],
+      stickers: await q('SELECT sticker, restants, utilises, maj_le FROM stickers_soldes WHERE compte_id = $1 ORDER BY sticker'),
       partenaires: await q(`SELECT c2.id, c2.pseudo, c2.numero, count(*)::int AS ensemble FROM participations a JOIN participations b ON b.partie_id = a.partie_id AND b.compte_id <> a.compte_id JOIN comptes c2 ON c2.id = b.compte_id WHERE a.compte_id = $1 GROUP BY c2.id, c2.pseudo, c2.numero ORDER BY ensemble DESC LIMIT 5`),
     });
   }));
@@ -203,6 +204,15 @@ function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainag
     });
     await journal('cadeau', null, { montant, motif: req.body.motif, joueurs: n2 });
     res.json({ ok: true, joueurs: n2 });
+  }));
+
+  // --- Stickers : utilisations offertes à un joueur, à tous, ou à un groupe (ancienneté, Google…), toujours avec un message.
+  r.get('/stickers', enveloppe(async (req, res) => res.json(n2(await stickers.resumeAdmin()))));
+  r.post('/stickers/compter', enveloppe(async (req, res) => res.json(await stickers.compter(req.body.cible))));
+  r.post('/stickers/offrir', enveloppe(async (req, res) => {
+    const x = await stickers.offrir(req.body || {});
+    await journal('stickers:cadeau', x.cible.type === 'joueur' ? x.cible.id : null, { cible: x.cible, stickers: x.stickers, utilisations: x.utilisations, message: req.body.message, joueurs: x.joueurs });
+    res.json({ ok: true, ...x });
   }));
 
   // --- Notifications push : abonnés, annonces envoyées, nouvelle annonce (essai à un joueur d'abord)

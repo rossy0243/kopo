@@ -10,6 +10,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'commun/cartes.dart';
 import 'commun/retention.dart';
 import 'commun/sons.dart';
+import 'commun/stickers.dart';
 import 'commun/stock.dart';
 import 'reseau/api.dart';
 import 'reseau/salle.dart';
@@ -34,8 +35,9 @@ class Effet {
 class MessageChat {
   final String? code, nom, texte;
   final bool moi;
+  final String? sticker; // ligne « Joueur + petit sticker », écrite une fois le sticker sorti de l'écran
   final DateTime le = DateTime.now();
-  MessageChat(this.code, this.nom, this.texte, this.moi);
+  MessageChat(this.code, this.nom, this.texte, this.moi, {this.sticker});
 }
 
 class App extends ChangeNotifier {
@@ -659,6 +661,10 @@ class App extends ChangeNotifier {
           _faceAFace(d);
         case 'reaction':
           if (d is Map) _reaction(d);
+        case 'sticker':
+          if (d is Map) _sticker(d);
+        case 'stickers':
+          if (d is Map) _resteSticker(d);
         case 'exclu':
           quitter();
           toast(d?.toString() ?? 'Tu as été exclu de la partie.');
@@ -932,6 +938,57 @@ class App extends ChangeNotifier {
     Timer(const Duration(milliseconds: 6650), () { filChat.remove(m); maj(); });
     if (!estPhrase(texte) && !sansAnim) _ajouterEffet(Effet('reaction', joueur: j, texte: texte, duree: 2400));
     maj();
+  }
+
+  // ---------------------------------------------------------------- stickers animés
+  // On vend des utilisations : chaque envoi en décompte une (vérifié par le serveur) ; à 0 le sticker se reverrouille.
+  // Tant que l'admin ne les a pas allumés, tout est grisé et rien ne s'envoie.
+  Map? stickers; // GET /stickers : actif, stickers, packs, offres, soldes
+  bool get stickersActifs => stickers?['actif'] == true || (config?['stickers'] as Map?)?['actif'] == true;
+  int resteSticker(String id) => (((stickers?['soldes'] as Map?) ?? const {})[id] as num?)?.toInt() ?? 0;
+  String nomSticker(String id) {
+    for (final x in ((stickers?['stickers'] as List?) ?? const [])) { if (x is Map && x['id'] == id) return x['nom'].toString(); }
+    return Stickers.noms[id] ?? id;
+  }
+  Future<void> chargerStickers() async {
+    if (!enLigne) return;
+    try { stickers = await Api.get('/stickers') as Map; maj(); } catch (_) {}
+  }
+  void envoyerSticker(String id) => envoyer({'type': 'sticker', 'sticker': id});
+  void _resteSticker(Map d) {
+    final id = d['sticker']?.toString(), n = (d['restants'] as num?)?.toInt() ?? 0;
+    if (id == null || stickers == null) return;
+    final soldes = Map<String, dynamic>.from((stickers!['soldes'] as Map?) ?? const {});
+    if (n > 0) { soldes[id] = n; } else { soldes.remove(id); toast('Plus d\'utilisations pour « ${nomSticker(id)} » : il se reverrouille.'); }
+    stickers!['soldes'] = soldes;
+    maj();
+  }
+  // Règle de foule : 6 à l'écran au plus, les suivants attendent qu'une place se libère.
+  int stickersEnCours = 0;
+  final _stickersEnAttente = <Map>[];
+  void _sticker(Map d) {
+    final j = d['joueur']?.toString(), id = d['sticker']?.toString();
+    if (j == null || !Stickers.connu(id) || bloques.contains(j)) return;
+    if (stickersEnCours >= Stickers.max) { _stickersEnAttente.add(d); return; }
+    final v = vue, moi = v != null && j == v['moi'];
+    final qui = moi ? 'Moi' : (v != null ? nomDe(v, j) : '?');
+    if (!moi) Sons.jouer('chat');
+    final duree = sansAnim ? 2400 : Stickers.duree(id!);
+    stickersEnCours++;
+    _ajouterEffet(Effet('sticker', joueur: j, texte: id!, sous: qui, duree: duree));
+    Timer(Duration(milliseconds: duree), () {
+      stickersEnCours--;
+      // Le fil du chat attend que le sticker ait quitté l'écran.
+      final m = MessageChat(v?['code'] as String?, qui, null, moi, sticker: id);
+      historiqueChat.add(m);
+      if (historiqueChat.length > 30) historiqueChat.removeAt(0);
+      filChat.add(m);
+      final max = vue?['etat'] == 'salon' ? 2 : 4;
+      while (filChat.length > max) { filChat.removeAt(0); }
+      Timer(const Duration(milliseconds: 6650), () { filChat.remove(m); maj(); });
+      if (_stickersEnAttente.isNotEmpty) _sticker(_stickersEnAttente.removeAt(0));
+      maj();
+    });
   }
 
   // ---------------------------------------------------------------- face-à-face (serveur)

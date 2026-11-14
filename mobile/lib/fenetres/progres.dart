@@ -7,6 +7,7 @@ import '../commun/apparences.dart';
 import '../commun/cartes.dart';
 import '../commun/retention.dart';
 import '../commun/sons.dart';
+import '../commun/stickers.dart';
 import '../commun/stock.dart';
 import '../commun/theme.dart';
 import '../etat.dart';
@@ -383,6 +384,7 @@ Future<void> ouvrirBoutique() async {
     B = await Api.get('/boutique') as Map;
   } catch (e) { app.toast(messageErreur(e)); return; }
   app.soldeServeur(B['solde']);
+  await app.chargerStickers();
   for (final o in (B['objets'] as List)) { app.objetDuServeur(o as Map); }
   final possedes = {...((B['possedes'] as List?) ?? []).map((e) => e.toString()), 'av-laiton', 'dos-laiton'};
   final eq = (B['equipes'] as Map?) ?? {};
@@ -404,9 +406,39 @@ Future<void> ouvrirBoutique() async {
               }),
           ]),
         ],
+        if (app.stickers != null) ..._rayonStickers(app.stickers!),
         const Ecart(12),
         Btn.principal('Fermer', large: true, onTap: app.fermerFenetre),
       ]), 'boutique');
+}
+
+// Stickers animés : on vendra des utilisations (par sticker ou par pack, en pièces ou en argent réel). Pas encore en vente.
+List<Widget> _rayonStickers(Map s) {
+  final actif = s['actif'] == true;
+  final offres = (s['offres'] as Map?) ?? const {};
+  Widget offre(String quoi, Map o) => Container(
+        margin: const EdgeInsets.only(top: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), border: Border.all(color: K.line)),
+        child: Row(children: [
+          Expanded(child: Text.rich(TextSpan(style: K.texte(13, couleur: K.muted), children: [TextSpan(text: '${o['utilisations']} utilisations ', style: K.texte(13, poids: FontWeight.w700)), TextSpan(text: quoi)]))),
+          Text('${App.formatPieces(o['pieces'] as num)} pièces ou ${App.formatPieces(o['francs'] as num)} FC · Bientôt', style: K.texte(12, couleur: K.muted)),
+        ]),
+      );
+  return [
+    const Titre3('Stickers animés'),
+    const Muet('Chaque envoi en partie utilise une fois le sticker. À 0, il se reverrouille.', taille: 12),
+    for (final (id, nom) in Stickers.packs) ...[
+      Muet('Pack $nom', taille: 12),
+      const Ecart(4),
+      Wrap(spacing: 6, runSpacing: 6, children: [
+        for (final st in Stickers.packDe.entries.where((e) => e.value == id).map((e) => e.key)) CaseSticker(st, verrou: !(actif && app.resteSticker(st) > 0), reste: app.resteSticker(st), taille: 54),
+      ]),
+      const Ecart(6),
+    ],
+    for (final o in ((offres['sticker'] as List?) ?? const [])) offre("d'un sticker", o as Map),
+    for (final o in ((offres['pack'] as List?) ?? const [])) offre("de tout un pack", o as Map),
+  ];
 }
 
 Future<void> _equiperDepuisBoutique(String id) async {

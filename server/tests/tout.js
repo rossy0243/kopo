@@ -1691,6 +1691,76 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     await api('/api/v1/push/natif', { methode: 'DELETE', jeton: b.jeton, corps: { jeton: jetonFcm } });
     assert.strictEqual((await api('/api/v1/push', { jeton: b.jeton })).json.natifs.length, 0);
   });
+  // --- Stickers animés : utilisations vendues (plus tard) ou offertes par l'admin, envoi vérifié et décompté
+  await test('stickers : éteints au départ, cadeaux de l\'admin (joueur, tous, groupe) avec message, envoi décompté', async () => {
+    assert.deepStrictEqual((await api('/api/config')).json.stickers, { actif: false });
+    const a = await invite('StickA'), b = await invite('StickB'), c = await invite('StickC');
+    const vide = (await api('/api/v1/stickers', { jeton: a.jeton })).json;
+    assert.strictEqual(vide.actif, false); assert.strictEqual(vide.vente, false);
+    assert.strictEqual(vide.stickers.length, 9); assert.deepStrictEqual(vide.soldes, {});
+    assert.deepStrictEqual(vide.packs.find((p) => p.id === 'emotions').stickers, ['ouf', 'rire', 'louche', 'encore', 'katapss', 'grrr']);
+    assert.ok(vide.offres.sticker.every((o) => o.utilisations && o.pieces && o.francs) && vide.offres.pack.length);
+    const adm = (chemin, corps) => api('/admin/api/stickers' + chemin, { methode: corps ? 'POST' : 'GET', jeton: adminJeton, corps });
+    assert.strictEqual((await api('/admin/api/stickers/compter', { methode: 'POST', jeton: a.jeton, corps: { cible: { type: 'tous' } } })).statut, 401);
+    // Cibles : tous, un groupe (critères cumulés), un joueur.
+    const tous = (await adm('/compter', { cible: { type: 'tous' } })).json.joueurs;
+    assert.ok(tous >= 3);
+    assert.strictEqual((await adm('/compter', { cible: { type: 'groupe', criteres: {} } })).statut, 400);
+    assert.strictEqual((await adm('/compter', { cible: { type: 'groupe', criteres: { google: true, invites: true } } })).statut, 400);
+    assert.strictEqual((await adm('/compter', { cible: { type: 'groupe', criteres: { anciennete: 0 } } })).statut, 400);
+    assert.strictEqual((await adm('/compter', { cible: { type: 'groupe', criteres: { inconnu: 1 } } })).statut, 400);
+    assert.strictEqual((await adm('/compter', { cible: { type: 'groupe', criteres: { anciennete: 30 } } })).json.joueurs, 0, 'personne n\'a 30 jours ici');
+    const sql = async (w) => (await srv.base.query(`SELECT count(*)::int AS n FROM comptes WHERE statut = 'actif' AND ${w}`)).rows[0].n;
+    assert.strictEqual((await adm('/compter', { cible: { type: 'groupe', criteres: { invites: true, nouveaux: 1, actifs: 1 } } })).json.joueurs, await sql("auth_id IS NULL AND cree_le > now() - interval '1 day' AND vu_le > now() - interval '1 day'"));
+    assert.strictEqual((await adm('/compter', { cible: { type: 'groupe', criteres: { google: true } } })).json.joueurs, await sql('auth_id IS NOT NULL'));
+    assert.strictEqual((await adm('/compter', { cible: { type: 'groupe', criteres: { pays: 'cd', parties: 1, kopoPlus: false } } })).statut, 200);
+    assert.strictEqual((await adm('/compter', { cible: { type: 'joueur', joueur: 'Personne#0000' } })).statut, 404);
+    assert.strictEqual((await adm('/compter', { cible: { type: 'joueur', joueur: `${a.compte.pseudo}#${a.compte.numero}` } })).json.joueurs, 1);
+    // Le message qui explique le cadeau est obligatoire.
+    const cibleA = { type: 'joueur', joueur: `${a.compte.pseudo}#${a.compte.numero}` };
+    assert.strictEqual((await adm('/offrir', { cible: cibleA, pack: 'emotions', utilisations: 20, message: '' })).statut, 400);
+    assert.strictEqual((await adm('/offrir', { cible: cibleA, pack: 'emotions', utilisations: 0, message: 'Merci pour tes retours !' })).statut, 400);
+    assert.strictEqual((await adm('/offrir', { cible: cibleA, sticker: 'inconnu', utilisations: 5, message: 'Merci pour tes retours !' })).statut, 400);
+    const r = await adm('/offrir', { cible: cibleA, pack: 'emotions', utilisations: 20, message: 'Merci pour tes retours !' });
+    assert.strictEqual(r.statut, 200); assert.strictEqual(r.json.joueurs, 1); assert.strictEqual(r.json.stickers.length, 6);
+    await adm('/offrir', { cible: { type: 'groupe', criteres: { invites: true, actifs: 1 } }, sticker: 'ouf', utilisations: 2, message: 'Bienvenue aux nouveaux joueurs.' });
+    const sa = (await api('/api/v1/stickers', { jeton: a.jeton })).json.soldes;
+    assert.strictEqual(sa.ouf, 22); assert.strictEqual(sa.grrr, 20); assert.strictEqual(sa.danse, undefined, 'le pack Ambiance reste verrouillé');
+    assert.deepStrictEqual((await api('/api/v1/stickers', { jeton: c.jeton })).json.soldes, { ouf: 2 }); assert.deepStrictEqual((await api('/api/v1/stickers', { jeton: b.jeton })).json.soldes, { ouf: 2 });
+    const notes = (await api('/api/v1/notifications', { jeton: a.jeton })).json.liste.filter((x) => x.type === 'cadeau');
+    assert.strictEqual(notes.length, 2);
+    assert.ok(notes.some((x) => /Merci pour tes retours !/.test(x.texte) && /20 utilisations du pack « Émotions »/.test(x.texte) && x.donnees.message === 'Merci pour tes retours !'));
+    const resume = (await adm('')).json;
+    assert.strictEqual(resume.reglage.actif, false); assert.ok(resume.criteres.some((x) => x.id === 'anciennete' && x.n));
+    assert.strictEqual(resume.cadeaux[0].message, 'Bienvenue aux nouveaux joueurs.');
+    assert.ok((await api('/admin/api/journal', { jeton: adminJeton })).json.some((l) => l.action === 'stickers:cadeau'));
+    assert.strictEqual((await api('/admin/api/joueurs/' + a.compte.id, { jeton: adminJeton })).json.stickers.length, 6);
+    // En partie : refusé tant que l'interrupteur est éteint, puis une utilisation de moins par envoi.
+    const client = new Client(URL_.replace('http', 'ws'));
+    const sA = await client.create('kopo', { jeton: a.jeton, code: 'STIK' });
+    const sB = await client.joinById(sA.roomId, { jeton: b.jeton });
+    const recu = { a: [], b: [], erreursA: [], erreursB: [], restants: [] };
+    for (const [s, k] of [[sA, 'a'], [sB, 'b']]) { s.onMessage('vue', () => {}); s.onMessage('sticker', (m) => recu[k].push(m)); s.onMessage('erreur', (t) => recu[k === 'a' ? 'erreursA' : 'erreursB'].push(t)); s.onMessage('stickers', (m) => k === 'a' && recu.restants.push(m)); }
+    try {
+      await attendre(100);
+      sA.send('sticker', { sticker: 'ouf' }); await attendre(150);
+      assert.deepStrictEqual(recu.erreursA, ['Les stickers arrivent bientôt.']); assert.strictEqual(recu.b.length, 0);
+      assert.strictEqual((await api('/admin/api/reglages/stickers', { methode: 'PUT', jeton: adminJeton, corps: { valeur: { actif: true, offres: { sticker: [{ utilisations: 0, pieces: 1, francs: 1 }] } } } })).statut, 400);
+      assert.strictEqual((await api('/admin/api/reglages/stickers', { methode: 'PUT', jeton: adminJeton, corps: { valeur: { ...resume.reglage, actif: true } } })).statut, 200);
+      assert.deepStrictEqual((await api('/api/config')).json.stickers, { actif: true });
+      sA.send('sticker', { sticker: 'ouf' }); await attendre(150);
+      assert.deepStrictEqual(recu.b, [{ type: 'sticker', joueur: a.compte.id, sticker: 'ouf' }]);
+      assert.strictEqual(recu.a.length, 1); assert.deepStrictEqual(recu.restants, [{ sticker: 'ouf', restants: 21 }]);
+      sA.send('sticker', { sticker: 'grrr' }); await attendre(150);
+      assert.strictEqual(recu.b.length, 1, 'un sticker toutes les 5 secondes'); assert.match(recu.erreursA.at(-1), /5 secondes/);
+      sB.send('sticker', { sticker: 'danse' }); await attendre(150);
+      assert.match(recu.erreursB.at(-1), /Plus d'utilisations/); assert.strictEqual(recu.a.length, 1);
+      assert.strictEqual((await api('/api/v1/stickers', { jeton: a.jeton })).json.soldes.ouf, 21);
+    } finally {
+      await api('/admin/api/reglages/stickers', { methode: 'PUT', jeton: adminJeton, corps: { valeur: { ...resume.reglage, actif: false } } });
+      await sA.leave(); await sB.leave();
+    }
+  });
   await test('documentation : chaque route des joueurs est décrite dans docs/api/openapi.yaml', async () => {
     const yaml = require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'docs', 'api', 'openapi.yaml'), 'utf8');
     const decrites = new Set();
