@@ -12,6 +12,12 @@
   const JEU = 'inter8';
   const MIN = 2, MAX = I.MAX_JOUEURS; // 8 joueurs au plus
   const MODES = ['simple', 'delire'];
+  // Formule de la partie : 'normale' (le dernier à garder des cartes est éliminé à chaque manche)
+  // ou 'cahier' (comptage des points : on écrit les points de chaque donne, celui qui atteint le
+  // total choisi par l'hôte est éliminé, le dernier qui reste gagne). Décision du 14/11.
+  const FORMULES = ['normale', 'cahier'];
+  const TOTAUX_CAHIER = I.TOTAUX_CAHIER;
+  const TOTAL_CAHIER = 500;
   const DELAIS = [0, 5, 10, 15, 20]; // secondes par tour (0 = sans chrono)
   const PAUSE_ROBOT = 1800; // un robot réfléchit 1,8 s avant de jouer : le temps de voir chaque coup
   const PAUSE_EVENTAIL = 1400; // en plus, après plusieurs cartes posées d'un coup (l'éventail se voit)
@@ -36,6 +42,9 @@
       etat: 'salon', // 'salon' | 'manche' | 'finManche' | 'finPartie'
       mode: 'simple', // 'simple' (1 paquet) | 'delire' (2 paquets), choisi par l'hôte dans le salon
       jRetour: false, // option du mode délire : le valet change le sens du jeu
+      formule: 'normale', // 'normale' | 'cahier' (salons privés et contre les robots)
+      totalCahier: TOTAL_CAHIER, // mode Cahier : total qui élimine
+      cahier: null, // mode Cahier en cours : { total, scores: { id: points }, donnes: [{ numero, sorti, points, mains, elimines }] }
       paquets: 1, // fixé au lancement selon le mode
       joueurs: [],
       hote: null,
@@ -140,6 +149,8 @@
   function lancer(s) {
     s.restants = s.joueurs.map((j) => j.id);
     s.paquets = I.nombrePaquets(s.mode);
+    if (s.publique) s.formule = 'normale';
+    s.cahier = s.formule === 'cahier' ? { total: s.totalCahier, scores: Object.fromEntries(s.restants.map((id) => [id, 0])), donnes: [] } : null;
     demarrerManche(s);
   }
   function rendrePublique(s, taille) {
@@ -202,7 +213,20 @@
   }
 
   // Premier joueur : au hasard, sauf en duel où les deux mêmes joueurs commencent à tour de rôle.
+  // Mode Cahier (créateur, 14/11) : commence celui qui a pris le plus de points à la donne précédente ;
+  // à égalité, le plus gros total au cahier ; encore à égalité, au hasard. Première donne : au hasard.
   function choisirPremier(s, sieges) {
+    const derniere = s.cahier && s.cahier.donnes[s.cahier.donnes.length - 1];
+    if (derniere) {
+      const cle = (j) => [derniere.points[j] || 0, s.cahier.scores[j] || 0];
+      let meilleurs = [];
+      for (const j of sieges) {
+        const [a, b] = cle(j), m = meilleurs[0] && cle(meilleurs[0]);
+        if (!m || a > m[0] || (a === m[0] && b > m[1])) meilleurs = [j];
+        else if (a === m[0] && b === m[1]) meilleurs.push(j);
+      }
+      return meilleurs[Math.floor(s.rng() * meilleurs.length)];
+    }
     const auHasard = sieges[Math.floor(s.rng() * sieges.length)];
     if (sieges.length !== 2 || s.numeroManche !== 0) return auHasard;
     const paire = sieges.slice().sort().join('|');
@@ -223,7 +247,7 @@
     // Avec une distribution animée, l'effet de la carte de départ (pénalité, tour sauté, J retour)
     // attend la fin du compte à rebours : le joueur sanctionné reçoit ses cartes après les autres.
     const differerDepart = s.durees.depart > 0;
-    s.manche = I.nouvelleManche(sieges, mains, pioche, premier, { mode: s.mode, jRetour: s.jRetour, graine: Math.floor(s.rng() * 4294967296), differerDepart });
+    s.manche = I.nouvelleManche(sieges, mains, pioche, premier, { mode: s.mode, jRetour: s.jRetour, graine: Math.floor(s.rng() * 4294967296), differerDepart, cahier: !!s.cahier });
     s.etat = 'manche';
     const depart = entreRobots(s) ? Math.min(s.durees.depart, RAPIDE.depart) : s.durees.depart;
     s.pause = depart > 0 ? { type: 'depart', jusqua: s.horloge() + depart, total: depart } : null;
@@ -248,6 +272,7 @@
   function reinitialiser(s) {
     s.restants = [];
     s.elimines = [];
+    s.cahier = null;
     s.numeroManche = 0;
     s.nulles = 0;
     s.manche = null;
@@ -294,8 +319,11 @@
       return;
     }
     if (m.phase !== 'terminee') return;
-    s.elimines.push(m.elimine);
-    s.restants = s.restants.filter((j) => j !== m.elimine);
+    let sortants;
+    if (s.cahier) sortants = noterDonne(s, m);
+    else sortants = [m.elimine];
+    s.elimines.push(...sortants);
+    s.restants = s.restants.filter((j) => !sortants.includes(j));
     if (s.restants.length === 1) {
       s.vainqueur = s.restants[0];
       s.etat = 'finPartie';
@@ -303,8 +331,22 @@
       s.revancheRatee = false;
     } else {
       s.etat = 'finManche';
-      suiteAuto(s, vraiRobot(s, m.elimine));
+      suiteAuto(s, sortants.length > 0 && sortants.every((j) => vraiRobot(s, j)));
     }
+  }
+  // Mode Cahier : écrit les points de la donne et renvoie les joueurs qui atteignent le total.
+  // Plusieurs éliminés à la même donne : le plus gros total sort le premier (il finit plus bas au
+  // classement). Celui qui est sorti marque 0, donc il reste toujours au moins un joueur.
+  function noterDonne(s, m) {
+    const c = s.cahier;
+    const mains = {};
+    for (const j of m.sieges) {
+      c.scores[j] = (c.scores[j] || 0) + m.points[j];
+      if (j !== m.sorti) mains[j] = m.mains[j].slice();
+    }
+    const sortants = m.sieges.filter((j) => c.scores[j] >= c.total).sort((a, b) => c.scores[b] - c.scores[a] || m.points[b] - m.points[a]);
+    c.donnes.push({ numero: c.donnes.length + 1, sorti: m.sorti, points: Object.assign({}, m.points), mains, elimines: sortants.slice() });
+    return sortants;
   }
   // Manche suivante automatique : vite entre robots (sauf juste après l'élimination d'un humain).
   function suiteAuto(s, robotSorti) {
@@ -405,6 +447,14 @@
           s.jRetour = msg.jRetour;
         }
         if (s.mode !== 'delire') s.jRetour = false;
+        if (msg.formule !== undefined) {
+          if (!FORMULES.includes(msg.formule) || (s.publique && msg.formule !== 'normale')) return { ok: false, erreur: 'Impossible.' };
+          s.formule = msg.formule;
+        }
+        if (msg.total !== undefined) {
+          if (!TOTAUX_CAHIER.includes(msg.total)) return { ok: false, erreur: 'Impossible.' };
+          s.totalCahier = msg.total;
+        }
         if (msg.robots !== undefined) {
           if (s.publique || !NIVEAUX_ROBOTS.concat('gentils').includes(msg.robots)) return { ok: false, erreur: 'Impossible.' };
           s.robots = msg.robots;
@@ -516,6 +566,9 @@
       hote: s.hote,
       mode: s.mode,
       jRetour: !!s.jRetour,
+      formule: s.formule || 'normale',
+      totalCahier: s.totalCahier || TOTAL_CAHIER,
+      cahier: s.cahier ? { total: s.cahier.total, scores: Object.assign({}, s.cahier.scores), donnes: s.cahier.donnes.map((d) => ({ numero: d.numero, sorti: d.sorti, points: Object.assign({}, d.points), mains: d.mains /* cartes retournées en fin de donne : tout le monde les a vues */, elimines: d.elimines.slice() })) } : null,
       joueurs: s.joueurs.map((j) => ({ id: j.id, nom: j.nom, connecte: j.connecte, peerId: j.peerId || null, voix: !!j.voix, muet: j.muet !== false, robot: !!j.robot, niveau: j.robot && !j.remplace ? niveauDuRobot(s, j.id) : null, pret: !!j.pret || !!j.robot, remplace: !!j.remplace, absent: estAbsent(s, j.id) })),
       delai: s.delai,
       publique: !!s.publique,
@@ -552,6 +605,7 @@
         joueurCourant: m.joueurCourant,
         qualifies: m.qualifies.map((j) => ({ joueur: j, raison: 'main vide' })), // même forme que Kopo
         elimine: m.elimine,
+        sorti: m.sorti || null, // mode Cahier : celui qui a fini la donne
         journal: journalLisible(s, m),
         main: p.main,
         posees: p.posees, // dernières cartes posées (animations côté téléphone)
@@ -585,10 +639,13 @@
     // Partie enregistrée avant l'option J retour : le délire se jouait avec.
     if (s.jRetour === undefined) s.jRetour = s.mode === 'delire';
     if (s.manche && s.manche.jRetour === undefined) s.manche.jRetour = s.manche.mode === 'delire';
+    if (!s.formule) s.formule = 'normale';
+    if (!s.totalCahier) s.totalCahier = TOTAL_CAHIER;
+    if (s.cahier === undefined) s.cahier = null;
     return s;
   }
 
-  const Inter8Salle = { JEU, MIN, MAX, MODES, DELAIS, PAUSE_ROBOT, DUREES, DELAI_ABSENT, DELAI_ANNONCE, RAPIDE, entreRobots, NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, niveauDuRobot, creerSalle, rendrePublique, choixRobot, reconnecter, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
+  const Inter8Salle = { JEU, MIN, MAX, MODES, FORMULES, TOTAUX_CAHIER, TOTAL_CAHIER, DELAIS, PAUSE_ROBOT, DUREES, DELAI_ABSENT, DELAI_ANNONCE, RAPIDE, entreRobots, NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, niveauDuRobot, creerSalle, rendrePublique, choixRobot, reconnecter, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
   if (enNode) module.exports = Inter8Salle;
   else root.Inter8Salle = Inter8Salle;
 })(typeof window !== 'undefined' ? window : globalThis);

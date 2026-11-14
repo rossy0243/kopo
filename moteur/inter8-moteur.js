@@ -19,6 +19,17 @@
   const PENALITES = { 2: 2, 10: 4, X: 5 };
   const MAX_JOUEURS = 8;
 
+  // Mode Cahier (décision du 14/11) : quand le premier joueur sort, chacun compte les cartes qui
+  // lui restent en main avec ce barème (celui du créateur). Pour le changer, il suffit de changer
+  // les nombres ci-dessous ; les cartes absentes valent leur chiffre (2 = 2 points… 9 = 9 points).
+  const BAREME_CAHIER = { X: 50, 8: 25, A: 1, 10: 10, R: 10, D: 10, V: 10 };
+  const TOTAUX_CAHIER = [500, 1000]; // les deux totals d'élimination (créateur, 14/11)
+  const pointsCarte = (carte) => {
+    const v = valeur(carte);
+    return v in BAREME_CAHIER ? BAREME_CAHIER[v] : Number(v) || 0;
+  };
+  const pointsMain = (main) => (main || []).reduce((t, c) => t + pointsCarte(c), 0);
+
   const brut = (carte) => carte.replace('*', '');
   const valeur = (carte) => (brut(carte)[0] === JOKER ? JOKER : brut(carte).slice(0, -1));
   const couleur = (carte) => (valeur(carte) === JOKER ? null : brut(carte).slice(-1));
@@ -82,6 +93,8 @@
   // sieges : joueurs dans le sens des aiguilles d'une montre. mains : { joueur: [cartes] }.
   // pioche : cartes restantes (on tire par la fin). premier : joueur qui commence.
   // options : { mode: 'simple' | 'delire', jRetour, graine } (la graine sert à remélanger la défausse).
+  // options.cahier : mode Cahier, la donne s'arrête dès que le premier joueur sort (m.sorti), et
+  // m.points donne les points de chacun (barème BAREME_CAHIER, 0 pour celui qui sort).
   // jRetour : option du mode délire (le valet change le sens du jeu), désactivée par défaut.
   // options.differerDepart : l'effet de la carte de départ attend appliquerDepart(m)
   // (l'appli le déclenche à la fin de la distribution).
@@ -105,6 +118,7 @@
       qualifies: [],
       elimine: null,
       phase: 'jeu', // 'jeu' | 'terminee' | 'nulle'
+      cahier: !!o.cahier,
       graine: (o.graine >>> 0) || 1,
       journal: [],
       // Ce que toute la table a vu : cartes posées, et qui a pioché pendant une demande.
@@ -184,6 +198,15 @@
     m.enJeu = m.enJeu.filter((j) => j !== joueur);
     m.annonces = m.annonces.filter((j) => j !== joueur);
     m.qualifies.push(joueur);
+    if (m.cahier) {
+      // Mode Cahier : la donne s'arrête au premier qui sort, les autres comptent leurs cartes.
+      m.sorti = joueur;
+      m.points = Object.fromEntries(m.sieges.map((j) => [j, j === joueur ? 0 : pointsMain(m.mains[j])]));
+      m.phase = 'terminee';
+      m.joueurCourant = null;
+      noter(m, `${joueur} pose sa dernière carte : fin de la donne, chacun compte ses points.`);
+      return true;
+    }
     noter(m, `${joueur} pose sa dernière carte : qualifié !`);
     if (m.enJeu.length === 1) {
       m.elimine = m.enJeu[0];
@@ -467,6 +490,9 @@
     }
     if (v === JOKER) m.libre = true;
 
+    // Mode Cahier : sortir sur un 2, un 10 ou un joker fait quand même piocher le suivant
+    // (décision du 14/11), et ses cartes comptent dans ses points.
+    if (finit && m.cahier && PENALITES[v]) penaliser(m, suivant(m, j), PENALITES[v] * cartes.length);
     if (finit && sortir(m, j)) return m;
 
     let prochain;
@@ -587,7 +613,7 @@
   }
 
   const Inter8 = {
-    COULEURS, NOMS_COULEURS, SYMBOLES, VALEURS, PENALITES, MAX_JOUEURS,
+    COULEURS, NOMS_COULEURS, SYMBOLES, VALEURS, PENALITES, MAX_JOUEURS, BAREME_CAHIER, TOTAUX_CAHIER, pointsCarte, pointsMain,
     valeur, couleur, afficher, nomValeur, finissable, nombrePaquets, nouveauPaquet, hasard, melanger, distribuer,
     nouvelleManche, appliquerDepart, actionsPossibles, refus, jouer, jouerPartie, vuePublique,
     strategieSimple, strategieHasard,

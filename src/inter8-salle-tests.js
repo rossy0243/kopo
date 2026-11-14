@@ -438,9 +438,9 @@ test('« Passer à la fin » donne le même classement qu\'à vitesse normale', 
   for (const [graine, mode] of [[1, 'simple'], [2, 'simple'], [3, 'delire'], [4, 'delire']]) {
     const a = salleRobots(graine, 5, mode), b = salleRobots(graine, 5, mode);
     let k = 0;
-    while (a.etat !== 'finPartie' && k++ < 300000) pas(a, 100);
+    while (a.etat !== 'finPartie' && k++ < 500000) pas(a, 100);
     k = 0;
-    while (b.etat !== 'finPartie' && k++ < 300000) {
+    while (b.etat !== 'finPartie' && k++ < 500000) {
       if (S.vue(b, 'p1').entreRobots) assert.ok(S.recevoir(b, 'p1', { type: 'passerFin' }).ok);
       else pas(b, 100);
     }
@@ -451,5 +451,87 @@ test('« Passer à la fin » donne le même classement qu\'à vitesse normale', 
   }
 });
 
+
+// ---------------------------------------------------------------- mode Cahier (14/11)
+test('Cahier : l\'hôte choisit la formule et le total, pas les autres', () => {
+  const s = salleAvec(3);
+  assert.ok(!S.recevoir(s, 'p2', { type: 'reglages', formule: 'cahier' }).ok);
+  assert.ok(!S.recevoir(s, 'p1', { type: 'reglages', formule: 'points' }).ok);
+  assert.ok(!S.recevoir(s, 'p1', { type: 'reglages', total: 200 }).ok);
+  assert.ok(S.recevoir(s, 'p1', { type: 'reglages', formule: 'cahier', total: 1000 }).ok);
+  const v = S.vue(s, 'p2');
+  assert.strictEqual(v.formule, 'cahier');
+  assert.strictEqual(v.totalCahier, 1000);
+  assert.strictEqual(v.cahier, null);
+});
+test('Cahier : pas en salle publique', () => {
+  const s = S.creerSalle('ABCD', I.hasard(1));
+  S.rendrePublique(s, 3);
+  S.recevoir(s, 'p1', { type: 'rejoindre', nom: 'A' });
+  assert.ok(!S.recevoir(s, 'p1', { type: 'reglages', formule: 'cahier' }).ok);
+});
+test('Cahier : points écrits à chaque donne, éliminé au total, le dernier gagne', () => {
+  for (const graine of [1, 2, 3, 4, 5, 6]) {
+    const s = salleAvec(4, graine);
+    assert.ok(S.recevoir(s, 'p1', { type: 'reglages', formule: 'cahier', total: 500, mode: graine % 2 ? 'simple' : 'delire' }).ok);
+    assert.ok(S.recevoir(s, 'p1', { type: 'lancer' }).ok);
+    assert.ok(s.cahier);
+    jouerPartieParLesVues(s, I.hasard(graine + 100));
+    const c = S.vue(s, 'p2').cahier;
+    assert.ok(c.donnes.length >= 2, 'plusieurs donnes');
+    // Chaque donne : celui qui sort marque 0 et les autres les points de leurs cartes retournées.
+    for (const d of c.donnes) {
+      assert.strictEqual(d.points[d.sorti], 0);
+      for (const [j, main] of Object.entries(d.mains)) assert.strictEqual(d.points[j], I.pointsMain(main));
+    }
+    // Totaux = somme des donnes ; les éliminés ont atteint 500, le vainqueur non.
+    for (const id of Object.keys(c.scores)) assert.strictEqual(c.scores[id], c.donnes.reduce((t, d) => t + (d.points[id] || 0), 0));
+    assert.strictEqual(s.elimines.length, 3);
+    for (const e of s.elimines) assert.ok(c.scores[e] >= 500);
+    assert.ok(c.scores[s.vainqueur] < 500);
+    assert.deepStrictEqual(c.donnes.flatMap((d) => d.elimines), s.elimines);
+  }
+});
+test('Cahier : contre les robots, la partie va jusqu\'au bout', () => {
+  const s = salleAvec(1, 9);
+  assert.ok(S.recevoir(s, 'p1', { type: 'reglages', formule: 'cahier', total: 500 }).ok);
+  for (let i = 0; i < 3; i++) assert.ok(S.recevoir(s, 'p1', { type: 'ajouterRobot' }).ok);
+  assert.ok(S.recevoir(s, 'p1', { type: 'lancer' }).ok);
+  jouerPartieParLesVues(s, I.hasard(9));
+  assert.strictEqual(s.etat, 'finPartie');
+  assert.ok(s.cahier.scores[s.vainqueur] < 500);
+});
+test('Cahier : la revanche repart d\'un cahier vide', () => {
+  const s = salleAvec(2, 3);
+  assert.ok(S.recevoir(s, 'p1', { type: 'reglages', formule: 'cahier', total: 500 }).ok);
+  assert.ok(S.recevoir(s, 'p1', { type: 'lancer' }).ok);
+  jouerPartieParLesVues(s, I.hasard(4));
+  assert.ok(S.recevoir(s, 'p1', { type: 'revanche' }).ok);
+  assert.ok(S.recevoir(s, 'p2', { type: 'revanche' }).ok);
+  assert.strictEqual(s.etat, 'manche');
+  assert.deepStrictEqual(s.cahier.scores, { p1: 0, p2: 0 });
+  assert.strictEqual(s.cahier.donnes.length, 0);
+});
+test('Cahier : exporter puis importer garde le cahier', () => {
+  const s = salleAvec(3, 5);
+  assert.ok(S.recevoir(s, 'p1', { type: 'reglages', formule: 'cahier' }).ok);
+  assert.ok(S.recevoir(s, 'p1', { type: 'lancer' }).ok);
+  const t = S.importer(S.exporter(s), I.hasard(1));
+  assert.strictEqual(t.formule, 'cahier');
+  assert.strictEqual(t.cahier.total, 500);
+});
+
+test('Cahier : commence le plus gros total de la donne, puis du cahier, puis au hasard', () => {
+  const s = salleAvec(4, 2);
+  assert.ok(S.recevoir(s, 'p1', { type: 'reglages', formule: 'cahier' }).ok);
+  assert.ok(S.recevoir(s, 'p1', { type: 'lancer' }).ok);
+  const donne = (points, scores) => { s.cahier.donnes.push({ numero: s.cahier.donnes.length + 1, sorti: 'p1', points, mains: {}, elimines: [] }); s.cahier.scores = scores; s.etat = 'finManche'; assert.ok(S.recevoir(s, 'p1', { type: 'mancheSuivante' }).ok); return s.manche.joueurCourant || s.manche.departEnAttente; };
+  s.durees.depart = 1; // la carte de départ n'agit pas encore : le premier joueur reste visible
+  assert.strictEqual(donne({ p1: 0, p2: 30, p3: 45, p4: 12 }, { p1: 0, p2: 30, p3: 45, p4: 12 }), 'p3');
+  assert.strictEqual(donne({ p1: 0, p2: 40, p3: 12, p4: 40 }, { p1: 10, p2: 70, p3: 57, p4: 90 }), 'p4');
+  const vus = new Set();
+  for (let i = 0; i < 30; i++) vus.add(donne({ p1: 0, p2: 20, p3: 20, p4: 5 }, { p1: 0, p2: 100, p3: 100, p4: 5 }));
+  assert.deepStrictEqual([...vus].sort(), ['p2', 'p3']);
+});
 console.log(`\n${ok} test(s) réussi(s), ${ko} échec(s).`);
 if (ko) process.exit(1);

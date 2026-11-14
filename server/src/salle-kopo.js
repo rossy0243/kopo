@@ -56,6 +56,11 @@ class SalleKopo extends Room {
       this.salle.mode = options.mode;
       this.salle.jRetour = options.mode === 'delire' && (options.jRetour === undefined ? true : options.jRetour === true);
     }
+    // Inter (8), mode Cahier (14/11) : comptage des points, salons privés seulement.
+    if (this.jeu === 'inter8' && !this.publique && options.formule === 'cahier') {
+      this.salle.formule = 'cahier';
+      if (SI.TOTAUX_CAHIER.includes(options.total)) this.salle.totalCahier = options.total;
+    }
     // Salle publique : N joueurs inconnus, elle démarre seule quand elle est pleine.
     this.taille = this.publique ? Math.min(this.S.MAX, Math.max(this.S.MIN, Number(options.taille) || this.S.MAX)) : null;
     if (this.publique) { this.S.rendrePublique(this.salle, this.taille); this.maxClients = this.taille; }
@@ -451,6 +456,8 @@ function optionsEntrainement(S, o = {}) {
   if (S === SI && SI.MODES.includes(o.mode)) {
     reglages.mode = o.mode;
     if (typeof o.jRetour === 'boolean') reglages.jRetour = o.jRetour;
+    if (SI.FORMULES.includes(o.formule)) reglages.formule = o.formule;
+    if (SI.TOTAUX_CAHIER.includes(o.total)) reglages.total = o.total;
   }
   return { robots, reglages, lancer: o.lancer === true };
 }
