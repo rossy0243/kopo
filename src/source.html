@@ -167,7 +167,7 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
 .main .carte .centre { font-size: 36px; }
 .main .carte.jouable { cursor: pointer; }
 .main .carte.choisie { z-index: 1; transform: translateY(-12px); box-shadow: 0 0 0 3px var(--brass), 0 10px 18px rgba(0,0,0,.4); }
-.main .carte:disabled { opacity: .4; filter: grayscale(.4); }
+.main .carte:disabled { filter: brightness(.5) grayscale(.45); } /* opaque : dans une main serrée, on ne voit pas les cartes du dessous à travers */
 .actions { display: grid; gap: 8px; }
 /* Animations coupées (réglage « Réduites », ou téléphone qui en demande moins) */ html.sans-anim .main .carte, html.sans-anim .btn.katapss { transition: none; animation: none; }
 
@@ -268,6 +268,15 @@ details.rappel summary { cursor: pointer; font-weight: 600; }
 }
 /* Invitation à tourner le téléphone (au début d'une partie tenue droite, sur téléphone). */
 .voile-tourner { z-index: 12; }
+/* Pause contre les robots : par-dessus la table et le bilan de manche ; s'efface le temps des règles ou de « Quitter ? ». */
+.voile-pause { z-index: 11; background: rgba(6,14,24,.82); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+body.pause-cachee .voile-pause { display: none; }
+.fenetre-pause { text-align: center; max-width: 340px; }
+.fenetre-pause p { margin: 0 0 4px; }
+.pause-icone { display: flex; justify-content: center; gap: 10px; margin: 2px auto 0; }
+.pause-icone i { width: 14px; height: 44px; border-radius: 4px; background: var(--brass); box-shadow: 0 4px 12px rgba(0,0,0,.35); }
+html:not(.sans-anim) .voile-pause:not([hidden]) .fenetre-pause { animation: pause-entree .22s cubic-bezier(.3,1.4,.5,1); }
+@keyframes pause-entree { from { transform: scale(.9); opacity: 0; } }
 /* Messages du tableau de bord : annonce (une fois) et maintenance (bloquante, au-dessus de tout). */
 .voile-annonce { z-index: 45; } /* au-dessus de l'écran de bienvenue (40) */
 .voile-maintenance { z-index: 60; background: rgba(6,14,24,.94); }
@@ -1243,6 +1252,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     <button class="btn" id="btnPleinEcranEntete" hidden title="Plein écran" aria-label="Plein écran">⛶</button>
     <button class="btn btn-ico" id="btnParametres" title="Paramètres" aria-label="Paramètres"><svg class="ico-k" viewBox="0 0 32 32" aria-hidden="true"><rect x="8" y="4" width="16" height="24" rx="2.5"/><path d="M12 10h8M12 16h8M12 22h8"/><circle cx="15" cy="10" r="1.8" class="fond"/><circle cx="18.5" cy="16" r="1.8" class="fond"/><circle cx="14" cy="22" r="1.8" class="acc"/></svg></button>
     <button class="btn btn-ico" id="btnReactions" title="Réactions" aria-label="Envoyer une réaction"><svg class="ico-k" viewBox="0 0 32 32" aria-hidden="true"><rect x="9" y="4" width="14" height="20" rx="2.5"/><path d="M13 24l-3 5 7-5"/><path d="M13 11h6M13 16h4"/><circle cx="20.5" cy="16" r="1.6" class="acc"/></svg></button>
+    <button class="btn btn-ico" id="btnPause" hidden title="Pause" aria-label="Mettre la partie en pause"><svg class="ico-k" viewBox="0 0 32 32" aria-hidden="true"><rect x="9" y="7" width="5" height="18" rx="1.5"/><rect x="18" y="7" width="5" height="18" rx="1.5"/></svg></button>
     <button class="btn" id="btnQuitter" hidden>Quitter</button>
   </header>
   <div class="bandeau" id="bandeau" hidden></div>
@@ -1538,6 +1548,14 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
 })();
 </script>
 <div class="voile" id="voile" hidden><div class="fenetre" id="fenetre"></div></div>
+<div class="voile voile-pause" id="voilePause" hidden><div class="fenetre fenetre-pause" role="dialog" aria-modal="true" aria-labelledby="titrePause">
+  <div class="pause-icone" aria-hidden="true"><i></i><i></i></div>
+  <h2 id="titrePause">Pause</h2>
+  <p class="muted">Les robots et le chrono t'attendent. Rien ne bouge tant que tu ne reprends pas.</p>
+  <button class="btn principal large" id="btnReprendre">Reprendre</button>
+  <button class="btn large" id="btnReglesPause">Règles</button>
+  <button class="btn large" id="btnQuitterPause">Quitter la partie</button>
+</div></div>
 <div class="voile voile-annonce" id="voileAnnonce" hidden>
   <div class="fenetre fenetre-serveur" role="dialog" aria-modal="true" aria-labelledby="titreAnnonce">
     <h2 id="titreAnnonce">Annonce</h2>
@@ -2266,6 +2284,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     if (accueil && document.fullscreenElement) document.exitFullscreen().catch(() => {});
     vocal.arreter();
     hote = client = vueActuelle = null;
+    majPause(null);
     session = null;
     stock.effacer(cleSession);
     history.replaceState(null, '', location.pathname + location.search);
@@ -2378,6 +2397,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     if (logo.lastChild.textContent !== nomJeu) { logo.lastChild.textContent = nomJeu; logo.classList.toggle('long', v.jeu === 'inter8'); logo.firstChild.src = v.jeu === 'inter8' ? 'icons/masano-logo.svg' : 'icons/kopo-logo.svg'; }
     garderEcranAllume();
     vocal.maj(v);
+    majPause(v);
     // Plus aucun humain en jeu : on peut sauter la fin (de la manche, si on est qualifié pour la suivante).
     $('btnPasserFin').hidden = !v.entreRobots;
     $('btnPasserFin').textContent = v.restants && v.restants.includes(v.moi) ? 'Passer à la fin de la manche' : 'Passer à la fin';
@@ -2464,6 +2484,14 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   // Fait voler une carte (face visible, ou de dos si c est null) d'un rectangle à un autre.
   function voler(c, de, vers, o = {}) {
     if (sansAnim || !visible(de) || !visible(vers)) return;
+    // Vers une carte de ta main : on vise sa vraie place (pas le rectangle élargi par l'inclinaison) et on arrive penché comme elle.
+    let rotFin = 0;
+    const cibleEl = o.cible && document.querySelector(o.cible);
+    if (cibleEl && cibleEl.offsetWidth) {
+      const r = cibleEl.getBoundingClientRect(), w = cibleEl.offsetWidth, h = cibleEl.offsetHeight;
+      if (visible(r)) vers = { left: r.left + r.width / 2 - w / 2, top: r.top + r.height / 2 - h / 2, width: w, height: h };
+      rotFin = parseFloat(getComputedStyle(cibleEl).getPropertyValue('--r')) || 0;
+    }
     const e = c ? (vueActuelle && vueActuelle.jeu === 'inter8' ? carteInterEl(c) : carteEl(c)) : el('div', 'carte dos-carte');
     e.classList.add('volante');
     if (o.verso) e.classList.add('verso');
@@ -2473,7 +2501,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     const duree = o.duree || 480, delai = o.delai || 0;
     const kf = [{ transform: `translate(${dx}px, ${dy}px) scale(${s0}, ${s0}) rotate(${o.rot ?? -12}deg)`, opacity: 1 }];
     if (o.retourner) kf.push({ offset: 0.5, transform: `translate(${dx / 2}px, ${dy / 2 - 30}px) scale(0.02, ${(s0 + 1) / 2}) rotate(-6deg)`, opacity: 1 });
-    kf.push(o.disparaitre ? { transform: 'translate(0px, 0px) scale(0.4, 0.4) rotate(0deg)', opacity: 0 } : { transform: 'translate(0px, 0px) scale(1, 1) rotate(0deg)', opacity: 1 });
+    kf.push(o.disparaitre ? { transform: 'translate(0px, 0px) scale(0.4, 0.4) rotate(0deg)', opacity: 0 } : { transform: `translate(0px, 0px) scale(1, 1) rotate(${rotFin}deg)`, opacity: 1 });
     if (o.cible) { enVol.set(o.cible, (enVol.get(o.cible) || 0) + 1); document.querySelectorAll(o.cible).forEach((x) => (x.style.visibility = 'hidden')); }
     calque.append(e);
     if (o.retourner) setTimeout(() => e.classList.toggle('verso'), delai + duree / 2);
@@ -2969,13 +2997,9 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     $('titreMain').textContent = `Ta main (${m.main.length} carte${m.main.length > 1 ? 's' : ''})` + (jouables.size ? ' · touche une carte' : '');
     const main = $('main'); main.replaceChildren();
     const triee = trierMain(m.main);
-    triee.forEach((c, i) => {
+    triee.forEach((c) => {
       const b = carteEl(c, 'button');
       b.type = 'button';
-      // Éventail (en paysage) : légère rotation et arc.
-      const ecart = i - (triee.length - 1) / 2;
-      b.style.setProperty('--r', (ecart * Math.min(2.5, 16 / triee.length)).toFixed(1) + 'deg');
-      b.style.setProperty('--dy', (ecart * ecart * Math.min(1, 8 / triee.length)).toFixed(1) + 'px');
       if (jouables.has(c)) {
         b.classList.add('jouable');
         if (c === carteChoisie) b.classList.add('choisie');
@@ -2989,6 +3013,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     ajusterMain();
     for (const sel of enVol.keys()) document.querySelectorAll(sel).forEach((x) => (x.style.visibility = 'hidden'));
     for (const c of cartesRecues) { const e = main.querySelector(`[data-carte="${c}"]`); if (e) e.classList.add('recue'); }
+    glisserMain();
     const act = $('actions'); act.replaceChildren();
     if (carteChoisie) {
       const b = el('button', 'btn principal large', `Jouer le ${K.afficher(carteChoisie)}`);
@@ -3224,13 +3249,9 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     $('titreMain').textContent = `Ta main (${m.main.length} carte${m.main.length > 1 ? 's' : ''})` + (coups.length && !choixInter.length ? ' · touche une carte' : '');
     const main = $('main'); main.replaceChildren();
     const triee = trierMainInter(m.main);
-    triee.forEach((c, i) => {
+    triee.forEach((c) => {
       const b = carteInterEl(c, 'button');
       b.type = 'button';
-      const ecart = i - (triee.length - 1) / 2;
-      b.style.setProperty('--r', (ecart * Math.min(2.5, 16 / triee.length)).toFixed(1) + 'deg');
-      // Arc léger : les cartes du bord descendent de 8 px au plus (une grande main ne sort pas de l'écran).
-      b.style.setProperty('--dy', (8 * (ecart / Math.max(1, (triee.length - 1) / 2)) ** 2).toFixed(1) + 'px');
       const k = choixInter.indexOf(c);
       if (k >= 0) {
         b.classList.add('jouable', 'choisie');
@@ -3251,6 +3272,10 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       main.append(b);
     });
     ajusterMain();
+    // Cartes piochées encore en vol : cachées jusqu'à l'arrivée (sinon on les voit en double) ; puis mises en évidence.
+    for (const sel of enVol.keys()) document.querySelectorAll(sel).forEach((x) => (x.style.visibility = 'hidden'));
+    for (const c of cartesRecues) { const e = main.querySelector(`[data-carte="${c}"]`); if (e) e.classList.add('recue'); }
+    glisserMain();
 
     const act = $('actions'); act.replaceChildren();
     if (encore.length) {
@@ -3391,6 +3416,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     main.style.width = '';
     for (const c of main.children) { c.style.marginTop = ''; c.style.marginRight = ''; }
     if (n < 2 || main.offsetParent === null) return;
+    poserEventail(main, n);
     if (matchMedia('(orientation: landscape)').matches && mainEnEtages(main, n)) return;
     const w = main.children[0].offsetWidth, W = main.clientWidth;
     if (n * w + (n - 1) * 6 <= W) return;
@@ -3405,8 +3431,40 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     if (paysage && inter && pas < lisible) { pas = lisible; main.classList.add('defile'); }
     main.style.setProperty('--pas', pas + 'px');
     main.classList.add('serree');
+    poserEventail(main, n, pas / w);
   }
-  window.addEventListener('resize', ajusterMain);
+  // Éventail (en paysage) : légère inclinaison et arc. Plus les cartes se chevauchent, plus il est discret :
+  // une main serrée reste bien alignée, et les cartes du bord ne descendent jamais de plus de 8 px (rien ne sort de l'écran).
+  function poserEventail(main, n, ouverture = 1) {
+    const k = Math.max(0.35, Math.min(1, ouverture)); // 1 : cartes côte à côte ; petit : cartes très serrées
+    const angle = Math.min(2.5, 16 / n) * k, creux = 8 * k, milieu = (n - 1) / 2;
+    [...main.children].forEach((c, i) => {
+      const ecart = i - milieu;
+      c.style.setProperty('--r', (ecart * angle).toFixed(2) + 'deg');
+      c.style.setProperty('--dy', (creux * (ecart / Math.max(1, milieu)) ** 2).toFixed(1) + 'px');
+    });
+  }
+  // Quand la main change (carte jouée, piochée, choisie), les cartes glissent vers leur nouvelle place au lieu de sauter.
+  let placesMain = new Map();
+  function lirePlacesMain() {
+    const p = new Map();
+    for (const e of $('main').children) { const r = e.getBoundingClientRect(); if (visible(r)) p.set(e.dataset.carte, { x: r.left + r.width / 2, y: r.top + r.height / 2 }); }
+    return p;
+  }
+  function glisserMain() {
+    const avant = placesMain, apres = lirePlacesMain();
+    placesMain = apres;
+    if (sansAnim || !transfoSeules || !document.body.classList.contains('en-jeu')) return;
+    for (const e of $('main').children) {
+      const a = avant.get(e.dataset.carte), b = apres.get(e.dataset.carte);
+      if (!a || !b || e.style.visibility === 'hidden') continue;
+      const dx = a.x - b.x, dy = a.y - b.y;
+      if (Math.abs(dx) < 1.5 && Math.abs(dy) < 1.5) continue;
+      if (Math.hypot(dx, dy) > 500) continue; // écran tourné : pas de grand vol
+      e.animate([{ translate: `${dx.toFixed(1)}px ${dy.toFixed(1)}px` }, { translate: '0px 0px' }], { duration: 240, easing: 'cubic-bezier(.25,.8,.3,1)' });
+    }
+  }
+  window.addEventListener('resize', () => { ajusterMain(); placesMain = lirePlacesMain(); });
   function mainEnEtages(main, n) {
     const cartes = [...main.children], h = cartes[0].offsetHeight, w = Math.round(h * 0.69), W = main.clientWidth, lisible = 30;
     if (n * w + (n - 1) * 6 <= W || (W - w) / (n - 1) >= lisible) return false; // tient sur une rangée : la règle normale suffit
@@ -3421,17 +3479,36 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     return true;
   }
 
+  // ------------------------------------------------------------------ pause (seul contre les robots)
+  // Le bouton Pause n'apparaît que si on est le seul humain à la table. Tout s'arrête chez l'hôte (ou sur le serveur) :
+  // robots, chrono, comptes à rebours. Quand on quitte l'appli (appel, autre appli), la partie se met en pause toute seule.
+  function majPause(v) {
+    const enJeu = !!v && (v.etat === 'manche' || v.etat === 'finManche');
+    $('btnPause').hidden = !(enJeu && v.pausable && !v.enPause);
+    const ouvrir = enJeu && !!v.enPause;
+    if (ouvrir && $('voilePause').hidden) setTimeout(() => { if (!$('voilePause').hidden) $('btnReprendre').focus({ preventScroll: true }); }, 50);
+    $('voilePause').hidden = !ouvrir;
+  }
+  const mettreEnPause = () => { const v = vueActuelle; if (v && v.pausable && !v.enPause) envoyer({ type: 'pause' }); };
+  $('btnPause').onclick = mettreEnPause;
+  $('btnReprendre').onclick = () => envoyer({ type: 'reprendre' });
+  $('btnReglesPause').onclick = () => { document.body.classList.add('pause-cachee'); montrerRegles(); };
+  $('btnQuitterPause').onclick = () => { document.body.classList.add('pause-cachee'); $('btnQuitter').onclick(); };
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') mettreEnPause(); });
+
   // ------------------------------------------------------------------ chrono (affichage)
   // L'hôte envoie le temps restant ; chaque téléphone le décompte avec sa propre horloge.
-  let finChrono = null, totalChrono = 0, dernierTic = null;
+  let finChrono = null, totalChrono = 0, dernierTic = null, chronoFige = null;
   function demarrerChrono(v) {
     const p = v.manche && v.manche.pause;
     const c = p ? { resteMs: p.resteMs, totalMs: p.totalMs } : v.etat === 'finManche' ? v.suite : v.chrono;
     finChrono = c ? performance.now() + c.resteMs : null;
     totalChrono = c ? c.totalMs : 0;
+    chronoFige = c && v.enPause ? c.resteMs : null; // partie en pause : le temps ne descend plus
   }
   function majChrono() {
     if (finChrono == null) return;
+    if (chronoFige != null) finChrono = performance.now() + chronoFige;
     const ds = document.querySelector('.decompte-suite');
     if (ds) ds.textContent = Math.max(0, Math.ceil((finChrono - performance.now()) / 1000));
     const d = document.querySelector('.decompte');
@@ -3576,7 +3653,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   }
 
   function ouvrirFenetre(contenu, type) { $('fenetre').replaceChildren(...contenu); $('fenetre').dataset.type = type || ''; $('voile').hidden = false; }
-  function fermerFenetre() { $('voile').hidden = true; }
+  function fermerFenetre() { $('voile').hidden = true; document.body.classList.remove('pause-cachee'); }
   const chatOuvert = () => $('fenetre').dataset.type === 'chat' && !$('voile').hidden;
 
   // ------------------------------------------------------------------ Inter (8) : mode Cahier (14/11)

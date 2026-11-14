@@ -533,5 +533,34 @@ test('Cahier : commence le plus gros total de la donne, puis du cahier, puis au 
   for (let i = 0; i < 30; i++) vus.add(donne({ p1: 0, p2: 20, p3: 20, p4: 5 }, { p1: 0, p2: 100, p3: 100, p4: 5 }));
   assert.deepStrictEqual([...vus].sort(), ['p2', 'p3']);
 });
+
+console.log('\nPause contre les robots');
+test('Inter (8) : la pause arrête tout, même en mode Cahier, puis la partie reprend au même point', () => {
+  for (const cahier of [false, true]) {
+    const s = S.creerSalle('ROBO', I.hasard(21));
+    const h = horloge(); s.horloge = h;
+    S.recevoir(s, 'p1', { type: 'rejoindre', nom: 'Moi' });
+    if (cahier) assert.ok(S.recevoir(s, 'p1', { type: 'reglages', formule: 'cahier', total: 500 }).ok);
+    for (let i = 0; i < 3; i++) S.recevoir(s, 'p1', { type: 'ajouterRobot' });
+    S.recevoir(s, 'p1', { type: 'lancer' });
+    for (let i = 0; i < 80; i++) pas(s, 100); // quelques coups
+    assert.strictEqual(S.vue(s, 'p1').pausable, true);
+    assert.ok(S.recevoir(s, 'p1', { type: 'pause' }).ok);
+    const avant = JSON.stringify(s.manche), v = S.vue(s, 'p1');
+    for (let i = 0; i < 300; i++) { h.avancer(1000); assert.strictEqual(S.tic(s), false); }
+    assert.strictEqual(JSON.stringify(s.manche), avant);
+    assert.deepStrictEqual(S.vue(s, 'p1').chrono, v.chrono);
+    assert.deepStrictEqual(S.vue(s, 'p1').manche.actions, []);
+    assert.ok(S.recevoir(s, 'p1', { type: 'reprendre' }).ok);
+    assert.deepStrictEqual(S.vue(s, 'p1').chrono, v.chrono);
+    for (let k = 0; k < 100; k++) pas(s, 100);
+    assert.notStrictEqual(JSON.stringify(s.manche), avant, 'la partie repart');
+  }
+});
+test('Inter (8) : pas de pause avec un autre humain à la table', () => {
+  const s = salleAvec(2); S.recevoir(s, 'p1', { type: 'lancer' });
+  assert.strictEqual(S.vue(s, 'p1').pausable, false);
+  assert.ok(!S.recevoir(s, 'p1', { type: 'pause' }).ok);
+});
 console.log(`\n${ok} test(s) réussi(s), ${ko} échec(s).`);
 if (ko) process.exit(1);

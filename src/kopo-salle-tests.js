@@ -971,5 +971,78 @@ test('Entre robots, pauses plus courtes ; juste après mon élimination, rythme 
   assert.ok(vuSuiteNormale || vuSuiteRapide || s.vainqueur === 'p1');
 });
 
+console.log('\nPause contre les robots');
+test('Seul contre les robots : la pause arrête robots, chrono et compte à rebours, puis tout reprend au même point', () => {
+  const s = salleRobots(11, 3);
+  const v0 = S.vue(s, 'p1');
+  assert.strictEqual(v0.pausable, true);
+  assert.ok(v0.manche.pause && v0.manche.pause.type === 'depart');
+  s.avancer(1000); S.tic(s);
+  const reste = S.vue(s, 'p1').manche.pause.resteMs;
+  assert.ok(S.recevoir(s, 'p1', { type: 'pause' }).ok);
+  const avant = JSON.stringify(s.manche);
+  for (let i = 0; i < 600; i++) { s.avancer(1000); assert.strictEqual(S.tic(s), false); } // 10 minutes de pause
+  assert.strictEqual(JSON.stringify(s.manche), avant, 'rien ne bouge');
+  const v = S.vue(s, 'p1');
+  assert.strictEqual(v.enPause, true);
+  assert.strictEqual(v.manche.pause.resteMs, reste, 'le compte à rebours est figé');
+  assert.deepStrictEqual(v.manche.actions, []);
+  assert.ok(!S.recevoir(s, 'p1', { type: 'mancheSuivante' }).ok);
+  assert.ok(S.recevoir(s, 'p1', { type: 'reprendre' }).ok);
+  assert.strictEqual(S.vue(s, 'p1').enPause, false);
+  assert.strictEqual(S.vue(s, 'p1').manche.pause.resteMs, reste, 'il reprend où il en était');
+  // Et la partie va jusqu'au bout.
+  for (let k = 0; k < 200000 && s.etat !== 'finPartie'; k++) { pas(s, 100); if (s.etat === 'finManche') S.recevoir(s, 'p1', { type: 'mancheSuivante' }); }
+  assert.strictEqual(s.etat, 'finPartie');
+});
+test('Pause pendant mon tour : mon chrono est figé, je ne peux pas jouer, et je le retrouve à la reprise', () => {
+  const s = salleRobots(12, 2);
+  let k = 0;
+  while (!(s.etat === 'manche' && !s.pause && s.manche.joueurCourant === 'p1') && k++ < 10000) { s.avancer(100); S.tic(s); }
+  const reste = S.vue(s, 'p1').chrono.resteMs;
+  assert.ok(S.recevoir(s, 'p1', { type: 'pause' }).ok);
+  s.avancer(60000); S.tic(s);
+  assert.strictEqual(S.vue(s, 'p1').chrono.resteMs, reste);
+  const a = S.coupAutomatique(s.manche, 'p1');
+  assert.ok(!S.recevoir(s, 'p1', { type: 'action', action: { type: a.type, carte: a.carte } }).ok);
+  S.recevoir(s, 'p1', { type: 'reprendre' });
+  assert.strictEqual(S.vue(s, 'p1').chrono.resteMs, reste);
+  assert.strictEqual(s.manche.joueurCourant, 'p1');
+});
+test('Pas de pause avec un autre humain à la table, ni en salle publique, ni au salon', () => {
+  const s = salleAvec(2); S.recevoir(s, 'p1', { type: 'ajouterRobot' }); S.recevoir(s, 'p1', { type: 'lancer' });
+  assert.strictEqual(S.vue(s, 'p1').pausable, false);
+  assert.ok(!S.recevoir(s, 'p1', { type: 'pause' }).ok);
+  assert.ok(!s.gel);
+  const salon = S.creerSalle('SALO'); S.recevoir(salon, 'p1', { type: 'rejoindre', nom: 'A' }); S.recevoir(salon, 'p1', { type: 'ajouterRobot' });
+  assert.ok(!S.recevoir(salon, 'p1', { type: 'pause' }).ok);
+  // Un robot qui remplace un joueur parti compte comme un humain.
+  const r = salleAvec(2); S.recevoir(r, 'p1', { type: 'lancer' }); S.recevoir(r, 'p1', { type: 'remplacerParRobot', cible: 'p2' });
+  assert.ok(!S.recevoir(r, 'p1', { type: 'pause' }).ok);
+  const j = salleRobots(13, 2); j.sansPause = true; // Match du jour
+  assert.ok(!S.recevoir(j, 'p1', { type: 'pause' }).ok);
+});
+test('Pause entre deux manches : la manche suivante attend', () => {
+  const s = salleRobots(14, 3);
+  let k = 0;
+  while (s.etat !== 'finManche' && k++ < 200000) pas(s, 100);
+  assert.strictEqual(s.etat, 'finManche');
+  assert.ok(S.recevoir(s, 'p1', { type: 'pause' }).ok);
+  const reste = S.vue(s, 'p1').suite.resteMs;
+  s.avancer(120000); S.tic(s);
+  assert.strictEqual(s.etat, 'finManche');
+  S.recevoir(s, 'p1', { type: 'reprendre' });
+  assert.strictEqual(S.vue(s, 'p1').suite.resteMs, reste);
+  s.avancer(reste + 10); S.tic(s);
+  assert.strictEqual(s.etat, 'manche');
+});
+test('La pause tient après une reprise de la page (sauvegarde)', () => {
+  const s = salleRobots(15, 2);
+  S.recevoir(s, 'p1', { type: 'pause' });
+  const t = S.importer(S.exporter(s));
+  assert.strictEqual(S.vue(t, 'p1').enPause, true);
+  assert.strictEqual(S.tic(t), false);
+});
+
 console.log(`\n${ok} tests réussis, ${ko} en échec.`);
 process.exit(ko ? 1 : 0);

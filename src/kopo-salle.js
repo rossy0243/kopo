@@ -259,6 +259,7 @@
   }
 
   function tic(s) {
+    if (s.gel) return false; // partie en pause (seul contre les robots) : robots, chrono et comptes à rebours arrêtés
     if (s.etat === 'salon' && s.publique) {
       if (s.joueurs.length >= s.taille) { lancer(s); return true; }
       return false;
@@ -376,6 +377,7 @@
     s.suiteA = null;
     s.revanche = null;
     s.revancheRatee = false;
+    s.gel = null;
     s.expirations = {};
     s.joueurs.forEach((j) => delete j.pret); // chacun se redit prêt pour la partie suivante
   }
@@ -422,11 +424,31 @@
     }
   }
 
+  // Pause : seulement quand on est le seul humain à la table (contre les robots), en manche ou entre deux manches.
+  // Tout s'arrête (robots, chrono, comptes à rebours) ; à la reprise, chaque échéance est décalée du temps de pause.
+  function peutPauser(s, id) {
+    const j = s.joueurs.find((x) => x.id === id);
+    return !!j && !j.robot && !s.publique && !s.sansPause && ['manche', 'finManche'].includes(s.etat)
+      && s.joueurs.every((x) => x.id === id || vraiRobot(s, x.id));
+  }
+  const maintenant = (s) => (s.gel ? s.gel.depuis : s.horloge());
+  function reprendre(s) {
+    if (!s.gel) return;
+    const d = Math.max(0, s.horloge() - s.gel.depuis);
+    s.gel = null;
+    if (s.echeance) s.echeance += d;
+    if (s.robotPret) s.robotPret += d;
+    if (s.pause) s.pause.jusqua += d;
+    if (s.suiteA) s.suiteA += d;
+    if (s.revanche && s.revanche.jusqua) s.revanche.jusqua += d;
+  }
+
   // Traite un message d'un joueur. Renvoie { ok, erreur? }.
   // msg : { type: 'rejoindre', nom } | { type: 'lancer' } | { type: 'action', action }
   //       | { type: 'mancheSuivante' } | { type: 'rejouer' } | { type: 'retirer', cible }
   function recevoir(s, id, msg) {
     const joueur = s.joueurs.find((j) => j.id === id);
+    if (s.gel && ['action', 'mancheSuivante', 'passerFin'].includes(msg && msg.type)) return { ok: false, erreur: 'La partie est en pause.' };
     switch (msg && msg.type) {
       case 'rejoindre': {
         if (joueur) {
@@ -546,6 +568,16 @@
         verifierRevanche(s);
         return { ok: true };
       }
+      case 'pause': {
+        if (!peutPauser(s, id)) return { ok: false, erreur: 'Pause possible seulement contre les robots.' };
+        if (!s.gel) s.gel = { depuis: s.horloge() };
+        return { ok: true };
+      }
+      case 'reprendre': {
+        if (!s.gel || !joueur || joueur.robot) return { ok: false, erreur: 'Impossible.' };
+        reprendre(s);
+        return { ok: true };
+      }
       case 'passerFin': { // un humain qui ne joue plus : les robots finissent tout de suite
         if (!joueur || joueur.robot || !entreRobots(s)) return { ok: false, erreur: 'Impossible.' };
         passerEntreRobots(s);
@@ -601,9 +633,9 @@
       delai: s.delai,
       publique: !!s.publique,
       taille: s.taille,
-      chrono: s.echeance && s.etat === 'manche' ? { resteMs: Math.max(0, s.echeance - s.horloge()), totalMs: s.chronoTotal || s.delai * 1000 } : null,
-      suite: s.etat === 'finManche' && s.suiteA ? { resteMs: Math.max(0, s.suiteA - s.horloge()), totalMs: s.suiteTotal || s.durees.mancheAuto } : null,
-      revanche: s.etat === 'finPartie' && s.revanche ? { oui: s.revanche.oui.slice(), non: s.revanche.non.slice(), resteMs: s.revanche.jusqua ? Math.max(0, s.revanche.jusqua - s.horloge()) : null, totalMs: s.durees.revanche === undefined ? DUREES.revanche : s.durees.revanche } : null,
+      chrono: s.echeance && s.etat === 'manche' ? { resteMs: Math.max(0, s.echeance - maintenant(s)), totalMs: s.chronoTotal || s.delai * 1000 } : null,
+      suite: s.etat === 'finManche' && s.suiteA ? { resteMs: Math.max(0, s.suiteA - maintenant(s)), totalMs: s.suiteTotal || s.durees.mancheAuto } : null,
+      revanche: s.etat === 'finPartie' && s.revanche ? { oui: s.revanche.oui.slice(), non: s.revanche.non.slice(), resteMs: s.revanche.jusqua ? Math.max(0, s.revanche.jusqua - maintenant(s)) : null, totalMs: s.durees.revanche === undefined ? DUREES.revanche : s.durees.revanche } : null,
       revancheRatee: s.etat === 'finPartie' && !!s.revancheRatee,
       robots: s.robots || 'normaux',
       entreRobots: entreRobots(s), // les robots jouent vite ; un humain peut passer à la fin
@@ -611,6 +643,8 @@
       elimines: s.elimines.slice(),
       numeroManche: s.numeroManche,
       vainqueur: s.vainqueur,
+      enPause: !!s.gel, // partie en pause (seul contre les robots)
+      pausable: peutPauser(s, id),
     };
     const m = s.manche;
     if (m && s.etat !== 'salon') {
@@ -619,7 +653,7 @@
         enJeu: m.enJeu.slice(),
         nbCartes: Object.fromEntries(m.sieges.map((j) => [j, m.mains[j].length])),
         table: (s.pause && s.pause.table ? s.pause.table : m.table).map((p) => ({ joueur: p.joueur, cartes: p.cartes.slice(), compte: p.compte })),
-        pause: s.pause ? { type: s.pause.type, resteMs: Math.max(0, s.pause.jusqua - s.horloge()), totalMs: s.pause.total, annonce: s.pause.annonce || null } : null,
+        pause: s.pause ? { type: s.pause.type, resteMs: Math.max(0, s.pause.jusqua - maintenant(s)), totalMs: s.pause.total, annonce: s.pause.annonce || null } : null,
         couleurTour: m.couleurTour,
         couleurInterdite: m.couleurInterdite,
         phase: m.phase,
@@ -629,7 +663,7 @@
         journal: journalLisible(s, m),
         redistributions: (m.redistributions || []).map((r) => ({ joueur: r.joueur, main: r.main.slice() })),
         main: m.mains[id] ? m.mains[id].slice() : [],
-        actions: s.pause ? [] : K.actionsPossibles(m, id).map((a) => ({ type: a.type, carte: a.carte })),
+        actions: s.pause || s.gel ? [] : K.actionsPossibles(m, id).map((a) => ({ type: a.type, carte: a.carte })),
       };
     }
     return v;
