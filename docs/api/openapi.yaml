@@ -552,7 +552,7 @@ paths:
     get:
       tags: [Boutique et parcours]
       summary: Stickers animés, offres et mes utilisations restantes
-      description: "On vend des utilisations : chaque envoi en partie (message `sticker`) en décompte une ; à 0 le sticker se reverrouille. Tant que `actif` est faux, tout est grisé et rien ne s'envoie. `vente` : on peut acheter en pièces (POST /stickers/acheter). Le prix en francs est affiché, le paiement mobile n'est pas encore branché."
+      description: "On vend des utilisations : chaque envoi en partie (message `sticker`) en décompte une ; à 0 le sticker se reverrouille. Tant que `actif` est faux, tout est grisé et rien ne s'envoie. `vente` : on peut acheter en pièces (POST /stickers/acheter). Le prix en francs (au taux des pièces : 200 pièces ≈ 500 FC) est affiché, le paiement mobile n'est pas encore branché."
       responses:
         '200':
           description: Stickers
