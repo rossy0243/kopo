@@ -29,7 +29,7 @@ class Partie extends StatelessWidget {
 
     final table = Expanded(child: _Table(v, m, inter));
     final bas = _Bas(v, m, inter, jeJoue);
-    return SafeArea(
+    final contenu = SafeArea(
       child: Column(children: [
         // En-tête
         Padding(
@@ -42,6 +42,9 @@ class Partie extends StatelessWidget {
                 TextSpan(text: '$style · ${v['code']}'),
               ]), overflow: TextOverflow.ellipsis),
             ),
+            // Contre les robots (seul humain) : pause. Le serveur arrête robots, chrono et comptes à rebours.
+            if (v['pausePossible'] == true && v['enPause'] != true)
+              IconButton(onPressed: () => app.envoyer({'type': 'enPause', 'pause': true}), icon: const Icon(Icons.pause_rounded, color: K.brass), tooltip: 'Pause'),
             IconButton(onPressed: ouvrirChat, icon: const Icon(Icons.chat_bubble_outline, color: K.brass), tooltip: 'Chat'),
             IconButton(onPressed: ouvrirParametres, icon: const Ico('reglages', taille: 22), tooltip: 'Paramètres'),
           ]),
@@ -51,6 +54,31 @@ class Partie extends StatelessWidget {
         else ...[table, ConstrainedBox(constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * .56), child: SingleChildScrollView(reverse: true, child: bas))],
       ]),
     );
+    if (v['enPause'] != true) return contenu;
+    // Partie en pause : la table est voilée jusqu'à « Reprendre ».
+    return Stack(children: [
+      contenu,
+      Positioned.fill(
+        child: Container(
+          color: const Color(0xC0060E18),
+          alignment: Alignment.center,
+          padding: const EdgeInsets.all(16),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 320),
+            padding: const EdgeInsets.fromLTRB(24, 22, 24, 22),
+            decoration: BoxDecoration(color: K.table2, borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0x73E2B04A))),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              const Icon(Icons.pause_rounded, color: K.brass, size: 44),
+              Text('PARTIE EN PAUSE', style: K.titre(30)),
+              const SizedBox(height: 6),
+              Text("Les robots t'attendent. Ton chrono est arrêté.", textAlign: TextAlign.center, style: K.texte(15, couleur: K.muted)),
+              const SizedBox(height: 16),
+              Btn.principal('Reprendre', large: true, onTap: () => app.envoyer({'type': 'enPause', 'pause': false})),
+            ]),
+          ),
+        ),
+      ),
+    ]);
   }
 }
 

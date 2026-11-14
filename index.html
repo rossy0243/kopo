@@ -105,7 +105,6 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
 .table-inter .pioche-inter.vide .carte { opacity: .35; }
 .table-inter .pioche-inter.vide .legende { color: var(--bad); }
 #poses:has(.table-inter) { width: 100%; }
-@media (orientation: landscape) { body.en-jeu .main.defile { justify-content: flex-start; overflow-x: auto; overflow-y: hidden; padding-top: 26px; scrollbar-width: none; } body.en-jeu .main.defile .carte { flex: none; transform: none; } body.en-jeu .main.defile .carte.choisie { transform: translateY(-20px); } body.en-jeu .main.defile { -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%); mask-image: linear-gradient(90deg, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%); } }
 .table-inter .pile { display: grid; justify-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
 .table-inter .carte { width: 66px; height: 96px; }
 @media (orientation: landscape) and (max-height: 430px) { /* téléphone couché : table plus petite, tout reste visible */
@@ -113,8 +112,6 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
   body.en-jeu #poses .table-inter .carte { width: 54px; height: 78px; }
   body.en-jeu #poses .table-inter .pioche-inter .carte { width: 34px; height: 50px; }
   body.en-jeu #main .carte-inter { width: 52px; height: 76px; }
-  body.en-jeu #main:has(.carte-inter) { width: min(calc(100% - 360px), 640px); } /* plus de place pour une grande main, entre ton siège et les boutons */
-  body.en-jeu #main:has(.carte-inter):not(.defile) { bottom: max(14px, env(safe-area-inset-bottom)); } /* l'arc des cartes du bord reste dans l'écran */
   body.en-jeu #main .carte-inter .coin { font-size: 15px; }
   body.en-jeu #main .carte-inter .centre { font-size: 26px; }
 }
@@ -167,7 +164,7 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
 .main .carte .centre { font-size: 36px; }
 .main .carte.jouable { cursor: pointer; }
 .main .carte.choisie { z-index: 1; transform: translateY(-12px); box-shadow: 0 0 0 3px var(--brass), 0 10px 18px rgba(0,0,0,.4); }
-.main .carte:disabled { opacity: .4; filter: grayscale(.4); }
+.main .carte:disabled { filter: brightness(.5) grayscale(.6); } /* assombrie mais opaque : dans une main serrée, on ne voit pas les cartes du dessous à travers */
 .actions { display: grid; gap: 8px; }
 /* Animations coupées (réglage « Réduites », ou téléphone qui en demande moins) */ html.sans-anim .main .carte, html.sans-anim .btn.katapss { transition: none; animation: none; }
 
@@ -231,10 +228,11 @@ header .vocal .btn { padding: 5px 9px; font-size: 15px; line-height: 1.2; }
 .poses.serre .pose .groupe .carte + .carte { margin-left: -28px; }
 .poses.serre .pose, .poses.serre .pose .legende { max-width: 70px; }
 .main { padding-top: 12px; margin-top: -12px; }
-.main.serree { gap: 6px 0; padding-right: calc(66px - var(--pas, 66px)); }
-.main.serree .carte { margin-right: calc(var(--pas, 66px) - 66px); }
+/* Ta main : chaque carte est placée par ajusterMain() (une rangée, ou plusieurs qui se chevauchent). */
+.main.placee { display: block; position: relative; }
+.main.placee > .carte { position: absolute; margin: 0; }
 /* Main serrée : une carte choisie monte sans passer devant sa voisine (son coin reste à toucher). */
-.main.serree .carte.choisie { z-index: auto; }
+.main.placee .carte.choisie { z-index: auto; }
 .actions { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
 .actions .btn.large { font-size: 16px; padding: 13px 8px; }
 body.en-jeu .app { height: 100vh; height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 8px; padding: 6px 8px 8px; }
@@ -325,12 +323,11 @@ details.rappel summary { cursor: pointer; font-weight: 600; }
   body.en-jeu .depart-qui { font-size: 17px; }
   body.en-jeu .zone-main { position: static; border: 0; background: none; padding: 0; margin: 0; }
   body.en-jeu .zone-main h3 { display: none; }
-  body.en-jeu .main { position: absolute; left: 50%; transform: translateX(-50%); bottom: max(6px, env(safe-area-inset-bottom)); width: min(50%, 560px); justify-content: center; flex-wrap: nowrap; margin: 0; padding-top: 0; min-height: 0; z-index: 2; }
+  body.en-jeu .main { position: absolute; left: 50%; transform: translateX(-50%); bottom: max(6px, env(safe-area-inset-bottom)); width: min(calc(100% - 340px), 640px); justify-content: center; flex-wrap: nowrap; margin: 0; padding-top: 0; min-height: 0; z-index: 2; }
   body.en-jeu .main .carte { transform: translateY(var(--dy, 0px)) rotate(var(--r, 0deg)); transform-origin: 50% 130%; box-shadow: 0 6px 14px rgba(0,0,0,.45); }
   body.en-jeu .main .carte.choisie { transform: translateY(calc(var(--dy, 0px) - 22px)) rotate(var(--r, 0deg)); }
-  body.en-jeu .main.etages { flex-wrap: wrap; justify-content: flex-start; gap: 0; padding-right: 0; }
-  body.en-jeu .main.etages .carte { flex: none; --r: 0deg !important; --dy: 0px !important; }
-  body.en-jeu .main.etages .carte.choisie { z-index: auto; }
+  body.en-jeu .main.placee { position: absolute; }
+  body.en-jeu .main.rangees .carte { --r: 0deg !important; --dy: 0px !important; } /* plusieurs rangées : cartes droites, bien alignées */
   body.en-jeu .actions { position: absolute; right: max(10px, env(safe-area-inset-right)); bottom: max(10px, env(safe-area-inset-bottom)); width: 150px; grid-template-columns: 1fr; gap: 6px; z-index: 2; }
   body.en-jeu .actions .btn.large { padding: 10px 8px; font-size: 15px; border-radius: 14px; box-shadow: 0 4px 12px rgba(0,0,0,.4); }
   body.en-jeu .btn.katapss.inter { font-size: 18px; padding: 0 8px; }
@@ -426,6 +423,12 @@ body.salon:has(#voile:not([hidden])) #filChat { display: none; } /* fenêtre du 
 }
 
 /* Animations : cartes qui volent, bulles au-dessus des joueurs, tampons. */
+/* Pause contre les robots : tout s'arrête, la table est voilée. */
+.voile-pause { z-index: 30; backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+.fenetre-pause { background: var(--table-2); border: 1px solid rgba(226,176,74,.45); border-radius: 18px; padding: 22px 26px; text-align: center; display: grid; gap: 10px; width: min(320px, 100%); box-shadow: 0 18px 40px rgba(0,0,0,.5); }
+.fenetre-pause h2 { margin: 0; font-family: var(--display); color: var(--brass); letter-spacing: 1px; font-size: 30px; }
+.fenetre-pause p { margin: 0 0 6px; }
+.pause-ico { font-size: 34px; color: var(--brass); letter-spacing: -4px; line-height: 1; }
 #calque { position: fixed; inset: 0; pointer-events: none; z-index: 15; overflow: hidden; }
 .carte { position: relative; }
 .volante { position: fixed; margin: 0 !important; z-index: 16; will-change: transform; box-shadow: 0 10px 22px rgba(0,0,0,.45); }
@@ -1243,6 +1246,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     <button class="btn" id="btnPleinEcranEntete" hidden title="Plein écran" aria-label="Plein écran">⛶</button>
     <button class="btn btn-ico" id="btnParametres" title="Paramètres" aria-label="Paramètres"><svg class="ico-k" viewBox="0 0 32 32" aria-hidden="true"><rect x="8" y="4" width="16" height="24" rx="2.5"/><path d="M12 10h8M12 16h8M12 22h8"/><circle cx="15" cy="10" r="1.8" class="fond"/><circle cx="18.5" cy="16" r="1.8" class="fond"/><circle cx="14" cy="22" r="1.8" class="acc"/></svg></button>
     <button class="btn btn-ico" id="btnReactions" title="Réactions" aria-label="Envoyer une réaction"><svg class="ico-k" viewBox="0 0 32 32" aria-hidden="true"><rect x="9" y="4" width="14" height="20" rx="2.5"/><path d="M13 24l-3 5 7-5"/><path d="M13 11h6M13 16h4"/><circle cx="20.5" cy="16" r="1.6" class="acc"/></svg></button>
+    <button class="btn btn-ico" id="btnPause" hidden title="Pause" aria-label="Mettre la partie en pause"><svg class="ico-k" viewBox="0 0 32 32" aria-hidden="true"><rect x="9" y="7" width="5" height="18" rx="1.6"/><rect x="18" y="7" width="5" height="18" rx="1.6"/></svg></button>
     <button class="btn" id="btnQuitter" hidden>Quitter</button>
   </header>
   <div class="bandeau" id="bandeau" hidden></div>
@@ -1581,6 +1585,14 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   </div>
 </div>
 <div id="calque" aria-hidden="true"></div>
+<div class="voile voile-pause" id="voilePause" hidden>
+  <div class="fenetre-pause" role="dialog" aria-modal="true" aria-labelledby="titrePause">
+    <div class="pause-ico" aria-hidden="true">❚❚</div>
+    <h2 id="titrePause">Partie en pause</h2>
+    <p class="muted">Les robots t'attendent. Ton chrono est arrêté.</p>
+    <button class="btn principal large" id="btnReprendre">Reprendre</button>
+  </div>
+</div>
 <div id="filChat" role="log" aria-live="polite" aria-label="Chat de la partie"></div>
 
 <script>kopoChargement(5, 0, 34)</script>
@@ -4555,7 +4567,23 @@ var qrcode = function() {
     s.taille = taille;
   }
 
+
+  // Pause (partie contre les robots) : seul humain de la table, il peut tout arrêter.
+  // Pendant la pause rien n'avance ; à la reprise, toutes les échéances sont décalées du temps passé.
+  const seulHumain = (s, id) => { const h = s.joueurs.filter((j) => !j.robot || j.remplace); return h.length === 1 && h[0].id === id && !s.publique && !s.sansPause; }; // sansPause : Match du jour (même temps pour tous)
+  const maintenant = (s) => (s.enPause ? s.enPause.depuis : s.horloge());
+  function reprendre(s) {
+    const d = s.horloge() - s.enPause.depuis;
+    s.enPause = null;
+    if (d <= 0) return;
+    for (const k of ['echeance', 'robotPret', 'suiteA']) if (s[k]) s[k] += d;
+    if (s.pause && s.pause.jusqua) s.pause.jusqua += d;
+    if (s.revanche && s.revanche.jusqua) s.revanche.jusqua += d;
+    if (s.graces) for (const j of Object.keys(s.graces)) s.graces[j] += d;
+  }
+
   function tic(s) {
+    if (s.enPause) return false;
     if (s.etat === 'salon' && s.publique) {
       if (s.joueurs.length >= s.taille) { lancer(s); return true; }
       return false;
@@ -4663,6 +4691,7 @@ var qrcode = function() {
 
   // Remet la salle à zéro pour une nouvelle partie (mêmes joueurs).
   function reinitialiser(s) {
+    s.enPause = null;
     s.restants = [];
     s.elimines = [];
     s.numeroManche = 0;
@@ -4843,6 +4872,12 @@ var qrcode = function() {
         verifierRevanche(s);
         return { ok: true };
       }
+      case 'enPause': { // { pause: true | false } : contre les robots seulement
+        if (!joueur || !seulHumain(s, id) || s.etat === 'salon') return { ok: false, erreur: 'La pause, c\'est seulement contre les robots.' };
+        if (msg.pause && !s.enPause) s.enPause = { depuis: s.horloge() };
+        else if (!msg.pause && s.enPause) reprendre(s);
+        return { ok: true };
+      }
       case 'passerFin': { // un humain qui ne joue plus : les robots finissent tout de suite
         if (!joueur || joueur.robot || !entreRobots(s)) return { ok: false, erreur: 'Impossible.' };
         passerEntreRobots(s);
@@ -4850,6 +4885,7 @@ var qrcode = function() {
       }
       case 'action': {
         if (s.etat !== 'manche' || !joueur) return { ok: false, erreur: 'Pas de manche en cours.' };
+        if (s.enPause) return { ok: false, erreur: 'La partie est en pause.' };
         if (s.pause) return { ok: false, erreur: s.pause.type === 'depart' ? 'Attends la fin du compte à rebours.' : 'Attends le tour suivant.' };
         const a = msg.action || {};
         // Le joueur ne peut agir que pour lui-même : on impose son id.
@@ -4898,9 +4934,9 @@ var qrcode = function() {
       delai: s.delai,
       publique: !!s.publique,
       taille: s.taille,
-      chrono: s.echeance && s.etat === 'manche' ? { resteMs: Math.max(0, s.echeance - s.horloge()), totalMs: s.chronoTotal || s.delai * 1000 } : null,
-      suite: s.etat === 'finManche' && s.suiteA ? { resteMs: Math.max(0, s.suiteA - s.horloge()), totalMs: s.suiteTotal || s.durees.mancheAuto } : null,
-      revanche: s.etat === 'finPartie' && s.revanche ? { oui: s.revanche.oui.slice(), non: s.revanche.non.slice(), resteMs: s.revanche.jusqua ? Math.max(0, s.revanche.jusqua - s.horloge()) : null, totalMs: s.durees.revanche === undefined ? DUREES.revanche : s.durees.revanche } : null,
+      chrono: s.echeance && s.etat === 'manche' ? { resteMs: Math.max(0, s.echeance - maintenant(s)), totalMs: s.chronoTotal || s.delai * 1000 } : null,
+      suite: s.etat === 'finManche' && s.suiteA ? { resteMs: Math.max(0, s.suiteA - maintenant(s)), totalMs: s.suiteTotal || s.durees.mancheAuto } : null,
+      revanche: s.etat === 'finPartie' && s.revanche ? { oui: s.revanche.oui.slice(), non: s.revanche.non.slice(), resteMs: s.revanche.jusqua ? Math.max(0, s.revanche.jusqua - maintenant(s)) : null, totalMs: s.durees.revanche === undefined ? DUREES.revanche : s.durees.revanche } : null,
       revancheRatee: s.etat === 'finPartie' && !!s.revancheRatee,
       robots: s.robots || 'normaux',
       entreRobots: entreRobots(s), // les robots jouent vite ; un humain peut passer à la fin
@@ -4908,6 +4944,8 @@ var qrcode = function() {
       elimines: s.elimines.slice(),
       numeroManche: s.numeroManche,
       vainqueur: s.vainqueur,
+      enPause: !!s.enPause,
+      pausePossible: seulHumain(s, id) && s.etat !== 'salon',
     };
     const m = s.manche;
     if (m && s.etat !== 'salon') {
@@ -4916,7 +4954,7 @@ var qrcode = function() {
         enJeu: m.enJeu.slice(),
         nbCartes: Object.fromEntries(m.sieges.map((j) => [j, m.mains[j].length])),
         table: (s.pause && s.pause.table ? s.pause.table : m.table).map((p) => ({ joueur: p.joueur, cartes: p.cartes.slice(), compte: p.compte })),
-        pause: s.pause ? { type: s.pause.type, resteMs: Math.max(0, s.pause.jusqua - s.horloge()), totalMs: s.pause.total, annonce: s.pause.annonce || null } : null,
+        pause: s.pause ? { type: s.pause.type, resteMs: Math.max(0, s.pause.jusqua - maintenant(s)), totalMs: s.pause.total, annonce: s.pause.annonce || null } : null,
         couleurTour: m.couleurTour,
         couleurInterdite: m.couleurInterdite,
         phase: m.phase,
@@ -5946,7 +5984,23 @@ var qrcode = function() {
     s.taille = taille;
   }
 
+
+  // Pause (partie contre les robots) : seul humain de la table, il peut tout arrêter.
+  // Pendant la pause rien n'avance ; à la reprise, toutes les échéances sont décalées du temps passé.
+  const seulHumain = (s, id) => { const h = s.joueurs.filter((j) => !j.robot || j.remplace); return h.length === 1 && h[0].id === id && !s.publique && !s.sansPause; }; // sansPause : Match du jour (même temps pour tous)
+  const maintenant = (s) => (s.enPause ? s.enPause.depuis : s.horloge());
+  function reprendre(s) {
+    const d = s.horloge() - s.enPause.depuis;
+    s.enPause = null;
+    if (d <= 0) return;
+    for (const k of ['echeance', 'robotPret', 'suiteA']) if (s[k]) s[k] += d;
+    if (s.pause && s.pause.jusqua) s.pause.jusqua += d;
+    if (s.revanche && s.revanche.jusqua) s.revanche.jusqua += d;
+    if (s.graces) for (const j of Object.keys(s.graces)) s.graces[j] += d;
+  }
+
   function tic(s) {
+    if (s.enPause) return false;
     // Fin des 3 s pour annoncer : le bouton « Contester » apparaît chez les autres (la vue change).
     const finies = Object.keys(s.graces || {}).filter((j) => s.horloge() >= s.graces[j]);
     finies.forEach((j) => delete s.graces[j]);
@@ -6057,6 +6111,7 @@ var qrcode = function() {
   }
 
   function reinitialiser(s) {
+    s.enPause = null;
     s.restants = [];
     s.elimines = [];
     s.cahier = null;
@@ -6294,6 +6349,12 @@ var qrcode = function() {
         verifierRevanche(s);
         return { ok: true };
       }
+      case 'enPause': { // { pause: true | false } : contre les robots seulement
+        if (!joueur || !seulHumain(s, id) || s.etat === 'salon') return { ok: false, erreur: 'La pause, c\'est seulement contre les robots.' };
+        if (msg.pause && !s.enPause) s.enPause = { depuis: s.horloge() };
+        else if (!msg.pause && s.enPause) reprendre(s);
+        return { ok: true };
+      }
       case 'passerFin': { // un humain qui ne joue plus : les robots finissent tout de suite
         if (!joueur || joueur.robot || !entreRobots(s)) return { ok: false, erreur: 'Impossible.' };
         passerEntreRobots(s);
@@ -6301,6 +6362,7 @@ var qrcode = function() {
       }
       case 'action': {
         if (s.etat !== 'manche' || !joueur) return { ok: false, erreur: 'Pas de manche en cours.' };
+        if (s.enPause) return { ok: false, erreur: 'La partie est en pause.' };
         if (s.pause) return { ok: false, erreur: 'Attends la fin du compte à rebours.' };
         // Le joueur ne peut agir que pour lui-même : on impose son id.
         const action = actionDe(id, msg.action || {});
@@ -6341,7 +6403,7 @@ var qrcode = function() {
   }
 
   // Le joueur « j » a encore ses 3 s pour annoncer : personne ne peut le contester.
-  const enGrace = (s, j) => !!(j && s.graces && s.graces[j] && s.horloge() < s.graces[j]);
+  const enGrace = (s, j) => !!(j && s.graces && s.graces[j] && maintenant(s) < s.graces[j]);
 
   // Vue envoyée à un joueur : uniquement ce qu'il a le droit de voir.
   function vue(s, id) {
@@ -6360,9 +6422,9 @@ var qrcode = function() {
       delai: s.delai,
       publique: !!s.publique,
       taille: s.taille,
-      chrono: s.echeance && s.etat === 'manche' ? { resteMs: Math.max(0, s.echeance - s.horloge()), totalMs: s.chronoTotal || s.delai * 1000 } : null,
-      suite: s.etat === 'finManche' && s.suiteA ? { resteMs: Math.max(0, s.suiteA - s.horloge()), totalMs: s.suiteTotal || s.durees.mancheAuto } : null,
-      revanche: s.etat === 'finPartie' && s.revanche ? { oui: s.revanche.oui.slice(), non: s.revanche.non.slice(), resteMs: s.revanche.jusqua ? Math.max(0, s.revanche.jusqua - s.horloge()) : null, totalMs: s.durees.revanche === undefined ? DUREES.revanche : s.durees.revanche } : null,
+      chrono: s.echeance && s.etat === 'manche' ? { resteMs: Math.max(0, s.echeance - maintenant(s)), totalMs: s.chronoTotal || s.delai * 1000 } : null,
+      suite: s.etat === 'finManche' && s.suiteA ? { resteMs: Math.max(0, s.suiteA - maintenant(s)), totalMs: s.suiteTotal || s.durees.mancheAuto } : null,
+      revanche: s.etat === 'finPartie' && s.revanche ? { oui: s.revanche.oui.slice(), non: s.revanche.non.slice(), resteMs: s.revanche.jusqua ? Math.max(0, s.revanche.jusqua - maintenant(s)) : null, totalMs: s.durees.revanche === undefined ? DUREES.revanche : s.durees.revanche } : null,
       revancheRatee: s.etat === 'finPartie' && !!s.revancheRatee,
       robots: s.robots || 'normaux',
       entreRobots: entreRobots(s), // les robots jouent vite ; un humain peut passer à la fin
@@ -6370,6 +6432,8 @@ var qrcode = function() {
       elimines: s.elimines.slice(),
       numeroManche: s.numeroManche,
       vainqueur: s.vainqueur,
+      enPause: !!s.enPause,
+      pausePossible: seulHumain(s, id) && s.etat !== 'salon',
     };
     const m = s.manche;
     if (m && s.etat !== 'salon') {
@@ -6400,7 +6464,7 @@ var qrcode = function() {
         dernier: p.dernier, // qui a posé la carte du centre
         piocheVide: p.piocheVide, // { joueur, motif, n } : il a passé faute de cartes à piocher
         paquets: p.paquets,
-        pause: s.pause ? { type: s.pause.type, resteMs: Math.max(0, s.pause.jusqua - s.horloge()), totalMs: s.pause.total } : null,
+        pause: s.pause ? { type: s.pause.type, resteMs: Math.max(0, s.pause.jusqua - maintenant(s)), totalMs: s.pause.total } : null,
         enGrace: (p.contestables || []).filter((j) => enGrace(s, j)), // pas encore contestables (3 s pour annoncer)
         actions: s.pause ? [] : I.actionsPossibles(m, id).filter((a) => !(a.type === 'contester' && enGrace(s, a.cible))).map((a) => {
           const r = { type: a.type };
@@ -7627,7 +7691,7 @@ svg .vb { transform-box: view-box; }
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = '8f71ea3377d6'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = '8ad7c5de5abc'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
@@ -8229,7 +8293,7 @@ svg .vb { transform-box: view-box; }
 
   // ------------------------------------------------------------------ affichage
   const ecrans = ['ecranAccueil', 'ecranConnexion', 'ecranSalon', 'ecranPartie'];
-  function montrerEcran(nom) { for (const e of ecrans) $(e).hidden = e !== nom; $('btnQuitter').hidden = nom === 'ecranAccueil'; document.body.classList.toggle('en-jeu', nom === 'ecranPartie'); document.body.classList.toggle('accueil', nom === 'ecranAccueil'); document.body.classList.toggle('salon', nom === 'ecranSalon'); if (nom !== 'ecranSalon') { $('ecranSalon').classList.remove('qr-ouvert'); $('nonLusSalon').hidden = true; $('nonLusSalon').dataset.n = 0; } if (nom !== 'ecranAccueil') $('voileRejoindre').hidden = $('voileRobots').hidden = $('voileSalles').hidden = true; majPleinEcran(); if (nom !== 'ecranPartie') { tournerVu = false; fermerInvitationPaysage(); } }
+  function montrerEcran(nom) { for (const e of ecrans) $(e).hidden = e !== nom; $('btnQuitter').hidden = nom === 'ecranAccueil'; document.body.classList.toggle('en-jeu', nom === 'ecranPartie'); document.body.classList.toggle('accueil', nom === 'ecranAccueil'); document.body.classList.toggle('salon', nom === 'ecranSalon'); if (nom !== 'ecranSalon') { $('ecranSalon').classList.remove('qr-ouvert'); $('nonLusSalon').hidden = true; $('nonLusSalon').dataset.n = 0; } if (nom !== 'ecranAccueil') $('voileRejoindre').hidden = $('voileRobots').hidden = $('voileSalles').hidden = true; majPleinEcran(); if (nom !== 'ecranPartie') { tournerVu = false; fermerInvitationPaysage(); $('btnPause').hidden = $('voilePause').hidden = true; } }
   // Plein écran (Android) : cache les barres du navigateur et bloque le téléphone en paysage.
   const peutPleinEcran = !!(document.fullscreenEnabled && document.documentElement.requestFullscreen);
   function majPleinEcran() {
@@ -8326,8 +8390,12 @@ svg .vb { transform-box: view-box; }
     // Plus aucun humain en jeu : on peut sauter la fin (de la manche, si on est qualifié pour la suivante).
     $('btnPasserFin').hidden = !v.entreRobots;
     $('btnPasserFin').textContent = v.restants && v.restants.includes(v.moi) ? 'Passer à la fin de la manche' : 'Passer à la fin';
+    // Contre les robots : bouton pause dans l'en-tête, et la table voilée tant que la partie est en pause.
+    $('btnPause').hidden = !v.pausePossible || v.enPause;
+    $('voilePause').hidden = !v.enPause;
     const finAvant = finChrono;
     demarrerChrono(v);
+    if (v.enPause) finChrono = null; // chrono figé : pas de tic-tac ni de décompte
     if (!ancienne || ancienne.etat !== v.etat || ancienne.numeroManche !== v.numeroManche) { carteChoisie = null; choixInter = []; cartesRecues.clear(); }
     if (v.jeu !== 'inter8') suivrePartie(v); // Inter (8) : l'XP et les missions viendront à l'étape de la progression
     if (v.etat !== 'finPartie') arreterSuiteAuto();
@@ -8527,15 +8595,16 @@ svg .vb { transform-box: view-box; }
     const m = v.manche, tas = rectTas();
     const mesCartes = Array.from(document.querySelectorAll('#main [data-carte]'));
     const max = Math.max(0, ...m.sieges.map((id) => m.nbCartes[id] || 0));
+    const total = m.sieges.reduce((t, id) => t + (m.nbCartes[id] || 0), 0);
+    const pasDonne = Math.max(30, Math.min(70, 1800 / Math.max(1, total))); // une grande donne va plus vite : 2 s au plus
     let k = 0;
     for (let tour = 0; tour < max; tour++) {
       for (const id of m.sieges) {
         if (id === v.moi) {
           const e = mesCartes[tour]; if (!e) continue;
-          const c = e.dataset.carte;
-          voler(c, tas, e.getBoundingClientRect(), { delai: k * 70, retourner: true, verso: true, duree: 520, cible: `#main [data-carte="${c}"]` });
+          arriver(e.dataset.carte, tas, { delai: k * pasDonne, retourner: true, duree: 520 });
         } else if (tour < (m.nbCartes[id] || 0)) {
-          voler(null, tas, rectCentre(rectSiege(id), 30, 44), { delai: k * 70, disparaitre: true, duree: 520 });
+          voler(null, tas, rectCentre(rectSiege(id), 30, 44), { delai: k * pasDonne, disparaitre: true, duree: 520 });
         } else continue;
         k++;
       }
@@ -8586,10 +8655,9 @@ svg .vb { transform-box: view-box; }
       if (an.type === 'ramasse') {
         const de = rectCarte(`#poses [data-carte="${an.carte}"]`) || avant.table[an.carte];
         if (an.joueur === moi) {
-          const sel = `#main [data-carte="${an.carte}"]`;
           cartesRecues.add(an.carte);
-          voler(an.carte, de, rectCarte(sel), { rot: 10, duree: 650, cible: sel });
-          const e = document.querySelector(sel); if (e) e.classList.add('recue');
+          arriver(an.carte, de, { rot: 10, duree: 650 });
+          const e = document.querySelector(`#main [data-carte="${an.carte}"]`); if (e) e.classList.add('recue');
         } else voler(an.carte, de, rectCentre(rectSiege(an.joueur), 36, 52), { rot: 10, duree: 650, disparaitre: true });
         bulle(an.joueur, ico('ramasse'), { delai: 300 });
       } else if (an.type === 'suivi') bulle(an.gagnant, ico('couronne'), { delai: 500, duree: 2200 });
@@ -8912,7 +8980,7 @@ svg .vb { transform-box: view-box; }
       zk.append(b);
     }
     $('titreMain').textContent = `Ta main (${m.main.length} carte${m.main.length > 1 ? 's' : ''})` + (jouables.size ? ' · touche une carte' : '');
-    const main = $('main'); main.replaceChildren();
+    const main = $('main'), cartesMain = [];
     const triee = trierMain(m.main);
     triee.forEach((c, i) => {
       const b = carteEl(c, 'button');
@@ -8929,9 +8997,9 @@ svg .vb { transform-box: view-box; }
           else { carteChoisie = c; afficherPartie(vueActuelle); }
         };
       } else if (monTour) b.disabled = true;
-      main.append(b);
+      cartesMain.push(b);
     });
-    ajusterMain();
+    poserMain(main, cartesMain);
     for (const sel of enVol.keys()) document.querySelectorAll(sel).forEach((x) => (x.style.visibility = 'hidden'));
     for (const c of cartesRecues) { const e = main.querySelector(`[data-carte="${c}"]`); if (e) e.classList.add('recue'); }
     const act = $('actions'); act.replaceChildren();
@@ -9167,7 +9235,7 @@ svg .vb { transform-box: view-box; }
     // Cartes de même valeur qu'on peut encore ajouter aux cartes choisies.
     const encore = choixInter.length ? m.main.filter((c) => !choixInter.includes(c) && ajoutable(actions, choixInter, c)) : [];
     $('titreMain').textContent = `Ta main (${m.main.length} carte${m.main.length > 1 ? 's' : ''})` + (coups.length && !choixInter.length ? ' · touche une carte' : '');
-    const main = $('main'); main.replaceChildren();
+    const main = $('main'), cartesMain = [];
     const triee = trierMainInter(m.main);
     triee.forEach((c, i) => {
       const b = carteInterEl(c, 'button');
@@ -9193,9 +9261,9 @@ svg .vb { transform-box: view-box; }
         b.classList.add('jouable');
         b.onclick = () => { choixInter = [c]; afficherPartieInter(vueActuelle); };
       } else if (monTour) b.disabled = true;
-      main.append(b);
+      cartesMain.push(b);
     });
-    ajusterMain();
+    poserMain(main, cartesMain);
 
     const act = $('actions'); act.replaceChildren();
     if (encore.length) {
@@ -9269,10 +9337,10 @@ svg .vb { transform-box: view-box; }
       if (plus <= 0) continue;
       if (id === moi) {
         const nouvellesMain = m.main.filter((c) => !a.main.includes(c));
+        const pasPioche = Math.max(60, Math.min(120, 900 / nouvellesMain.length)); // +10 : toutes arrivées en 1,5 s
         nouvellesMain.forEach((c, i) => {
-          const sel = `#main [data-carte="${c}"]`;
           cartesRecues.add(c);
-          voler(c, tas, rectCarte(sel), { delai: delai + i * 120, retourner: true, verso: true, duree: 560, cible: sel });
+          arriver(c, tas, { delai: delai + i * pasPioche, retourner: true, duree: 560 });
         });
       } else for (let i = 0; i < Math.min(plus, 8); i++) voler(null, tas, rectCentre(rectSiege(id), 30, 44), { delai: delai + i * 120, disparaitre: true, duree: 560 });
       if (plus > 1) bulle(id, '+' + plus, { cls: 'ko', delai: delai + 200 });
@@ -9327,43 +9395,110 @@ svg .vb { transform-box: view-box; }
     if (m.elimine && !a.elimine) Sons.jouer('elimine', { moi: m.elimine === moi, delai: 200 });
   }
 
-  // Ta main sur une seule ligne : si les cartes ne tiennent pas, elles se chevauchent
-  // (le coin de chaque carte reste visible). Au-delà, elles passent sur deux lignes.
-  // En paysage, une grande main se range en 3 étages au plus qui se chevauchent, sans défiler.
+  // Ta main. Chaque carte est placée à la main (position absolue), toujours de la même façon :
+  // une rangée si elle tient, sinon des cartes qui se chevauchent en gardant le coin (« 10♥ ») lisible,
+  // puis plusieurs rangées (4 en portrait, 3 en paysage) qui se chevauchent elles aussi, sans sortir de l'écran.
+  // Les cartes gardent le même élément d'un affichage à l'autre (poserMain) : quand la main change,
+  // les autres glissent à leur nouvelle place au lieu de sauter, et une carte en vol n'est pas perdue.
   function ajusterMain() {
-    const main = $('main'), n = main.children.length;
-    main.classList.remove('serree', 'defile', 'etages');
-    main.style.width = '';
-    for (const c of main.children) { c.style.marginTop = ''; c.style.marginRight = ''; }
-    if (n < 2 || main.offsetParent === null) return;
-    if (matchMedia('(orientation: landscape)').matches && mainEnEtages(main, n)) return;
-    const w = main.children[0].offsetWidth, W = main.clientWidth;
-    if (n * w + (n - 1) * 6 <= W) return;
-    let parLigne = n;
+    const main = $('main'), cartes = [...main.children], n = cartes.length;
+    main.classList.add('placee'); // cartes en position absolue : elles gardent leur taille pour la mesure
+    main.classList.remove('rangees');
+    if (!n || main.offsetParent === null) { main.style.height = ''; return; }
     const paysage = matchMedia('(orientation: landscape)').matches;
-    // Inter (8) : une main peut dépasser 20 cartes. Le coin de chaque carte (« 10♥ ») doit rester lisible :
-    // en portrait, jusqu'à 4 lignes ; en paysage, la main défile du doigt.
-    const inter = vueActuelle && vueActuelle.jeu === 'inter8', lisible = 34;
-    if (!paysage && inter) { let lignes = 1; while (lignes < 4 && (W - w) / Math.max(1, Math.ceil(n / lignes) - 1) < lisible) lignes++; parLigne = Math.ceil(n / lignes); }
-    else if (!paysage && (W - w) / (n - 1) < 30) parLigne = Math.ceil(n / 2);
-    let pas = Math.min(w, Math.floor((W - w) / Math.max(1, parLigne - 1))); // au plus la largeur d'une carte : sinon la dernière passe à la ligne
-    if (paysage && inter && pas < lisible) { pas = lisible; main.classList.add('defile'); }
-    main.style.setProperty('--pas', pas + 'px');
-    main.classList.add('serree');
-  }
-  window.addEventListener('resize', ajusterMain);
-  function mainEnEtages(main, n) {
-    const cartes = [...main.children], h = cartes[0].offsetHeight, w = Math.round(h * 0.69), W = main.clientWidth, lisible = 30;
-    if (n * w + (n - 1) * 6 <= W || (W - w) / (n - 1) >= lisible) return false; // tient sur une rangée : la règle normale suffit
-    let rangs = 2; while (rangs < 3 && (W - w) / Math.max(1, Math.ceil(n / rangs) - 1) < lisible) rangs++;
-    const parRang = Math.ceil(n / rangs), pas = Math.min(w, Math.floor((W - w) / Math.max(1, parRang - 1)));
-    main.classList.add('etages');
-    main.style.width = ((parRang - 1) * pas + w + 1) + 'px';
+    const W = main.clientWidth, w = cartes[0].offsetWidth, h = cartes[0].offsetHeight;
+    const cs = getComputedStyle(main), padG = parseFloat(cs.paddingLeft) || 0, padH = parseFloat(cs.paddingTop) || 0;
+    const L = W - padG - (parseFloat(cs.paddingRight) || 0);
+    const ECART = 6, lisible = paysage ? 30 : 32, maxRangs = paysage ? 3 : 4;
+    const hMax = Math.max(h + 2 * 30, Math.round(innerHeight * 0.36));
+    const pasPour = (parRang) => (parRang < 2 ? w + ECART : Math.min(w + ECART, (L - w) / (parRang - 1)));
+    let rangs = 1;
+    while (rangs < maxRangs && pasPour(Math.ceil(n / rangs)) < lisible) rangs++;
+    const parRang = Math.ceil(n / rangs), pas = Math.max(14, Math.floor(pasPour(parRang)));
+    rangs = Math.ceil(n / parRang);
+    // Rangées : entières si la place le permet, sinon elles se chevauchent en laissant voir le haut des cartes.
+    const pasV = rangs < 2 ? 0 : Math.max(30, Math.min(h + ECART, Math.floor((hMax - h) / (rangs - 1))));
+    const largeur = (Math.min(n, parRang) - 1) * pas + w;
+    const x0 = paysage || rangs > 1 || n * (w + ECART) - ECART > L ? Math.max(0, Math.round((L - largeur) / 2)) : 0;
+    main.classList.toggle('rangees', rangs > 1);
+    main.style.height = padH + (rangs - 1) * pasV + h + 'px';
     cartes.forEach((c, i) => {
-      c.style.marginRight = i % parRang === parRang - 1 ? '0px' : (pas - w) + 'px';
-      if (i >= parRang) c.style.marginTop = -(h - 28) + 'px'; // la rangée du dessous laisse voir le coin de celle du dessus
+      const r = Math.floor(i / parRang), k = i % parRang;
+      c.style.left = padG + x0 + k * pas + 'px';
+      c.style.top = padH + r * pasV + 'px';
     });
-    return true;
+  }
+  window.addEventListener('resize', () => poserMain($('main'), null));
+
+  // Centre d'une carte de ta main à sa place finale (sans ses animations).
+  function centrePlace(e) {
+    const m = e.offsetParent, r = m && m.getBoundingClientRect();
+    if (!r) return null;
+    return { x: r.left + m.clientLeft + e.offsetLeft + e.offsetWidth / 2, y: r.top + m.clientTop + e.offsetTop + e.offsetHeight / 2 };
+  }
+  const centreDe = (r) => ({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
+  // Fait glisser une carte de la main depuis un point (centre, à l'écran) jusqu'à sa place.
+  function glisser(e, de, duree, delai = 0, easing = 'cubic-bezier(.25,.8,.3,1)') {
+    if (sansAnim || !transfoSeules || !de) return null;
+    e.getAnimations().forEach((a) => { if (a.id === 'glisse') a.cancel(); });
+    const fin = centrePlace(e); if (!fin) return null;
+    const dx = de.x - fin.x, dy = de.y - fin.y;
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return null;
+    const a = e.animate([{ translate: `${dx}px ${dy}px` }, { translate: '0px 0px' }], { duration: duree, delay: delai, easing, fill: 'backwards' });
+    a.id = 'glisse';
+    return a;
+  }
+
+  // Met les cartes dans ta main en gardant les éléments déjà là (mêmes cartes), puis les place.
+  // nouvelles = null : on replace seulement (rotation de l'écran).
+  function poserMain(main, nouvelles) {
+    const avant = new Map();
+    for (const e of main.children) { const r = e.getBoundingClientRect(); if (visible(r)) avant.set(e.dataset.carte, centreDe(r)); }
+    if (nouvelles) {
+      const anciens = new Map([...main.children].map((e) => [e.dataset.carte, e]));
+      const liste = nouvelles.map((b) => {
+        const o = anciens.get(b.dataset.carte);
+        if (!o) return b;
+        // Même carte : on garde l'élément (ses animations continuent) avec son nouvel état.
+        o.className = b.className; o.disabled = b.disabled; o.onclick = b.onclick;
+        for (const v of ['--r', '--dy']) o.style.setProperty(v, b.style.getPropertyValue(v));
+        if (b.getAttribute('aria-label')) o.setAttribute('aria-label', b.getAttribute('aria-label'));
+        o.replaceChildren(...b.childNodes);
+        return o;
+      });
+      if (liste.length !== main.children.length || liste.some((e, i) => main.children[i] !== e)) main.replaceChildren(...liste);
+    }
+    const t = performance.now();
+    for (const e of main.children) if (e._vol && t < e._vol.retourne) e.classList.add('verso');
+    ajusterMain();
+    if (sansAnim || !transfoSeules) return;
+    // Les cartes qui ont bougé glissent de leur ancienne place à la nouvelle (une carte en vol est reprise là où elle est).
+    for (const e of main.children) {
+      const v = e._vol;
+      if (v && t < v.depart) { glisser(e, v.de, v.fin - v.depart, v.depart - t); continue; } // pas encore partie du tas
+      const de = avant.get(e.dataset.carte);
+      if (de) glisser(e, de, v && t < v.fin ? Math.max(220, v.fin - t) : 280, 0, 'ease-out');
+    }
+  }
+
+  // Une carte qui arrive dans ta main (distribution, ramassage, pioche) : c'est la vraie carte de la main
+  // qui vole depuis le tas, de dos puis retournée. Si la main change pendant le vol, elle va à sa nouvelle place.
+  function arriver(c, de, o = {}) {
+    const e = $('main').querySelector(`[data-carte="${CSS.escape(c)}"]`);
+    if (!e || sansAnim || !transfoSeules || !visible(de)) return;
+    const duree = o.duree || 520, delai = o.delai || 0, t = performance.now();
+    const fin = centrePlace(e); if (!fin) return;
+    const s0 = Math.min(1.6, Math.max(0.35, de.width / (e.offsetWidth || de.width)));
+    e._vol = { de: centreDe(de), depart: t + delai, fin: t + delai + duree, retourne: o.retourner ? t + delai + duree / 2 : 0 };
+    glisser(e, e._vol.de, duree, delai);
+    const forme = o.retourner
+      ? [{ scale: `${s0} ${s0}`, rotate: `${o.rot ?? -12}deg` }, { offset: 0.5, scale: `0.02 ${(s0 + 1) / 2}`, rotate: '-6deg' }, { scale: '1 1', rotate: '0deg' }]
+      : [{ scale: `${s0} ${s0}`, rotate: `${o.rot ?? -12}deg` }, { scale: '1 1', rotate: '0deg' }];
+    const a = e.animate(forme, { duration: duree, delay: delai, easing: 'cubic-bezier(.25,.8,.3,1)', fill: 'backwards' });
+    e.style.zIndex = '20'; // passe au-dessus des autres cartes pendant le vol
+    if (o.retourner) { e.classList.add('verso'); setTimeout(() => { if (e._vol && performance.now() >= e._vol.retourne - 20) e.classList.remove('verso'); }, delai + duree / 2); }
+    const finVol = () => { if (e._vol && performance.now() >= e._vol.fin - 30) { e._vol = null; e.style.zIndex = ''; e.classList.remove('verso'); } };
+    a.onfinish = finVol; a.oncancel = finVol;
   }
 
   // ------------------------------------------------------------------ chrono (affichage)
@@ -13093,6 +13228,13 @@ svg .vb { transform-box: view-box; }
     if (session) { stock.effacer(cleSession); session = null; }
     afficherAccueil();
   }
+  $('btnPause').onclick = () => envoyer({ type: 'enPause', pause: true });
+  $('btnReprendre').onclick = () => envoyer({ type: 'enPause', pause: false });
+  // Contre les robots : l'appli passée en arrière-plan (appel, autre appli) met la partie en pause.
+  document.addEventListener('visibilitychange', () => {
+    const v = vueActuelle;
+    if (document.visibilityState === 'hidden' && hote && v && v.pausePossible && !v.enPause && (v.etat === 'manche' || v.etat === 'finManche')) envoyer({ type: 'enPause', pause: true });
+  });
   window.__kopo = { get vue() { return vueActuelle; }, monId, MODE_SERVEUR };
   window.kopoReaction = (emoji) => envoyer({ type: 'reaction', emoji }); // pour les émojis rapides (écoute : événement « kopo-reaction »)
   if (LOCAL) window.__kopo.afficher = afficher; // tests des animations
