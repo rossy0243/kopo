@@ -301,13 +301,13 @@ details.rappel summary { cursor: pointer; font-weight: 600; }
     background: radial-gradient(ellipse at 50% 42%, #24497a, #142c4a 72%);
     box-shadow: inset 0 0 0 7px #3b2a12, inset 0 0 0 10px rgba(226,176,74,.45), inset 0 0 60px rgba(0,0,0,.45), 0 14px 40px rgba(0,0,0,.5); }
   body.en-jeu .sieges { position: absolute; inset: 0; display: block; pointer-events: none; }
-  body.en-jeu .siege { position: absolute; left: var(--x, 50%); top: var(--y, 20%); transform: translate(-50%, -50%); width: 136px; background: none; border: 0; box-shadow: none; padding: 0; display: grid; justify-items: center; gap: 3px; pointer-events: auto; }
+  body.en-jeu .siege { position: absolute; left: var(--x, 50%); top: var(--y, 20%); transform: translate(-50%, -50%); width: 118px; background: none; border: 0; box-shadow: none; padding: 0; display: grid; justify-items: center; gap: 3px; pointer-events: auto; }
   body.en-jeu .siege .eventail { display: flex; height: 22px; align-items: flex-end; }
   body.en-jeu .siege .eventail span { width: 15px; height: 22px; border-radius: 3px; border: 1px solid #f3e3bd; background: repeating-linear-gradient(45deg, var(--brass) 0 3px, #9c7524 3px 6px); box-shadow: 0 2px 4px rgba(0,0,0,.4); }
   body.en-jeu .siege .eventail span + span { margin-left: -9px; }
   body.en-jeu .siege .eventail .nb { margin-left: 5px; font-size: 14px; line-height: 1; font-variant-numeric: tabular-nums; text-shadow: 0 1px 3px rgba(0,0,0,.8); }
   body.en-jeu .siege:not(.vous) .ligne .compte { display: none; }
-  body.en-jeu .siege .ligne { background: #0b1828; border: 2px solid rgba(255,255,255,.18); border-radius: 99px; padding: 2px 12px; max-width: 136px; box-shadow: 0 3px 8px rgba(0,0,0,.4); }
+  body.en-jeu .siege .ligne { background: #0b1828; border: 2px solid rgba(255,255,255,.18); border-radius: 99px; padding: 2px 10px; max-width: 118px; box-shadow: 0 3px 8px rgba(0,0,0,.4); }
   body.en-jeu .siege .nom { font-size: 14px; font-weight: 700; text-align: center; }
   body.en-jeu .siege.courant .ligne { background: var(--brass); color: #1d1606; border-color: #f6d488; box-shadow: 0 0 0 4px rgba(226,176,74,.35), 0 3px 8px rgba(0,0,0,.4); }
   body.en-jeu .siege.courant .compte::before { background: #1d1606; }
@@ -328,6 +328,9 @@ details.rappel summary { cursor: pointer; font-weight: 600; }
   body.en-jeu .main { position: absolute; left: 50%; transform: translateX(-50%); bottom: max(6px, env(safe-area-inset-bottom)); width: min(50%, 560px); justify-content: center; flex-wrap: nowrap; margin: 0; padding-top: 0; min-height: 0; z-index: 2; }
   body.en-jeu .main .carte { transform: translateY(var(--dy, 0px)) rotate(var(--r, 0deg)); transform-origin: 50% 130%; box-shadow: 0 6px 14px rgba(0,0,0,.45); }
   body.en-jeu .main .carte.choisie { transform: translateY(calc(var(--dy, 0px) - 22px)) rotate(var(--r, 0deg)); }
+  body.en-jeu .main.etages { flex-wrap: wrap; justify-content: flex-start; gap: 0; padding-right: 0; }
+  body.en-jeu .main.etages .carte { flex: none; --r: 0deg !important; --dy: 0px !important; }
+  body.en-jeu .main.etages .carte.choisie { z-index: auto; }
   body.en-jeu .actions { position: absolute; right: max(10px, env(safe-area-inset-right)); bottom: max(10px, env(safe-area-inset-bottom)); width: 150px; grid-template-columns: 1fr; gap: 6px; z-index: 2; }
   body.en-jeu .actions .btn.large { padding: 10px 8px; font-size: 15px; border-radius: 14px; box-shadow: 0 4px 12px rgba(0,0,0,.4); }
   body.en-jeu .btn.katapss.inter { font-size: 18px; padding: 0 8px; }
@@ -7494,7 +7497,7 @@ svg .vb { transform-box: view-box; }
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = 'f89a348e21fe'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = '84582bfb7732'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
@@ -8623,6 +8626,27 @@ svg .vb { transform-box: view-box; }
     return b;
   }
 
+  // En paysage, les adversaires sont à égale distance les uns des autres le long du bord de la table
+  // (et non à angle égal, qui les serrait sur les côtés), de ta gauche à ta droite en descendant un peu sur les côtés.
+  function placerSieges() {
+    const sieges = [...document.querySelectorAll('#sieges .siege[data-rang]')], n = sieges.length;
+    if (!n) return;
+    const W = innerWidth || 1, H = innerHeight || 1, cx = 50, cy = 51, rx = 43, ry = 37;
+    const a0 = Math.PI * 1.1, a1 = -Math.PI * 0.1, N = 240, pts = [], L = [0];
+    for (let i = 0; i <= N; i++) {
+      const a = a0 + (a1 - a0) * i / N;
+      pts.push([cx + rx * Math.cos(a), cy - ry * Math.sin(a)]);
+      if (i) L.push(L[i - 1] + Math.hypot((pts[i][0] - pts[i - 1][0]) * W, (pts[i][1] - pts[i - 1][1]) * H));
+    }
+    sieges.forEach((d) => {
+      const cible = L[N] * (Number(d.dataset.rang) + 0.5) / n;
+      let i = L.findIndex((l) => l >= cible); if (i < 0) i = N;
+      d.style.setProperty('--x', pts[i][0].toFixed(1) + '%');
+      d.style.setProperty('--y', pts[i][1].toFixed(1) + '%');
+    });
+  }
+  window.addEventListener('resize', placerSieges);
+
   // Sièges autour de la table (Kopo et Inter (8)).
   function dessinerSieges(v) {
     const m = v.manche, pause = m.pause;
@@ -8639,11 +8663,7 @@ svg .vb { transform-box: view-box; }
       if (id !== v.moi && !jj.robot) { d.classList.add('cliquable'); d.onclick = () => ficheJoueur(id, jj.nom); }
       if (pause && pause.annonce && pause.annonce.meneur === id) d.classList.add('meneur');
       const k = autres.indexOf(id);
-      if (k >= 0) {
-        const angle = Math.PI * (1 - (k + 0.5) / autres.length);
-        d.style.setProperty('--x', (50 + 41 * Math.cos(angle)).toFixed(1) + '%');
-        d.style.setProperty('--y', (50 - 37 * Math.sin(angle)).toFixed(1) + '%');
-      }
+      if (k >= 0) d.dataset.rang = k;
       const q = m.qualifies.findIndex((x) => x.joueur === id);
       const joueur = v.joueurs.find((j) => j.id === id) || {};
       if (id === m.joueurCourant) d.classList.add('courant');
@@ -8673,7 +8693,7 @@ svg .vb { transform-box: view-box; }
       else if (joueur.absent && m.enJeu.includes(id)) d.append(el('span', 'pastille ko', 'absent · 5 s'));
       box.append(d);
     });
-
+    placerSieges();
   }
 
   function afficherPartie(v) {
@@ -9159,10 +9179,14 @@ svg .vb { transform-box: view-box; }
 
   // Ta main sur une seule ligne : si les cartes ne tiennent pas, elles se chevauchent
   // (le coin de chaque carte reste visible). Au-delà, elles passent sur deux lignes.
+  // En paysage, une grande main se range en 3 étages au plus qui se chevauchent, sans défiler.
   function ajusterMain() {
     const main = $('main'), n = main.children.length;
-    main.classList.remove('serree', 'defile');
+    main.classList.remove('serree', 'defile', 'etages');
+    main.style.width = '';
+    for (const c of main.children) { c.style.marginTop = ''; c.style.marginRight = ''; }
     if (n < 2 || main.offsetParent === null) return;
+    if (matchMedia('(orientation: landscape)').matches && mainEnEtages(main, n)) return;
     const w = main.children[0].offsetWidth, W = main.clientWidth;
     if (n * w + (n - 1) * 6 <= W) return;
     let parLigne = n;
@@ -9178,6 +9202,19 @@ svg .vb { transform-box: view-box; }
     main.classList.add('serree');
   }
   window.addEventListener('resize', ajusterMain);
+  function mainEnEtages(main, n) {
+    const cartes = [...main.children], h = cartes[0].offsetHeight, w = Math.round(h * 0.69), W = main.clientWidth, lisible = 30;
+    if (n * w + (n - 1) * 6 <= W || (W - w) / (n - 1) >= lisible) return false; // tient sur une rangée : la règle normale suffit
+    let rangs = 2; while (rangs < 3 && (W - w) / Math.max(1, Math.ceil(n / rangs) - 1) < lisible) rangs++;
+    const parRang = Math.ceil(n / rangs), pas = Math.min(w, Math.floor((W - w) / Math.max(1, parRang - 1)));
+    main.classList.add('etages');
+    main.style.width = ((parRang - 1) * pas + w + 1) + 'px';
+    cartes.forEach((c, i) => {
+      c.style.marginRight = i % parRang === parRang - 1 ? '0px' : (pas - w) + 'px';
+      if (i >= parRang) c.style.marginTop = -(h - 28) + 'px'; // la rangée du dessous laisse voir le coin de celle du dessus
+    });
+    return true;
+  }
 
   // ------------------------------------------------------------------ chrono (affichage)
   // L'hôte envoie le temps restant ; chaque téléphone le décompte avec sa propre horloge.
