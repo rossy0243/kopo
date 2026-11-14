@@ -552,7 +552,7 @@ paths:
     get:
       tags: [Boutique et parcours]
       summary: Stickers animés, offres et mes utilisations restantes
-      description: "On vend des utilisations : chaque envoi en partie (message `sticker`) en décompte une ; à 0 le sticker se reverrouille. Tant que `actif` est faux, tout est grisé et rien ne s'envoie. `vente` reste faux tant que les paiements ne sont pas branchés."
+      description: "On vend des utilisations : chaque envoi en partie (message `sticker`) en décompte une ; à 0 le sticker se reverrouille. Tant que `actif` est faux, tout est grisé et rien ne s'envoie. `vente` : on peut acheter en pièces (POST /stickers/acheter). Le prix en francs est affiché, le paiement mobile n'est pas encore branché."
       responses:
         '200':
           description: Stickers
@@ -567,11 +567,39 @@ paths:
                   packs: { type: array, items: { type: object, properties: { id: { type: string }, nom: { type: string }, stickers: { type: array, items: { type: string } } } } }
                   offres:
                     type: object
-                    description: Offres d'un sticker et d'un pack entier (chaque sticker du pack reçoit les utilisations), prix en pièces et en francs congolais
+                    description: Offres d'un sticker, et de chaque pack (chaque sticker du pack reçoit les utilisations ; prix selon la taille du pack, avec une remise ; vide pour un pack d'un seul sticker). Prix en pièces et en francs congolais.
                     properties:
                       sticker: { type: array, items: { $ref: '#/components/schemas/OffreSticker' } }
-                      pack: { type: array, items: { $ref: '#/components/schemas/OffreSticker' } }
+                      packs: { type: object, additionalProperties: { type: array, items: { $ref: '#/components/schemas/OffreSticker' } }, description: 'Par identifiant de pack' }
                   soldes: { type: object, additionalProperties: { type: integer }, description: 'Utilisations restantes par sticker (absent = verrouillé)' }
+  /stickers/acheter:
+    post:
+      tags: [Boutique et parcours]
+      summary: Acheter des utilisations en pièces (un sticker ou un pack)
+      description: "Seulement quand `vente` est vrai (sinon 403). Le prix vient du serveur. `offre` est la position de l'offre dans `offres.sticker` ou `offres.packs[pack]`. 402 si le solde ne suffit pas (rien n'est débité)."
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [offre]
+              properties:
+                sticker: { type: string, description: 'Un sticker…' }
+                pack: { type: string, description: '…ou un pack entier' }
+                offre: { type: integer }
+      responses:
+        '200':
+          description: Achat fait
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  solde: { type: integer, description: Pièces restantes }
+                  pieces: { type: integer, description: Prix payé }
+                  utilisations: { type: integer }
+                  stickers: { type: array, items: { type: string } }
+                  soldes: { type: object, additionalProperties: { type: integer } }
   /boutique:
     get:
       tags: [Boutique et parcours]

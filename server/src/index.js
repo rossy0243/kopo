@@ -40,7 +40,7 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
   const parrainage = creerParrainage(base, reglages, comptes, social, env);
   const matchJour = creerMatchJour(base, reglages, env);
   const bande = creerBande(base, reglages, comptes, matchJour, social);
-  const stickers = creerStickers(base, reglages);
+  const stickers = creerStickers(base, reglages, comptes);
   // Chaque minute : semaines de Bande finies (pot partagé), mises automatiques du lundi, rappel du soir.
   const minuteurBande = setInterval(() => bande.tic().catch((e) => console.error('Bande :', e.message)), 60e3);
   minuteurBande.unref();

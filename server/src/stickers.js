@@ -1,5 +1,5 @@
 // Stickers animés (ergonomie/stickers/decisions-stickers.md) : on vend des utilisations d'un sticker.
-// Un achat (plus tard) ou un cadeau de l'admin donne par exemple 20 ou 50 envois ; chaque envoi en décompte un,
+// Un achat en pièces (quand l'admin ouvre la vente ; l'argent réel viendra avec le paiement mobile) ou un cadeau de l'admin donne par exemple 20 ou 50 envois ; chaque envoi en décompte un,
 // vérifié ici ; à 0 le sticker se reverrouille. Tant que l'interrupteur « stickers » est éteint, rien ne s'envoie.
 // Lignes rouges (strategie-pieces.md) : pas de tirage au sort, seulement du cosmétique, jamais de pièces changées en argent.
 'use strict';
@@ -59,27 +59,37 @@ const CRITERES = {
 
 const erreur = (m, statut = 400) => Object.assign(new Error(m), { statut });
 
-// Réglage « stickers » : interrupteur (éteint au départ) et offres en vente, toutes inactives tant que les paiements
-// ne sont pas branchés. Une offre donne `utilisations` envois de chaque sticker (d'un seul, ou de tout le pack),
-// pour un prix en pièces et un prix en argent réel (francs congolais, mobile money).
+// Réglage « stickers » : deux interrupteurs éteints au départ, `actif` (les stickers s'envoient) et `vente`
+// (on peut les acheter en pièces), et les offres. Une offre donne `utilisations` envois d'un sticker, pour un prix
+// en pièces et un prix en argent réel (francs congolais, mobile money : pas encore branché).
+// Un pack (2 stickers ou plus) se vend avec les mêmes offres, pour chacun de ses stickers, avec `remisePack` % de moins
+// que les stickers achetés un par un : le prix suit donc la taille du pack.
 const OFFRES_DEFAUT = {
   sticker: [{ utilisations: 20, pieces: 300, francs: 500 }, { utilisations: 50, pieces: 600, francs: 1000 }],
-  pack: [{ utilisations: 20, pieces: 1200, francs: 2000 }, { utilisations: 50, pieces: 2500, francs: 4000 }],
 };
+const REMISE_PACK = 33;
 function verifierReglage(v) {
   v = v || {};
-  const out = { actif: v.actif === true, offres: {} };
-  for (const genre of ['sticker', 'pack']) {
-    const l = Array.isArray(v.offres && v.offres[genre]) ? v.offres[genre] : OFFRES_DEFAUT[genre];
-    if (!l.length || l.length > 4) throw erreur(`Entre 1 et 4 offres par ${genre}.`);
-    out.offres[genre] = l.map((o) => {
-      const x = { utilisations: Math.trunc(Number(o && o.utilisations)), pieces: Math.trunc(Number(o && o.pieces)), francs: Math.trunc(Number(o && o.francs)) };
-      if (!(x.utilisations >= 1 && x.utilisations <= UTILISATIONS_MAX)) throw erreur(`Utilisations entre 1 et ${UTILISATIONS_MAX}.`);
-      if (!(x.pieces >= 0 && x.pieces <= 1e6) || !(x.francs >= 0 && x.francs <= 1e7)) throw erreur('Prix invalide.');
-      return x;
-    });
-  }
+  const remise = v.remisePack == null ? REMISE_PACK : Math.trunc(Number(v.remisePack));
+  if (!(remise >= 0 && remise <= 60)) throw erreur('Remise des packs entre 0 et 60 %.');
+  const out = { actif: v.actif === true, vente: v.vente === true, remisePack: remise, offres: {} };
+  const l = Array.isArray(v.offres && v.offres.sticker) ? v.offres.sticker : OFFRES_DEFAUT.sticker;
+  if (!l.length || l.length > 4) throw erreur('Entre 1 et 4 offres.');
+  out.offres.sticker = l.map((o) => {
+    const x = { utilisations: Math.trunc(Number(o && o.utilisations)), pieces: Math.trunc(Number(o && o.pieces)), francs: Math.trunc(Number(o && o.francs)) };
+    if (!(x.utilisations >= 1 && x.utilisations <= UTILISATIONS_MAX)) throw erreur(`Utilisations entre 1 et ${UTILISATIONS_MAX}.`);
+    if (!(x.pieces >= 1 && x.pieces <= 1e6) || !(x.francs >= 0 && x.francs <= 1e7)) throw erreur('Prix invalide.');
+    return x;
+  });
   return out;
+}
+// Prix d'un pack : la somme de ses stickers, moins la remise, arrondie (50 pièces, 100 FC) ; jamais au-dessus des stickers un par un.
+const arrondi = (x, pas) => Math.max(pas, Math.round(x / pas) * pas);
+function offresPack(r, pack) {
+  const n = stickersDuPack(pack).length;
+  if (n < 2) return [];
+  const k = n * (1 - (r.remisePack == null ? REMISE_PACK : r.remisePack) / 100);
+  return r.offres.sticker.map((o) => ({ utilisations: o.utilisations, pieces: Math.min(n * o.pieces, arrondi(o.pieces * k, 50)), francs: Math.min(n * o.francs, arrondi(o.francs * k, 100)) }));
 }
 
 // cible : { type: 'joueur', joueur: 'Pseudo#1234' ou identifiant } | { type: 'tous' } | { type: 'groupe', criteres: { anciennete: 30, google: true, … } }
@@ -120,8 +130,9 @@ async function conditionCible(base, cible) {
   throw erreur('Cible : un joueur, tous les joueurs ou un groupe.');
 }
 
-function creerStickers(base, reglages) {
-  const reglage = () => reglages.get('stickers') || { actif: false, offres: OFFRES_DEFAUT };
+function creerStickers(base, reglages, comptes) {
+  const reglage = () => { const r = reglages.get('stickers') || {}; return { actif: false, vente: false, remisePack: REMISE_PACK, ...r, offres: { sticker: (r.offres && r.offres.sticker) || OFFRES_DEFAUT.sticker } }; };
+  const offres = (r) => ({ sticker: r.offres.sticker, packs: Object.fromEntries(Object.keys(PACKS).map((p) => [p, offresPack(r, p)])) });
   const catalogue = () => Object.entries(STICKERS).map(([id, s]) => ({ id, nom: s.nom, pack: s.pack }));
   const packs = () => Object.entries(PACKS).map(([id, p]) => ({ id, nom: p.nom, stickers: stickersDuPack(id) }));
 
@@ -144,10 +155,34 @@ function creerStickers(base, reglages) {
     reglage, catalogue, packs, soldes,
     actif: () => reglage().actif === true,
 
-    // Pour le joueur : catalogue, offres (pas encore en vente) et ses utilisations restantes.
+    // Pour le joueur : catalogue, offres (achetables en pièces quand `vente`) et ses utilisations restantes.
     async pourJoueur(compteId) {
       const r = reglage();
-      return { actif: r.actif === true, vente: false, stickers: catalogue(), packs: packs(), offres: r.offres || OFFRES_DEFAUT, soldes: compteId ? await soldes(compteId) : {} };
+      return { actif: r.actif === true, vente: r.actif === true && r.vente === true, stickers: catalogue(), packs: packs(), offres: offres(r), soldes: compteId ? await soldes(compteId) : {} };
+    },
+
+    // Achat en pièces : le prix vient d'ici (jamais du téléphone), débit et utilisations dans la même transaction.
+    // { sticker } ou { pack }, et `offre` : la position de l'offre (0 = la première).
+    async acheter(compte, { sticker, pack, offre }) {
+      const r = reglage();
+      if (!(r.actif && r.vente)) throw erreur('Les stickers ne sont pas encore en vente.', 403);
+      const liste = pack ? (PACKS[pack] ? offresPack(r, pack) : null) : STICKERS[sticker] ? r.offres.sticker : null;
+      if (!liste) throw erreur(pack ? 'Pack inconnu.' : 'Sticker inconnu.');
+      const o = liste[Math.trunc(Number(offre))];
+      if (!o) throw erreur('Offre inconnue.');
+      const { ids, n, quoi } = contenu({ sticker, pack, utilisations: o.utilisations });
+      const ref = `${pack ? 'pack:' + pack : sticker}:${n}`;
+      const solde = await base.transaction(async (q) => {
+        const reste = await comptes.mouvement(q, compte.id, -o.pieces, 'stickers', ref)
+          .catch((e) => { throw /solde|insuffisant/i.test(e.message) || e.statut === 402 ? erreur(`Il te faut ${o.pieces} pièces.`, 402) : e; });
+        for (const id of ids) {
+          await q.query(`INSERT INTO stickers_soldes (compte_id, sticker, restants) VALUES ($1, $2, $3)
+            ON CONFLICT (compte_id, sticker) DO UPDATE SET restants = stickers_soldes.restants + EXCLUDED.restants, maj_le = now()`, [compte.id, id, n]);
+          await q.query("INSERT INTO stickers_mouvements (compte_id, sticker, nombre, motif, ref) VALUES ($1, $2, $3, 'achat', $4)", [compte.id, id, n, `${o.pieces} pièces`]);
+        }
+        return reste;
+      });
+      return { ok: true, solde, pieces: o.pieces, utilisations: n, stickers: ids, texte: `${n} utilisations ${quoi}`, soldes: await soldes(compte.id) };
     },
 
     async compter(cible) {
@@ -190,9 +225,9 @@ function creerStickers(base, reglages) {
     async resumeAdmin() {
       const cadeaux = (await base.query('SELECT id::int AS id, cible, stickers, utilisations, message, joueurs, cree_le FROM stickers_cadeaux ORDER BY id DESC LIMIT 30')).rows;
       const parSticker = (await base.query('SELECT sticker, sum(restants)::int AS restants, sum(utilises)::int AS utilises, count(*) FILTER (WHERE restants > 0)::int AS joueurs FROM stickers_soldes GROUP BY sticker')).rows;
-      return { reglage: reglage(), stickers: catalogue(), packs: packs(), criteres: Object.entries(CRITERES).map(([id, d]) => ({ id, texte: d.texte, n: d.n || null, pays: !!d.pays })), cadeaux, parSticker };
+      return { reglage: reglage(), offres: offres(reglage()), stickers: catalogue(), packs: packs(), criteres: Object.entries(CRITERES).map(([id, d]) => ({ id, texte: d.texte, n: d.n || null, pays: !!d.pays })), cadeaux, parSticker };
     },
   };
 }
 
-module.exports = { creerStickers, verifierReglage, STICKERS, PACKS, CRITERES, OFFRES_DEFAUT, ATTENTE_MS };
+module.exports = { creerStickers, verifierReglage, offresPack, STICKERS, PACKS, CRITERES, OFFRES_DEFAUT, REMISE_PACK, ATTENTE_MS };

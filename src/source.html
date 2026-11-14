@@ -879,6 +879,11 @@ body.en-jeu #filChat { display: flex; }
 .boutique .st-offres { display: grid; gap: 6px; }
 .boutique .st-offre { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 8px 10px; border: 1px dashed var(--line); border-radius: 10px; color: var(--muted); font-size: 13px; }
 .boutique .st-offre b { color: var(--ink); }
+.boutique .st-tete-pack .btn { padding: 5px 10px; font-size: 13px; }
+.boutique .st-tete-pack { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 10px 0 4px; }
+.boutique button.st-case { color: inherit; font: inherit; }
+.fenetre[data-type="boutique"] .st-prix { display: inline-flex; align-items: center; gap: 4px; vertical-align: middle; }
+.fenetre[data-type="boutique"] .st-prix .piece { width: 18px; height: 18px; font-size: 11px; }
 .liste-k { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .liste-k li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; }
 .liste-k small { color: var(--muted); }
@@ -4876,26 +4881,33 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       }
       z.append(g);
     }
-    // Stickers animés : on vendra des utilisations (par sticker ou par pack, en pièces ou en argent réel). Pas encore en vente.
+    // Stickers animés : on vend des utilisations, d'un sticker ou de tout un pack, en pièces quand l'admin ouvre la vente.
     const E = await chargerStickers();
     if (E) {
-      z.append(el('h3', null, 'Stickers animés'), el('small', 'muted', 'Chaque envoi en partie utilise une fois le sticker. À 0, il se reverrouille.'));
+      z.append(el('h3', null, 'Stickers animés'), el('small', 'muted', (E.vente ? 'Touche un sticker ou « Tout le pack » pour l\'acheter. ' : '') + 'Chaque envoi en partie utilise une fois le sticker. À 0, il se reverrouille.'));
       for (const p of E.packs) {
-        z.append(el('p', 'muted', 'Pack ' + p.nom));
+        const tete = el('div', 'st-tete-pack'); tete.append(el('span', 'muted', 'Pack ' + p.nom));
+        const op = (E.offres.packs || {})[p.id] || [];
+        if (E.vente && op.length) { const b = el('button', 'btn petit', `Tout le pack · dès ${formatPieces(op[0].pieces)}`); b.onclick = () => acheterStickers({ pack: p.id }, E, B.solde); tete.append(b); }
+        z.append(tete);
         const g = el('div', 'st-grille');
         for (const id of p.stickers) {
-          const reste = (E.soldes || {})[id] || 0, c = el('div', 'st-case' + (reste > 0 && E.actif ? ' anim' : ' verrou'));
+          const reste = (E.soldes || {})[id] || 0, c = el(E.vente ? 'button' : 'div', 'st-case' + (reste > 0 && E.actif ? ' anim' : ' verrou'));
           c.innerHTML = KopoStickers.svg(id, nomSticker(id));
           if (reste > 0) c.append(el('span', 'reste', '×' + reste));
+          if (E.vente) c.onclick = () => acheterStickers({ sticker: id }, E, B.solde);
           g.append(c);
         }
         z.append(g);
       }
-      const offres = el('div', 'st-offres');
-      const ligne = (titre, o) => { const d = el('div', 'st-offre'); d.append(el('span', null, titre), el('span', null, `${formatPieces(o.pieces)} pièces ou ${formatPieces(o.francs)} FC · Bientôt`)); d.firstChild.prepend(el('b', null, o.utilisations + ' utilisations ')); return d; };
-      for (const o of E.offres.sticker) offres.append(ligne('d\'un sticker', o));
-      for (const o of E.offres.pack) offres.append(ligne('de tout un pack', o));
-      z.append(offres);
+      if (!E.vente) {
+        const offres = el('div', 'st-offres');
+        const ligne = (titre, o) => { const d = el('div', 'st-offre'); d.append(el('span', null, titre), el('span', null, `${formatPieces(o.pieces)} pièces ou ${formatPieces(o.francs)} FC · Bientôt`)); d.firstChild.prepend(el('b', null, o.utilisations + ' utilisations ')); return d; };
+        for (const o of E.offres.sticker) offres.append(ligne('d\'un sticker', o));
+        const grand = E.packs.find((p) => ((E.offres.packs || {})[p.id] || []).length === E.offres.sticker.length && p.stickers.length >= 6);
+        if (grand) for (const o of E.offres.packs[grand.id]) offres.append(ligne(`de chaque sticker d'un pack de ${grand.stickers.length}`, o));
+        z.append(offres);
+      }
     }
     const fermer = el('button', 'btn principal large', 'Fermer'); fermer.onclick = fermerFenetre;
     ouvrirFenetre([el('h2', null, 'Boutique'), z, fermer], 'boutique');
@@ -4932,6 +4944,35 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     ouvrirFenetre([corps, oui, non], 'boutique');
   }
   window.ouvrirBoutique = ouvrirBoutique;
+  // Achat de stickers en pièces : le serveur fixe le prix et débite ; l'argent réel viendra avec le paiement mobile.
+  function acheterStickers(quoi, E, solde) {
+    const p = quoi.pack && E.packs.find((x) => x.id === quoi.pack), ids = p ? p.stickers : [quoi.sticker];
+    const offres = p ? E.offres.packs[p.id] : E.offres.sticker;
+    const corps = el('div', 'bonus-jour');
+    corps.append(el('h2', null, p ? 'Pack ' + p.nom : nomSticker(quoi.sticker)));
+    const g = el('div', 'st-grille'); for (const id of ids) { const c = el('div', 'st-case anim'); c.innerHTML = KopoStickers.svg(id, nomSticker(id)); g.append(c); } corps.append(g);
+    corps.append(el('p', null, p ? `Chaque sticker du pack (${ids.length}) reçoit les utilisations.` : 'Chaque envoi en partie utilise une fois le sticker.'));
+    corps.append(el('small', 'muted', `Tu as ${formatPieces(solde)} pièces.`));
+    const boutons = offres.map((o, i) => {
+      const cher = o.pieces > solde, b = el('button', 'btn large' + (i ? '' : ' principal'));
+      const px = el('span', 'st-prix'); px.append(` · ${formatPieces(o.pieces)}`, pieceEl());
+      b.append(el('b', null, `${o.utilisations} utilisations`), px);
+      if (cher) { b.disabled = true; b.append(el('small', null, ` (il te manque ${formatPieces(o.pieces - solde)})`)); }
+      b.onclick = async () => {
+        boutons.forEach((x) => (x.disabled = true));
+        try {
+          const r = await apiJoueur('/stickers/acheter', 'POST', { ...quoi, offre: i });
+          soldeServeur(r.solde);
+          if (stickersEtat) stickersEtat.soldes = r.soldes;
+          vibrer(40); toast(`Merci ! ${r.texte} (${formatPieces(r.pieces)} pièces)`);
+          ouvrirBoutique();
+        } catch (e) { toast(e.message); boutons.forEach((x, k) => (x.disabled = offres[k].pieces > solde)); }
+      };
+      return b;
+    });
+    const non = el('button', 'btn large', 'Retour'); non.onclick = ouvrirBoutique;
+    ouvrirFenetre([corps, ...boutons, el('small', 'muted', 'Paiement en francs congolais (mobile money) : bientôt.'), non], 'boutique');
+  }
 
   // Chat en partie : messages choisis dans le tableau de bord (/api/config), sinon la liste de départ.
   const messagesChat = () => (configServeur && Array.isArray(configServeur.messages) && configServeur.messages.length ? configServeur.messages : REACTIONS);
@@ -5009,7 +5050,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       if (reste > 0) b.append(el('span', 'reste', '×' + reste));
       b.onclick = () => {
         if (!E.actif) return toast('Les stickers arrivent bientôt.');
-        if (!reste) return toast(`« ${x.nom} » est verrouillé : il arrive bientôt en boutique.`);
+        if (!reste) return toast(E.vente ? `« ${x.nom} » est verrouillé : achète-le dans la boutique.` : `« ${x.nom} » est verrouillé : il arrive bientôt en boutique.`);
         if (!enLigne) return toast('Les stickers s\'envoient pendant une partie en ligne.');
         fermerFenetre(); if (vueActuelle) afficher(vueActuelle);
         client.reseau.envoyer({ type: 'sticker', sticker: x.id });
