@@ -1695,7 +1695,7 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
   });
   // --- Stickers animés : utilisations vendues (plus tard) ou offertes par l'admin, envoi vérifié et décompté
   await test('stickers : éteints au départ, cadeaux de l\'admin (joueur, tous, groupe) avec message, envoi décompté', async () => {
-    assert.deepStrictEqual((await api('/api/config')).json.stickers, { actif: false });
+    assert.deepStrictEqual((await api('/api/config')).json.stickers, { actif: false, vente: false });
     const a = await invite('StickA'), b = await invite('StickB'), c = await invite('StickC');
     const vide = (await api('/api/v1/stickers', { jeton: a.jeton })).json;
     assert.strictEqual(vide.actif, false); assert.strictEqual(vide.vente, false);
@@ -1705,7 +1705,7 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.deepStrictEqual(vide.packs.map((p) => p.id), ['emotions', 'coupsDurs', 'table', 'ambiance', 'supporters']);
     assert.deepStrictEqual(vide.packs.find((p) => p.id === 'coupsDurs').stickers, ['quoi', 'aie', 'pitie', 'snif', 'serieux', 'pfff']);
     assert.deepStrictEqual(vide.packs.find((p) => p.id === 'emotions').stickers, ['ouf', 'rire', 'louche', 'encore', 'katapss', 'grrr']);
-    assert.ok(vide.offres.sticker.every((o) => o.utilisations && o.pieces && o.francs) && vide.offres.pack.length);
+    assert.ok(vide.offres.sticker.every((o) => o.utilisations && o.pieces && o.francs) && vide.offres.packs.emotions.length);
     const adm = (chemin, corps) => api('/admin/api/stickers' + chemin, { methode: corps ? 'POST' : 'GET', jeton: adminJeton, corps });
     assert.strictEqual((await api('/admin/api/stickers/compter', { methode: 'POST', jeton: a.jeton, corps: { cible: { type: 'tous' } } })).statut, 401);
     // Cibles : tous, un groupe (critères cumulés), un joueur.
@@ -1753,7 +1753,7 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
       assert.deepStrictEqual(recu.erreursA, ['Les stickers arrivent bientôt.']); assert.strictEqual(recu.b.length, 0);
       assert.strictEqual((await api('/admin/api/reglages/stickers', { methode: 'PUT', jeton: adminJeton, corps: { valeur: { actif: true, offres: { sticker: [{ utilisations: 0, pieces: 1, francs: 1 }] } } } })).statut, 400);
       assert.strictEqual((await api('/admin/api/reglages/stickers', { methode: 'PUT', jeton: adminJeton, corps: { valeur: { ...resume.reglage, actif: true } } })).statut, 200);
-      assert.deepStrictEqual((await api('/api/config')).json.stickers, { actif: true });
+      assert.deepStrictEqual((await api('/api/config')).json.stickers, { actif: true, vente: false });
       sA.send('sticker', { sticker: 'ouf' }); await attendre(150);
       assert.deepStrictEqual(recu.b, [{ type: 'sticker', joueur: a.compte.id, sticker: 'ouf' }]);
       assert.strictEqual(recu.a.length, 1); assert.deepStrictEqual(recu.restants, [{ sticker: 'ouf', restants: 21 }]);
@@ -1766,6 +1766,41 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
       await api('/admin/api/reglages/stickers', { methode: 'PUT', jeton: adminJeton, corps: { valeur: { ...resume.reglage, actif: false } } });
       await sA.leave(); await sB.leave();
     }
+  });
+  await test('stickers : achat en pièces (prix du serveur, pack selon sa taille), fermé tant que la vente est éteinte', async () => {
+    const j = await invite('StickAch');
+    const acheter = (corps) => api('/api/v1/stickers/acheter', { methode: 'POST', jeton: j.jeton, corps });
+    const E = (await api('/api/v1/stickers', { jeton: j.jeton })).json;
+    assert.strictEqual(E.vente, false);
+    // Prix des packs : 6 stickers = 33 % de moins que 6 × 300 ; 2 stickers = 400 au lieu de 600 ; un pack d'un seul sticker ne se vend pas.
+    assert.deepStrictEqual(E.offres.sticker.map((o) => o.pieces), [300, 600]);
+    assert.deepStrictEqual(E.offres.packs.emotions.map((o) => [o.pieces, o.francs]), [[1200, 2000], [2400, 4000]]);
+    assert.deepStrictEqual(E.offres.packs.ambiance.map((o) => [o.pieces, o.francs]), [[400, 700], [800, 1300]]);
+    assert.deepStrictEqual(E.offres.packs.supporters, []);
+    assert.strictEqual((await acheter({ sticker: 'ouf', offre: 0 })).statut, 403, 'vente éteinte');
+    const r0 = (await api('/admin/api/reglages', { jeton: adminJeton })).json.stickers;
+    const reg = (v) => api('/admin/api/reglages/stickers', { methode: 'PUT', jeton: adminJeton, corps: { valeur: v } });
+    assert.strictEqual((await reg({ actif: true, vente: true })).statut, 200);
+    try {
+      assert.deepStrictEqual((await api('/api/config')).json.stickers, { actif: true, vente: true });
+      await srv.comptes.crediter(j.compte.id, 5000 - await solde(j.compte.id), 'admin', 'test');
+      assert.strictEqual((await acheter({ sticker: 'ouf', offre: 9 })).statut, 400);
+      assert.strictEqual((await acheter({ sticker: 'inconnu', offre: 0 })).statut, 400);
+      assert.strictEqual((await acheter({ pack: 'supporters', offre: 0 })).statut, 400, 'pas de pack d\'un seul sticker');
+      const a = await acheter({ sticker: 'ouf', offre: 0, pieces: 1 }); // le prix envoyé par le téléphone est ignoré
+      assert.strictEqual(a.statut, 200, JSON.stringify(a.json));
+      assert.deepStrictEqual([a.json.solde, a.json.pieces, a.json.soldes], [4700, 300, { ouf: 20 }]);
+      const p = await acheter({ pack: 'emotions', offre: 1 });
+      assert.strictEqual(p.statut, 200); assert.strictEqual(p.json.solde, 2300);
+      assert.deepStrictEqual(p.json.soldes, { ouf: 70, rire: 50, louche: 50, encore: 50, katapss: 50, grrr: 50 });
+      const trop = await acheter({ pack: 'coupsDurs', offre: 1 });
+      assert.strictEqual(trop.statut, 402); assert.match(trop.json.erreur, /2400 pièces/);
+      assert.strictEqual(await solde(j.compte.id), 2300, 'rien débité');
+      assert.deepStrictEqual((await api('/api/v1/stickers', { jeton: j.jeton })).json.soldes.quoi, undefined);
+      const reg2 = await srv.base.query("SELECT montant, motif FROM registre_pieces WHERE compte_id = $1 AND motif = 'stickers' ORDER BY id", [j.compte.id]);
+      assert.deepStrictEqual(reg2.rows.map((l) => Number(l.montant)), [-300, -2400]);
+      assert.strictEqual((await reg({ actif: true, vente: true, remisePack: 80 })).statut, 400);
+    } finally { await reg(r0); }
   });
   await test('documentation : chaque route des joueurs est décrite dans docs/api/openapi.yaml', async () => {
     const yaml = require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'docs', 'api', 'openapi.yaml'), 'utf8');

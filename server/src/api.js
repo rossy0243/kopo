@@ -67,7 +67,7 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours,
     const client = clientMobile(req);
     const site = adresseSite(env);
     res.json({ jeux, annonce: t.annonce.active ? t.annonce.texte : null, maintenance: t.maintenance.active ? t.maintenance.message : null, versionMin: t.versionMin, tables: t.tables, deblocage: DEBLOCAGE, pot: t.pot, remiseAFlot: t.remiseAFlot.seuil, messages: t.messagesRapides,
-      stickers: { actif: !!(t.stickers && t.stickers.actif) }, // stickers animés : grisés tant que l'admin ne les allume pas
+      stickers: { actif: !!(t.stickers && t.stickers.actif), vente: !!(t.stickers && t.stickers.actif && t.stickers.vente) }, // stickers animés : grisés tant que l'admin ne les allume pas
       communautes: communautesPubliques(t.communautes), // groupes à rejoindre (bouton Partager)
       nouveaute: t.nouveaute && t.nouveaute.bande ? 'bande' : null, // fenêtre « Nouveau : Match du jour et Bande »
       // Connexion Google : active quand CONNEXION_GOOGLE=1 et que Google est activé dans Supabase.
@@ -153,6 +153,7 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours,
   r.post('/collection/equiper', joueur, enveloppe(async (req, res) => res.json(await parcours.equiper(req.compte, req.body.objet))));
   // Stickers animés : catalogue, offres (pas encore en vente) et utilisations restantes du joueur.
   r.get('/stickers', joueur, enveloppe(async (req, res) => res.json(await stickers.pourJoueur(req.compte.id))));
+  r.post('/stickers/acheter', joueur, enveloppe(async (req, res) => res.json(await stickers.acheter(req.compte, req.body || {}))));
   r.get('/boutique', joueur, enveloppe(async (req, res) => res.json({ solde: req.compte.solde, objets: parcours.catalogue(), ...(await parcours.collection(req.compte)) })));
   r.post('/boutique/acheter', joueur, enveloppe(async (req, res) => res.json(await parcours.acheter(req.compte, req.body.objet))));
 

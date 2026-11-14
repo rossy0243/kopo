@@ -50,7 +50,7 @@ const DEFAUTS = {
   // Groupes de la communauté (bouton Partager) : réseau, nom, lien, visible. Dans l'ordre de la liste ; sans lien, pas affiché.
   communautes: [],
   // Stickers animés : interrupteur éteint au départ (tout grisé), offres en pièces et en argent réel, pas encore en vente.
-  stickers: { actif: false, offres: require('./stickers').OFFRES_DEFAUT },
+  stickers: { actif: false, vente: false, remisePack: require('./stickers').REMISE_PACK, offres: require('./stickers').OFFRES_DEFAUT },
   messagesRapides: ['👏', '😂', '😮', '🔥', '😡', '👍', '😭', '🙏', 'Bien joué !', 'Bravo !', 'Joli coup !', 'Belle carte !', 'Bien vu !', 'Trop fort !', 'Merci !', 'Désolé !', 'Oups !', 'Aïe !', 'Pas de chance !', 'Je ramasse…', 'Je t’ai eu !', 'Katapss !', 'Vite !', 'Prends ton temps', 'À toi !', 'Encore une !', 'Bonne chance !', 'Bonne partie !', 'GG !', 'Revanche ?', 'On en refait une ?', 'Je reviens', 'Salut tout le monde !', 'À la prochaine !'],
 };
 // Version actuelle de l'appli (const VERSION dans src/source.html). La version minimale demandée

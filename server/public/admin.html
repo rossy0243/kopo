@@ -362,7 +362,9 @@ const afficher = {
     $('#contenu').innerHTML = `<h2>Stickers animés</h2>
       <div class="carte"><div class="ligne"><span>${R.actif ? '<b class="ok">Allumés</b> : les joueurs qui ont des utilisations peuvent envoyer leurs stickers.' : '<b class="ko">Éteints</b> : grisés pour tous les joueurs, rien ne s\'envoie. Les utilisations offertes sont gardées pour plus tard.'}</span>
         <span style="flex:1"></span><button class="btn ${R.actif ? 'danger' : 'principal'}" id="stInter">${R.actif ? 'Éteindre les stickers' : 'Allumer les stickers'}</button></div>
-        <p class="muted" style="margin:0">Vente : pas encore ouverte (les paiements ne sont pas branchés). Chaque envoi en partie décompte une utilisation ; à 0 le sticker se reverrouille.</p></div>
+        <div class="ligne"><span>${R.vente ? '<b class="ok">Vente ouverte</b> : les joueurs peuvent acheter des utilisations en pièces' + (R.actif ? '.' : ', dès que les stickers seront allumés.') : '<b class="ko">Vente fermée</b> : les prix sont affichés, rien ne s\'achète.'}</span>
+          <span style="flex:1"></span><button class="btn ${R.vente ? 'danger' : 'principal'}" id="stVente">${R.vente ? 'Fermer la vente' : 'Ouvrir la vente en pièces'}</button></div>
+        <p class="muted" style="margin:0">Chaque envoi en partie décompte une utilisation ; à 0 le sticker se reverrouille. L'achat en argent réel attend le paiement mobile.</p></div>
       <h3>Offrir des stickers</h3>
       <div class="carte">
         <div class="ligne"><b style="width:90px">À qui</b><select id="stCible"><option value="joueur">Un joueur</option><option value="tous">Tous les joueurs</option><option value="groupe">Un groupe de joueurs</option></select>
@@ -378,9 +380,10 @@ const afficher = {
       <h3>En circulation</h3>
       <div class="carte"><table><tr><th>Sticker</th><th>Pack</th><th class="n">Joueurs qui en ont</th><th class="n">Utilisations restantes</th><th class="n">Envoyés</th></tr>
         ${S.stickers.map((x) => { const p = parSt[x.id] || {}; return `<tr><td>${esc(x.nom)}</td><td>${esc(nomPack[x.pack])}</td><td class="n">${nb(p.joueurs)}</td><td class="n">${nb(p.restants)}</td><td class="n">${nb(p.utilises)}</td></tr>`; }).join('')}</table></div>
-      <h3>Offres prévues (pas encore en vente)</h3>
-      <div class="carte"><table><tr><th>Un sticker</th><td>${R.offres.sticker.map(prix).join('<br>')}</td></tr><tr><th>Un pack entier</th><td>${R.offres.pack.map(prix).join('<br>')} <span class="muted">(pour chaque sticker du pack)</span></td></tr></table>
-        <p class="muted" style="margin:8px 0 0">Prix en pièces ou en argent réel (mobile money, francs congolais). Aucun achat possible tant que les paiements ne sont pas branchés.</p></div>
+      <h3>Offres</h3>
+      <div class="carte"><table><tr><th>Un sticker</th><td>${R.offres.sticker.map(prix).join('<br>')}</td></tr>
+        ${S.packs.map((p) => `<tr><th>Pack ${esc(p.nom)} (${p.stickers.length})</th><td>${S.offres.packs[p.id].length ? S.offres.packs[p.id].map(prix).join('<br>') : '<span class="muted">pas de pack d\'un seul sticker : il se vend à l\'unité</span>'}</td></tr>`).join('')}</table>
+        <p class="muted" style="margin:8px 0 0">Un pack donne les utilisations à chacun de ses stickers, avec ${nb(R.remisePack)} % de moins que les stickers achetés un par un. Les pièces s'achètent en jeu ; le prix en francs congolais attend le paiement mobile.</p></div>
       <h3>Derniers cadeaux</h3>
       <div class="carte"><table><tr><th>Date</th><th>À qui</th><th>Quoi</th><th class="n">Joueurs</th><th>Message</th></tr>
         ${lignes('stCadeaux', S.cadeaux, (k) => `<tr><td>${date(k.cree_le)}</td><td>${decrire(k.cible)}</td><td>${nb(k.utilisations)} × ${k.stickers.map((x) => esc(nomSt[x] || x)).join(', ')}</td><td class="n">${nb(k.joueurs)}</td><td>${esc(k.message)}</td></tr>`, { par: 10, colonnes: 5, vide: '<tr><td class="muted" colspan="5">Aucun cadeau pour l\'instant.</td></tr>' })}</table></div>`;
@@ -421,6 +424,10 @@ const afficher = {
     $('#stInter').onclick = async () => {
       if (!R.actif && !confirm('Allumer les stickers ? Les joueurs qui ont des utilisations pourront les envoyer en partie.')) return;
       try { await api('/reglages/stickers', { methode: 'PUT', corps: { valeur: { ...R, actif: !R.actif } } }); message(R.actif ? 'Stickers éteints.' : 'Stickers allumés.'); aller('stickers'); } catch (e) { message(e.message); }
+    };
+    $('#stVente').onclick = async () => {
+      if (!R.vente && !confirm('Ouvrir la vente ? Les joueurs pourront acheter des utilisations de stickers avec leurs pièces.')) return;
+      try { await api('/reglages/stickers', { methode: 'PUT', corps: { valeur: { ...R, vente: !R.vente } } }); message(R.vente ? 'Vente fermée.' : 'Vente ouverte.'); aller('stickers'); } catch (e) { message(e.message); }
     };
   },
 

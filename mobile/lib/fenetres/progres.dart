@@ -406,16 +406,18 @@ Future<void> ouvrirBoutique() async {
               }),
           ]),
         ],
-        if (app.stickers != null) ..._rayonStickers(app.stickers!),
+        if (app.stickers != null) ..._rayonStickers(app.stickers!, solde),
         const Ecart(12),
         Btn.principal('Fermer', large: true, onTap: app.fermerFenetre),
       ]), 'boutique');
 }
 
-// Stickers animés : on vendra des utilisations (par sticker ou par pack, en pièces ou en argent réel). Pas encore en vente.
-List<Widget> _rayonStickers(Map s) {
-  final actif = s['actif'] == true;
+// Stickers animés : on vend des utilisations, d'un sticker ou de tout un pack, en pièces quand l'admin ouvre la vente.
+// Le prix vient du serveur ; l'argent réel (mobile money) viendra plus tard.
+List<Widget> _rayonStickers(Map s, int solde) {
+  final actif = s['actif'] == true, vente = s['vente'] == true;
   final offres = (s['offres'] as Map?) ?? const {};
+  final parPack = (offres['packs'] as Map?) ?? const {};
   Widget offre(String quoi, Map o) => Container(
         margin: const EdgeInsets.only(top: 6),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -425,20 +427,71 @@ List<Widget> _rayonStickers(Map s) {
           Text('${App.formatPieces(o['pieces'] as num)} pièces ou ${App.formatPieces(o['francs'] as num)} FC · Bientôt', style: K.texte(12, couleur: K.muted)),
         ]),
       );
+  final grand = Stickers.packs.map((p) => p.$1).where((id) => Stickers.packDe.values.where((v) => v == id).length >= 6 && ((parPack[id] as List?) ?? const []).isNotEmpty).firstOrNull;
   return [
     const Titre3('Stickers animés'),
-    const Muet('Chaque envoi en partie utilise une fois le sticker. À 0, il se reverrouille.', taille: 12),
+    Muet('${vente ? 'Touche un sticker ou « Tout le pack » pour l\'acheter. ' : ''}Chaque envoi en partie utilise une fois le sticker. À 0, il se reverrouille.', taille: 12),
     for (final (id, nom) in Stickers.packs) ...[
-      Muet('Pack $nom', taille: 12),
+      Row(children: [
+        Expanded(child: Muet('Pack $nom', taille: 12)),
+        if (vente && ((parPack[id] as List?) ?? const []).isNotEmpty)
+          Btn('Tout le pack · dès ${App.formatPieces(((parPack[id] as List).first as Map)['pieces'] as num)}', taille: 13, onTap: () => _acheterStickers(s, solde, pack: id, nom: 'Pack $nom')),
+      ]),
       const Ecart(4),
       Wrap(spacing: 6, runSpacing: 6, children: [
-        for (final st in Stickers.packDe.entries.where((e) => e.value == id).map((e) => e.key)) CaseSticker(st, verrou: !(actif && app.resteSticker(st) > 0), reste: app.resteSticker(st), taille: 54),
+        for (final st in Stickers.packDe.entries.where((e) => e.value == id).map((e) => e.key))
+          CaseSticker(st, verrou: !(actif && app.resteSticker(st) > 0), reste: app.resteSticker(st), taille: 54,
+              onTap: vente ? () => _acheterStickers(s, solde, sticker: st, nom: app.nomSticker(st)) : null),
       ]),
       const Ecart(6),
     ],
-    for (final o in ((offres['sticker'] as List?) ?? const [])) offre("d'un sticker", o as Map),
-    for (final o in ((offres['pack'] as List?) ?? const [])) offre("de tout un pack", o as Map),
+    if (!vente) ...[
+      for (final o in ((offres['sticker'] as List?) ?? const [])) offre("d'un sticker", o as Map),
+      if (grand != null) for (final o in (parPack[grand] as List)) offre("de chaque sticker d'un pack de 6", o as Map),
+    ],
   ];
+}
+
+void _acheterStickers(Map s, int solde, {String? sticker, String? pack, required String nom}) {
+  final offres = (s['offres'] as Map?) ?? const {};
+  final liste = ((pack != null ? ((offres['packs'] as Map?) ?? const {})[pack] : offres['sticker']) as List? ?? const []).cast<Map>();
+  final ids = pack != null ? Stickers.packDe.entries.where((e) => e.value == pack).map((e) => e.key).toList() : [sticker!];
+  var enCours = false;
+  app.ouvrirFenetre((context) => StatefulBuilder(builder: (context, setState) => Fenetre(enfants: [
+        Text(nom, textAlign: TextAlign.center, style: K.titre(30)),
+        const Ecart(8),
+        Wrap(alignment: WrapAlignment.center, spacing: 6, runSpacing: 6, children: [for (final id in ids) CaseSticker(id, verrou: false, taille: 54)]),
+        const Ecart(8),
+        Text(pack != null ? 'Chaque sticker du pack (${ids.length}) reçoit les utilisations.' : 'Chaque envoi en partie utilise une fois le sticker.', textAlign: TextAlign.center, style: K.texte(14)),
+        Center(child: Muet('Tu as ${App.formatPieces(solde)} pièces.', taille: 12)),
+        const Ecart(10),
+        for (final (i, o) in liste.indexed) ...[
+          Builder(builder: (_) {
+            final prix = (o['pieces'] as num).toInt(), cher = prix > solde;
+            final contenu = Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Text('${o['utilisations']} utilisations · ${App.formatPieces(prix)} ', style: K.texte(15, couleur: i == 0 && !cher ? K.encre : K.ink, poids: FontWeight.w700)),
+              const Piece(taille: 16),
+              if (cher) Text('  (il te manque ${App.formatPieces(prix - solde)})', style: K.texte(12, couleur: K.muted)),
+            ]);
+            final faire = enCours || cher ? null : () async {
+              setState(() => enCours = true);
+              try {
+                final r = await Api.post('/stickers/acheter', {if (pack != null) 'pack': pack else 'sticker': sticker, 'offre': i}) as Map;
+                app.soldeServeur(r['solde']);
+                if (app.stickers != null) app.stickers!['soldes'] = r['soldes'];
+                app.vibrer(40);
+                app.toast('Merci ! ${r['texte']} (${App.formatPieces(r['pieces'] as num)} pièces)');
+                ouvrirBoutique();
+              } catch (e) { app.toast(messageErreur(e)); setState(() => enCours = false); }
+            };
+            return i == 0 ? Btn.principal(null, enfant: contenu, large: true, onTap: faire) : Btn(null, enfant: contenu, large: true, onTap: faire);
+          }),
+          const Ecart(8),
+        ],
+        const Muet('Paiement en francs congolais (mobile money) : bientôt.', taille: 12),
+        const Ecart(8),
+        Btn('Retour', large: true, onTap: ouvrirBoutique),
+      ])), 'boutique');
 }
 
 Future<void> _equiperDepuisBoutique(String id) async {
