@@ -386,7 +386,8 @@ class SalleKopo extends Room {
           continue;
         }
         if (avecRobots || p.abandons.has(id) || !pl) continue; // pas de gains contre les robots (strategie-pieces §3)
-        const manchesSurvecues = pl === 1 ? s.numeroManche : s.elimines.indexOf(id);
+        // Mode Cahier : une donne n'est pas une manche, le vainqueur « survit » à chaque éliminé (sinon trop de pièces).
+        const manchesSurvecues = pl === 1 ? (s.cahier ? s.elimines.length : s.numeroManche) : s.elimines.indexOf(id);
         const gains = [
           [manchesSurvecues * g.manche, 'manche'],
           [(p.katapss.get(id) || 0) * g.katapss, 'katapss'],
@@ -409,7 +410,7 @@ class SalleKopo extends Room {
     if (parcours && !avecRobots && humains.length >= 2) { // Kopo et Inter (8) : un seul parcours de saison, partagé
       xps = await parcours.enregistrerPartie(p.id, humains.map((id) => {
         const pl = place(id);
-        return { id, place: pl, abandon: p.abandons.has(id), manchesSurvecues: !pl ? 0 : pl === 1 ? s.numeroManche : s.elimines.indexOf(id) };
+        return { id, place: pl, abandon: p.abandons.has(id), manchesSurvecues: !pl ? 0 : pl === 1 ? (s.cahier ? s.elimines.length : s.numeroManche) : s.elimines.indexOf(id) };
       })).catch((e) => { console.error('Parcours :', e.message); return new Map(); });
     }
     // Parrainage : le filleul avance ; à sa dernière partie, son parrain et lui reçoivent leur cadeau.

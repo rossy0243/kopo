@@ -7627,7 +7627,7 @@ svg .vb { transform-box: view-box; }
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = '87a6ef089443'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = '8f71ea3377d6'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: false };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
@@ -7990,7 +7990,7 @@ svg .vb { transform-box: view-box; }
       const cli = new Colyseus.Client(SERVEUR.replace(/^http/, 'ws'));
       if (facon.reconnexion) room = await cli.reconnect(facon.reconnexion).catch(() => facon.code ? reprendreServeur(cli, c.jeton, facon.code).then((r) => r || Promise.reject(new Error('reconnexion'))) : Promise.reject(new Error('reconnexion')));
       else if (facon.matchJour) room = await cli.create('kopo-jour', { jeton: c.jeton });
-      else if (facon.creer) room = await cli.create(facon.jeu === 'inter8' ? 'inter8' : 'kopo', Object.assign({ jeton: c.jeton, code: nouveauCode() }, facon.jeu === 'inter8' ? { mode: facon.mode, jRetour: !!facon.jRetour } : {}));
+      else if (facon.creer) room = await cli.create(facon.jeu === 'inter8' ? 'inter8' : 'kopo', Object.assign({ jeton: c.jeton, code: nouveauCode() }, facon.jeu === 'inter8' ? { mode: facon.mode, jRetour: !!facon.jRetour, formule: facon.formule, total: facon.total } : {}));
       // Par le code : la table peut être de Kopo ou d'Inter (8), on cherche dans les deux.
       else if (facon.code) room = (await reprendreServeur(cli, c.jeton, facon.code)) || await cli.join('kopo', { jeton: c.jeton, code: facon.code }).catch((e) => cli.join('inter8', { jeton: c.jeton, code: facon.code }).catch(() => { throw e; }));
       else if (facon.mise) room = await cli.joinOrCreate('kopo-mise', { jeton: c.jeton, publique: true, taille: facon.taille, mise: facon.mise });
