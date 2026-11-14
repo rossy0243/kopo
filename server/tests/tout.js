@@ -30,13 +30,13 @@ async function devenirAmis(x, y) {
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Joue une partie jusqu'au bout : chaque client humain joue la première action permise.
-async function jouerPartie(joueurs, { robots = 0, jeu = 'kopo', reglages = null } = {}) {
+async function jouerPartie(joueurs, { robots = 0, jeu = 'kopo', reglages = null, options = {} } = {}) {
   const client = new Client(URL_.replace('http', 'ws'));
   const code = 'T' + Math.random().toString(36).slice(2, 5).toUpperCase().replace(/[^A-Z]/g, 'Q').padEnd(3, 'Q');
   const salles = [];
   let fin = null;
   for (const j of joueurs) {
-    const salle = salles.length ? await client.joinById(salles[0].roomId, { jeton: j.jeton }) : await client.create(jeu, { jeton: j.jeton, code, rapide: true });
+    const salle = salles.length ? await client.joinById(salles[0].roomId, { jeton: j.jeton }) : await client.create(jeu, Object.assign({ jeton: j.jeton, code, rapide: true }, options));
     salle.onMessage('erreur', () => {});
     salle.onMessage('solde', () => {});
     salle.onMessage('vue', (v) => {
@@ -50,7 +50,7 @@ async function jouerPartie(joueurs, { robots = 0, jeu = 'kopo', reglages = null 
   for (let i = 0; i < robots; i++) salles[0].send('ajouterRobot');
   await attendre(100);
   salles[0].send('lancer');
-  for (let t = 0; t < 400 && !fin; t++) await attendre(50);
+  for (let t = 0; t < 2400 && !fin; t++) await attendre(50);
   assert.ok(fin, 'la partie doit se terminer');
   await attendre(400); // enregistrement en base
   for (const s of salles) await s.leave();
@@ -363,6 +363,16 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
   });
 
   console.log('Inter (8) sur le serveur');
+  await test('Inter (8) mode Cahier : la formule choisie à la création est gardée, gains comme une partie normale', async () => {
+    const js = [await invite('Cah_A'), await invite('Cah_B'), await invite('Cah_C')];
+    const fin = await jouerPartie(js, { jeu: 'inter8', options: { formule: 'cahier', total: 500 } });
+    assert.strictEqual(fin.formule, 'cahier');
+    assert.strictEqual(fin.cahier.total, 500);
+    assert.ok(fin.cahier.donnes.length >= 2, 'plusieurs donnes');
+    for (const e of fin.elimines) assert.ok(fin.cahier.scores[e] >= 500);
+    const ordre = [fin.vainqueur, ...fin.elimines.slice().reverse()];
+    assert.strictEqual((await srv.comptes.lire(ordre[0])).solde, 500 + 2 * 5 + 40, 'vainqueur : comme 2 manches et la victoire');
+  });
   await test('Inter (8) entre amis : partie complète en délire, gains, partie notée « inter8 », XP du parcours de saison', async () => {
     const js = [await invite('Inter_A'), await invite('Inter_B'), await invite('Inter_C')];
     const fin = await jouerPartie(js, { jeu: 'inter8', reglages: { mode: 'delire' } });

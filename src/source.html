@@ -2057,7 +2057,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       const cli = new Colyseus.Client(SERVEUR.replace(/^http/, 'ws'));
       if (facon.reconnexion) room = await cli.reconnect(facon.reconnexion).catch(() => facon.code ? reprendreServeur(cli, c.jeton, facon.code).then((r) => r || Promise.reject(new Error('reconnexion'))) : Promise.reject(new Error('reconnexion')));
       else if (facon.matchJour) room = await cli.create('kopo-jour', { jeton: c.jeton });
-      else if (facon.creer) room = await cli.create(facon.jeu === 'inter8' ? 'inter8' : 'kopo', Object.assign({ jeton: c.jeton, code: nouveauCode() }, facon.jeu === 'inter8' ? { mode: facon.mode, jRetour: !!facon.jRetour } : {}));
+      else if (facon.creer) room = await cli.create(facon.jeu === 'inter8' ? 'inter8' : 'kopo', Object.assign({ jeton: c.jeton, code: nouveauCode() }, facon.jeu === 'inter8' ? { mode: facon.mode, jRetour: !!facon.jRetour, formule: facon.formule, total: facon.total } : {}));
       // Par le code : la table peut être de Kopo ou d'Inter (8), on cherche dans les deux.
       else if (facon.code) room = (await reprendreServeur(cli, c.jeton, facon.code)) || await cli.join('kopo', { jeton: c.jeton, code: facon.code }).catch((e) => cli.join('inter8', { jeton: c.jeton, code: facon.code }).catch(() => { throw e; }));
       else if (facon.mise) room = await cli.joinOrCreate('kopo-mise', { jeton: c.jeton, publique: true, taille: facon.taille, mise: facon.mise });
