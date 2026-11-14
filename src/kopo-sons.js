@@ -1,12 +1,13 @@
 // Kopo — sons du jeu, entièrement générés par le téléphone (Web Audio) : aucun fichier,
 // aucune licence à respecter, rien à télécharger.
 // Deux réglages indépendants : les effets (cartes, tour, Katapss…) et la musique d'ambiance.
+// La musique ne joue que sur les menus (accueil, salon) : elle s'efface quand une partie commence.
 // L'audio ne démarre qu'après un premier toucher (règle des navigateurs) et se met en veille
 // quand la page est cachée.
 (function (root) {
   'use strict';
 
-  const etat = { effets: true, musique: false };
+  const etat = { effets: true, musique: false, menu: true };
   let ctx = null, sortie = null, busEffets = null, busMusique = null, bruitBlanc = null;
   let toucheRecue = false;
   const VOL_EFFETS = 0.55, VOL_MUSIQUE = 0.22;
@@ -30,6 +31,7 @@
     return ctx;
   }
   const actif = () => etat.effets || etat.musique;
+  const musiqueVoulue = () => etat.musique && etat.menu;
   // Prêt à jouer : contexte créé, débloqué par un toucher, page visible.
   function pret() {
     if (!toucheRecue || !actif()) return null;
@@ -47,7 +49,7 @@
     if (c.state !== 'running') c.resume().catch(() => {});
     // iOS : un son muet joué pendant le toucher déverrouille la sortie audio.
     try { const b = c.createBufferSource(); b.buffer = c.createBuffer(1, 1, 22050); b.connect(c.destination); b.start(0); } catch (e) {}
-    if (etat.musique) Musique.demarrer();
+    if (musiqueVoulue()) Musique.demarrer();
   }
 
   // ------------------------------------------------------------------ briques sonores
@@ -187,11 +189,11 @@
         minuteur = setInterval(() => { try { planifier(); } catch (e) {} }, 100);
         planifier();
       },
-      arreter() {
+      arreter(lent) {
         if (!enMarche) return;
         enMarche = false;
         clearInterval(minuteur); minuteur = null;
-        if (ctx) { busMusique.gain.cancelScheduledValues(ctx.currentTime); busMusique.gain.setTargetAtTime(0, ctx.currentTime, 0.15); }
+        if (ctx) { busMusique.gain.cancelScheduledValues(ctx.currentTime); busMusique.gain.setTargetAtTime(0, ctx.currentTime, lent ? 0.5 : 0.15); }
       },
       get enMarche() { return enMarche; },
     };
@@ -202,8 +204,15 @@
     if ('effets' in o) etat.effets = !!o.effets;
     if ('musique' in o) etat.musique = !!o.musique;
     if (ctx) busEffets.gain.setTargetAtTime(etat.effets ? VOL_EFFETS : 0, ctx.currentTime, 0.05);
-    if (etat.musique) Musique.demarrer(); else Musique.arreter();
+    if (musiqueVoulue()) Musique.demarrer(); else Musique.arreter();
     if (ctx && !actif() && ctx.state === 'running') ctx.suspend().catch(() => {});
+  }
+  // Menus (true) ou partie en cours (false) : la musique s'efface en douceur pendant le jeu.
+  function surMenu(oui) {
+    oui = !!oui;
+    if (oui === etat.menu) return;
+    etat.menu = oui;
+    if (musiqueVoulue()) Musique.demarrer(); else Musique.arreter(true);
   }
 
   if (typeof document !== 'undefined') {
@@ -211,11 +220,11 @@
     document.addEventListener('visibilitychange', () => {
       if (!ctx) return;
       if (document.visibilityState === 'hidden') { Musique.arreter(); ctx.suspend().catch(() => {}); }
-      else if (actif()) { ctx.resume().catch(() => {}); if (etat.musique) Musique.demarrer(); }
+      else if (actif()) { ctx.resume().catch(() => {}); if (musiqueVoulue()) Musique.demarrer(); }
     });
   }
 
-  const KopoSons = { jouer, regler, debloquer, effets: Object.keys(EFFETS) };
+  const KopoSons = { jouer, regler, surMenu, debloquer, effets: Object.keys(EFFETS) };
   if (typeof module !== 'undefined' && module.exports) module.exports = KopoSons;
   else root.KopoSons = KopoSons;
 })(typeof window !== 'undefined' ? window : globalThis);
