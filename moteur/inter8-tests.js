@@ -661,5 +661,38 @@ test('2 000 parties au hasard (2 à 8 joueurs, simple et délire) : jamais bloqu
   }
 });
 
+
+// Mode Cahier (14/11) : la donne s'arrête au premier qui sort, les autres comptent leurs cartes.
+const cahier = (mains, pioche, premier) => I.nouvelleManche(Object.keys(mains), mains, pioche, premier, { mode: 'simple', graine: 7, cahier: true });
+test('Cahier : barème des points', () => {
+  assert.strictEqual(I.pointsMain(['XR', '5C', 'RP']), 65);
+  assert.strictEqual(I.pointsMain(['8C', '2P', '10K', 'AT', 'DC', 'VC', '9P', '3K']), 25 + 2 + 10 + 1 + 10 + 10 + 9 + 3);
+  assert.strictEqual(I.pointsCarte('7C*'), 7);
+  assert.strictEqual(I.pointsMain([]), 0);
+});
+test('Cahier : la donne s\'arrête dès que le premier joueur sort', () => {
+  const m = cahier({ A: ['5C'], B: ['XR', '7P'], C: ['RP', '9T', 'AC'] }, remplir('4C'), 'A');
+  J(m, 'A', ['5C']);
+  assert.strictEqual(m.phase, 'terminee');
+  assert.strictEqual(m.sorti, 'A');
+  assert.strictEqual(m.elimine, null);
+  assert.deepStrictEqual(m.points, { A: 0, B: 57, C: 20 });
+  assert.deepStrictEqual(I.actionsPossibles(m, 'B'), []);
+});
+test('Cahier : sortir sur un 2 fait quand même piocher le suivant', () => {
+  const m = cahier({ A: ['2C'], B: ['3P'], C: ['4T'] }, remplir('4C'), 'A');
+  J(m, 'A', ['2C']);
+  assert.strictEqual(m.phase, 'terminee');
+  assert.strictEqual(m.mains.B.length, 3);
+  assert.strictEqual(m.points.B, I.pointsMain(m.mains.B));
+  assert.strictEqual(m.mains.C.length, 1);
+});
+test('Cahier : sans l\'option, la manche continue jusqu\'au dernier', () => {
+  const m = manche({ A: ['5C'], B: ['XR', '7P'], C: ['RP', '9T', 'AC'] }, remplir('4C'), 'A');
+  J(m, 'A', ['5C']);
+  assert.strictEqual(m.phase, 'jeu');
+  assert.strictEqual(m.points, undefined);
+});
+
 console.log(`\n${ok} test(s) réussi(s), ${echecs.length} échec(s).`);
 if (echecs.length) process.exit(1);

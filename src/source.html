@@ -1191,6 +1191,40 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   .fenetre[data-type="chat"] .phrases-chat button { padding: 4px 9px; font-size: 12.5px; }
   .fenetre[data-type="chat"] .histo-chat { max-height: 72px; }
 }
+/* Inter (8), mode Cahier (14/11) : la page du cahier, et le comptage animé en fin de donne. */
+.cahier-page { --papier: #f7f1df; --encre: #1f3a6b; --marge: #d64541; position: relative; color: var(--encre); background: repeating-linear-gradient(to bottom, transparent 0 27px, rgba(58,110,190,.22) 27px 28px), var(--papier); border-radius: 10px; padding: 8px 12px 10px 30px; box-shadow: 0 8px 22px rgba(0,0,0,.4), inset 0 0 0 1px rgba(0,0,0,.06); font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Chalkboard SE", cursive; }
+.cahier-page::before { content: ''; position: absolute; left: 20px; top: 0; bottom: 0; width: 2px; background: var(--marge); opacity: .55; }
+.cahier-page .tete { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13px; opacity: .75; margin-bottom: 2px; }
+.cahier-ligne { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 2px 10px; align-items: center; padding: 4px 0 5px; }
+.cahier-ligne + .cahier-ligne { border-top: 1px dashed rgba(31,58,107,.18); }
+.cahier-ligne .qui { font-weight: 700; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cahier-ligne .ajout { color: var(--marge); font-size: 16px; font-weight: 700; min-width: 3.2ch; text-align: right; font-variant-numeric: tabular-nums; }
+.cahier-ligne .ajout.sort { color: #2a7a4b; font-size: 13px; }
+.cahier-ligne .total { font-size: 22px; font-weight: 700; min-width: 3.6ch; text-align: right; font-variant-numeric: tabular-nums; }
+.cahier-cartes { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 3px; }
+.cahier-carte { display: inline-block; background: #fff; color: #1b2533; border: 1px solid #cfc6ab; border-radius: 4px; padding: 0 4px; font: 700 12px/18px var(--body); box-shadow: 0 1px 2px rgba(0,0,0,.18); }
+.cahier-carte.rouge { color: var(--red); }
+.cahier-carte.fort { border-color: var(--marge); }
+.cahier-barre { grid-column: 1 / -1; height: 5px; border-radius: 99px; background: rgba(31,58,107,.14); overflow: hidden; }
+.cahier-barre span { display: block; height: 100%; border-radius: inherit; background: #3a7bd5; }
+.cahier-barre.chaud span { background: #e08a1e; }
+.cahier-barre.rouge span { background: var(--marge); }
+.cahier-ligne .trait { position: absolute; left: -6px; right: -6px; top: 15px; height: 3px; border-radius: 3px; background: var(--marge); transform: scaleX(0); transform-origin: left; pointer-events: none; }
+.cahier-ligne.elimine .trait { transform: scaleX(1); }
+.cahier-ligne .tampon { grid-column: 1 / -1; justify-self: start; color: var(--marge); font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; border: 2px solid var(--marge); border-radius: 4px; padding: 0 6px; transform: rotate(-4deg); }
+.cahier-ligne.moi .qui { text-decoration: underline; text-decoration-color: rgba(31,58,107,.35); }
+.cahier-scroll { max-height: 52vh; max-height: 52dvh; overflow: auto; }
+.cahier-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.cahier-table th { font-size: 13px; padding: 0 3px 2px; max-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-bottom: 2px solid var(--encre); }
+.cahier-table td { text-align: center; height: 28px; padding: 0 3px; font-size: 16px; }
+.cahier-table td.n { text-align: left; font-size: 11px; opacity: .6; white-space: nowrap; }
+.cahier-table td.zero { color: #2a7a4b; }
+.cahier-table tfoot td { border-top: 2px solid var(--encre); font-weight: 700; font-size: 19px; }
+.cahier-table .out { color: var(--marge); text-decoration: line-through; }
+.chip.chip-cahier { cursor: pointer; border: 1px solid var(--brass); }
+.siege .pts-cahier { font-size: 10px; font-weight: 700; color: #1d1606; background: var(--brass); border-radius: 99px; padding: 0 6px; justify-self: start; }
+.siege .pts-cahier.rouge { background: var(--bad); color: #fff; }
+.fenetre[data-type="findonne"] { width: min(460px, 100%); }
 </style>
 <script>
 // Avant tout affichage : coupe les animations CSS si le joueur l'a choisi, ou si le téléphone en demande moins
@@ -1242,6 +1276,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   <symbol id="i-oeil" viewBox="0 0 32 32"><path d="M3 16s5-9 13-9 13 9 13 9-5 9-13 9S3 16 3 16z"/><circle cx="16" cy="16" r="4"/><circle cx="16" cy="16" r="1.4" style="fill:var(--acc,#c7362f);stroke:none"/></symbol>
   <symbol id="i-depart" viewBox="0 0 32 32"><rect x="8" y="4" width="16" height="24" rx="2.5"/><path d="M14 11.5l6 4.5-6 4.5z"/></symbol>
   <symbol id="i-revanche" viewBox="0 0 32 32"><rect x="10.5" y="8" width="11" height="16" rx="2.2"/><path d="M4.5 15A11.5 11.5 0 0 1 14 4.6M27.5 17A11.5 11.5 0 0 1 18 27.4"/><path d="M10.5 3.6l3.6 1-1 3.6M21.5 28.4l-3.6-1 1-3.6"/><path style="fill:var(--acc,#c7362f);stroke:none" d="M16 13.2l2 2.8-2 2.8-2-2.8z"/></symbol>
+  <symbol id="i-cahier" viewBox="0 0 32 32"><rect x="8" y="4" width="17" height="24" rx="2.5"/><path d="M5.5 9h4M5.5 14h4M5.5 19h4M5.5 24h4M13 11h8M13 15.5h8M13 20h4"/><path style="fill:var(--acc,#c7362f);stroke:none" d="M19.5 25.5l5.5-7 1.8 1.4-5.5 7-2.3.9z"/></symbol>
   <symbol id="i-missions" viewBox="0 0 32 32"><rect x="7" y="4" width="18" height="24" rx="2.5"/><path d="M11 10.5l1.8 1.8 3.2-3.4M19 11h2.5M11 17.5l1.8 1.8 3.2-3.4M19 18h2.5M11 24h4"/><circle cx="20.5" cy="24" r="1.4" style="fill:var(--acc,#c7362f);stroke:none"/></symbol>
   <symbol id="i-joker" viewBox="0 0 32 32"><rect x="8" y="4" width="16" height="24" rx="2.5"/><path d="M16 9.5l1.9 3.9 4.2.6-3 3 .7 4.2-3.8-2-3.8 2 .7-4.2-3-3 4.2-.6z"/><circle cx="16" cy="24.6" r="1.4" style="fill:var(--acc,#c7362f);stroke:none"/></symbol>
   <symbol id="i-cadeau" viewBox="0 0 32 32"><rect x="7" y="9" width="18" height="19" rx="2.5"/><path d="M16 9v19M7 16h18M16 9c-1-3.6-6-4.4-6-1.4 0 1.2 1.8 1.4 6 1.4 4.2 0 6-.2 6-1.4 0-3-5-2.2-6 1.4z"/><path style="fill:var(--acc,#c7362f);stroke:none" d="M20.5 19.6l1.8 2.4-1.8 2.4-1.8-2.4z"/></symbol>
@@ -1290,6 +1325,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       <button class="mode mode-enligne" id="btnInconnus" data-coin="♦"><span class="mode-icone"><svg class="ico"><use href="#i-enligne"/></svg></span><b>En ligne</b><small>Avec des inconnus <span id="enLigne"></span></small></button>
       <button class="mode mode-rejoindre" data-coin="♥" id="btnModeRejoindre"><span class="mode-icone"><svg class="ico"><use href="#i-rejoindre"/></svg></span><b>Rejoindre</b><small>Avec un code ou le QR</small></button>
       <button class="mode mode-robots" data-coin="♣" id="btnModeRobots"><span class="mode-icone"><svg class="ico"><use href="#i-robots"/></svg></span><b>Contre les robots</b><small>Partie rapide, seul</small></button>
+      <button class="mode mode-cahier" data-coin="♣" id="btnCahier" hidden><span class="mode-icone"><svg class="ico"><use href="#i-cahier"/></svg></span><b>Cahier</b><small>On compte les points entre amis</small></button>
       <button class="mode mode-ligue" data-coin="♠" id="btnLigue" hidden><span class="mode-icone"><svg class="ico"><use href="#i-couronne"/></svg><i class="point-nouveau" id="pointLigue" hidden></i></span><b>Ligue</b><small id="ligueResume">Saison classée</small></button>
       <div class="mode mode-bientot" id="modeTournoi" data-coin="♠" aria-disabled="true"><span class="mode-icone"><svg class="ico"><use href="#i-tournoi"/></svg></span><b>Tournoi</b><small>Bientôt</small></div>
     </div>
@@ -1334,6 +1370,11 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
         <div class="choix choix-niveau-robots" id="jRetourRobots" role="group" aria-label="J retour" hidden>
           <button type="button" data-v="non">Sans J retour</button>
           <button type="button" data-v="oui">Avec J retour</button>
+        </div>
+        <div class="choix choix-niveau-robots style-inter" id="formuleRobots" role="group" aria-label="Formule" hidden>
+          <button type="button" data-v="normale">Partie normale</button>
+          <button type="button" data-v="500">Cahier 500</button>
+          <button type="button" data-v="1000">Cahier 1000</button>
         </div>
         <p>Quel niveau ?</p>
         <div class="choix choix-niveau-robots" id="niveauRobots" role="group" aria-label="Niveau des robots">
@@ -1436,6 +1477,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     <div class="reglage" id="reglage"></div>
     <div class="reglage" id="reglageStyle" hidden></div>
     <div class="reglage" id="reglageJRetour" hidden></div>
+    <div class="reglage" id="reglageFormule" hidden></div>
     <h3 id="titreJoueurs"></h3>
     <ul class="liste-joueurs" id="listeJoueurs"></ul>
     <p id="attenteHote" hidden>En attente du lancement par l'hôte…</p>
@@ -2366,7 +2408,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
         minuteurFenetre = setTimeout(() => { const w = vueActuelle; if (w && w.etat === 'finManche') afficherFinManche(w); else if (w && w.etat === 'finPartie') afficherFinPartie(w); }, attente);
       } else if (v.etat === 'finManche') afficherFinManche(v);
       else afficherFinPartie(v);
-    } else if (!($('fenetre').dataset.type === 'chat' && !$('voile').hidden && !(v.manche && v.manche.joueurCourant === v.moi))
+    } else if (!(['chat', 'cahier'].includes($('fenetre').dataset.type) && !$('voile').hidden && !(v.manche && v.manche.joueurCourant === v.moi))
       && !(['demande8', 'couleur8'].includes($('fenetre').dataset.type) && !$('voile').hidden && v.manche && v.manche.joueurCourant === v.moi)) fermerFenetre();
     // (le chat reste ouvert pendant que les autres jouent, et se ferme quand c'est à toi)
   }
@@ -2699,6 +2741,19 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
         } else if (v.mode === mode) rs.append(el('strong', null, libelle));
       }
     }
+    // Mode Cahier (14/11) : partie normale, ou comptage des points jusqu'à 500 ou 1000. Pas en salle publique.
+    const rf = $('reglageFormule'); rf.hidden = v.jeu !== 'inter8' || v.publique; rf.replaceChildren();
+    if (!rf.hidden) {
+      rf.append(el('span', null, 'Formule'));
+      const actuelle = v.formule === 'cahier' ? String(v.totalCahier) : 'normale';
+      for (const [f, libelle] of [['normale', 'Normale'], ['500', 'Cahier 500'], ['1000', 'Cahier 1000']]) {
+        if (jeSuisHote) {
+          const b = el('button', 'btn' + (actuelle === f ? ' actif' : ''), libelle);
+          b.onclick = () => { choisirFormule(f); envoyer(f === 'normale' ? { type: 'reglages', formule: 'normale' } : { type: 'reglages', formule: 'cahier', total: Number(f) }); };
+          rf.append(b);
+        } else if (actuelle === f) rf.append(el('strong', null, f === 'normale' ? 'Partie normale' : `Cahier · éliminé à ${f} points`));
+      }
+    }
     // Délire : le J retour, en option.
     const rj = $('reglageJRetour'); rj.hidden = v.jeu !== 'inter8' || v.mode !== 'delire'; rj.replaceChildren();
     if (!rj.hidden) {
@@ -2822,7 +2877,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       if (m.nbCartes[id]) { const n = el('span', 'compte', String(m.nbCartes[id])); n.setAttribute('aria-label', m.nbCartes[id] + ' carte' + (m.nbCartes[id] > 1 ? 's' : '')); ligne.append(n); }
       d.append(ligne);
       if (id === m.joueurCourant) d.setAttribute('aria-current', 'true');
-      if (q >= 0) d.append(el('span', 'pastille ok', m.qualifies[q].raison === 'Katapss' ? 'Katapss ✓' : `qualifié ${q + 1}e`.replace('1e', '1er')));
+      if (q >= 0) d.append(el('span', 'pastille ok', v.cahier ? 'sorti ✓' : m.qualifies[q].raison === 'Katapss' ? 'Katapss ✓' : `qualifié ${q + 1}e`.replace('1e', '1er')));
       else if (m.elimine === id) d.append(el('span', 'pastille ko', 'éliminé'));
       else if (id === m.joueurCourant && v.chrono && !m.pause) { const c = el('div', 'chrono chrono-siege'); c.append(el('span')); d.append(c); }
       if (!joueur.connecte && !joueur.robot) {
@@ -3067,12 +3122,15 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     const m = v.manche;
     const finale = v.restants.length === 2;
     $('info').innerHTML = '';
-    $('info').append(el('strong', null, finale ? 'Finale' : 'Manche ' + v.numeroManche), document.createTextNode(` · ${v.mode === 'delire' ? (v.jRetour ? 'Délire · J retour' : 'Délire') : 'Simple'} · ${v.code}`));
+    if (v.cahier) $('info').append(el('strong', null, 'Donne ' + v.numeroManche), document.createTextNode(` · Cahier ${v.cahier.total} · ${v.mode === 'delire' ? 'Délire' : 'Simple'} · ${v.code}`));
+    else $('info').append(el('strong', null, finale ? 'Finale' : 'Manche ' + v.numeroManche), document.createTextNode(` · ${v.mode === 'delire' ? (v.jRetour ? 'Délire · J retour' : 'Délire') : 'Simple'} · ${v.code}`));
     const pause = m.pause;
     dessinerSieges(v);
     // Qui a annoncé, et le sens du jeu (mode délire).
     for (const id of m.annonces) { const d = siegeEl(id); if (d && !m.qualifies.some((q) => q.joueur === id)) d.append(el('span', 'pastille tour', 'annonce')); }
     const qui = (id) => (id === v.moi ? 'Toi' : nom(v, id));
+    // Mode Cahier : le total de chacun sous son nom (rouge près de l'élimination).
+    if (v.cahier) for (const id of m.sieges) { const d = siegeEl(id); const t = v.cahier.scores[id]; if (d && t !== undefined) d.append(el('span', 'pts-cahier' + (t >= v.cahier.total * 0.8 ? ' rouge' : ''), `${t} pts`)); }
 
     // En-tête : ce que la carte du centre impose.
     const ent = $('entete'); ent.replaceChildren();
@@ -3083,6 +3141,8 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       if (m.piochable === 0) ent.append(el('span', 'chip vide', 'Pioche vide : qui ne peut pas jouer passe'));
       if (v.mode === 'delire' && v.jRetour && m.enJeu.length > 2) { const c = el('span', 'chip'); c.append('Sens ', el('b', null, m.sens === 1 ? '↻' : '↺')); ent.append(c); }
     }
+    // Mode Cahier : le cahier s'ouvre à tout moment depuis l'en-tête.
+    if (v.cahier) { const c = el('button', 'chip chip-cahier'); c.type = 'button'; c.append('Cahier · ', el('b', null, String(v.cahier.scores[v.moi] ?? '–')), ` / ${v.cahier.total}`); c.onclick = () => ouvrirCahier(vueActuelle); ent.append(c); }
 
     // Table : compte à rebours de départ, ou la carte du centre et la pioche.
     const poses = $('poses'); poses.replaceChildren(); poses.classList.remove('serre');
@@ -3303,6 +3363,8 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     // Qualifiés et éliminé, comme pour Kopo.
     m.qualifies.forEach((q, rang) => { if (!a.qualifies.some((x) => x.joueur === q.joueur)) bulle(q.joueur, rang === 0 ? '✓ 1er' : `✓ ${rang + 1}e`, { cls: 'texte', delai: 300 }); });
     if (m.elimine && !a.elimine) { secouer(m.elimine); bulle(m.elimine, '✕', { cls: 'ko', delai: 200, duree: 1800 }); retardFenetre = Math.max(retardFenetre, Date.now() + 1900); }
+    // Mode Cahier : on voit la dernière carte posée avant le comptage.
+    if (m.sorti && !a.sorti) retardFenetre = Math.max(retardFenetre, Date.now() + 1400);
   }
   function sonnerInter(A, N) {
     if (N.etat === 'finPartie' && A && A.etat !== 'finPartie') Sons.jouer(N.vainqueur === N.moi ? 'victoire' : 'defaite', { delai: 1300 });
@@ -3517,7 +3579,118 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   function fermerFenetre() { $('voile').hidden = true; }
   const chatOuvert = () => $('fenetre').dataset.type === 'chat' && !$('voile').hidden;
 
+  // ------------------------------------------------------------------ Inter (8) : mode Cahier (14/11)
+  // Fin de donne : les cartes de chacun se retournent, les points se comptent, la ligne s'écrit dans le
+  // cahier et les éliminés sont barrés. Le tout tient en 2 à 3 s, dans l'attente avant la donne suivante.
+  const carteCahierEl = (c) => el('span', 'cahier-carte' + (estRougeInter(c) ? ' rouge' : '') + (I8.pointsCarte(c) >= 25 ? ' fort' : ''), I8.afficher(c));
+  function defiler(e, a, b, delai, duree, avant = '') { // un nombre qui passe de a à b
+    if (sansAnim || a === b) { e.textContent = avant + b; return; }
+    e.textContent = avant + a;
+    const t0 = performance.now() + delai;
+    const pas = (t) => { const k = Math.max(0, Math.min(1, (t - t0) / duree)); e.textContent = avant + Math.round(a + (b - a) * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(pas); };
+    requestAnimationFrame(pas);
+  }
+  const cleDonne = (v) => v.code + '|' + v.cahier.donnes.length + '|' + Object.keys(v.cahier.scores).join(',');
+  let finDonneOuverte = null;
+  const donnesMontrees = new Set();
+  function afficherFinDonne(v, finDePartie) {
+    const c = v.cahier, d = c.donnes[c.donnes.length - 1];
+    if (!d) return finDePartie ? construireFinPartieCahier(v) : null;
+    const cle = cleDonne(v);
+    if (finDonneOuverte === cle && ['findonne', 'cahier'].includes($('fenetre').dataset.type) && !$('voile').hidden) return; // déjà à l'écran (le décompte avance tout seul), ou le cahier complet ouvert par-dessus
+    finDonneOuverte = cle;
+    const dejaVu = donnesMontrees.has(cle);
+    donnesMontrees.add(cle);
+    const animAvant = sansAnim;
+    if (dejaVu) sansAnim = true;
+    try {
+      const qui = (id) => (id === v.moi ? 'Toi' : nom(v, id));
+      const page = el('div', 'cahier-page');
+      const tete = el('div', 'tete'); tete.append(el('span', null, 'Donne ' + d.numero), el('span', null, 'éliminé à ' + c.total));
+      page.append(tete);
+      const ids = [d.sorti].concat(Object.keys(d.points).filter((id) => id !== d.sorti));
+      ids.forEach((id, k) => {
+        const pts = d.points[id] || 0, apres = c.scores[id], avant = apres - pts, elimine = d.elimines.includes(id);
+        const ligne = el('div', 'cahier-ligne' + (id === v.moi ? ' moi' : ''));
+        const ajout = el('span', 'ajout' + (id === d.sorti ? ' sort' : ''), id === d.sorti ? 'sort ✓' : '+0');
+        const total = el('span', 'total', String(avant));
+        ligne.append(el('span', 'qui', qui(id)), ajout, total);
+        const cartes = el('div', 'cahier-cartes');
+        (d.mains[id] || []).forEach((carte, i) => {
+          const e = carteCahierEl(carte); cartes.append(e);
+          if (!sansAnim) e.animate([{ transform: 'rotateY(90deg) translateY(-6px)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 260, delay: 150 + k * 70 + i * 80, fill: 'backwards', easing: 'ease-out' });
+        });
+        if (cartes.childNodes.length) ligne.append(cartes);
+        const barre = el('div', 'cahier-barre'), plein = el('span'); barre.append(plein);
+        barre.classList.toggle('chaud', apres >= c.total * 0.6 && apres < c.total * 0.8);
+        barre.classList.toggle('rouge', apres >= c.total * 0.8);
+        ligne.append(barre);
+        remplir(plein, Math.min(1, avant / c.total), Math.min(1, apres / c.total), 1300 + k * 60, 700);
+        if (pts) defiler(ajout, 0, pts, 700 + k * 60, 600, '+');
+        defiler(total, avant, apres, 1300 + k * 60, 700);
+        if (elimine) {
+          const trait = el('span', 'trait'); ligne.append(trait);
+          plus(() => { ligne.classList.add('elimine'); ligne.append(el('span', 'tampon', id === v.moi ? 'tu es éliminé' : 'éliminé')); if (!sansAnim) trait.animate([{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: 450, easing: 'ease-out' }); vibrer(id === v.moi ? 80 : 20); }, 2100 + k * 60);
+        }
+        page.append(ligne);
+      });
+      const titre = d.sorti === v.moi ? 'Tu sors !' : `${nom(v, d.sorti)} sort !`;
+      const contenu = [el('h2', null, titre), page];
+      if (d.elimines.length) contenu.push(el('p', null, d.elimines.includes(v.moi) ? 'Tu as atteint le total : tu es éliminé. Tu peux continuer à regarder.' : `${d.elimines.map((id) => nom(v, id)).join(', ')} ${d.elimines.length > 1 ? 'sont éliminés' : 'est éliminé'}.`));
+      const toutCahier = el('button', 'btn large', 'Voir tout le cahier');
+      toutCahier.onclick = () => ouvrirCahier(vueActuelle);
+      if (finDePartie) {
+        const go = el('button', 'btn principal large', 'Résultat de la partie');
+        go.onclick = () => construireFinPartieCahier(vueActuelle);
+        contenu.push(go, toutCahier);
+        // On passe tout seul au résultat une fois le comptage vu.
+        setTimeout(() => { if (finDonneOuverte === cle && $('fenetre').dataset.type === 'findonne' && !$('voile').hidden && vueActuelle && vueActuelle.etat === 'finPartie') construireFinPartieCahier(vueActuelle); }, sansAnim ? 2500 : 5000);
+      } else {
+        if (v.suite) {
+          const p = el('p', 'suite-auto');
+          p.append('Donne suivante dans ', el('strong', 'decompte-suite', String(Math.ceil(v.suite.resteMs / 1000))), ' s.');
+          contenu.push(p);
+        }
+        if (v.entreRobots) { const b = el('button', 'btn principal large', 'Passer à la fin'); b.onclick = () => envoyer({ type: 'passerFin' }); contenu.push(b); }
+        if (v.hote === v.moi) { const b = el('button', 'btn' + (v.entreRobots ? '' : ' principal') + ' large', 'Donne suivante'); b.onclick = () => envoyer({ type: 'mancheSuivante' }); contenu.push(b); }
+        else if (!v.suite) contenu.push(el('p', null, "En attente de l'hôte pour la donne suivante…"));
+        contenu.push(toutCahier);
+      }
+      ouvrirFenetre(contenu, 'findonne');
+    } finally { sansAnim = animAvant; }
+  }
+  function construireFinPartieCahier(v) {
+    finDonneOuverte = null;
+    if (v && v.etat === 'finPartie') { recapOuvert = null; afficherFinPartie(v, true); }
+  }
+  // Le cahier complet : une colonne par joueur, une ligne par donne, les totaux en bas.
+  function ouvrirCahier(v) {
+    if (!v || !v.cahier) return;
+    const c = v.cahier;
+    const ids = Object.keys(c.scores);
+    const page = el('div', 'cahier-page'), scroll = el('div', 'cahier-scroll'), t = el('table', 'cahier-table');
+    const thead = el('thead'), tr = el('tr'); tr.append(el('th'));
+    ids.forEach((id) => tr.append(el('th', v.elimines.includes(id) ? 'out' : null, id === v.moi ? 'Toi' : nom(v, id))));
+    thead.append(tr);
+    const tbody = el('tbody');
+    c.donnes.forEach((d) => {
+      const r = el('tr'); r.append(el('td', 'n', 'D' + d.numero));
+      ids.forEach((id) => { const p = d.points[id]; r.append(el('td', p === 0 ? 'zero' : null, p === undefined ? '' : p === 0 ? '0' : String(p))); });
+      tbody.append(r);
+    });
+    if (!c.donnes.length) { const r = el('tr'), td = el('td', 'n', 'Rien d\'écrit pour l\'instant : première donne en cours.'); td.colSpan = ids.length + 1; r.append(td); tbody.append(r); }
+    const tfoot = el('tfoot'), tf = el('tr'); tf.append(el('td', 'n', 'Total'));
+    ids.forEach((id) => tf.append(el('td', v.elimines.includes(id) ? 'out' : null, String(c.scores[id]))));
+    tfoot.append(tf);
+    t.append(thead, tbody, tfoot); scroll.append(t); page.append(scroll);
+    const ok = el('button', 'btn principal large', 'Fermer');
+    ok.onclick = () => { if (vueActuelle && vueActuelle.etat === 'finPartie') { recapOuvert = null; afficherFinPartie(vueActuelle, true); } else fermerFenetre(); };
+    ouvrirFenetre([el('h2', null, 'Cahier'), el('small', 'muted', `Celui qui sort marque 0, les autres comptent leurs cartes. Éliminé à ${c.total} points : le dernier qui reste gagne.`), page, ok], 'cahier');
+    scroll.scrollTop = scroll.scrollHeight;
+  }
+
   function afficherFinManche(v) {
+    if (v.jeu === 'inter8' && v.cahier) return afficherFinDonne(v);
     const m = v.manche;
     const ul = el('ul', 'bilan' + (m.qualifies.length >= 4 ? ' deux' : '')); // 5 joueurs ou plus : deux colonnes, comme en fin de partie
     ul.style.setProperty('--rangs', Math.ceil((m.qualifies.length + 1) / 2));
@@ -3619,7 +3792,9 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
 
   let recapOuvert = null; // { cle, maj(v) } : la fenêtre n'est construite qu'une fois, puis mise à jour
   const recapsAnimes = new Set(); // bilans déjà montrés : s'ils se rouvrent, plus de « NIVEAU » ni d'animation
-  function afficherFinPartie(v) {
+  function afficherFinPartie(v, apresCahier) {
+    if (v.jeu === 'inter8' && v.cahier && !apresCahier && !donnesMontrees.has(cleDonne(v))) return afficherFinDonne(v, true);
+    if (v.jeu === 'inter8' && v.cahier && !apresCahier && finDonneOuverte === cleDonne(v) && $('fenetre').dataset.type === 'findonne' && !$('voile').hidden) return;
     const cle = v.code + '|' + v.vainqueur + '|' + v.elimines.join(',');
     if (recapOuvert && recapOuvert.cle === cle && $('fenetre').dataset.type === 'recap' && !$('voile').hidden) return recapOuvert.maj(v);
     const dejaVu = recapsAnimes.has(cle);
@@ -3761,6 +3936,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       ch.onclick = () => { arreterSuiteAuto(); envoyer({ type: 'rejouer' }); };
       rangee.append(ch);
     }
+    if (v.cahier) { const cb = el('button', 'btn', 'Cahier'); cb.onclick = () => ouvrirCahier(vueActuelle); rangee.append(cb); }
     const q = el('button', 'btn', 'Quitter'); q.onclick = () => { arreterSuiteAuto(); quitter(); };
     rangee.append(q);
     boutons.append(rangee);
@@ -3770,7 +3946,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     const deux = classement.length >= 5;
     const ul = el('ul', 'bilan' + (deux ? ' deux' : ''));
     if (deux) ul.style.setProperty('--rangs', Math.ceil(classement.length / 2));
-    classement.forEach((id, i) => { const li = el('li' , id === v.moi ? 'moi' : null); li.append(el('span', null, `${i + 1}. ${nom(v, id)}`), el('span', 'pastille ' + (i ? 'neutre' : 'ok'), i ? `${deux ? '' : 'éliminé '}manche ${v.elimines.length - i + 1}` : 'vainqueur')); ul.append(li); });
+    classement.forEach((id, i) => { const li = el('li' , id === v.moi ? 'moi' : null); li.append(el('span', null, `${i + 1}. ${nom(v, id)}`), el('span', 'pastille ' + (i ? 'neutre' : 'ok'), v.cahier ? (i ? `${v.cahier.scores[id]} pts` : `vainqueur · ${v.cahier.scores[id]} pts`) : i ? `${deux ? '' : 'éliminé '}manche ${v.elimines.length - i + 1}` : 'vainqueur')); ul.append(li); });
     droite.append(ul);
     recap.append(gauche, droite);
 
@@ -4151,7 +4327,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   // Accueil : l'onglet Ligue existe avec le serveur ; un point s'allume si une saison s'est terminée.
   // La carte Ligue prend la place de « Tournoi (bientôt) » sur l'accueil.
   async function majOngletLigue() {
-    $('btnLigue').hidden = !MODE_SERVEUR;
+    $('btnLigue').hidden = !MODE_SERVEUR || jeuChoisi() === 'inter8';
     $('modeTournoi').hidden = MODE_SERVEUR;
     if (!MODE_SERVEUR || !compteLocal()) return;
     try {
@@ -6102,7 +6278,8 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     if (jeu === 'inter8') envoyer(Object.assign({ type: 'reglages' }, style));
   }
   // Inter (8) : « Quelle partie ? » (Simple ou Délire) avant d'ouvrir la table. Le style se change encore dans le salon.
-  function choisirStyleInter(p) {
+  function choisirStyleInter(p, formule) {
+    if (formule === 'cahier' && formuleInter() !== 'cahier') ecrireFormule('cahier');
     const carte = (mode, lettre, titre, texte, puces) => {
       const b = el('button', 'style-partie'); b.type = 'button';
       const corps = el('span', 'style-corps');
@@ -6121,12 +6298,23 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       option.append(b);
     }
     majOption();
+    // Partie normale, ou mode Cahier (comptage des points) à 500 ou 1000.
+    const formules = el('div', 'choix choix-niveau-robots'); formules.setAttribute('role', 'group'); formules.setAttribute('aria-label', 'Formule');
+    const majFormules = () => formules.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === valeurFormule())));
+    for (const [v, libelle] of [['normale', 'Partie normale'], ['500', 'Cahier 500'], ['1000', 'Cahier 1000']]) {
+      const b = el('button', null, libelle); b.type = 'button'; b.dataset.v = v;
+      b.onclick = () => { choisirFormule(v); majFormules(); };
+      formules.append(b);
+    }
+    majFormules();
     const annuler = el('button', 'btn large', 'Annuler'); annuler.onclick = fermerFenetre;
     ouvrirFenetre([el('h2', null, 'Quelle partie ?'), el('p', 'muted', "Inter (8), entre amis. Choisis le style avant d'inviter."),
       carte('simple', '8', 'Simple', 'Les règles de base, de 2 à 8 joueurs.', ['1 paquet (54 cartes)']),
       carte('delire', 'J', 'Délire', 'Les mêmes règles avec deux paquets, de 2 à 8 joueurs. Le J retour (le valet change le sens du jeu) en option.', ['2 paquets (108 cartes)']),
-      el('small', 'muted', 'En délire :'), option, annuler], 'styleInter');
+      el('small', 'muted', 'En délire :'), option,
+      el('small', 'muted', 'Formule (Cahier : on compte les points de chaque donne, éliminé au total) :'), formules, annuler], 'styleInter');
   }
+  $('btnCahier').onclick = async () => { const p = lirePseudo(); if (!p || await exigerGoogle()) return; choisirStyleInter(p, 'cahier'); };
   $('btnCreer').onclick = async () => { const p = lirePseudo(); if (!p || await exigerGoogle()) return; if (jeuChoisi() === 'inter8') choisirStyleInter(p); else creerPartie(p, 'kopo'); };
   $('btnRejoindre').onclick = () => {
     const p = lirePseudo(); if (!p) return;
@@ -6606,7 +6794,13 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   // J retour : option du délire, désactivée par défaut. Qui jouait déjà en délire (avant l'option) le garde.
   const jRetourInter = () => { const j = stock.lire('kopo-inter8-jretour'); return j ? j === 'oui' : styleInter() === 'delire'; };
   const ecrireJRetour = (oui) => stock.ecrire('kopo-inter8-jretour', oui ? 'oui' : 'non');
-  const reglagesStyleInter = (mode) => ({ mode, jRetour: mode === 'delire' && jRetourInter() });
+  // Mode Cahier (14/11) : formule et total d'élimination (500 ou 1000), gardés sur le téléphone.
+  const formuleInter = () => (stock.lire('kopo-inter8-formule') === 'cahier' ? 'cahier' : 'normale');
+  const totalInter = () => (Number(stock.lire('kopo-inter8-total')) === 1000 ? 1000 : 500);
+  const ecrireFormule = (formule, total) => { stock.ecrire('kopo-inter8-formule', formule); if (total) stock.ecrire('kopo-inter8-total', total); };
+  const valeurFormule = () => (formuleInter() === 'cahier' ? String(totalInter()) : 'normale'); // boutons « Partie normale · Cahier 500 · Cahier 1000 »
+  const choisirFormule = (v) => (v === 'normale' ? ecrireFormule('normale') : ecrireFormule('cahier', Number(v)));
+  const reglagesStyleInter = (mode) => ({ mode, jRetour: mode === 'delire' && jRetourInter(), formule: formuleInter(), total: totalInter() });
   function majStyleRobots() {
     const inter = jeuChoisi() === 'inter8', delire = styleInter() === 'delire';
     document.querySelectorAll('#voileRobots .style-inter').forEach((e) => (e.hidden = !inter));
@@ -6615,7 +6809,9 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     $('jRetourRobots').hidden = !inter || !delire;
     $('jRetourRobots').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.v === 'oui') === jRetourInter())));
     $('choixRobots').querySelectorAll('button').forEach((b) => (b.hidden = inter && +b.textContent > SI.MAX - 1));
+    $('formuleRobots').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === valeurFormule())));
   }
+  $('formuleRobots').querySelectorAll('button').forEach((b) => (b.onclick = () => { choisirFormule(b.dataset.v); majStyleRobots(); }));
   $('styleRobots').querySelectorAll('button').forEach((b) => (b.onclick = () => { if (!stock.lire('kopo-inter8-jretour')) ecrireJRetour(jRetourInter()); stock.ecrire('kopo-inter8-style', b.dataset.v); majStyleRobots(); }));
   $('jRetourRobots').querySelectorAll('button').forEach((b) => (b.onclick = () => { ecrireJRetour(b.dataset.v === 'oui'); majStyleRobots(); }));
   $('btnModeRobots').onclick = () => {
@@ -6745,6 +6941,9 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       else if (marque) marque.remove();
     });
     majSousTitresModes();
+    // Inter (8) : la Ligue et la saison sont remplacées par le mode Cahier (14/11). Kopo garde sa Ligue.
+    $('btnCahier').hidden = jeu !== 'inter8';
+    $('btnLigue').hidden = jeu === 'inter8' || !MODE_SERVEUR;
     const r = $('btnRegles'); if (r && r.lastChild) r.lastChild.textContent = jeu === 'inter8' ? 'Règles Inter' : 'Règles';
   }
   $('choixJeu').querySelectorAll('button').forEach((b) => (b.onclick = () => { stock.ecrire('kopo-jeu', b.dataset.jeu); majChoixJeu(); }));
@@ -6760,7 +6959,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   const interBientot = (e) => {
     if (jeuChoisi() !== 'inter8') return;
     const cible = e.target.closest('#modes .mode');
-    if (!cible || ['btnModeRejoindre', 'btnModeRobots', 'btnCreer', 'btnInconnus'].includes(cible.id)) return; // ouverts pour Inter (8)
+    if (!cible || ['btnModeRejoindre', 'btnModeRobots', 'btnCreer', 'btnInconnus', 'btnCahier'].includes(cible.id)) return; // ouverts pour Inter (8)
     e.preventDefault(); e.stopImmediatePropagation();
     toast("Ce mode arrive très bientôt pour Inter (8). En attendant : entre amis, en ligne ou contre les robots !");
   };
