@@ -11,10 +11,15 @@ class Stickers {
   static const noms = {
     'ouf': 'Ouf !', 'rire': 'Je t’ai eu !', 'louche': 'Bluff ?', 'encore': 'Encore moi…', 'katapss': 'Katapss !', 'grrr': 'Grrr…',
     'danse': 'On danse !', 'dodo': 'Tu dors ?', 'supporter': 'Allez la RDC !',
+    'quoi': 'Quoi ?!', 'aie': 'Aïe aïe aïe', 'pitie': 'Pitié !', 'snif': 'Snif…', 'serieux': 'Sérieux ?', 'pfff': 'Pfff…',
+    'hmm': 'Hmm…', 'chut': 'Chut…', 'frime': 'Trop facile', 'byebye': 'Bye bye !', 'bravo': 'Bravo !', 'revanche': 'Revanche !',
   };
-  static const durees = {'ouf': 3200, 'rire': 2400, 'louche': 2800, 'encore': 3000, 'katapss': 2600, 'grrr': 2800, 'danse': 2800, 'dodo': 2400, 'supporter': 2400};
-  static const packs = [('emotions', 'Émotions'), ('ambiance', 'Ambiance'), ('supporters', 'Supporters')];
-  static const packDe = {'ouf': 'emotions', 'rire': 'emotions', 'louche': 'emotions', 'encore': 'emotions', 'katapss': 'emotions', 'grrr': 'emotions', 'danse': 'ambiance', 'dodo': 'ambiance', 'supporter': 'supporters'};
+  static const durees = {'ouf': 3200, 'rire': 2400, 'louche': 2800, 'encore': 3000, 'katapss': 2600, 'grrr': 2800, 'danse': 2800, 'dodo': 2400, 'supporter': 2400,
+    'quoi': 2600, 'aie': 2600, 'pitie': 2800, 'snif': 3000, 'serieux': 3000, 'pfff': 3000, 'hmm': 3000, 'chut': 3000, 'frime': 3000, 'byebye': 2600, 'bravo': 2400, 'revanche': 2800};
+  static const packs = [('emotions', 'Émotions'), ('coupsDurs', 'Coups durs'), ('table', 'À la table'), ('ambiance', 'Ambiance'), ('supporters', 'Supporters')];
+  static const packDe = {'ouf': 'emotions', 'rire': 'emotions', 'louche': 'emotions', 'encore': 'emotions', 'katapss': 'emotions', 'grrr': 'emotions', 'danse': 'ambiance', 'dodo': 'ambiance', 'supporter': 'supporters',
+    'quoi': 'coupsDurs', 'aie': 'coupsDurs', 'pitie': 'coupsDurs', 'snif': 'coupsDurs', 'serieux': 'coupsDurs', 'pfff': 'coupsDurs',
+    'hmm': 'table', 'chut': 'table', 'frime': 'table', 'byebye': 'table', 'bravo': 'table', 'revanche': 'table'};
   static bool connu(String? id) => id != null && noms.containsKey(id);
   static int duree(String id) => durees[id] ?? 2800;
   /// Six stickers au plus à l'écran (règle de foule du 11/11), les suivants attendent.

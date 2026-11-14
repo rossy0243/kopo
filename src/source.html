@@ -4949,6 +4949,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   // On vend des utilisations : chaque envoi en décompte une (vérifié par le serveur) ; à 0 le sticker se reverrouille.
   // Tant que l'admin ne les a pas allumés, tout est grisé et rien ne s'envoie.
   let ongletChat = 'msg', stickersEtat = null, packChoisi = 'emotions';
+  const PACK_ST = { 'Émotions': 'emotions', 'Coups durs': 'coupsDurs', 'À la table': 'table', 'Ambiance': 'ambiance', 'Supporters': 'supporters' }; // sans réponse du serveur
   (() => { const st = document.createElement('style'); st.textContent = KopoStickers.CSS; document.head.append(st); })();
   const nomSticker = (id) => { const x = stickersEtat && stickersEtat.stickers.find((y) => y.id === id); return x ? x.nom : (KopoStickers.ST[id] ? KopoStickers.ST[id].nom : id); };
   async function chargerStickers() {
@@ -4958,7 +4959,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   }
   function zoneStickers() { const z = el('div', 'st-zone'); remplirStickers(z); return z; }
   function remplirStickers(z) {
-    const E = stickersEtat || { actif: false, soldes: {}, stickers: KopoStickers.IDS.map((id) => ({ id, nom: KopoStickers.ST[id].nom, pack: KopoStickers.ST[id].pack ? (KopoStickers.ST[id].pack === 'Ambiance' ? 'ambiance' : 'supporters') : 'emotions' })), packs: [{ id: 'emotions', nom: 'Émotions' }, { id: 'ambiance', nom: 'Ambiance' }, { id: 'supporters', nom: 'Supporters' }] };
+    const E = stickersEtat || { actif: false, soldes: {}, stickers: KopoStickers.IDS.map((id) => ({ id, nom: KopoStickers.ST[id].nom, pack: PACK_ST[KopoStickers.ST[id].pack || 'Émotions'] })), packs: Object.entries(PACK_ST).map(([nom, id]) => ({ id, nom })) };
     const enLigne = !!(client && client.serveur);
     z.replaceChildren();
     const packs = el('div', 'st-packs');

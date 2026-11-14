@@ -1697,7 +1697,11 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     const a = await invite('StickA'), b = await invite('StickB'), c = await invite('StickC');
     const vide = (await api('/api/v1/stickers', { jeton: a.jeton })).json;
     assert.strictEqual(vide.actif, false); assert.strictEqual(vide.vente, false);
-    assert.strictEqual(vide.stickers.length, 9); assert.deepStrictEqual(vide.soldes, {});
+    assert.strictEqual(vide.stickers.length, 21); assert.deepStrictEqual(vide.soldes, {});
+    // Le serveur et les dessins du jeu (src/kopo-stickers.js) connaissent les mêmes stickers.
+    assert.deepStrictEqual(vide.stickers.map((x) => x.id), require('../../src/kopo-stickers.js').IDS);
+    assert.deepStrictEqual(vide.packs.map((p) => p.id), ['emotions', 'coupsDurs', 'table', 'ambiance', 'supporters']);
+    assert.deepStrictEqual(vide.packs.find((p) => p.id === 'coupsDurs').stickers, ['quoi', 'aie', 'pitie', 'snif', 'serieux', 'pfff']);
     assert.deepStrictEqual(vide.packs.find((p) => p.id === 'emotions').stickers, ['ouf', 'rire', 'louche', 'encore', 'katapss', 'grrr']);
     assert.ok(vide.offres.sticker.every((o) => o.utilisations && o.pieces && o.francs) && vide.offres.pack.length);
     const adm = (chemin, corps) => api('/admin/api/stickers' + chemin, { methode: corps ? 'POST' : 'GET', jeton: adminJeton, corps });
