@@ -15,9 +15,24 @@ const STICKERS = {
   danse: { nom: 'On danse !', pack: 'ambiance' },
   dodo: { nom: 'Tu dors ?', pack: 'ambiance' },
   supporter: { nom: 'Allez la RDC !', pack: 'supporters' },
+  // Deuxième lot (validé le 14/11) : les autres émotions d'une partie de cartes.
+  quoi: { nom: 'Quoi ?!', pack: 'coupsDurs' },
+  aie: { nom: 'Aïe aïe aïe', pack: 'coupsDurs' },
+  pitie: { nom: 'Pitié !', pack: 'coupsDurs' },
+  snif: { nom: 'Snif…', pack: 'coupsDurs' },
+  serieux: { nom: 'Sérieux ?', pack: 'coupsDurs' },
+  pfff: { nom: 'Pfff…', pack: 'coupsDurs' },
+  hmm: { nom: 'Hmm…', pack: 'table' },
+  chut: { nom: 'Chut…', pack: 'table' },
+  frime: { nom: 'Trop facile', pack: 'table' },
+  byebye: { nom: 'Bye bye !', pack: 'table' },
+  bravo: { nom: 'Bravo !', pack: 'table' },
+  revanche: { nom: 'Revanche !', pack: 'table' },
 };
 const PACKS = {
   emotions: { nom: 'Émotions' },
+  coupsDurs: { nom: 'Coups durs' },
+  table: { nom: 'À la table' },
   ambiance: { nom: 'Ambiance' },
   supporters: { nom: 'Supporters' },
 };

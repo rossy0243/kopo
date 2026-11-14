@@ -8,7 +8,8 @@ const path = require('path');
 const { chromium } = require('playwright');
 const K = require('../../src/kopo-stickers.js');
 // Moment figé, en part de la durée du sticker (la pose la plus parlante).
-const MOMENT = { ouf: 0.4, rire: 0.5, louche: 0.55, encore: 0.6, katapss: 0.45, grrr: 0.6, danse: 0.3, dodo: 0.5, supporter: 0.4 };
+const MOMENT = { ouf: 0.4, rire: 0.5, louche: 0.55, encore: 0.6, katapss: 0.45, grrr: 0.6, danse: 0.3, dodo: 0.5, supporter: 0.4,
+  quoi: 0.5, aie: 0.5, pitie: 0.5, snif: 0.5, serieux: 0.5, pfff: 0.6, hmm: 0.6, chut: 0.5, frime: 0.5, byebye: 0.4, bravo: 0.45, revanche: 0.6 };
 
 (async () => {
   const b = await chromium.launch();

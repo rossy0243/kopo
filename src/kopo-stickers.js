@@ -18,6 +18,17 @@
   const note = (x, y) => `<path d="M${x} ${y} v-16 l10 -3 v16" fill="none" stroke="${B}" stroke-width="3"/><circle cx="${x - 3}" cy="${y + 1}" r="4" fill="${B}"/><circle cx="${x + 7}" cy="${y - 2}" r="4" fill="${B}"/>`;
   const bouche_rire = `<path d="M43 64 h34 q-2 22 -17 22 q-15 0 -17 -22z" fill="${BOUCHE}" ${s(2.5)}/><path d="M45.5 65.5 h29 v4 q-14.5 2 -29 0z" fill="#fff"/><ellipse cx="60" cy="80" rx="7" ry="3.5" fill="#EF6B5F"/>`;
   const yeux_joie = `<path d="M43 57 q6.5 -8 13 0 M64 57 q6.5 -8 13 0" fill="none" ${s(3.5)}/>`;
+  // Deuxième lot (validé le 14/11) : les autres émotions d'une partie de cartes.
+  const T = (x, y, t, fs = 22, f = B, rot = 0) => `<text x="${x}" y="${y}" text-anchor="middle"${rot ? ` transform="rotate(${rot} ${x} ${y})"` : ''} font-family="Bebas Neue,Impact,sans-serif" font-size="${fs}" fill="${f}" stroke="${I}" stroke-width="1.1">${t}</text>`;
+  const sourcils_tristes = `<path d="M42 46 L54 41 M78 46 L66 41" ${s(3.5)}/>`;
+  const sourcils_hauts = `<path d="M41 38 q6 -6 13 -3 M79 38 q-6 -6 -13 -3" fill="none" ${s(3.5)}/>`;
+  const sourcils_durs = `<path d="M41 42 L56 48 M79 42 L64 48" ${s(4)}/>`;
+  const blancs = (r = 6.5) => `<circle cx="50" cy="56" r="${r}" fill="#fff" ${s(2.5)}/><circle cx="70" cy="56" r="${r}" fill="#fff" ${s(2.5)}/>`;
+  const pupilles = (k, r = 3, dx = 0, dy = 0) => `<g class="p ${k}"><circle cx="${50 + dx}" cy="${56.5 + dy}" r="${r}" fill="${I}"/><circle cx="${70 + dx}" cy="${56.5 + dy}" r="${r}" fill="${I}"/></g>`;
+  const paupieres = `<path d="M42.5 55 a7.5 6 0 0 1 15 0z M62.5 55 a7.5 6 0 0 1 15 0z" fill="${SK}"/><path d="M42.5 55 h15 M62.5 55 h15" ${s(3)}/>`;
+  const eclat = (x, y, k) => `<g class="p ${k}"><path d="M${x} ${y - 9} v-6 M${x + 8} ${y - 5} l5 -4 M${x - 8} ${y - 5} l-5 -4 M${x + 10} ${y + 3} h6 M${x - 10} ${y + 3} h-6" stroke="${B}" stroke-width="3" stroke-linecap="round"/></g>`;
+  const carte = (x, y, a, coul = R, sig = '♥') => `<g transform="rotate(${a} ${x + 10} ${y + 14})"><rect x="${x}" y="${y}" width="20" height="28" rx="3" fill="${C}" ${s(2.5)}/><text x="${x + 10}" y="${y + 19}" text-anchor="middle" font-size="13" fill="${coul}">${sig}</text></g>`;
+  const dos = (x, y, a) => `<g transform="rotate(${a} ${x + 10} ${y + 14})"><rect x="${x}" y="${y}" width="20" height="28" rx="3" fill="${R}" ${s(2.5)}/><rect x="${x + 3}" y="${y + 3}" width="14" height="22" rx="2" fill="none" stroke="${B}" stroke-width="1.5"/></g>`;
 
   const ST = {
     ouf: { nom: 'Ouf !', d: '3.2s', note: 'Il a eu chaud et s\'essuie le front', svg: `
@@ -107,6 +118,122 @@
         <path d="M41 41 q6 -6 13 -3 M79 41 q-6 -6 -13 -3" fill="none" ${s(3.5)}/>${yeux_joie}<path d="M38 63 l6 2 M82 63 l-6 2" stroke="#3B8FD6" stroke-width="4"/><path d="M38 66 l6 2 M82 66 l-6 2" stroke="#F7D038" stroke-width="3"/><path d="M38 69 l6 2 M82 69 l-6 2" stroke="#CE1021" stroke-width="3"/>
         <ellipse cx="60" cy="75" rx="9" ry="8" fill="${BOUCHE}" ${s(2.5)}/>
       </g>` },
+
+    // ---- Deuxième lot : packs « Coups durs » et « À la table »
+    quoi: { nom: 'Quoi ?!', d: '2.6s', pack: 'Coups durs', note: 'Le choc : on vient de lui poser une carte inattendue', svg: `
+      <g class="p q-corps">${corps('#E36414')}${tete()}
+        <g class="p q-sourcils">${sourcils_hauts}</g>
+        <g class="p q-yeux"><circle cx="50" cy="55" r="9" fill="#fff" ${s(2.5)}/><circle cx="70" cy="55" r="9" fill="#fff" ${s(2.5)}/><circle cx="50" cy="55.5" r="2.2" fill="${I}"/><circle cx="70" cy="55.5" r="2.2" fill="${I}"/></g>
+        <g class="p q-bouche"><ellipse cx="60" cy="77" rx="7" ry="5" fill="${BOUCHE}" ${s(2.5)}/></g>
+        ${bras(35, 74, 22, 124, '#E36414')}${bras(85, 74, 98, 124, '#E36414')}
+      </g>
+      <g class="p q-mot">${T(101, 30, '!?', 30, B, 10)}</g>
+      <g class="p q-traits"><path d="M14 30 l8 6 M10 46 l9 2 M106 52 l-8 2" stroke="#fff" stroke-width="3" stroke-linecap="round"/></g>` },
+
+    aie: { nom: 'Aïe aïe aïe', d: '2.6s', pack: 'Coups durs', note: 'Le stress : il se ronge les ongles, ça sent le ramassage', svg: `
+      <g class="p ai-trem">${corps('#F4A261')}${tete()}
+        ${sourcils_tristes}${blancs(7.5)}${pupilles('ai-pup', 2.2)}
+        <rect x="51" y="68" width="18" height="6" rx="2" fill="#fff" ${s(2)}/>
+        <g class="p ai-mains">${bras(54, 80, 22, 124, '#F4A261')}${bras(67, 81, 98, 124, '#F4A261')}</g>
+        <g class="p ai-g1">${goutte(34, 40)}</g><g class="p ai-g2">${goutte(86, 38)}</g>
+      </g>
+      <g class="p ai-mot">${T(20, 26, 'AÏE !', 22, B, -12)}</g>` },
+
+    pitie: { nom: 'Pitié !', d: '2.8s', pack: 'Coups durs', note: 'La prière : pas de ramassage cette fois, s\'il vous plaît', svg: `
+      <g class="p pi-halo"><ellipse cx="60" cy="16" rx="17" ry="4.5" fill="none" stroke="${B}" stroke-width="3.5"/></g>
+      ${corps('#9B5DE5')}${tete()}
+      ${sourcils_tristes}
+      <circle cx="50" cy="56" r="8" fill="#fff" ${s(2.5)}/><circle cx="70" cy="56" r="8" fill="#fff" ${s(2.5)}/>
+      <g class="p pi-pup"><circle cx="50" cy="53" r="4.6" fill="${I}"/><circle cx="70" cy="53" r="4.6" fill="${I}"/><circle cx="51.8" cy="51.4" r="1.6" fill="#fff"/><circle cx="71.8" cy="51.4" r="1.6" fill="#fff"/></g>
+      <path d="M54 75 q6 -4 12 0" fill="none" ${s(2.8)}/>
+      <g class="p pi-mains">${bras(56, 92, 22, 124, '#9B5DE5')}${bras(64, 92, 98, 124, '#9B5DE5')}<path d="M60 84 v15" ${s(2)}/></g>
+      <g class="p pi-e1">${etoile(22, 34, 5, B)}</g><g class="p pi-e2">${etoile(100, 30, 6)}</g>` },
+
+    snif: { nom: 'Snif…', d: '3s', pack: 'Coups durs', note: 'Éliminé : il pleure à chaudes larmes', svg: `
+      <g class="p sn-sanglot">${corps('#5B7DB1')}${tete()}
+        ${sourcils_tristes}<path d="M43 56 q6.5 -5 13 0 M64 56 q6.5 -5 13 0" fill="none" ${s(3.5)}/>
+        <g class="p sn-ruisseaux"><path d="M47 59 q-3 10 -1 24 M73 59 q3 10 1 24" fill="none" stroke="${EAU}" stroke-width="5" stroke-linecap="round"/></g>
+        <g class="p sn-levre"><path d="M48 79 q12 -11 24 0" fill="${BOUCHE}" ${s(2.5)}/></g>
+      </g>
+      ${[0, 1, 2].map(n => `<g class="p sn-l sn-g${n}"><g transform="translate(42 58) scale(1.6) translate(-42 -58)">${goutte(42, 58)}</g></g><g class="p sn-r sn-d${n}"><g transform="translate(78 58) scale(1.6) translate(-78 -58)">${goutte(78, 58)}</g></g>`).join('')}
+      <g class="p sn-flaque"><ellipse cx="60" cy="118" rx="40" ry="4" fill="${EAU}" opacity=".7"/></g>` },
+
+    serieux: { nom: 'Sérieux ?', d: '3s', pack: 'Coups durs', note: 'La main sur le visage : quel mauvais coup', svg: `
+      <g class="p vb se-tete">${corps('#6C757D')}${tete()}
+        <path d="M42 45 h12 M66 45 h12" ${s(3.5)}/>${paupieres}<circle cx="50" cy="57.5" r="2.5" fill="${I}"/><circle cx="70" cy="57.5" r="2.5" fill="${I}"/>
+        <path d="M49 77 q11 -5 22 0" fill="none" ${s(3)}/>
+        <g class="p se-bras">${bras(58, 50, 104, 126, '#6C757D')}</g>
+      </g>
+      <g class="p se-choc"><path d="M30 26 l7 7 M46 16 l2 9 M86 22 l-5 8" stroke="#fff" stroke-width="3" stroke-linecap="round"/></g>
+      <g class="p se-mot">${T(100, 28, '?', 30)}</g>` },
+
+    pfff: { nom: 'Pfff…', d: '3s', pack: 'Coups durs', note: 'Blasé : encore une main pourrie, il hausse les épaules', svg: `
+      <g class="p pf-epaules">${bras(14, 90, 28, 116, '#8D99AE')}${bras(106, 90, 92, 116, '#8D99AE')}${corps('#8D99AE')}</g>
+      <g class="p vb pf-tete">${tete()}
+        <path d="M42 45 h12 M66 45 h12" ${s(3.5)}/>
+        <ellipse cx="50" cy="56" rx="7" ry="5.5" fill="#fff" ${s(2.5)}/><ellipse cx="70" cy="56" rx="7" ry="5.5" fill="#fff" ${s(2.5)}/>
+        ${pupilles('pf-pup', 3)}
+        <path d="M42.5 56 a7.5 6 0 0 1 15 0z M62.5 56 a7.5 6 0 0 1 15 0z" fill="${SK}"/><path d="M42.5 56 h15 M62.5 56 h15" ${s(3)}/>
+        <g class="p pf-joues"><circle cx="44" cy="72" r="6" fill="#B06A36"/><circle cx="76" cy="72" r="6" fill="#B06A36"/></g>
+        <ellipse cx="60" cy="75" rx="4" ry="3.5" fill="${BOUCHE}" ${s(2.2)}/>
+      </g>
+      <g class="p pf-air">${nuage([[100, 78, 10], [110, 70, 7], [90, 72, 6]], 'PFFF', 101, 82, 11)}</g>` },
+
+    hmm: { nom: 'Hmm…', d: '3s', pack: 'À la table', note: 'Il réfléchit : quelle carte poser ?', svg: `
+      ${corps('#2A9D8F')}${tete()}
+      <path d="M42 46 h12" ${s(3.5)}/><path d="M66 42 q6 -5 12 -1" fill="none" ${s(3.5)}/>
+      ${blancs(6.5)}${pupilles('hm-pup', 3, 2, -2)}
+      <path d="M52 76 q8 -3 15 1" fill="none" ${s(3)}/>
+      <g class="p hm-main">${bras(66, 88, 98, 124, '#2A9D8F')}</g>
+      <g class="p hm-b1"><circle cx="92" cy="36" r="3.5" fill="#fff" ${s(1.5)}/></g>
+      <g class="p hm-b2"><circle cx="99" cy="26" r="5" fill="#fff" ${s(1.5)}/></g>
+      <g class="p hm-b3">${nuage([[106, 8, 13], [94, 6, 9], [116, 14, 8]], '', 0, 0)}${carte(97, -6, -8)}</g>` },
+
+    chut: { nom: 'Chut…', d: '3s', pack: 'À la table', note: 'Il cache son jeu : pas un mot', svg: `
+      ${corps('#264653')}${tete()}
+      <path d="M42 45 h12" ${s(3.5)}/><path d="M66 45 h12" ${s(3.5)}/>
+      <ellipse cx="50" cy="56" rx="7" ry="5.5" fill="#fff" ${s(2.5)}/><ellipse cx="70" cy="56" rx="7" ry="5.5" fill="#fff" ${s(2.5)}/>
+      ${pupilles('ch-pup', 3)}${paupieres}
+      <path d="M52 75 h16" ${s(3)}/>
+      <g class="p ch-cartes">${dos(18, 84, -20)}${dos(26, 82, -4)}${bras(30, 104, 18, 126, '#264653')}</g>
+      <g class="p ch-doigt">${bras(66, 92, 100, 126, '#264653')}<rect x="57" y="62" width="8" height="24" rx="4" fill="${SK}" ${s(2.5)}/></g>
+      <g class="p ch-mot">${T(98, 32, 'CHUT…', 22, B, 8)}</g>` },
+
+    frime: { nom: 'Trop facile', d: '3s', pack: 'À la table', note: 'La frime : lunettes de soleil, il gagne sans forcer', svg: `
+      ${corps('#1B2533')}<path d="M45 96 q15 14 30 0" fill="none" stroke="${B}" stroke-width="3"/><circle cx="60" cy="106" r="4" fill="${B}" ${s(1.5)}/>
+      ${tete()}
+      <path d="M42 41 h12 M66 41 h12" ${s(3.5)}/>
+      <path d="M50 74 q11 6 20 -4" fill="none" ${s(3)}/>
+      <g class="p fr-lunettes"><path d="M38 51 h44" ${s(3)}/><rect x="39" y="50" width="18" height="12" rx="5" fill="${I}"/><rect x="63" y="50" width="18" height="12" rx="5" fill="${I}"/>
+        <path class="p fr-reflet" d="M44 60 l6 -9 M68 60 l6 -9" stroke="#fff" stroke-width="2.5" stroke-linecap="round" opacity=".8"/></g>
+      <g class="p vb fr-bras">${bras(100, 46, 92, 112, '#1B2533')}</g>
+      <g class="p fr-carte">${carte(92, 6, 14, N, '♠')}</g>
+      <g class="p fr-eclat">${etoile(84, 48, 7)}</g>` },
+
+    byebye: { nom: 'Bye bye !', d: '2.6s', pack: 'À la table', note: 'Pour celui qui vient d\'être éliminé (gentiment)', svg: `
+      ${corps('#E76F51')}${tete()}
+      <path d="M41 42 q6 -6 13 -3 M66 44 h12" fill="none" ${s(3.5)}/>
+      ${oeil(50, 56, 6.5, 3)}<path d="M64 57 q6.5 -6 13 0" fill="none" ${s(3.5)}/>
+      <path d="M47 69 q13 12 26 0z" fill="${BOUCHE}" ${s(2.5)}/><g class="p by-langue"><path d="M58 75 q0 10 6 10 q6 0 6 -10z" fill="#EF6B5F" ${s(2)}/></g>${joues}
+      <g class="p vb by-main">${bras(100, 30, 92, 112, '#E76F51')}<path d="M108 14 q6 6 2 12 M114 20 q4 4 0 8" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/></g>
+      <g class="p by-mot">${T(34, 24, 'BYE BYE', 22, B, -10)}</g>` },
+
+    bravo: { nom: 'Bravo !', d: '2.4s', pack: 'À la table', note: 'Respect : il applaudit le beau coup', svg: `
+      ${corps('#2B9348')}${tete()}
+      <path d="M41 41 q6 -6 13 -3 M79 41 q-6 -6 -13 -3" fill="none" ${s(3.5)}/>${yeux_joie}${joues}<path d="M48 68 q12 12 24 0z" fill="${BOUCHE}" ${s(2.5)}/>
+      <g class="p br-g">${bras(52, 92, 22, 124, '#2B9348')}</g><g class="p br-d">${bras(68, 92, 98, 124, '#2B9348')}</g>
+      ${eclat(60, 84, 'br-eclat')}
+      <g class="p br-e1">${etoile(18, 30, 6, B)}</g><g class="p br-e2">${etoile(102, 24, 5)}</g><g class="p br-e3">${etoile(104, 52, 4, B)}</g>` },
+
+    revanche: { nom: 'Revanche !', d: '2.8s', pack: 'À la table', note: 'Fin de partie : il en redemande, gonflé à bloc', svg: `
+      <g class="p re-feu">${[42, 60, 78].map((x, i) => `<path d="M${x} ${26 - i % 2 * 4} q-7 -10 0 -20 q2 8 6 4 q4 10 -6 16z" fill="${i === 1 ? B : '#F77F00'}" ${s(1.8)}/>`).join('')}</g>
+      ${corps('#C1121F')}${tete()}
+      <path d="M31 43 q29 -10 58 0 v7 q-29 -10 -58 0z" fill="${R}" ${s(2.5)}/>
+      <g class="p re-noeud"><path d="M88 46 q10 -2 16 6 l-6 3 q-4 -5 -10 -4z M88 47 q8 4 10 14 l-6 0 q-1 -7 -6 -10z" fill="${R}" ${s(2)}/></g>
+      ${sourcils_durs}${oeil(50, 57, 6, 3)}${oeil(70, 57, 6, 3)}
+      <path d="M48 72 q12 8 24 -2" fill="none" ${s(3)}/><path d="M60 74 v4" ${s(2)}/>
+      <g class="p re-poing">${bras(98, 38, 92, 112, '#C1121F')}</g>
+      <g class="p re-mot"><rect x="10" y="96" width="100" height="24" rx="6" fill="${B}" ${s()}/><text x="60" y="115" text-anchor="middle" font-family="Bebas Neue,Impact,sans-serif" font-size="19" fill="${I}">REVANCHE !</text></g>` },
   };
   const CSS = `
 /* ======================= animations des stickers ======================= */
@@ -186,6 +313,92 @@ svg .vb { transform-box: view-box; }
 .anim .su-tissu { animation-name: su-tissu; animation-duration: .8s; transform-origin: left center; } @keyframes su-tissu { 0%, 100% { transform: skewY(-6deg) scaleX(.94) } 50% { transform: skewY(5deg) scaleX(1) } }
 
 @media (prefers-reduced-motion: reduce) { .anim .p, .recu { animation: none !important; } .recu { opacity: 1 !important; } }
+/* Quoi ?! (le choc) */
+.anim .q-corps { animation-name: q-corps; } @keyframes q-corps { 0%, 14% { transform: none } 20% { transform: translateY(4px) scale(1.02, .97) } 28%, 100% { transform: none } }
+.anim .q-yeux { animation-name: q-yeux; } @keyframes q-yeux { 0%, 16% { transform: scale(.75) } 24% { transform: scale(1.35) } 30%, 90% { transform: scale(1.15) } 100% { transform: scale(.75) } }
+.anim .q-bouche { animation-name: q-bouche; transform-origin: 50% 0; } @keyframes q-bouche { 0%, 16% { transform: scale(.7, .5) } 26%, 90% { transform: scale(1, 1.9) } 100% { transform: scale(.7, .5) } }
+.anim .q-sourcils { animation-name: q-sourcils; } @keyframes q-sourcils { 0%, 16% { transform: translateY(5px) } 24%, 90% { transform: translateY(-3px) } 100% { transform: translateY(5px) } }
+.q-mot, .q-traits { opacity: 0; } .anim .q-mot { animation-name: q-mot; } @keyframes q-mot { 0%, 22% { transform: scale(0); opacity: 1 } 30% { transform: scale(1.35); opacity: 1 } 38%, 90% { transform: scale(1); opacity: 1 } 100% { transform: scale(0); opacity: 1 } }
+.anim .q-traits { animation-name: q-traits; } @keyframes q-traits { 0%, 20% { opacity: 0; transform: scale(.6) } 26% { opacity: 1; transform: scale(1.1) } 50% { opacity: 1; transform: scale(1) } 60%, 100% { opacity: 0 } }
+
+/* Aïe aïe aïe (le stress) */
+.anim .ai-trem { animation-name: ai-trem; animation-duration: .18s; animation-timing-function: linear; } @keyframes ai-trem { 0%, 100% { transform: translateX(0) } 25% { transform: translateX(-1.4px) } 75% { transform: translateX(1.4px) } }
+.anim .ai-pup { animation-name: ai-pup; animation-duration: 1.3s; } @keyframes ai-pup { 0%, 20% { transform: translateX(0) } 30%, 45% { transform: translateX(-3.5px) } 55%, 75% { transform: translateX(3.5px) } 85%, 100% { transform: translateX(0) } }
+.anim .ai-mains { animation-name: ai-mains; animation-duration: .4s; } @keyframes ai-mains { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(-2.5px) } }
+.ai-g1, .ai-g2 { opacity: 0; } .anim .ai-g1, .anim .ai-g2 { animation-name: ai-g; animation-duration: 1.3s; } .anim .ai-g2 { animation-delay: .65s; }
+@keyframes ai-g { 0% { opacity: 0; transform: none } 15% { opacity: 1 } 100% { opacity: 0; transform: translateY(18px) } }
+.anim .ai-mot { animation-name: ai-mot; animation-duration: .9s; } @keyframes ai-mot { 0%, 100% { transform: scale(1) rotate(0) } 50% { transform: scale(1.12) rotate(-4deg) } }
+
+/* Pitié ! (la prière) */
+.anim .pi-halo { animation-name: pi-halo; } @keyframes pi-halo { 0%, 100% { transform: translateY(0); opacity: .9 } 50% { transform: translateY(-3px); opacity: 1 } }
+.anim .pi-mains { animation-name: pi-mains; animation-duration: .7s; } @keyframes pi-mains { 0%, 100% { transform: translate(0, 0) } 25% { transform: translate(-1.5px, -1.5px) } 75% { transform: translate(1.5px, -1.5px) } }
+.anim .pi-pup { animation-name: pi-pup; } @keyframes pi-pup { 0%, 100% { transform: scale(1) } 50% { transform: scale(1.12) } }
+.pi-e1, .pi-e2 { opacity: 0; } .anim .pi-e1, .anim .pi-e2 { animation-name: pi-e; animation-duration: 1.4s; } .anim .pi-e2 { animation-delay: .7s; }
+@keyframes pi-e { 0% { opacity: 0; transform: scale(.3) rotate(0) } 40% { opacity: 1; transform: scale(1.1) rotate(40deg) } 100% { opacity: 0; transform: scale(.4) rotate(90deg) } }
+
+/* Snif… (il pleure) */
+.anim .sn-sanglot { animation-name: sn-sanglot; animation-duration: .8s; transform-origin: 50% 100%; } @keyframes sn-sanglot { 0%, 100% { transform: none } 30% { transform: scale(1.02, .97) } 50% { transform: none } 70% { transform: scale(1.015, .98) } }
+.anim .sn-ruisseaux { animation-name: sn-ruis; animation-duration: .6s; } @keyframes sn-ruis { 0%, 100% { opacity: .95 } 50% { opacity: .6 } }
+.anim .sn-levre { animation-name: sn-levre; animation-duration: .3s; } @keyframes sn-levre { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(1.5px) } }
+.sn-l, .sn-r { opacity: 0; } .anim .sn-l, .anim .sn-r { animation-duration: .9s; animation-timing-function: cubic-bezier(.3, 0, .7, 1); }
+.anim .sn-l { animation-name: sn-l; } .anim .sn-r { animation-name: sn-r; }
+@keyframes sn-l { 0% { opacity: 1; transform: translate(0, 0) } 100% { opacity: 0; transform: translate(-30px, 46px) } }
+@keyframes sn-r { 0% { opacity: 1; transform: translate(0, 0) } 100% { opacity: 0; transform: translate(30px, 46px) } }
+.anim .sn-g1, .anim .sn-d1 { animation-delay: .3s } .anim .sn-g2, .anim .sn-d2 { animation-delay: .6s }
+.sn-flaque { transform: scaleX(0); } .anim .sn-flaque { animation-name: sn-flaque; } @keyframes sn-flaque { 0%, 10% { transform: scaleX(0) } 80% { transform: scaleX(1) } 100% { transform: scaleX(1); opacity: 0 } }
+
+/* Sérieux ? (la main sur le visage) */
+.anim .se-bras { animation-name: se-bras; } @keyframes se-bras { 0%, 10% { transform: translate(30px, 70px); opacity: 0 } 22% { transform: translate(0, -4px); opacity: 1 } 26%, 88% { transform: none; opacity: 1 } 100% { transform: translate(30px, 70px); opacity: 0 } }
+.anim .se-tete { animation-name: se-tete; transform-origin: 60px 120px; } @keyframes se-tete { 0%, 24% { transform: none } 28% { transform: rotate(-3deg) translateY(2px) } 40% { transform: rotate(4deg) } 54% { transform: rotate(-4deg) } 68% { transform: rotate(3deg) } 82%, 100% { transform: none } }
+.se-choc, .se-mot { opacity: 0; } .anim .se-choc { animation-name: se-choc; } @keyframes se-choc { 0%, 21% { opacity: 0; transform: scale(.5) } 25% { opacity: 1; transform: scale(1.15) } 40%, 100% { opacity: 0; transform: scale(1) } }
+.anim .se-mot { animation-name: se-mot; } @keyframes se-mot { 0%, 40% { opacity: 0; transform: scale(0) } 48% { opacity: 1; transform: scale(1.3) } 55%, 88% { opacity: 1; transform: scale(1) } 100% { opacity: 0; transform: scale(0) } }
+
+/* Pfff… (blasé) */
+.anim .pf-pup { animation-name: pf-pup; } @keyframes pf-pup { 0%, 10% { transform: translate(0, 1px) } 22% { transform: translate(-3px, -5px) } 34%, 48% { transform: translate(3px, -5px) } 58%, 100% { transform: translate(0, 1px) } }
+.anim .pf-tete { animation-name: pf-tete; transform-origin: 60px 90px; } @keyframes pf-tete { 0%, 40% { transform: none } 52%, 80% { transform: rotate(-8deg) } 92%, 100% { transform: none } }
+.anim .pf-epaules { animation-name: pf-epaules; } @keyframes pf-epaules { 0%, 48% { transform: translateY(0) } 56% { transform: translateY(-6px) } 66% { transform: translateY(-6px) } 76%, 100% { transform: translateY(0) } }
+.anim .pf-joues { animation-name: pf-joues; } @keyframes pf-joues { 0%, 50% { transform: scale(.2); opacity: 0 } 58% { transform: scale(1); opacity: 1 } 64% { transform: scale(1); opacity: 1 } 70%, 100% { transform: scale(.2); opacity: 0 } }
+.pf-air { opacity: 0; } .anim .pf-air { animation-name: pf-air; transform-origin: 0% 50%; } @keyframes pf-air { 0%, 64% { opacity: 0; transform: scale(.2) } 72% { opacity: 1; transform: scale(1.1) } 78%, 92% { opacity: 1; transform: scale(1) translateX(3px) } 100% { opacity: 0; transform: scale(1.1) translateX(8px) } }
+
+/* Hmm… (il réfléchit) */
+.anim .hm-pup { animation-name: hm-pup; } @keyframes hm-pup { 0%, 20% { transform: translate(0, 0) } 30%, 55% { transform: translate(-4px, -1px) } 65%, 100% { transform: translate(0, 0) } }
+.anim .hm-main { animation-name: hm-main; animation-duration: .7s; } @keyframes hm-main { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(-2px) } }
+.hm-b1, .hm-b2, .hm-b3 { opacity: 0; } .anim .hm-b1 { animation-name: hm-b1; } .anim .hm-b2 { animation-name: hm-b2; } .anim .hm-b3 { animation-name: hm-b3; }
+@keyframes hm-b1 { 0%, 10% { opacity: 0; transform: scale(0) } 16%, 92% { opacity: 1; transform: scale(1) } 100% { opacity: 0 } }
+@keyframes hm-b2 { 0%, 20% { opacity: 0; transform: scale(0) } 26%, 92% { opacity: 1; transform: scale(1) } 100% { opacity: 0 } }
+@keyframes hm-b3 { 0%, 30% { opacity: 0; transform: scale(0) } 38% { opacity: 1; transform: scale(1.1) } 44%, 92% { opacity: 1; transform: scale(1) } 100% { opacity: 0 } }
+
+/* Chut… (il cache son jeu) */
+.anim .ch-pup { animation-name: ch-pup; } @keyframes ch-pup { 0%, 15% { transform: translateX(0) } 25%, 45% { transform: translateX(-4px) } 55%, 75% { transform: translateX(4px) } 85%, 100% { transform: translateX(0) } }
+.anim .ch-doigt { animation-name: ch-doigt; } @keyframes ch-doigt { 0%, 8% { transform: translate(20px, 50px); opacity: 0 } 20%, 92% { transform: none; opacity: 1 } 100% { transform: translate(20px, 50px); opacity: 0 } }
+.anim .ch-cartes { animation-name: ch-cartes; } @keyframes ch-cartes { 0%, 100% { transform: translateX(0) } 50% { transform: translateX(-2px) } }
+.ch-mot { opacity: 0; } .anim .ch-mot { animation-name: ch-mot; } @keyframes ch-mot { 0%, 22% { opacity: 0; transform: scale(.4) } 30% { opacity: 1; transform: scale(1.1) } 36%, 88% { opacity: 1; transform: scale(1) } 100% { opacity: 0 } }
+
+/* Trop facile (la frime) */
+.anim .fr-lunettes { animation-name: fr-lunettes; } @keyframes fr-lunettes { 0%, 10% { transform: translateY(-34px); opacity: 0 } 14% { opacity: 1 } 24% { transform: translateY(2px) } 28%, 92% { transform: none; opacity: 1 } 100% { transform: translateY(-34px); opacity: 0 } }
+.fr-reflet { opacity: 0; } .anim .fr-reflet { animation-name: fr-reflet; transform-box: view-box; } @keyframes fr-reflet { 0%, 30% { opacity: 0; transform: translateX(-6px) } 36% { opacity: .9 } 46%, 100% { opacity: 0; transform: translateX(6px) } }
+.fr-eclat { opacity: 0; } .anim .fr-eclat { animation-name: fr-eclat; } @keyframes fr-eclat { 0%, 32% { opacity: 0; transform: scale(0) rotate(0) } 40% { opacity: 1; transform: scale(1.3) rotate(45deg) } 50%, 100% { opacity: 0; transform: scale(0) rotate(90deg) } }
+.anim .fr-bras { animation-name: fr-bras; transform-origin: 92px 112px; } @keyframes fr-bras { 0%, 46% { transform: rotate(0) } 54% { transform: rotate(-12deg) } 62%, 100% { transform: rotate(0) } }
+.anim .fr-carte { animation-name: fr-carte; } @keyframes fr-carte { 0%, 50% { transform: translateY(26px) rotate(0); opacity: 0 } 54% { opacity: 1 } 70% { transform: translateY(-10px) rotate(200deg); opacity: 1 } 86% { transform: translateY(26px) rotate(360deg); opacity: 1 } 90%, 100% { transform: translateY(26px) rotate(360deg); opacity: 0 } }
+
+/* Bye bye ! */
+.anim .by-main { animation-name: by-main; animation-duration: .5s; transform-origin: 92px 112px; } @keyframes by-main { 0%, 100% { transform: rotate(-8deg) } 50% { transform: rotate(10deg) } }
+.anim .by-langue { animation-name: by-langue; animation-duration: 1.3s; transform-origin: 50% 0; } @keyframes by-langue { 0%, 100% { transform: scaleY(1) } 50% { transform: scaleY(.75) } }
+.by-mot { opacity: 0; } .anim .by-mot { animation-name: by-mot; } @keyframes by-mot { 0%, 14% { opacity: 0; transform: scale(0) } 22% { opacity: 1; transform: scale(1.2) } 28%, 90% { opacity: 1; transform: scale(1) } 100% { opacity: 0 } }
+
+/* Bravo ! (il applaudit) */
+.anim .br-g, .anim .br-d, .anim .br-eclat { animation-duration: .4s; }
+.anim .br-g { animation-name: br-g; } @keyframes br-g { 0%, 100% { transform: translateX(-7px) } 45% { transform: translateX(1px) } }
+.anim .br-d { animation-name: br-d; } @keyframes br-d { 0%, 100% { transform: translateX(7px) } 45% { transform: translateX(-1px) } }
+.br-eclat { opacity: 0; } .anim .br-eclat { animation-name: br-eclat; } @keyframes br-eclat { 0%, 40% { opacity: 0; transform: scale(.6) } 50% { opacity: 1; transform: scale(1.1) } 80%, 100% { opacity: 0; transform: scale(1.2) } }
+.br-e1, .br-e2, .br-e3 { opacity: 0; } .anim .br-e1, .anim .br-e2, .anim .br-e3 { animation-name: br-e; animation-duration: 1.2s; } .anim .br-e2 { animation-delay: .4s } .anim .br-e3 { animation-delay: .8s }
+@keyframes br-e { 0% { opacity: 0; transform: scale(.2) rotate(0) } 40% { opacity: 1; transform: scale(1.1) rotate(45deg) } 100% { opacity: 0; transform: scale(.3) rotate(90deg) translateY(-6px) } }
+
+/* Revanche ! */
+.anim .re-feu { animation-name: re-feu; animation-duration: .5s; transform-origin: 50% 100%; } @keyframes re-feu { 0%, 100% { transform: scale(1, 1) } 50% { transform: scale(1.06, 1.18) } }
+.anim .re-noeud { animation-name: re-noeud; animation-duration: .45s; transform-origin: 0% 50%; } @keyframes re-noeud { 0%, 100% { transform: rotate(0) } 50% { transform: rotate(14deg) } }
+.anim .re-poing { animation-name: re-poing; } @keyframes re-poing { 0%, 12% { transform: translateY(0) } 20% { transform: translateY(-8px) } 28% { transform: translateY(0) } 36% { transform: translateY(-8px) } 44%, 100% { transform: translateY(0) } }
+.anim .re-mot { animation-name: re-mot; } @keyframes re-mot { 0%, 30% { transform: scale(0) rotate(-5deg) } 40% { transform: scale(1.2) rotate(-5deg) } 48%, 92% { transform: scale(1) rotate(-5deg) } 100% { transform: scale(0) rotate(-5deg) } }
 `;
   const svg = (id, etiquette) => `<svg viewBox="0 0 120 120" role="img" aria-label="${etiquette || ST[id].nom}" style="--d:${ST[id].d}">${ST[id].svg}</svg>`;
   const api = { ST, CSS, IDS: Object.keys(ST), svg, duree: (id) => parseFloat(ST[id].d) * 1000 };
