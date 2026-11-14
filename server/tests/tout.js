@@ -1365,6 +1365,8 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
 
   let bandeId, codeBande, membres;
   await test('Bande : créer (Google), rejoindre par le lien, 3 Bandes au plus, conditions pour miser', async () => {
+    // Lundi 10 h : sinon, de jeudi à dimanche, « inscriptions fermées » répond avant les conditions pour miser.
+    srv.matchJour.regler(() => new Date(MJ.debutDu(MJ.lundiDe(MJ.jourDe())).getTime() + 10 * 36e5));
     const inv = await invite('SansG2' + Date.now() % 1000);
     assert.strictEqual((await api('/api/bandes', { methode: 'POST', jeton: inv.jeton, corps: { nom: 'Les Lions', mise: 1000 } })).statut, 403);
     membres = [];
