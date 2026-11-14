@@ -33,7 +33,7 @@ Documentation de l'API pour l'appli mobile (Flutter) : [docs/api/](docs/api/) (O
 ## Fichiers
 - `index.html` : la page complète, générée par `node build.js`.
 - `moteur/` : moteur de règles de Kopo (règlement v1.2) et ses tests.
-- `moteur/inter8-moteur.js` : moteur de règles d'Inter (8) (règlement v1.3), le second jeu de Masano, et ses tests (`moteur/inter8-tests.js`). Robots Facile, Normal et Fort dans `moteur/inter8-robots.js` (tests : `moteur/inter8-robots-tests.js`). Branché sur le site, le serveur et l'appli.
+- `moteur/inter8-moteur.js` : moteur de règles d'Inter (8) (règlement v1.4), le second jeu de Masano, et ses tests (`moteur/inter8-tests.js`). Robots Facile, Normal et Fort dans `moteur/inter8-robots.js` (tests : `moteur/inter8-robots-tests.js`). Branché sur le site, le serveur et l'appli.
 - `src/inter8-salle.js` : salle de jeu d'Inter (8), même interface que celle de Kopo (style Simple ou Délire, J retour, formule normale ou Cahier, 2 à 8 joueurs), et ses tests. Utilisée par le site et par le serveur (donc par l'appli).
 - `src/kopo-salle.js` : salle de jeu (salon, manches, chrono, revanche, vues par joueur) et ses tests.
 - `src/kopo-retention.js` : XP, niveau, stats, face-à-face, missions, défi, bienvenue, joker, collection (calculés sur le téléphone, dans `kopo-profil`) et ses tests.

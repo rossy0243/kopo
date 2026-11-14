@@ -131,6 +131,32 @@ test('Bluff libre : le demandeur, quand le tour lui revient, pose la valeur dema
   interdit(() => P(m, 'A'));
 });
 
+test('Demande : un 8 pioché peut la casser (nouvelle demande), comme un 8 de la main (14/11)', () => {
+  const m = manche({ A: ['8T', '4C', '5K', '6K'], B: ['3P', '9P', '5P', '6P'] }, remplir('DC').slice(0, -1).concat('8C', 'DC'), 'A');
+  J(m, 'A', ['8T'], '4');
+  P(m, 'B');
+  assert.strictEqual(m.aPioche, '8C');
+  assert.ok(peut(m, 'B', 'jouer'));
+  J(m, 'B', ['8C'], '9');
+  assert.deepStrictEqual(m.demande, { valeur: '9', par: 'B' });
+});
+
+test('Demande : un joker pioché peut la casser, comme un joker de la main (14/11)', () => {
+  const m = manche({ A: ['8T', '4C', '5K', '6K'], B: ['3P', '9P', '5P', '6P'] }, remplir('DC').slice(0, -1).concat('XR', 'DC'), 'A');
+  J(m, 'A', ['8T'], '4');
+  P(m, 'B');
+  assert.strictEqual(m.aPioche, 'XR');
+  J(m, 'B', ['XR']);
+  assert.strictEqual(m.demande, null);
+});
+
+test('Demande : une autre carte piochée ne se pose pas', () => {
+  const m = manche({ A: ['8T', '4C', '5K', '6K'], B: ['3P', '9P', '5P', '6P'] }, remplir('DC').slice(0, -1).concat('7C', 'DC'), 'A');
+  J(m, 'A', ['8T'], '4');
+  P(m, 'B');
+  assert.notStrictEqual(m.joueurCourant, 'B'); // rien de jouable : son tour passe
+});
+
 test('Le joker et le 8 ne forcent pas à jouer : on peut les garder et piocher', () => {
   // Jeu normal sur le 9♣ : A n'a qu'un joker et un 8 de jouables.
   const m = manche({ A: ['XN', '8C', '5C', '6C'], B: ['3P', '4P', '5P', '6P'] }, remplir('9T').slice(0, -1).concat('DP', '9T'), 'A');

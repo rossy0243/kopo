@@ -313,7 +313,7 @@ void montrerReglesInter() {
         titre('Les cartes spéciales'),
         li([['2'], ' : le suivant pioche 2 cartes et passe son tour. ', ['10'], ' : 4 cartes. ', ['Joker'], " : 5 cartes, et il se pose sur tout ; ensuite on pose la carte de son choix. Les pénalités posées ensemble s'additionnent, et on ne peut pas les contrer."]),
         li([['As'], " : chaque As fait passer le tour d'un joueur (jamais celui qui le pose)."]),
-        li([['8'], ' : il se pose sur tout. Tu ', ['demandes une valeur'], " que tu as en main (le joker aussi, pas le 8). Chacun à son tour pose cette valeur, un 8 ou un joker, sinon pioche une carte. Si personne ne la pose, le tour te revient et tu la poses. On ne pose qu'un 8 à la fois, sauf pour sortir avec ses derniers 8."]),
+        li([['8'], ' : il se pose sur tout. Tu ', ['demandes une valeur'], " que tu as en main (le joker aussi, pas le 8). Chacun à son tour pose cette valeur, un 8 ou un joker, sinon pioche une carte (si c'est cette valeur, un 8 ou un joker, tu peux la poser tout de suite). Si personne ne la pose, le tour te revient et tu la poses. On ne pose qu'un 8 à la fois, sauf pour sortir avec ses derniers 8."]),
         titre('Annoncer et sortir'),
         li(['Quand tu peux finir au coup suivant, touche ', ["J'annonce"], ' dans les 3 secondes. Sinon, les autres peuvent te ', ['contester'], ' : tu pioches 1 carte.']),
         li(["Tu peux sortir avec n'importe quelle carte. Si c'est une carte spéciale, son effet s'applique quand même au suivant."]),

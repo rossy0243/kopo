@@ -312,8 +312,8 @@
     if (m.demande) {
       if (joueur === m.demande.par) {
         if (v !== m.demande.valeur) return `Pose la valeur que tu as demandée (${nomValeur(m.demande.valeur)}).`;
-      } else if (m.aPioche) {
-        if (v !== m.demande.valeur) return `Seule la valeur demandée (${nomValeur(m.demande.valeur)}) peut être posée.`;
+      // Carte piochée pendant une demande (14/11, retour des joueurs) : comme une carte de la main,
+      // la valeur demandée, un 8 (nouvelle demande) ou un joker (qui casse la demande) peut être posé.
       } else if (v !== m.demande.valeur && v !== '8' && v !== JOKER) {
         return m.demande.valeur === JOKER ? 'Inter demande un joker : pose un joker ou un 8, sinon pioche.' : `Inter demande ${nomValeur(m.demande.valeur)} : pose ce ${nomValeur(m.demande.valeur)}, un 8 ou un joker, sinon pioche.`;
       }
