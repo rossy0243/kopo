@@ -61,6 +61,7 @@ input, select, textarea { background: #0b1a2c; border: 1px solid var(--ligne); c
   <symbol id="d-pilotage" viewBox="0 0 32 32"><rect x="8" y="4" width="16" height="24" rx="2.5"/><path d="M12 10h8M12 16h8M12 22h8"/><circle cx="14" cy="22" r="1.8" class="acc"/></symbol>
   <symbol id="d-ligue" viewBox="0 0 32 32"><rect x="8" y="4" width="16" height="24" rx="2.5"/><path d="M12 10h8v3a4 4 0 0 1-8 0zM16 17v4M13 22h6"/><circle cx="16" cy="11.5" r="1.4" class="acc"/></symbol>
   <symbol id="d-notif" viewBox="0 0 32 32"><rect x="8" y="4" width="16" height="24" rx="2.5"/><path d="M12 19v-4a4 4 0 0 1 8 0v4l1.5 2h-11zM14.5 23.5h3"/><circle cx="20.5" cy="10" r="1.8" class="acc"/></symbol>
+  <symbol id="d-sticker" viewBox="0 0 32 32"><rect x="8" y="4" width="16" height="24" rx="2.5"/><circle cx="16" cy="15" r="5"/><path d="M14 14h.01M18 14h.01M13.8 17a3 3 0 0 0 4.4 0"/><circle cx="21" cy="9" r="1.6" class="acc"/></symbol>
   <symbol id="d-journal" viewBox="0 0 32 32"><rect x="8" y="4" width="16" height="24" rx="2.5"/><path d="M12 10h8M12 14h8M12 18h5"/></symbol>
 </svg>
 
@@ -123,7 +124,7 @@ $('#btnDeconnexion').onclick = deconnexion;
 // --- Navigation
 const PAGES = [
   ['direct', 'En direct', 'd-direct'], ['audience', 'Audience', 'd-audience'], ['economie', 'Pièces', 'd-pieces'],
-  ['ligue', 'Ligue', 'd-ligue'], ['bandes', 'Bandes', 'd-joueurs'], ['joueurs', 'Joueurs', 'd-joueurs'], ['signalements', 'Signalements', 'd-signal'], ['pilotage', 'Pilotage', 'd-pilotage'], ['notifications', 'Notifications', 'd-notif'], ['journal', 'Journal', 'd-journal'],
+  ['ligue', 'Ligue', 'd-ligue'], ['bandes', 'Bandes', 'd-joueurs'], ['joueurs', 'Joueurs', 'd-joueurs'], ['signalements', 'Signalements', 'd-signal'], ['stickers', 'Stickers', 'd-sticker'], ['pilotage', 'Pilotage', 'd-pilotage'], ['notifications', 'Notifications', 'd-notif'], ['journal', 'Journal', 'd-journal'],
 ];
 function nav() {
   $('#nav').innerHTML = PAGES.map(([id, t, ico]) => `<button data-page="${id}" ${id === page ? 'aria-current="page"' : ''}><svg class="ico-k"><use href="#${ico}"/></svg>${t}${id === 'signalements' ? ' <span class="badge" id="nbSignal" hidden></span>' : ''}</button>`).join('');
@@ -303,6 +304,8 @@ const afficher = {
         <div class="ligne"><span>${c.parrain_createur ? '<b>Créateur vérifié</b> : pas de plafond de parrainages par mois' : 'Plafond de parrainages par mois normal'}</span><button class="btn" id="btnCreateur">${c.parrain_createur ? 'Retirer le statut créateur' : 'Marquer comme créateur (influenceur)'}</button></div>
         <h3>Corriger le solde</h3>
         <div class="ligne"><input id="pMontant" type="number" placeholder="+100 ou -50" style="width:130px"><input id="pMotif" placeholder="Motif (obligatoire)" style="flex:1;min-width:200px"><button class="btn" id="btnPieces">Corriger</button></div>
+        <h3>Stickers</h3>
+        <div class="ligne"><span>${f.stickers.some((x) => x.restants > 0) ? f.stickers.filter((x) => x.restants > 0).map((x) => `${esc(x.sticker)} : <b>${nb(x.restants)}</b>`).join(' · ') : 'Aucune utilisation : tous ses stickers sont verrouillés.'}${f.stickers.length ? ` <span class="muted">(${nb(f.stickers.reduce((t, x) => t + x.utilises, 0))} envoyés)</span>` : ''}</span><button class="btn" id="btnStickers">Lui offrir des stickers</button></div>
       </div>
       ${f.parrainages && f.parrainages.length ? `<h3>Parrainage</h3><div class="carte"><table>${lignes('parrainages', f.parrainages, (p) => `<tr><td>${date(p.cree_le)}</td><td>${p.filleul_id === c.id ? 'Parrainé par' : 'A parrainé'} <button class="lien" data-joueur="${esc(p.filleul_id === c.id ? p.parrain_id : p.filleul_id)}">${esc(p.filleul_id === c.id ? p.parrain + '#' + p.parrain_numero : p.filleul + '#' + p.filleul_numero)}</button></td><td>${esc(p.statut)}</td><td class="n">${p.parties} parties</td><td class="n">${p.filleul_id === c.id ? nb(p.pieces_filleul) : nb(p.pieces_parrain)} pièces</td><td class="muted">${esc(p.note || '')}</td></tr>`, { colonnes: 6 })}</table></div>` : ''}
       ${f.partenaires.length ? `<h3>Joue souvent avec</h3><p class="muted">Utile pour repérer la complicité aux tables à mise.</p><div class="carte"><table>${f.partenaires.map((p) => `<tr><td><button class="lien" data-joueur="${esc(p.id)}">${esc(p.pseudo)}#${p.numero}</button></td><td class="n">${p.ensemble} parties ensemble</td></tr>`).join('')}</table></div>` : ''}
@@ -324,6 +327,7 @@ const afficher = {
     $('#btnKopoPlus').onclick = async () => { try { await api(`/joueurs/${encodeURIComponent(id)}/kopo-plus`, { methode: 'POST', corps: { jours: Number($('#kpJours').value) } }); message('Kopo+ mis à jour.'); aller('fiche', id); } catch (e) { message(e.message); } };
     $('#btnCreateur').onclick = async () => { try { await api(`/joueurs/${encodeURIComponent(id)}/createur`, { methode: 'POST', corps: { actif: !c.parrain_createur } }); message('Statut créateur mis à jour.'); aller('fiche', id); } catch (e) { message(e.message); } };
     $('#btnObjet').onclick = async () => { try { await api(`/joueurs/${encodeURIComponent(id)}/objet`, { methode: 'POST', corps: { objet: $('#objOffert').value.trim() } }); message('Apparence offerte.'); aller('fiche', id); } catch (e) { message(e.message); } };
+    $('#btnStickers').onclick = () => aller('stickers', `${c.pseudo}#${c.numero}`);
     $('#btnPieces').onclick = async () => {
       try { await api(`/joueurs/${encodeURIComponent(id)}/pieces`, { methode: 'POST', corps: { montant: Number($('#pMontant').value), motif: $('#pMotif').value } }); message('Solde corrigé.'); aller('fiche', id); } catch (e) { message(e.message); }
     };
@@ -343,6 +347,81 @@ const afficher = {
     $('#contenu').querySelectorAll('[data-traiter]').forEach((b) => (b.onclick = () => traiter(b.dataset.traiter, 'traite')));
     $('#contenu').querySelectorAll('[data-rejeter]').forEach((b) => (b.onclick = () => traiter(b.dataset.rejeter, 'rejete')));
     lierJoueurs();
+  },
+
+  // Stickers animés : on vend des utilisations (20, 50…). En attendant les paiements, l'admin les offre
+  // à un joueur, à tous, ou à un groupe, avec un message qui dit pourquoi (montré au joueur).
+  async stickers(joueur = '') {
+    const S = await api('/stickers');
+    const R = S.reglage, nomSt = Object.fromEntries(S.stickers.map((x) => [x.id, x.nom])), nomPack = Object.fromEntries(S.packs.map((p) => [p.id, p.nom]));
+    const parSt = Object.fromEntries(S.parSticker.map((x) => [x.sticker, x]));
+    const critere = Object.fromEntries(S.criteres.map((x) => [x.id, x]));
+    const decrire = (c) => !c ? '—' : c.type === 'tous' ? 'Tous les joueurs' : c.type === 'joueur' ? esc(c.nom || c.id)
+      : 'Groupe : ' + Object.entries(c.criteres || {}).map(([k, v]) => esc(k === 'pays' ? 'pays ' + v : (critere[k] ? critere[k].texte : k).replace(' N ', v === true ? ' ' : ` ${v} `).replace(/\s*\(.*\)/, ''))).join(' et ');
+    const prix = (o) => `${nb(o.utilisations)} utilisations · ${nb(o.pieces)} pièces · ${nb(o.francs)} FC`;
+    $('#contenu').innerHTML = `<h2>Stickers animés</h2>
+      <div class="carte"><div class="ligne"><span>${R.actif ? '<b class="ok">Allumés</b> : les joueurs qui ont des utilisations peuvent envoyer leurs stickers.' : '<b class="ko">Éteints</b> : grisés pour tous les joueurs, rien ne s\'envoie. Les utilisations offertes sont gardées pour plus tard.'}</span>
+        <span style="flex:1"></span><button class="btn ${R.actif ? 'danger' : 'principal'}" id="stInter">${R.actif ? 'Éteindre les stickers' : 'Allumer les stickers'}</button></div>
+        <p class="muted" style="margin:0">Vente : pas encore ouverte (les paiements ne sont pas branchés). Chaque envoi en partie décompte une utilisation ; à 0 le sticker se reverrouille.</p></div>
+      <h3>Offrir des stickers</h3>
+      <div class="carte">
+        <div class="ligne"><b style="width:90px">À qui</b><select id="stCible"><option value="joueur">Un joueur</option><option value="tous">Tous les joueurs</option><option value="groupe">Un groupe de joueurs</option></select>
+          <input id="stJoueur" placeholder="Pseudo#1234" value="${esc(joueur)}" style="min-width:200px"></div>
+        <div id="stGroupe" hidden><p class="muted" style="margin:4px 0">Coche un ou plusieurs critères : le groupe, ce sont les joueurs qui les remplissent tous.</p>
+          ${S.criteres.map((x) => `<div class="ligne" style="margin:4px 0"><label style="display:flex;gap:8px;align-items:center;min-width:330px"><input type="checkbox" data-critere="${x.id}">${esc(x.texte)}</label>${x.n ? `<input type="number" data-n="${x.id}" min="${x.n[0]}" max="${x.n[1]}" value="${{ anciennete: 30, nouveaux: 7, actifs: 7, absents: 14, parties: 10, parrains: 1 }[x.id] || x.n[0]}" style="width:90px"> <span class="muted">${x.id === 'parties' ? 'parties' : x.id === 'parrains' ? 'amis' : 'jours'}</span>` : x.pays ? `<input data-pays="${x.id}" value="CD" maxlength="2" style="width:60px">` : ''}</div>`).join('')}</div>
+        <div class="ligne"><b style="width:90px">Quoi</b><select id="stQuoi">${S.packs.map((p) => `<option value="pack:${p.id}">Pack ${esc(p.nom)} (${p.stickers.length} sticker${p.stickers.length > 1 ? 's' : ''})</option>`).join('')}${S.stickers.map((x) => `<option value="sticker:${x.id}">${esc(x.nom)} (${esc(nomPack[x.pack])})</option>`).join('')}</select>
+          <input id="stN" type="number" min="1" max="500" value="20" style="width:90px"> <span class="muted">utilisations de chaque sticker</span></div>
+        <div class="ligne"><b style="width:90px">Pourquoi</b><textarea id="stMessage" rows="2" maxlength="200" placeholder="Message montré aux joueurs (obligatoire), ex. Merci d'être avec nous depuis le début !" style="flex:1;min-width:280px"></textarea></div>
+        <p class="muted" id="stApercu" style="margin:6px 0"></p>
+        <div class="ligne"><button class="btn" id="stCompter">Compter les joueurs</button><span id="stCompte" class="muted"></span><span style="flex:1"></span><button class="btn principal" id="stOffrir">Offrir</button></div>
+      </div>
+      <h3>En circulation</h3>
+      <div class="carte"><table><tr><th>Sticker</th><th>Pack</th><th class="n">Joueurs qui en ont</th><th class="n">Utilisations restantes</th><th class="n">Envoyés</th></tr>
+        ${S.stickers.map((x) => { const p = parSt[x.id] || {}; return `<tr><td>${esc(x.nom)}</td><td>${esc(nomPack[x.pack])}</td><td class="n">${nb(p.joueurs)}</td><td class="n">${nb(p.restants)}</td><td class="n">${nb(p.utilises)}</td></tr>`; }).join('')}</table></div>
+      <h3>Offres prévues (pas encore en vente)</h3>
+      <div class="carte"><table><tr><th>Un sticker</th><td>${R.offres.sticker.map(prix).join('<br>')}</td></tr><tr><th>Un pack entier</th><td>${R.offres.pack.map(prix).join('<br>')} <span class="muted">(pour chaque sticker du pack)</span></td></tr></table>
+        <p class="muted" style="margin:8px 0 0">Prix en pièces ou en argent réel (mobile money, francs congolais). Aucun achat possible tant que les paiements ne sont pas branchés.</p></div>
+      <h3>Derniers cadeaux</h3>
+      <div class="carte"><table><tr><th>Date</th><th>À qui</th><th>Quoi</th><th class="n">Joueurs</th><th>Message</th></tr>
+        ${lignes('stCadeaux', S.cadeaux, (k) => `<tr><td>${date(k.cree_le)}</td><td>${decrire(k.cible)}</td><td>${nb(k.utilisations)} × ${k.stickers.map((x) => esc(nomSt[x] || x)).join(', ')}</td><td class="n">${nb(k.joueurs)}</td><td>${esc(k.message)}</td></tr>`, { par: 10, colonnes: 5, vide: '<tr><td class="muted" colspan="5">Aucun cadeau pour l\'instant.</td></tr>' })}</table></div>`;
+    lierJoueurs();
+    const cible = () => {
+      const t = $('#stCible').value;
+      if (t === 'joueur') return { type: 'joueur', joueur: $('#stJoueur').value.trim() };
+      if (t === 'tous') return { type: 'tous' };
+      const criteres = {};
+      $('#contenu').querySelectorAll('[data-critere]').forEach((b) => {
+        if (!b.checked) return;
+        const k = b.dataset.critere, n = $(`[data-n="${k}"]`), p = $(`[data-pays="${k}"]`);
+        criteres[k] = n ? Number(n.value) : p ? p.value.trim() : true;
+      });
+      return { type: 'groupe', criteres };
+    };
+    const quoi = () => { const [g, id] = $('#stQuoi').value.split(':'); return g === 'pack' ? { pack: id } : { sticker: id }; };
+    const apercu = () => {
+      $('#stJoueur').hidden = $('#stCible').value !== 'joueur';
+      $('#stGroupe').hidden = $('#stCible').value !== 'groupe';
+      const q = quoi(), n = Number($('#stN').value) || 0, m = $('#stMessage').value.trim();
+      $('#stApercu').textContent = `Les joueurs verront : 🎁 ${m || '(ton message)'} Tu reçois ${n} utilisation${n > 1 ? 's' : ''} ${q.pack ? `du pack « ${nomPack[q.pack]} »` : `du sticker « ${nomSt[q.sticker]} »`}.`;
+      $('#stCompte').textContent = '';
+    };
+    $('#contenu').querySelectorAll('#stCible, #stQuoi, #stN, #stMessage, #stJoueur, [data-critere], [data-n], [data-pays]').forEach((x) => (x.oninput = x.onchange = apercu));
+    apercu();
+    $('#stCompter').onclick = async () => { try { const r = await api('/stickers/compter', { methode: 'POST', corps: { cible: cible() } }); $('#stCompte').textContent = !r.joueurs ? 'Aucun joueur dans cette cible.' : r.joueurs === 1 ? '1 joueur recevra le cadeau.' : `${nb(r.joueurs)} joueurs recevront le cadeau.`; } catch (e) { message(e.message); } };
+    $('#stOffrir').onclick = async () => {
+      try {
+        if ($('#stMessage').value.trim().length < 5) return message('Écris aux joueurs pourquoi tu leur offres ces stickers.');
+        const k = await api('/stickers/compter', { methode: 'POST', corps: { cible: cible() } });
+        if (!k.joueurs) return message('Aucun joueur dans cette cible.');
+        if (!confirm(`Offrir ce cadeau à ${nb(k.joueurs)} joueur${k.joueurs > 1 ? 's' : ''} ? Il ne peut pas être annulé.`)) return;
+        const r = await api('/stickers/offrir', { methode: 'POST', corps: { cible: cible(), ...quoi(), utilisations: Number($('#stN').value), message: $('#stMessage').value } });
+        message(`Stickers offerts à ${nb(r.joueurs)} joueur${r.joueurs > 1 ? 's' : ''}.`); aller('stickers');
+      } catch (e) { message(e.message); }
+    };
+    $('#stInter').onclick = async () => {
+      if (!R.actif && !confirm('Allumer les stickers ? Les joueurs qui ont des utilisations pourront les envoyer en partie.')) return;
+      try { await api('/reglages/stickers', { methode: 'PUT', corps: { valeur: { ...R, actif: !R.actif } } }); message(R.actif ? 'Stickers éteints.' : 'Stickers allumés.'); aller('stickers'); } catch (e) { message(e.message); }
+    };
   },
 
   async pilotage() {

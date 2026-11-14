@@ -19,6 +19,7 @@ const { creerParrainage } = require('./parrainage');
 const { creerMatchJour } = require('./match-jour');
 const { creerBande } = require('./bande');
 const { creerPush } = require('./push');
+const { creerStickers } = require('./stickers');
 
 async function demarrer({ port = Number(process.env.PORT || 2567), env = process.env } = {}) {
   const base = await ouvrirBase(env.DATABASE_URL);
@@ -39,6 +40,7 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
   const parrainage = creerParrainage(base, reglages, comptes, social, env);
   const matchJour = creerMatchJour(base, reglages, env);
   const bande = creerBande(base, reglages, comptes, matchJour, social);
+  const stickers = creerStickers(base, reglages);
   // Chaque minute : semaines de Bande finies (pot partagé), mises automatiques du lundi, rappel du soir.
   const minuteurBande = setInterval(() => bande.tic().catch((e) => console.error('Bande :', e.message)), 60e3);
   minuteurBande.unref();
@@ -47,7 +49,7 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
   minuteurPush.unref();
   // Jouer en ligne ou entre amis demande un compte Google dès que la connexion Google est active.
   const googleObligatoire = env.CONNEXION_GOOGLE === '1' && !!env.SUPABASE_URL;
-  SalleKopo.services = { base, auth, comptes, reglages, ligue, social, parcours, parrainage, matchJour, bande, googleObligatoire };
+  SalleKopo.services = { base, auth, comptes, reglages, ligue, social, parcours, parrainage, matchJour, bande, stickers, googleObligatoire };
 
   const app = express();
   app.set('trust proxy', 1);
@@ -64,7 +66,7 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
   // version = commit déployé (Render le donne dans RENDER_GIT_COMMIT) : pour vérifier qu'une mise à jour est en ligne.
   app.get('/sante', (req, res) => res.json({ ok: true, salles: salles.size, version: (env.RENDER_GIT_COMMIT || '').slice(0, 7) || null }));
   // API des joueurs : /api (site) et /api/v1 (applis mobiles, version figée de l'API). Les deux servent les mêmes routes.
-  const routes = routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours, parrainage, matchJour, bande, push, env });
+  const routes = routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours, parrainage, matchJour, bande, push, stickers, env });
 
   // Compteur en ligne et salles ouvertes (lu par l'accueil).
   routes.get('/en-ligne', async (req, res) => {
@@ -103,7 +105,7 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
   app.get('/api/openapi.yaml', (req, res) => { res.type('application/yaml'); res.sendFile(path.join(__dirname, '..', '..', 'docs', 'api', 'openapi.yaml')); });
   app.use('/api/v1', routes);
   app.use('/api', routes);
-  app.use('/admin/api', routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainage, bande, push, salles, demarrage: Date.now() }));
+  app.use('/admin/api', routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainage, bande, push, stickers, salles, demarrage: Date.now() }));
   app.get('/admin', (req, res) => { res.set('Cache-Control', 'no-store'); res.set('X-Frame-Options', 'DENY'); res.sendFile(path.join(__dirname, '..', 'public', 'admin.html')); });
 
   const serveurHttp = http.createServer(app);

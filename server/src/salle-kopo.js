@@ -10,6 +10,7 @@ const SI = require('../../src/inter8-salle.js');
 const K = require('../../moteur/kopo-moteur.js');
 const { idAleatoire } = require('./comptes');
 const { etatJeuPour, NOMS_JEUX } = require('./reglages');
+const ATTENTE_STICKER = require('./stickers').ATTENTE_MS;
 
 const salles = new Set(); // salles ouvertes (tableau de bord : en direct)
 const LETTRES = 'ABCDEFGHJKMNPQRSTUVWXYZ';
@@ -261,12 +262,35 @@ class SalleKopo extends Room {
       const liste = SalleKopo.services.reglages.get('messagesRapides') || [];
       if (!liste.includes(typeof msg.emoji === 'string' ? msg.emoji.trim() : '')) { client.send('erreur', 'Ce message n\'est plus proposé.'); return; }
     }
+    if (type === 'sticker') { this.envoyerSticker(client, id, msg.sticker).catch((e) => { console.error('Sticker :', e.message); client.send('erreur', 'Sticker non envoyé.'); }); return; }
     if (type === 'micro' && this.comptes.get(id) && this.comptes.get(id).micro_coupe) msg.voix = false; // sanction
     const r = this.S.recevoir(this.salle, id, msg);
     if (!r.ok) { client.send('erreur', r.erreur); return; }
     if (r.evenement) { this.broadcast(r.evenement.type, r.evenement); return; } // émoji rapide : relayé à toute la table
     if (type === 'action' && msg.action && msg.action.type === 'katapss' && this.partie) this.partie.katapss.set(id, (this.partie.katapss.get(id) || 0) + 1);
     this.apresChangement();
+  }
+
+  // Sticker animé : interrupteur de l'admin allumé, joueur assis, un toutes les 5 s, et une utilisation à décompter
+  // (vérifiée en base). Relayé à toute la table ; l'envoyeur reçoit ce qu'il lui reste.
+  async envoyerSticker(client, id, sticker) {
+    const { stickers } = SalleKopo.services;
+    if (!stickers || !stickers.actif()) { client.send('erreur', 'Les stickers arrivent bientôt.'); return; }
+    if (typeof sticker !== 'string' || !stickers.STICKERS[sticker]) { client.send('erreur', 'Sticker inconnu.'); return; }
+    if (!this.salle.joueurs.some((j) => j.id === id)) return;
+    this.derniersStickers = this.derniersStickers || new Map();
+    const t = Date.now();
+    if (t - (this.derniersStickers.get(id) || 0) < ATTENTE_STICKER) { client.send('erreur', 'Un sticker toutes les 5 secondes.'); return; }
+    this.derniersStickers.set(id, t);
+    const restants = await stickers.utiliser(id, sticker);
+    if (restants === null) {
+      this.derniersStickers.delete(id);
+      client.send('stickers', { sticker, restants: 0 });
+      client.send('erreur', 'Plus d\'utilisations pour ce sticker.');
+      return;
+    }
+    this.broadcast('sticker', { type: 'sticker', joueur: id, sticker });
+    client.send('stickers', { sticker, restants });
   }
 
   apresChangement() {

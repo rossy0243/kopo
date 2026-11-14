@@ -548,6 +548,30 @@ paths:
         '200': { description: Cadeau, content: { application/json: { schema: { type: object, properties: { ok: { type: boolean }, nouveau: { type: boolean }, objet: { type: string } } } } } }
 
   # ------------------------------------------------------------------ Boutique et parcours
+  /stickers:
+    get:
+      tags: [Boutique et parcours]
+      summary: Stickers animés, offres et mes utilisations restantes
+      description: "On vend des utilisations : chaque envoi en partie (message `sticker`) en décompte une ; à 0 le sticker se reverrouille. Tant que `actif` est faux, tout est grisé et rien ne s'envoie. `vente` reste faux tant que les paiements ne sont pas branchés."
+      responses:
+        '200':
+          description: Stickers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  actif: { type: boolean }
+                  vente: { type: boolean }
+                  stickers: { type: array, items: { type: object, properties: { id: { type: string }, nom: { type: string }, pack: { type: string } } } }
+                  packs: { type: array, items: { type: object, properties: { id: { type: string }, nom: { type: string }, stickers: { type: array, items: { type: string } } } } }
+                  offres:
+                    type: object
+                    description: Offres d'un sticker et d'un pack entier (chaque sticker du pack reçoit les utilisations), prix en pièces et en francs congolais
+                    properties:
+                      sticker: { type: array, items: { $ref: '#/components/schemas/OffreSticker' } }
+                      pack: { type: array, items: { $ref: '#/components/schemas/OffreSticker' } }
+                  soldes: { type: object, additionalProperties: { type: integer }, description: 'Utilisations restantes par sticker (absent = verrouillé)' }
   /boutique:
     get:
       tags: [Boutique et parcours]
@@ -1068,6 +1092,12 @@ components:
         ami: { type: boolean }
         match: { type: boolean }
         annonce: { type: boolean }
+    OffreSticker:
+      type: object
+      properties:
+        utilisations: { type: integer }
+        pieces: { type: integer }
+        francs: { type: integer }
     Objet:
       type: object
       properties:
@@ -1166,6 +1196,7 @@ components:
         pot: { type: object, description: 'Partage du pot en % (vainqueur, deuxieme, troisieme, maison)', additionalProperties: { type: integer } }
         remiseAFlot: { type: integer, description: Seuil de solde pour la remise à flot }
         messages: { type: array, items: { type: string }, description: 'Messages du chat en partie (les seuls acceptés par le message « reaction »)' }
+        stickers: { type: object, properties: { actif: { type: boolean } }, description: 'Stickers animés allumés par l\'admin (sinon grisés)' }
         communautes: { type: array, items: { type: object, properties: { reseau: { type: string }, libelle: { type: string }, url: { type: string } } } }
         nouveaute: { type: [string, 'null'] }
         google: { type: [string, 'null'], description: 'Adresse Supabase (site), null si la connexion Google est fermée' }

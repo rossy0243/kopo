@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../commun/apparences.dart';
 import '../commun/retention.dart';
+import '../commun/stickers.dart';
 import '../commun/stock.dart';
 import '../commun/theme.dart';
 import '../ecrans/accueil.dart' show creer;
@@ -524,6 +525,19 @@ void montrerNotification(Map a) {
         const Muet("Retrouve-le en ligne pour reprendre l'avantage !", align: TextAlign.center),
       ]);
       boutons.addAll([fermer('À moi de jouer !'), Btn('Ne plus recevoir les rivalités', large: true, onTap: () => couper('rivalite', 'Notifications de rivalité coupées.'))]);
+    case 'cadeau':
+      // Stickers offerts par l'équipe : le message dit pourquoi, puis ce qui est reçu.
+      icone = 'cadeau';
+      final ids = ((d['stickers'] as List?) ?? const []).map((e) => e.toString()).where(Stickers.connu).toList();
+      final n = (d['utilisations'] as num?)?.toInt() ?? 0;
+      contenu.addAll([
+        titre("Cadeau de l'équipe Masano"),
+        if (d['message'] != null) Text(d['message'].toString(), textAlign: TextAlign.center, style: K.texte(15)) else Text(a['texte'].toString(), textAlign: TextAlign.center, style: K.texte(15)),
+        if (ids.isNotEmpty) Wrap(alignment: WrapAlignment.center, spacing: 6, runSpacing: 6, children: [for (final id in ids.take(10)) CaseSticker(id, verrou: false, reste: n, taille: 56)]),
+        Muet('$n utilisation${n > 1 ? 's' : ''} de chaque sticker, à envoyer depuis le chat en partie${app.stickersActifs ? '' : ' dès que les stickers seront ouverts'}.', align: TextAlign.center),
+      ]);
+      app.stickers = null; // relu à la prochaine ouverture du chat
+      boutons.add(fermer('Merci !'));
     case 'parrainage':
       icone = 'cadeau';
       contenu.addAll([titre('Parrainage'), Text(a['texte'].toString(), textAlign: TextAlign.center, style: K.texte(15)), if (d['titre'] != null) Text('« ${d['titre']} »', textAlign: TextAlign.center, style: K.texte(16, couleur: K.brass, poids: FontWeight.w700))]);

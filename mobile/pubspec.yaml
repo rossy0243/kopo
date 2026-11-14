@@ -34,6 +34,7 @@ flutter:
   assets:
     - assets/img/
     - assets/sons/
+    - assets/stickers/
   fonts:
     - family: Bebas
       fonts:

@@ -285,7 +285,7 @@ CREATE TABLE IF NOT EXISTS parrainage_paliers (
 );
 
 ALTER TABLE notifications DROP CONSTRAINT IF EXISTS notifications_type_check;
-ALTER TABLE notifications ADD CONSTRAINT notifications_type_check CHECK (type IN ('rivalite', 'invitation', 'ami', 'parrainage', 'bande')); -- bande : rappel du Match du jour, fin de semaine
+ALTER TABLE notifications ADD CONSTRAINT notifications_type_check CHECK (type IN ('rivalite', 'invitation', 'ami', 'parrainage', 'bande', 'cadeau')); -- bande : rappel du Match du jour, fin de semaine ; cadeau : stickers offerts par l'admin
 
 -- ===== Sauvegarde du profil du téléphone (niveau, statistiques, face-à-face, collection) =====
 -- Le profil est calculé sur le téléphone ; sa copie ici le fait revenir sur un autre téléphone,
@@ -412,3 +412,34 @@ CREATE TABLE IF NOT EXISTS push_annonces (
   envoyees  integer NOT NULL DEFAULT 0,
   cree_le   timestamptz NOT NULL DEFAULT now()
 );
+-- Stickers animés (ergonomie/stickers) : on vend des utilisations, pas le sticker. Chaque envoi décompte une
+-- utilisation, vérifiée ici ; à 0 le sticker se reverrouille. En attendant les paiements, l'admin offre des utilisations.
+CREATE TABLE IF NOT EXISTS stickers_soldes (
+  compte_id  text NOT NULL REFERENCES comptes(id),
+  sticker    text NOT NULL,
+  restants   integer NOT NULL DEFAULT 0 CHECK (restants >= 0),
+  utilises   integer NOT NULL DEFAULT 0,
+  maj_le     timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (compte_id, sticker)
+);
+-- Cadeaux de l'admin : à qui (un joueur, tous, un groupe), quoi, et le message montré aux joueurs.
+CREATE TABLE IF NOT EXISTS stickers_cadeaux (
+  id            bigserial PRIMARY KEY,
+  cible         jsonb NOT NULL,
+  stickers      text[] NOT NULL,
+  utilisations  integer NOT NULL,
+  message       text NOT NULL,
+  joueurs       integer NOT NULL DEFAULT 0,
+  cree_le       timestamptz NOT NULL DEFAULT now()
+);
+-- Ce que chaque joueur a reçu (cadeau de l'admin, plus tard achat), pour répondre à « où sont passés mes stickers ? ».
+CREATE TABLE IF NOT EXISTS stickers_mouvements (
+  id         bigserial PRIMARY KEY,
+  compte_id  text NOT NULL REFERENCES comptes(id),
+  sticker    text NOT NULL,
+  nombre     integer NOT NULL,
+  motif      text NOT NULL,
+  ref        text,
+  cree_le    timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS stickers_mouvements_compte ON stickers_mouvements (compte_id, id DESC);

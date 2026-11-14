@@ -7,6 +7,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../commun/stickers.dart';
 import '../commun/stock.dart';
 import '../commun/theme.dart';
 import '../etat.dart';
@@ -389,7 +390,8 @@ class FilChat extends StatelessWidget {
                   decoration: BoxDecoration(color: m.moi ? const Color(0xD9473513) : const Color(0xD90B1828), borderRadius: BorderRadius.circular(12), border: Border.all(color: K.line)),
                   child: Text.rich(TextSpan(children: [
                     TextSpan(text: '${m.moi ? 'Moi' : m.nom} ', style: K.texte(13, couleur: K.brass, poids: FontWeight.w700)),
-                    TextSpan(text: m.texte, style: App.estPhrase(m.texte ?? '') ? K.texte(13) : const TextStyle(fontSize: 20)),
+                    if (m.sticker != null) WidgetSpan(alignment: PlaceholderAlignment.middle, child: StickerImage(m.sticker!, taille: 30))
+                    else TextSpan(text: m.texte, style: App.estPhrase(m.texte ?? '') ? K.texte(13) : const TextStyle(fontSize: 20)),
                   ])),
                 ),
               ),
@@ -408,6 +410,7 @@ class CalqueEffets extends StatelessWidget {
     final racine = context.findRenderObject() as RenderBox?;
     return LayoutBuilder(builder: (context, c) {
       final enfants = <Widget>[];
+      final places = <Offset>[];
       for (final e in app.effets) {
         if (e.type == 'tampon') {
           enfants.add(Positioned.fill(child: _Tampon(key: ValueKey(e.id), e: e)));
@@ -420,6 +423,23 @@ class CalqueEffets extends StatelessWidget {
         final ref = moiBox ?? racine;
         if (ref == null) continue;
         final centre = box.localToGlobal(box.size.center(Offset.zero), ancestor: ref);
+        if (e.type == 'sticker') {
+          // Sous le siège (joueurs du haut) ou au-dessus (joueurs du bas) ; plus petits dès 4 à la fois,
+          // écartés vers le centre quand ils se chevauchent (règle de foule du 11/11).
+          final n = app.effets.where((x) => x.type == 'sticker').length;
+          final t = n >= 4 ? 72.0 : 96.0, h = t + 18;
+          final enHaut = centre.dy < c.maxHeight / 2;
+          var x = (centre.dx - t / 2).clamp(6.0, math.max(6.0, c.maxWidth - t - 6)).toDouble();
+          final y = enHaut ? box.localToGlobal(Offset(0, box.size.height), ancestor: ref).dy + 4 : box.localToGlobal(Offset.zero, ancestor: ref).dy - h - 8;
+          for (var k = 0; k < 6; k++) {
+            final gene = places.where((q) => (q.dx - x).abs() < t * .95 && (q.dy - y).abs() < h).toList();
+            if (gene.isEmpty) break;
+            x = (gene.first.dx + (x + t / 2 <= c.maxWidth / 2 ? 1 : -1) * t * 1.02).clamp(6.0, math.max(6.0, c.maxWidth - t - 6)).toDouble();
+          }
+          places.add(Offset(x, y));
+          enfants.add(Positioned(left: x, top: y, width: t, child: StickerAnime(key: ValueKey(e.id), id: e.texte, qui: e.sous ?? '', duree: e.duree, taille: t)));
+          continue;
+        }
         enfants.add(Positioned(left: centre.dx - 100, top: centre.dy - 100, width: 200, height: 200, child: _Bulle(key: ValueKey(e.id), e: e)));
       }
       return Stack(clipBehavior: Clip.none, children: enfants);

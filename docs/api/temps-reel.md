@@ -110,6 +110,7 @@ Après l'entrée, envoyer **`sync`** : le serveur répond par la vue. Toutes les
 | `remplacerParRobot` | `{ cible: idJoueur }` | L'hôte, pendant la partie (joueur absent) |
 | `pret` | `{ pret: bool }` | Un joueur, salon (indicatif) |
 | `reaction` | `{ emoji: texte }` | **Chat** : seulement un des messages de `GET /api/v1/config` → `messages` (pas de texte libre). Un par seconde au plus. Relayé à toute la table par le message `reaction` |
+| `sticker` | `{ sticker: id }` | **Sticker animé** (`GET /api/v1/stickers`) : seulement quand l'admin a allumé les stickers (sinon `Les stickers arrivent bientôt.`), un toutes les 5 s, et s'il reste au moins une utilisation (une de moins à chaque envoi). Relayé à toute la table par le message `sticker` ; l'envoyeur reçoit aussi `stickers` |
 | `micro` | `{ voix: bool, muet: bool, peerId? }` | Micro (voir 5) |
 | `mancheSuivante` | rien | L'hôte, entre deux manches (sinon elle part seule après 10 s) |
 | `revanche` / `revancheNon` | rien | Chaque joueur, en fin de partie (15 s). La revanche part quand tout le monde a répondu, ou à la fin du temps avec 2 joueurs au moins |
@@ -124,6 +125,8 @@ Match du jour (`kopo-jour`) : la table est fixée par le serveur et la partie d�
 | `vue` | la vue du joueur (4.1) | Après chaque changement, et en réponse à `sync` |
 | `erreur` | texte | Message refusé (à afficher brièvement) |
 | `reaction` | `{ type: 'reaction', joueur, emoji }` | Chat : quelqu'un a envoyé un message rapide |
+| `sticker` | `{ type: 'sticker', joueur, sticker }` | Quelqu'un a envoyé un sticker animé (il joue une fois, puis une ligne s'écrit dans le fil du chat) |
+| `stickers` | `{ sticker, restants }` | À l'envoyeur : utilisations restantes de ce sticker (0 : il se reverrouille) |
 | `classee` | `{ classee: bool }` | Début de partie : la partie compte pour la ligue |
 | `mise` | `{ niveau, mise, pot }` | Table à mise : mise prélevée, pot de la partie |
 | `solde` | `{ solde }` | Solde après une mise ou en fin de partie |
