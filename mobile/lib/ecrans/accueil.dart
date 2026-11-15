@@ -362,7 +362,7 @@ void boutonAmis() {
   final cfg = app.config;
   if (app.avecGoogle || (app.enLigne && cfg?['google'] == null)) { ouvrirAmis(); return; }
   fenetreGoogle('Amis', 'Connecte-toi pour ajouter tes amis, voir qui est en ligne et les inviter à ta table. Ta progression et tes pièces sont gardées.',
-      extra: (_) => [Btn('Inviter sur WhatsApp', large: true, onTap: () => ouvrirWhatsApp('Viens jouer avec moi sur Masano (Kopo et Inter (8)) !\n$lienJeu'))]);
+      extra: (_) => [Btn('Inviter sur WhatsApp', large: true, onTap: () => ouvrirWhatsApp('$texteInviterMasano\n$lienMasano'))]);
 }
 
 void creer({String? formule}) {

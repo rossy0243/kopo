@@ -14,13 +14,30 @@ import '../reseau/google.dart';
 
 const lienSite = 'https://kopo-d655.onrender.com/';
 String get lienJeu => (app.config?['liens'] is Map ? app.config!['liens']['site'] as String? : null) ?? lienSite;
-String lienPartie(String code) => '${lienJeu.replaceAll(RegExp(r'#.*$'), '')}#$code';
+String get lienMasano => lienJeu.replaceAll(RegExp(r'#.*$'), '');
 
+// ---------------------------------------------------------------- textes partagés
+// Tous les messages partagés (WhatsApp, Facebook…), mêmes textes que le site (src/source.html, « textes partagés ») :
+// Masano = l'appli ; Kopo et Inter (8) = les jeux, chacun avec son accroche et son lien (kopo/ ou inter8/,
+// dont l'aperçu montre l'image du jeu). Le lien est seul sur la dernière ligne : c'est lui qui fait l'aperçu.
 const nomsPartage = {
-  'kopo': (nom: 'Kopo', au: 'au Kopo', de: 'de Kopo'),
-  'inter8': (nom: 'Inter (8)', au: 'à Inter (8)', de: "d'Inter (8)"),
+  'kopo': (nom: 'Kopo', au: 'au Kopo', de: 'de Kopo', chemin: 'kopo/', accroche: 'Une manche, un éliminé : le dernier debout gagne.'),
+  'inter8': (nom: 'Inter (8)', au: 'à Inter (8)', de: "d'Inter (8)", chemin: 'inter8/', accroche: 'Le 8 demande, le Joker fait piocher 5 : vide ta main le premier !'),
 };
-({String nom, String au, String de}) jeuPartage(String? jeu) => nomsPartage[jeu] ?? nomsPartage['kopo']!;
+({String nom, String au, String de, String chemin, String accroche}) jeuPartage(String? jeu) => nomsPartage[jeu] ?? nomsPartage['kopo']!;
+String lienDuJeu(String? jeu) => '$lienMasano${jeuPartage(jeu).chemin}';
+String lienPartie(String code, [String? jeu]) => '${lienDuJeu(jeu)}#$code';
+
+/// « Ali », « Ali et Ben », « Ali, Ben et Chris » ; au-delà de 6 : « Ali, Ben, Chris, Dédé, Eli et 3 autres ».
+String listeNoms(List<String> noms) {
+  if (noms.length > 6) return '${noms.take(5).join(', ')} et ${noms.length - 5} autres';
+  if (noms.length < 2) return noms.isEmpty ? '' : noms.first;
+  return '${noms.sublist(0, noms.length - 1).join(', ')} et ${noms.last}';
+}
+const texteInviterMasano = '🃏 Viens jouer avec moi sur Masano : le Kopo et Inter (8), les jeux de cartes entre amis !';
+String texteInviterJeu(String? jeu) => '🃏 Viens jouer ${jeuPartage(jeu).au} avec moi sur Masano ! ${jeuPartage(jeu).accroche}';
+String texteTable(String? jeu, String code, String lien) => '🃏 Viens jouer ${jeuPartage(jeu).au} avec moi sur Masano ! Ma table t\'attend, code $code.\n$lien';
+String texteBande(String nomBande, String lien) => '👑 Rejoins ma Bande « $nomBande » sur Masano ! Chaque jour un Match de Kopo, chaque semaine on mise, et le meilleur rafle le pot.\n$lien';
 
 Future<void> ouvrirWhatsApp(String texte) async {
   final u = Uri.parse('https://wa.me/?text=${Uri.encodeComponent(texte)}');

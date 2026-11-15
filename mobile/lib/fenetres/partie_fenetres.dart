@@ -579,13 +579,16 @@ class _Compteur extends StatelessWidget {
 }
 
 Future<void> partagerVictoire(Vue v, Recap? r) async {
-  final J = jeuPartage(v['jeu'] as String?);
+  final jeu = v['jeu'] as String?;
+  final J = jeuPartage(jeu), lien = lienDuJeu(jeu);
+  // Les adversaires battus : tous les autres joueurs de la partie (robots compris), par leur pseudo.
+  final noms = [for (final j in ((v['joueurs'] as List?) ?? const []).cast<Map>()) if (j['id'] != v['moi'] && (j['nom'] ?? '').toString().isNotEmpty) j['nom'].toString()];
   final texte = v['vainqueur'] == v['moi']
-      ? 'Je viens de gagner une partie ${J.de} sur Masano ! Viens me battre :'
-      : r?.titre != null ? 'Mon nouveau titre ${J.au} : « ${r!.titre} ». Viens jouer sur Masano :' : 'Viens jouer ${J.au} avec moi sur Masano :';
+      ? '${noms.isNotEmpty ? "🏆 J'ai battu ${listeNoms(noms)} ${J.au} sur Masano !" : '🏆 Je viens de gagner une partie ${J.de} sur Masano !'} Qui ose me défier ?\n$lien'
+      : r?.titre != null ? '🎖️ Nouveau titre ${J.au} sur Masano : « ${r!.titre} ». Viens jouer avec moi !\n$lien' : '${texteInviterJeu(jeu)}\n$lien';
   try {
-    await SharePlus.instance.share(ShareParams(text: '$texte $lienJeu'));
+    await SharePlus.instance.share(ShareParams(text: texte));
   } catch (_) {
-    await ouvrirWhatsApp('$texte $lienJeu');
+    await ouvrirWhatsApp(texte);
   }
 }

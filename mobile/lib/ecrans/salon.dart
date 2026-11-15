@@ -24,7 +24,7 @@ class Salon extends StatelessWidget {
     final prets = invites.where((j) => j['pret'] == true).length;
     final moi = joueurs.firstWhere((j) => j['id'] == v['moi'], orElse: () => {});
     final code = v['code'].toString();
-    final lien = lienPartie(code);
+    final lien = lienPartie(code, v['jeu'] as String?);
     final paysage = MediaQuery.of(context).orientation == Orientation.landscape;
 
     final colCode = Colonne([
@@ -45,7 +45,7 @@ class Salon extends StatelessWidget {
         ),
       ]),
       Row(children: [
-        Expanded(child: Btn('WhatsApp', icone: 'partager', onTap: () => ouvrirWhatsApp('Viens jouer ${jeuPartage(v['jeu'] as String?).au} avec moi sur Masano ! Code de la partie : $code\n$lien'))),
+        Expanded(child: Btn('WhatsApp', icone: 'partager', onTap: () => ouvrirWhatsApp(texteTable(v['jeu'] as String?, code, lien)))),
         const SizedBox(width: 8),
         Btn('Copier', onTap: () => copier(lien, 'Lien copié.')),
         if (app.enLigne && !publique) ...[const SizedBox(width: 8), Btn('Amis', icone: 'amis', onTap: () => inviterDepuisSalon(code))],

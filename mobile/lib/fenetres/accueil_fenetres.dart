@@ -13,7 +13,6 @@ import '../reseau/api.dart';
 import 'communes.dart';
 import 'compet.dart' show fenetreNouveaute;
 import 'progres.dart';
-import 'social.dart';
 
 // ---------------------------------------------------------------- Inter (8) : quelle partie ?
 void choisirStyleInter(String p, {String? formule}) {
@@ -338,10 +337,10 @@ const reseaux = {
 };
 
 Future<void> partagerJeu() async {
-  var url = lienJeu.replaceAll(RegExp(r'#.*$'), '');
-  if (app.enLigne) { try { final P = await Api.get('/parrainage'); if (P['code'] != null) url = lienParrain(P['code'].toString()); } catch (_) {} }
+  var url = lienDuJeu(app.jeu);
+  if (app.enLigne) { try { final P = await Api.get('/parrainage'); if (P['code'] != null) url = '${lienDuJeu(app.jeu)}?parrain=${P['code']}'; } catch (_) {} }
   try {
-    await SharePlus.instance.share(ShareParams(title: 'Masano', text: 'Viens jouer ${jeuPartage(app.jeu).au} avec moi sur Masano ! $url'));
+    await SharePlus.instance.share(ShareParams(title: 'Masano · ${jeuPartage(app.jeu).nom}', text: '${texteInviterJeu(app.jeu)}\n$url'));
   } catch (_) {
     await copier(url, 'Lien du jeu copié.');
   }

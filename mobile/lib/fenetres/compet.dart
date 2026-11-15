@@ -238,7 +238,7 @@ Future<void> ouvrirParcours() async {
 
 // ---------------------------------------------------------------- Match du jour
 String casesMatch(Map r) => '🟩' * math.min(7, ((r['manches'] as num?) ?? 0).toInt()) + (r['victoire'] == true ? '🏆' : r['parti'] == true ? '⬜' : '🟥');
-void partagerMatchJour(Map r) => ouvrirWhatsApp('Masano · Kopo, Match du jour n°${r['numero']}\n${casesMatch(r)} ${r['score']} / 100\nTu fais mieux ? 👉 $lienJeu');
+void partagerMatchJour(Map r) => ouvrirWhatsApp('🃏 Masano · Match du jour de Kopo n°${r['numero']}\n${casesMatch(r)} ${r['score']} / 100\nTu fais mieux ? 👉 ${lienDuJeu('kopo')}');
 String _rangTexte(Object? r) => r == 1 ? '1er' : '${r}e';
 
 void expliquerMatchJour([VoidCallback? suite]) {
@@ -487,12 +487,12 @@ void finDeSemaineBande(Map x, VoidCallback suite) {
       ]));
 }
 
-String lienBande(Map x) => '${lienJeu.replaceAll(RegExp(r'#.*$'), '')}?bande=${x['code']}';
+String lienBande(Map x) => '${lienDuJeu('kopo')}?bande=${x['code']}';
 Future<void> inviterBande(Map x) async {
   String? parrain;
   try { parrain = (await Api.get('/parrainage'))['code'] as String?; } catch (_) {}
   final lien = lienBande(x) + (parrain != null ? '&parrain=$parrain' : '');
-  ouvrirWhatsApp('Rejoins ma Bande « ${x['nom']} » sur Masano (Kopo) ! Chaque jour un Match, chaque semaine on mise, et le meilleur rafle le pot 👑 $lien');
+  ouvrirWhatsApp(texteBande('${x['nom']}', lien));
 }
 
 void afficherBande(Map x) {
