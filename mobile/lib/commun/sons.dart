@@ -1,6 +1,7 @@
 // Effets sonores et musique d'ambiance : les sons du site (src/kopo-sons.js), rendus d'avance en WAV
 // par outils/sons.js et joués ici. Plusieurs lecteurs pour que les effets se chevauchent.
-// La musique ne joue que sur les menus (accueil, salon) : elle s'efface quand une partie commence.
+// La musique joue partout : normale sur les menus (accueil, salon), plus basse pendant la partie pour laisser
+// passer les effets (35 % du volume des menus, comme sur le site).
 import 'dart:async';
 
 import 'package:audioplayers/audioplayers.dart';
@@ -13,6 +14,9 @@ class Sons {
   static AudioPlayer? _fond;
   static bool _menu = true;
   static Timer? _fondu;
+  static double _vol = 0;
+  static const _volMenu = .8, _volPartie = .8 * .35;
+  static double get _cible => _menu ? _volMenu : _volPartie;
 
   static const noms = {
     'carte', 'distribution', 'distribution8', 'ramasse', 'tour', 'tic', 'decompte', 'qualifie', 'katapss',
@@ -56,13 +60,18 @@ class Sons {
 
   static void _majFond() {
     _fondu?.cancel();
-    if (_musique && _menu) {
-      _fond ??= AudioPlayer()..setReleaseMode(ReleaseMode.loop);
-      _fond!.setVolume(0);
-      _fond!.play(AssetSource('sons/musique.wav')).catchError((_) {});
-      _fondre(0, .8, 2000, null);
+    if (_musique) {
+      if (_fond == null || _fond!.state != PlayerState.playing) {
+        _fond ??= AudioPlayer()..setReleaseMode(ReleaseMode.loop);
+        _vol = 0;
+        _fond!.setVolume(0);
+        _fond!.play(AssetSource('sons/musique.wav')).catchError((_) {});
+        _fondre(0, _cible, 2000, null);
+      } else {
+        _fondre(_vol, _cible, 1200, null); // menu ↔ partie : la musique baisse ou remonte sans s'arrêter
+      }
     } else if (_fond != null) {
-      _fondre(.8, 0, 800, () => _fond?.stop());
+      _fondre(_vol, 0, 800, () => _fond?.stop());
     }
   }
 
@@ -72,14 +81,15 @@ class Sons {
     const pas = 20;
     _fondu = Timer.periodic(Duration(milliseconds: ms ~/ pas), (t) {
       k++;
-      _fond?.setVolume(de + (a - de) * k / pas);
+      _vol = de + (a - de) * k / pas;
+      _fond?.setVolume(_vol);
       if (k >= pas) { t.cancel(); fin?.call(); }
     });
   }
 
   /// Appli en arrière-plan : on coupe la musique, on la reprend au retour.
   static void pause(bool enPause) {
-    if (!_musique || !_menu || _fond == null) return;
+    if (!_musique || _fond == null) return;
     if (enPause) { _fond!.pause(); } else { _fond!.resume(); }
   }
 }

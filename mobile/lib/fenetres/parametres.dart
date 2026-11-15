@@ -96,7 +96,7 @@ class _ParametresState extends State<_Parametres> {
     return Fenetre(titre: 'Paramètres', onFermer: app.fermerFenetre, enfants: [
       const Titre3('Son et vibrations'),
       Bascule('Effets sonores', pr['effetsSonores'] == true, (_) => _bascule('effetsSonores', () => Sons.jouer('essai')), aide: 'Cartes, tour, Katapss, chat'),
-      Bascule("Musique d'ambiance", pr['musique'] == true, (_) => _bascule('musique'), aide: 'Sur les menus, coupée pendant les parties'),
+      Bascule("Musique d'ambiance", pr['musique'] == true, (_) => _bascule('musique'), aide: 'Plus basse pendant les parties'),
       Bascule('Vibrations', pr['vibrations'] == true, (_) => _bascule('vibrations', () => app.vibrer(60)), aide: "Quand c'est à toi de jouer"),
       const Titre3('Jeu'),
       choix('Ranger ma main', null, const [('couleur', 'Par couleur'), ('valeur', 'Par valeur')], pr['tri'] == 'valeur' ? 'valeur' : 'couleur', (v) { pr['tri'] = v; app.enregistrerPrefs(); setState(() {}); }),
