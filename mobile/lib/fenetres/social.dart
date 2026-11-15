@@ -350,7 +350,7 @@ class _AmisState extends State<_Amis> {
       Row(children: [
         Expanded(child: Btn.principal('Ajouter un ami', onTap: () => setState(() => ajout = !ajout))),
         const SizedBox(width: 8),
-        Expanded(child: Btn('WhatsApp', icone: 'partager', onTap: () => ouvrirWhatsApp('Viens jouer avec moi sur Masano (Kopo et Inter (8)) ! Ajoute-moi : $ident\n$lienJeu'))),
+        Expanded(child: Btn('WhatsApp', icone: 'partager', onTap: () => ouvrirWhatsApp('$texteInviterMasano Ajoute-moi en ami : $ident\n$lienMasano'))),
       ]),
       const Ecart(8),
       Btn('Inviter et gagner des pièces', style: StyleBtn.discret, icone: 'cadeau', large: true, onTap: () => ouvrirParrainage(retour: _rouvrir)),
@@ -378,7 +378,7 @@ class _AmisState extends State<_Amis> {
 }
 
 // ---------------------------------------------------------------- parrainage
-String lienParrain(String code) => '${lienJeu.replaceAll(RegExp(r'#.*$'), '')}?parrain=$code';
+String lienParrain(String code) => '$lienMasano?parrain=$code';
 String _fr(num n) => App.formatPieces(n);
 
 void ouvrirParrainage({VoidCallback? retour}) {
@@ -419,7 +419,7 @@ void ouvrirParrainage({VoidCallback? retour}) {
                       Btn('Copier', onTap: () => copier(lien, 'Lien copié.')),
                     ]),
                     const Ecart(8),
-                    Btn('Inviter sur WhatsApp', icone: 'partager', large: true, onTap: () => ouvrirWhatsApp('Viens jouer avec moi sur Masano (Kopo et Inter (8)) ! Crée ton compte avec ce lien, on gagne des pièces tous les deux :\n$lien')),
+                    Btn('Inviter sur WhatsApp', icone: 'partager', large: true, onTap: () => ouvrirWhatsApp('$texteInviterMasano Crée ton compte avec ce lien, on gagne des pièces tous les deux :\n$lien')),
                   ]);
                 }),
                 const Ecart(10),

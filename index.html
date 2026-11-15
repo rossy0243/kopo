@@ -4,18 +4,23 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#10233a">
-<meta name="description" content="Masano : Kopo et Inter (8), jeux de cartes entre amis ou en ligne.">
+<meta name="description" content="Masano : le Kopo et Inter (8), les jeux de cartes qu'on joue entre amis. De 2 à 9 joueurs, en ligne ou autour de la table. Gratuit.">
 <link rel="icon" href="icons/masano-logo.svg" type="image/svg+xml">
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="manifest" href="manifest.webmanifest">
+<!-- Aperçu des liens partagés (Facebook, WhatsApp…). Les liens d'un seul jeu passent par kopo/ et inter8/ (pages légères faites par build.js). -->
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Masano">
-<meta property="og:title" content="Masano · Kopo et Inter (8), jeux de cartes entre amis">
-<meta property="og:description" content="De 2 à 9 joueurs, entre amis ou en ligne. Gratuit.">
+<meta property="og:locale" content="fr_FR">
+<meta property="og:title" content="Masano · Kopo et Inter (8), les jeux de cartes entre amis">
+<meta property="og:description" content="Deux jeux de cartes, une seule appli. De 2 à 9 joueurs, en ligne ou autour de la table. Gratuit, viens jouer !">
 <meta property="og:url" content="https://rossy0243.github.io/kopo/">
-<meta property="og:image" content="https://rossy0243.github.io/kopo/icons/og-masano.png">
+<meta property="og:image" content="https://rossy0243.github.io/kopo/icons/og-masano.png?v=2">
+<meta property="og:image:secure_url" content="https://rossy0243.github.io/kopo/icons/og-masano.png?v=2">
+<meta property="og:image:type" content="image/png">
 <meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Masano : Kopo et Inter (8), jeux de cartes entre amis">
 <meta name="twitter:card" content="summary_large_image">
 <title>Masano · Kopo et Inter (8)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -7711,7 +7716,7 @@ svg .vb { transform-box: view-box; }
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = '1a2b4bde61fe'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = '705270809750'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: true };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // La musique des menus était coupée par défaut : on l'allume une fois pour tous (le joueur peut la recouper).
@@ -7732,6 +7737,13 @@ svg .vb { transform-box: view-box; }
   if (/^[A-Z0-9]{6}$/.test(parrainLien)) {
     if (!stock.lire('kopo-parrain')) stock.ecrire('kopo-parrain', { code: parrainLien, le: Date.now() });
     const q = new URLSearchParams(location.search); q.delete('parrain');
+    history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + location.hash);
+  }
+  // Lien partagé d'un jeu (kopo/ ou inter8/ ajoutent ?jeu=…) : ce jeu est choisi sur l'accueil.
+  const jeuLien = new URLSearchParams(location.search).get('jeu');
+  if (jeuLien) {
+    if (jeuLien === 'kopo' || jeuLien === 'inter8') stock.ecrire('kopo-jeu', jeuLien);
+    const q = new URLSearchParams(location.search); q.delete('jeu');
     history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + location.hash);
   }
   // Lien d'invitation dans une Bande (?bande=ABC234) : gardé jusqu'à ce que le joueur soit connecté avec Google.
@@ -8312,7 +8324,7 @@ svg .vb { transform-box: view-box; }
     return c;
   }
   function majHash(code) { if (location.hash !== '#' + code) history.replaceState(null, '', '#' + code); }
-  function lienPartie(code) { return location.origin + location.pathname + location.search + '#' + code; }
+  function lienPartie(code, jeu) { return lienJeu(jeu) + '#' + code; }
 
   // ------------------------------------------------------------------ affichage
   const ecrans = ['ecranAccueil', 'ecranConnexion', 'ecranSalon', 'ecranPartie'];
@@ -8749,7 +8761,7 @@ svg .vb { transform-box: view-box; }
     if (v.publique) $('attentePublique').replaceChildren('En attente de joueurs : ', el('strong', null, `${v.joueurs.length}/${v.taille}`), `. La partie démarre dès que la salle est pleine. ${lobby.enLigne()} en ligne.`);
     $('texteCode').textContent = v.publique ? 'Code pour tes amis' : 'Code de la partie';
     $('codeSalon').textContent = v.code;
-    const lien = lienPartie(v.code);
+    const lien = lienPartie(v.code, v.jeu);
     $('lienSalon').value = lien;
     if (qrPour !== lien && window.qrcode) {
       try { const q = qrcode(0, 'M'); q.addData(lien); q.make(); $('qr').innerHTML = q.createSvgTag({ cellSize: 4, margin: 0, scalable: true }); qrPour = lien; } catch (e) {}
@@ -10092,27 +10104,55 @@ svg .vb { transform-box: view-box; }
     texte(jeuPartage(v.jeu).nom.toUpperCase(), 320, '90px "Bebas Neue", Impact, sans-serif', '#e2b04a');
     texte(gagne ? 'VICTOIRE !' : (r && r.titre ? 'TITRE' : 'BIEN JOUÉ'), 500, '230px "Bebas Neue", Impact, sans-serif', '#ffffff');
     texte(moi, 650, '600 70px Outfit, sans-serif', '#e2b04a');
-    texte(gagne ? `gagne une partie à ${v.joueurs.length} joueurs` : '', 730, '500 44px Outfit, sans-serif', '#c9d6e6');
+    texte(gagne ? (adversaires(v).length ? 'a battu ' + listeNoms(adversaires(v)) : `gagne une partie à ${v.joueurs.length} joueurs`) : '', 730, '500 44px Outfit, sans-serif', '#c9d6e6');
     if (r && r.titre) texte('« ' + r.titre + ' »', 810, 'italic 600 50px Outfit, sans-serif', '#e2b04a');
     else if (r && r.faceAFace) texte(`Toi ${r.faceAFace.gagnes} – ${r.faceAFace.perdus} ${r.faceAFace.nom}`, 810, '600 50px Outfit, sans-serif', '#ffffff');
     if (r) texte('Niveau ' + r.niveauApres.niveau, 880, '500 40px Outfit, sans-serif', '#9fb2c8');
-    texte('Viens me battre : ' + (location.host + location.pathname).replace(/index\.html$/, '').replace(/\/$/, ''), 975, '500 38px Outfit, sans-serif', '#9fb2c8');
+    texte('Viens me battre sur MASANO', 935, '600 40px Outfit, sans-serif', '#e2b04a');
+    texte(lienJeu(v.jeu).replace(/^https?:\/\//, '').replace(/\/$/, ''), 985, '500 34px Outfit, sans-serif', '#9fb2c8');
     return new Promise((ok) => c.toBlob(ok, 'image/png'));
   }
-  // Nom du jeu dans les textes partagés (« jouer au Kopo », « une partie d'Inter (8) »). Masano = l'appli.
-  const NOMS_PARTAGE = { kopo: { nom: 'Kopo', au: 'au Kopo', de: 'de Kopo', logo: 'icons/kopo-logo.svg' }, inter8: { nom: 'Inter (8)', au: 'à Inter (8)', de: 'd\'Inter (8)', logo: 'icons/masano-logo.svg' } };
+  // ------------------------------------------------------------------ textes partagés
+  // Tous les messages partagés (WhatsApp, Facebook…) sont écrits ici, sur le même modèle :
+  // Masano = l'appli ; Kopo et Inter (8) = les jeux, chacun avec son accroche et son lien (kopo/ ou inter8/,
+  // dont l'aperçu montre l'image du jeu). Le lien est seul sur la dernière ligne : c'est lui qui fait l'aperçu.
+  // Mêmes textes dans l'appli (mobile/lib/fenetres/communes.dart).
+  const NOMS_PARTAGE = {
+    kopo: { nom: 'Kopo', au: 'au Kopo', de: 'de Kopo', chemin: 'kopo/', logo: 'icons/kopo-logo.svg', accroche: 'Une manche, un éliminé : le dernier debout gagne.' },
+    inter8: { nom: 'Inter (8)', au: 'à Inter (8)', de: 'd\'Inter (8)', chemin: 'inter8/', logo: 'icons/masano-logo.svg', accroche: 'Le 8 demande, le Joker fait piocher 5 : vide ta main le premier !' },
+  };
   const jeuPartage = (jeu) => NOMS_PARTAGE[jeu] || NOMS_PARTAGE.kopo;
+  function lienJeu(jeu) { return LIEN_SITE() + jeuPartage(jeu).chemin; }
+  // « Ali », « Ali et Ben », « Ali, Ben et Chris » ; au-delà de 6 : « Ali, Ben, Chris, Dédé, Eli et 3 autres ».
+  function listeNoms(noms) {
+    if (noms.length > 6) return noms.slice(0, 5).join(', ') + ` et ${noms.length - 5} autres`;
+    return noms.length < 2 ? (noms[0] || '') : noms.slice(0, -1).join(', ') + ' et ' + noms[noms.length - 1];
+  }
+  // Les adversaires battus : tous les autres joueurs de la partie (robots compris), par leur pseudo.
+  const adversaires = (v) => v.joueurs.filter((j) => j.id !== v.moi).map((j) => j.nom).filter(Boolean);
+  const texteInviterMasano = () => '🃏 Viens jouer avec moi sur Masano : le Kopo et Inter (8), les jeux de cartes entre amis !';
+  const texteInviterJeu = (jeu) => `🃏 Viens jouer ${jeuPartage(jeu).au} avec moi sur Masano ! ${jeuPartage(jeu).accroche}`;
+  const texteTable = (jeu, code, lien) => `🃏 Viens jouer ${jeuPartage(jeu).au} avec moi sur Masano ! Ma table t'attend, code ${code}.\n${lien}`;
+  const texteMatchJour = (r, lien) => `🃏 Masano · Match du jour de Kopo n°${r.numero}\n${casesMatch(r)} ${r.score} / 100\nTu fais mieux ? 👉 ${lien}`;
+  const texteBande = (nomBande, lien) => `👑 Rejoins ma Bande « ${nomBande} » sur Masano ! Chaque jour un Match de Kopo, chaque semaine on mise, et le meilleur rafle le pot.\n${lien}`;
+  function texteVictoire(v, r) {
+    const J = jeuPartage(v.jeu), lien = lienJeu(v.jeu);
+    if (v.vainqueur === v.moi) {
+      const noms = adversaires(v);
+      return (noms.length ? `🏆 J'ai battu ${listeNoms(noms)} ${J.au} sur Masano !` : `🏆 Je viens de gagner une partie ${J.de} sur Masano !`) + ` Qui ose me défier ?\n${lien}`;
+    }
+    if (r && r.titre) return `🎖️ Nouveau titre ${J.au} sur Masano : « ${r.titre} ». Viens jouer avec moi !\n${lien}`;
+    return `${texteInviterJeu(v.jeu)}\n${lien}`;
+  }
   function ouvrirWhatsApp(texte) { window.open('https://wa.me/?text=' + encodeURIComponent(texte), '_blank', 'noopener'); }
   async function partagerVictoire(v, r) {
-    const url = location.origin + location.pathname;
-    const J = jeuPartage(v.jeu);
-    const texte = v.vainqueur === v.moi ? `Je viens de gagner une partie ${J.de} sur Masano ! Viens me battre :` : (r && r.titre ? `Mon nouveau titre ${J.au} : « ${r.titre} ». Viens jouer sur Masano :` : `Viens jouer ${J.au} avec moi sur Masano :`);
+    const texte = texteVictoire(v, r);
     try {
       const blob = await imageVictoire(v, r);
       const f = blob && new File([blob], (v.jeu === 'inter8' ? 'inter8' : 'kopo') + '.png', { type: 'image/png' });
-      if (f && navigator.canShare && navigator.canShare({ files: [f] })) { await navigator.share({ files: [f], text: texte + ' ' + url }); return; }
+      if (f && navigator.canShare && navigator.canShare({ files: [f] })) { await navigator.share({ files: [f], text: texte }); return; }
     } catch (e) { if (e && e.name === 'AbortError') return; }
-    ouvrirWhatsApp(texte + ' ' + url);
+    ouvrirWhatsApp(texte);
   }
 
   function demanderConfirmation(texte, ok, o = {}) {
@@ -10447,7 +10487,7 @@ svg .vb { transform-box: view-box; }
   const JOURS_COURTS = ['L', 'M', 'Me', 'J', 'V', 'S', 'D'];
   const dureeLisible = (ms) => { const h = Math.floor(ms / 36e5), m = Math.floor((ms % 36e5) / 6e4); return h ? `${h} h ${String(m).padStart(2, '0')}` : `${Math.max(1, m)} min`; };
   // Adresse publique du jeu pour les liens partagés : dans l'appli (capacitor://, https://localhost), l'adresse de la page ne marche pas chez un ami.
-  const LIEN_SITE = () => /^https?:$/.test(location.protocol) && !/^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? location.origin + location.pathname : NOUVELLE_ADRESSE;
+  const LIEN_SITE = () => /^https?:$/.test(location.protocol) && !/^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? (location.origin + location.pathname).replace(/index\.html$/, '') : NOUVELLE_ADRESSE;
   let etatJour = null, etatBandes = null;
   async function compteEnLigne() { if (!compteLocal()) { const p = lirePseudo(); if (!p) return false; await compteServeur(p); } return true; }
 
@@ -10517,7 +10557,7 @@ svg .vb { transform-box: view-box; }
   // Les cases à partager : une verte par manche passée, rouge à l'élimination, 🏆 pour la victoire.
   const casesMatch = (r) => '🟩'.repeat(Math.min(7, r.manches)) + (r.victoire ? '🏆' : r.parti ? '⬜' : '🟥');
   function partagerMatchJour(r) {
-    ouvrirWhatsApp(`Masano · Kopo, Match du jour n°${r.numero}\n${casesMatch(r)} ${r.score} / 100\nTu fais mieux ? 👉 ${LIEN_SITE()}`);
+    ouvrirWhatsApp(texteMatchJour(r, lienJeu('kopo')));
   }
 
   async function ouvrirMatchJour() {
@@ -10797,12 +10837,12 @@ svg .vb { transform-box: view-box; }
     ouvrirFenetre([z, ok]);
   }
 
-  function lienBande(x) { return `${LIEN_SITE()}?bande=${x.code}`; }
+  function lienBande(x) { return `${lienJeu('kopo')}?bande=${x.code}`; }
   async function inviterBande(x) {
     let parrain = null;
     try { parrain = (await apiJoueur('/parrainage')).code; } catch (e) {} // le lien sert aussi de lien de parrainage
     const lien = lienBande(x) + (parrain ? '&parrain=' + parrain : '');
-    ouvrirWhatsApp(`Rejoins ma Bande « ${x.nom} » sur Masano (Kopo) ! Chaque jour un Match, chaque semaine on mise, et le meilleur rafle le pot 👑 ${lien}`);
+    ouvrirWhatsApp(texteBande(x.nom, lien));
   }
 
   function afficherBande(x) {
@@ -11543,7 +11583,7 @@ svg .vb { transform-box: view-box; }
       const cfg = await lireConfig();
       if (avecGoogle() || compteLocal() && !(cfg && cfg.google)) return ouvrirAmis();
       const wa = el('button', 'btn large', 'Inviter sur WhatsApp');
-      wa.onclick = () => window.open('https://wa.me/?text=' + encodeURIComponent('Viens jouer avec moi sur Masano (Kopo et Inter (8)) !\n' + LIEN_SITE()), '_blank', 'noopener');
+      wa.onclick = () => window.open('https://wa.me/?text=' + encodeURIComponent(texteInviterMasano() + '\n' + LIEN_SITE()), '_blank', 'noopener');
       fenetreGoogle('Amis', 'Connecte-toi pour ajouter tes amis, voir qui est en ligne et les inviter à ta table. Ta progression et tes pièces sont gardées.', [wa]);
     };
   }
@@ -11582,7 +11622,7 @@ svg .vb { transform-box: view-box; }
     const ajouter = el('button', 'btn principal', 'Ajouter un ami');
     ajouter.onclick = () => { ajout.hidden = !ajout.hidden; if (!ajout.hidden) champ.focus(); };
     const wa = el('button', 'btn wa', 'WhatsApp');
-    wa.onclick = () => { const m = `Viens jouer avec moi sur Masano (Kopo et Inter (8)) ! Ajoute-moi : ${ident}\n${LIEN_SITE()}`; window.open('https://wa.me/?text=' + encodeURIComponent(m), '_blank', 'noopener'); };
+    wa.onclick = () => { const m = `${texteInviterMasano()} Ajoute-moi en ami : ${ident}\n${LIEN_SITE()}`; window.open('https://wa.me/?text=' + encodeURIComponent(m), '_blank', 'noopener'); };
     const bas = el('div', 'amis-bas'); bas.append(ajouter, wa);
     const parrain = el('button', 'amis-parrain', 'Inviter et gagner des pièces');
     parrain.onclick = () => ouvrirParrainage(rouvrir);
@@ -11724,7 +11764,7 @@ svg .vb { transform-box: view-box; }
       const ligne = el('div', 'lien'); ligne.append(champ, copier);
       const wa = el('button', 'btn large btn-whatsapp', 'Inviter sur WhatsApp');
       wa.prepend(icone('i-partager'));
-      wa.onclick = () => ouvrirWhatsApp(`Viens jouer avec moi sur Masano (Kopo et Inter (8)) ! Crée ton compte avec ce lien, on gagne des pièces tous les deux :\n${lien}`);
+      wa.onclick = () => ouvrirWhatsApp(`${texteInviterMasano()} Crée ton compte avec ce lien, on gagne des pièces tous les deux :\n${lien}`);
       zone.append(ligne, wa);
       // Progression et paliers (les gros parrains sont récompensés).
       const prochain = P.paliers.find((x) => !x.atteint);
@@ -13074,9 +13114,10 @@ svg .vb { transform-box: view-box; }
   $('btnParametresAccueil').onclick = () => window.ouvrirParametres && window.ouvrirParametres();
   setTimeout(() => ($('btnParametresAccueil').hidden = typeof window.ouvrirParametres !== 'function'), 0);
   async function partagerJeu() {
-    let url = location.origin + location.pathname;
-    if (MODE_SERVEUR && compteLocal()) { try { const P = await apiJoueur('/parrainage'); if (P.code) url = lienParrain(P.code); } catch (e) {} }
-    try { if (navigator.share) { await navigator.share({ title: 'Masano', text: `Viens jouer ${jeuPartage(jeuChoisi()).au} avec moi sur Masano !`, url }); return; } } catch (e) { return; }
+    const jeu = jeuChoisi();
+    let url = lienJeu(jeu);
+    if (MODE_SERVEUR && compteLocal()) { try { const P = await apiJoueur('/parrainage'); if (P.code) url = lienJeu(jeu) + '?parrain=' + P.code; } catch (e) {} }
+    try { if (navigator.share) { await navigator.share({ title: 'Masano · ' + jeuPartage(jeu).nom, text: texteInviterJeu(jeu), url }); return; } } catch (e) { return; }
     try { await navigator.clipboard.writeText(url); toast('Lien du jeu copié.'); } catch (e) { toast(url); }
   }
   // Groupes de la communauté (réglés dans l'admin, onglet Pilotage) : couleur et initiale du réseau.
@@ -13119,7 +13160,7 @@ svg .vb { transform-box: view-box; }
     () => { if (client && vueActuelle && vueActuelle.etat === 'salon') {} quitter(); });
   $('btnWhatsappSalon').onclick = () => {
     const v = vueActuelle; if (!v) return;
-    ouvrirWhatsApp(`Viens jouer ${jeuPartage(v.jeu).au} avec moi sur Masano ! Code de la partie : ${v.code}\n${lienPartie(v.code)}`);
+    ouvrirWhatsApp(texteTable(v.jeu, v.code, lienPartie(v.code, v.jeu)));
   };
   // QR code du salon : le bouton QR (portrait) ou le petit QR (paysage) l'ouvre en grand par-dessus l'écran, toucher le referme.
   const basculerQr = () => $('ecranSalon').classList.toggle('qr-ouvert');
