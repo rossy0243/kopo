@@ -1000,5 +1000,22 @@ test('Pause contre les robots : rien n\'avance, puis tout reprend décalé', () 
   assert.ok(!SP.recevoir(d, 'p1', { type: 'enPause', pause: true }).ok);
 });
 
+console.log('\nPlaces autour de la table');
+test('Entre les manches, personne ne change de place (créateur, 16/11)', () => {
+  const vraie = K.nouvelleManche;
+  for (let g = 1; g <= 30; g++) {
+    const tables = [];
+    K.nouvelleManche = (sieges, ...r) => { tables.push(sieges.slice()); return vraie(sieges, ...r); };
+    try {
+      const s = salleAvec(6, g);
+      S.recevoir(s, 'p1', { type: 'lancer' });
+      jouerPartieParLesVues(s, K.hasard(g));
+    } finally { K.nouvelleManche = vraie; }
+    assert.ok(tables.length >= 5);
+    // À chaque manche : les mêmes joueurs dans le même ordre, moins les éliminés.
+    for (let k = 1; k < tables.length; k++) assert.deepStrictEqual(tables[k], tables[k - 1].filter((id) => tables[k].includes(id)));
+  }
+});
+
 console.log(`\n${ok} tests réussis, ${ko} en échec.`);
 process.exit(ko ? 1 : 0);

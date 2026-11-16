@@ -562,5 +562,22 @@ test('Pause contre les robots : rien n\'avance, puis tout reprend décalé', () 
   assert.ok(!SP.recevoir(d, 'p1', { type: 'enPause', pause: true }).ok);
 });
 
+console.log('\nPlaces autour de la table');
+test('Mode Cahier : entre les donnes, personne ne change de place (créateur, 16/11)', () => {
+  const vraie = I.nouvelleManche;
+  for (let g = 1; g <= 10; g++) {
+    const tables = [];
+    I.nouvelleManche = (sieges, ...r) => { tables.push(sieges.slice()); return vraie(sieges, ...r); };
+    try {
+      const s = salleAvec(5, g);
+      assert.ok(S.recevoir(s, 'p1', { type: 'reglages', formule: 'cahier', total: 500 }).ok);
+      S.recevoir(s, 'p1', { type: 'lancer' });
+      jouerPartieParLesVues(s, I.hasard(g));
+    } finally { I.nouvelleManche = vraie; }
+    assert.ok(tables.length >= 3, 'plusieurs donnes');
+    for (let k = 1; k < tables.length; k++) assert.deepStrictEqual(tables[k], tables[k - 1].filter((id) => tables[k].includes(id)));
+  }
+});
+
 console.log(`\n${ok} test(s) réussi(s), ${ko} échec(s).`);
 if (ko) process.exit(1);

@@ -247,8 +247,10 @@
   }
 
   // À appeler régulièrement par l'hôte. Renvoie true si un coup automatique a été joué.
+  // Les places autour de la table sont tirées une fois au début de la partie : entre les manches,
+  // personne ne change de place (créateur, 16/11). s.restants garde cet ordre.
   function lancer(s) {
-    s.restants = s.joueurs.map((j) => j.id);
+    s.restants = K.melanger(s.joueurs.map((j) => j.id), s.rng);
     demarrerManche(s);
   }
   // Partie publique : une salle de N joueurs démarre seule dès qu'elle est pleine.
@@ -341,7 +343,7 @@
   function placerDonne(s) {
     const rng = hasardManche(s.donne.graine, s.numeroManche + 1);
     const presents = (l) => l.filter((id) => s.restants.includes(id));
-    const tour = K.melanger(s.donne.ordre, rng); // ordre autour de la table, places vides comprises
+    const tour = K.melanger(s.donne.ordre, hasardManche(s.donne.graine, 0)); // ordre autour de la table, places vides comprises : le même à chaque manche
     const { mains, redistributions } = K.distribuer(presents(s.donne.ordre), rng);
     const depart = Math.floor(rng() * tour.length);
     const ouvreur = presents(tour.slice(depart).concat(tour.slice(0, depart)))[0];
@@ -352,7 +354,7 @@
     let sieges, mains, redistributions, premier;
     if (s.donne) ({ sieges, mains, redistributions, premier } = placerDonne(s));
     else {
-      sieges = K.melanger(s.restants, s.rng);
+      sieges = s.restants.slice(); // mêmes places qu'à la manche précédente
       ({ mains, redistributions } = K.distribuer(sieges, s.rng));
       premier = choisirOuvreur(s, sieges);
     }

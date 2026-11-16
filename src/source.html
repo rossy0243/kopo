@@ -1203,12 +1203,14 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
   .fenetre[data-type="chat"] .phrases-chat button { padding: 4px 9px; font-size: 12.5px; }
   .fenetre[data-type="chat"] .histo-chat { max-height: 72px; }
 }
-/* Inter (8), mode Cahier (14/11) : la page du cahier, et le comptage animé en fin de donne. */
-.cahier-page { --papier: #f7f1df; --encre: #1f3a6b; --marge: #d64541; position: relative; color: var(--encre); background: repeating-linear-gradient(to bottom, transparent 0 27px, rgba(58,110,190,.22) 27px 28px), var(--papier); border-radius: 10px; padding: 8px 12px 10px 30px; box-shadow: 0 8px 22px rgba(0,0,0,.4), inset 0 0 0 1px rgba(0,0,0,.06); font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Chalkboard SE", cursive; }
-.cahier-page::before { content: ''; position: absolute; left: 20px; top: 0; bottom: 0; width: 2px; background: var(--marge); opacity: .55; }
+/* Inter (8), mode Cahier (14/11) : la page du cahier, et le comptage animé en fin de donne.
+   Mise en page (16/11) : le titre et les boutons restent toujours visibles, seule la page défile ;
+   sur un écran large (PC, téléphone couché), ils passent dans une colonne à gauche de la page. */
+.cahier-page { --papier: #f7f1df; --encre: #1f3a6b; --marge: #d64541; position: relative; color: var(--encre); background: linear-gradient(to right, transparent 20px, rgba(214,69,65,.55) 20px 22px, transparent 22px), repeating-linear-gradient(to bottom, transparent 0 27px, rgba(58,110,190,.22) 27px 28px), var(--papier); background-attachment: local; border-radius: 10px; padding: 8px 12px 10px 30px; box-shadow: 0 8px 22px rgba(0,0,0,.4), inset 0 0 0 1px rgba(0,0,0,.06); font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Chalkboard SE", cursive; min-width: 0; min-height: 0; overflow: auto; overscroll-behavior: contain; }
 .cahier-page .tete { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13px; opacity: .75; margin-bottom: 2px; }
 .cahier-ligne { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 2px 10px; align-items: center; padding: 4px 0 5px; }
 .cahier-ligne + .cahier-ligne { border-top: 1px dashed rgba(31,58,107,.18); }
+.cahier-ligne.moi { background: rgba(58,123,213,.1); border-radius: 6px; margin: 0 -6px; padding-inline: 6px; }
 .cahier-ligne .qui { font-weight: 700; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cahier-ligne .ajout { color: var(--marge); font-size: 16px; font-weight: 700; min-width: 3.2ch; text-align: right; font-variant-numeric: tabular-nums; }
 .cahier-ligne .ajout.sort { color: #2a7a4b; font-size: 13px; }
@@ -1223,20 +1225,76 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
 .cahier-barre.rouge span { background: var(--marge); }
 .cahier-ligne .trait { position: absolute; left: -6px; right: -6px; top: 15px; height: 3px; border-radius: 3px; background: var(--marge); transform: scaleX(0); transform-origin: left; pointer-events: none; }
 .cahier-ligne.elimine .trait { transform: scaleX(1); }
-.cahier-ligne .tampon { grid-column: 1 / -1; justify-self: start; color: var(--marge); font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; border: 2px solid var(--marge); border-radius: 4px; padding: 0 6px; transform: rotate(-4deg); }
+.cahier-ligne .cahier-tampon { grid-column: 1 / -1; justify-self: start; color: var(--marge); font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; border: 2px solid var(--marge); border-radius: 4px; padding: 0 6px; transform: rotate(-4deg); }
 .cahier-ligne.moi .qui { text-decoration: underline; text-decoration-color: rgba(31,58,107,.35); }
-.cahier-scroll { max-height: 52vh; max-height: 52dvh; overflow: auto; }
-.cahier-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-.cahier-table th { font-size: 13px; padding: 0 3px 2px; max-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-bottom: 2px solid var(--encre); }
-.cahier-table td { text-align: center; height: 28px; padding: 0 3px; font-size: 16px; }
-.cahier-table td.n { text-align: left; font-size: 11px; opacity: .6; white-space: nowrap; }
+/* Les deux fenêtres du cahier : colonne (titre, page qui défile, boutons) ; la page seule défile. */
+.fenetre[data-type="findonne"], .fenetre[data-type="cahier"] { width: min(460px, 100%); display: flex; flex-direction: column; gap: 12px; overflow: hidden; }
+.fenetre[data-type="findonne"] > *, .fenetre[data-type="cahier"] > * { flex: none; }
+.fenetre[data-type="findonne"] > .cahier-page, .fenetre[data-type="cahier"] > .cahier-page { flex: 0 1 auto; order: 2; }
+.fd-cote { display: contents; }
+.fd-tete { order: 1; display: grid; gap: 6px; flex: none; }
+.fd-actions { order: 3; display: grid; gap: 8px; flex: none; }
+.fd-actions .suite-auto { margin: 0; text-align: center; }
+/* Le cahier complet : seul le tableau défile ; noms (en haut), donnes (à gauche) et totaux (en bas) restent visibles. */
+.fenetre[data-type="cahier"] > .cahier-page { display: flex; flex-direction: column; overflow: hidden; padding-right: 8px; }
+.cahier-scroll { min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.cahier-table { border-collapse: separate; border-spacing: 0; font-variant-numeric: tabular-nums; margin-right: 4px; }
+.cahier-table th, .cahier-table td { white-space: nowrap; }
+.cahier-table thead th { position: sticky; top: 0; z-index: 2; background: var(--papier); font-size: 13px; padding: 2px 6px 3px; border-bottom: 2px solid var(--encre); vertical-align: bottom; }
+.cahier-table th span { display: block; max-width: 92px; overflow: hidden; text-overflow: ellipsis; }
+.cahier-table td { text-align: center; height: 28px; padding: 0 6px; font-size: 16px; min-width: 44px; }
+.cahier-table .n { position: sticky; left: 0; z-index: 1; background: var(--papier); text-align: left; font-size: 11px; opacity: 1; color: rgba(31,58,107,.6); padding: 0 8px 0 2px; min-width: 0; }
+.cahier-table thead .n { z-index: 3; }
 .cahier-table td.zero { color: #2a7a4b; }
-.cahier-table tfoot td { border-top: 2px solid var(--encre); font-weight: 700; font-size: 19px; }
+.cahier-table .moi { background: rgba(58,123,213,.13); }
+.cahier-table thead th.moi, .cahier-table tfoot td.moi { background: linear-gradient(rgba(58,123,213,.13), rgba(58,123,213,.13)), var(--papier); }
+.cahier-table tfoot td { position: sticky; bottom: 0; z-index: 2; background: var(--papier); border-top: 2px solid var(--encre); font-weight: 700; font-size: 19px; height: auto; padding: 2px 6px 3px; line-height: 1.1; }
+.cahier-table tfoot td.n { z-index: 3; }
+.cahier-table tfoot small { display: block; font-size: 10px; font-weight: 400; opacity: .7; }
+.cahier-table tfoot .chaud { color: #c76a00; }
+.cahier-table tfoot .rouge { color: var(--marge); }
 .cahier-table .out { color: var(--marge); text-decoration: line-through; }
+.cahier-table tbody tr:last-child td { border-bottom: 0; }
+.cahier-vide { padding: 12px 0; font-size: 14px; opacity: .7; }
+/* Écran large (PC, tablette, téléphone couché) : titre et boutons dans une colonne à gauche. */
+@media (orientation: landscape) and (min-width: 700px) {
+  .fenetre[data-type="findonne"], .fenetre[data-type="cahier"] { flex-direction: row; align-items: stretch; gap: 18px; }
+  .fenetre[data-type="findonne"] { width: min(920px, 100%); }
+  .fenetre[data-type="cahier"] { width: auto; max-width: min(1000px, 100%); min-width: min(560px, 100%); }
+  .fd-cote { display: flex; flex-direction: column; justify-content: space-between; gap: 14px; flex: none; width: 210px; }
+  .fd-actions .suite-auto { text-align: left; }
+  .fenetre[data-type="findonne"] > .cahier-page, .fenetre[data-type="cahier"] > .cahier-page { flex: 1 1 auto; max-height: calc(90dvh - 44px); }
+  .fenetre[data-type="findonne"] > .cahier-page { align-self: flex-start; }
+  /* Une ligne par joueur : nom, cartes retournées, points de la donne, total ; la barre dessous. */
+  .fenetre[data-type="findonne"] .cahier-ligne { grid-template-columns: minmax(70px, 150px) minmax(0, 1fr) auto auto; column-gap: 12px; align-items: start; }
+  .fenetre[data-type="findonne"] .cahier-ligne .qui, .fenetre[data-type="findonne"] .cahier-ligne .ajout { line-height: 26px; }
+  .fenetre[data-type="findonne"] .cahier-ligne .total { line-height: 26px; }
+  .fenetre[data-type="findonne"] .cahier-cartes { padding-top: 3px; }
+  .fenetre[data-type="findonne"] .cahier-ligne .trait { top: 16px; }
+  .fenetre[data-type="findonne"] .cahier-ligne .qui { grid-area: 1 / 1; }
+  .fenetre[data-type="findonne"] .cahier-cartes { grid-area: 1 / 2; }
+  .fenetre[data-type="findonne"] .cahier-ligne .ajout { grid-area: 1 / 3; }
+  .fenetre[data-type="findonne"] .cahier-ligne .total { grid-area: 1 / 4; }
+  .fenetre[data-type="findonne"] .cahier-ligne .cahier-tampon { grid-column: 1 / -1; }
+}
+@media (orientation: landscape) and (min-width: 700px) and (max-height: 500px) {
+  .fenetre[data-type="findonne"], .fenetre[data-type="cahier"] { padding: 12px 14px; max-height: 96dvh; gap: 14px; }
+  .fenetre[data-type="findonne"] > .cahier-page, .fenetre[data-type="cahier"] > .cahier-page { max-height: calc(96dvh - 30px); }
+  .fenetre[data-type="findonne"] h2, .fenetre[data-type="cahier"] h2 { font-size: 28px; }
+  .fd-cote { width: 190px; }
+  .fd-actions { gap: 6px; }
+  .fd-actions .btn.large { padding: 9px; font-size: 15px; }
+  .fenetre[data-type="findonne"] .cahier-ligne { padding-block: 2px 3px; }
+  .fenetre[data-type="findonne"] .cahier-ligne .total { font-size: 19px; }
+  .cahier-table td { height: 24px; }
+}
+@media (orientation: portrait) and (max-height: 700px) {
+  .fenetre[data-type="findonne"], .fenetre[data-type="cahier"] { padding: 14px; gap: 10px; }
+  .fenetre[data-type="findonne"] h2, .fenetre[data-type="cahier"] h2 { font-size: 30px; }
+}
 .chip.chip-cahier { cursor: pointer; border: 1px solid var(--brass); }
 .siege .pts-cahier { font-size: 10px; font-weight: 700; color: #1d1606; background: var(--brass); border-radius: 99px; padding: 0 6px; justify-self: start; }
 .siege .pts-cahier.rouge { background: var(--bad); color: #fff; }
-.fenetre[data-type="findonne"] { width: min(460px, 100%); }
 </style>
 <script>
 // Avant tout affichage : coupe les animations CSS si le joueur l'a choisi, ou si le téléphone en demande moins
@@ -3732,62 +3790,77 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
         defiler(total, avant, apres, 1300 + k * 60, 700);
         if (elimine) {
           const trait = el('span', 'trait'); ligne.append(trait);
-          plus(() => { ligne.classList.add('elimine'); ligne.append(el('span', 'tampon', id === v.moi ? 'tu es éliminé' : 'éliminé')); if (!sansAnim) trait.animate([{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: 450, easing: 'ease-out' }); vibrer(id === v.moi ? 80 : 20); }, 2100 + k * 60);
+          plus(() => { ligne.classList.add('elimine'); ligne.append(el('span', 'cahier-tampon', id === v.moi ? 'tu es éliminé' : 'éliminé')); if (!sansAnim) trait.animate([{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: 450, easing: 'ease-out' }); vibrer(id === v.moi ? 80 : 20); }, 2100 + k * 60);
         }
         page.append(ligne);
       });
       const titre = d.sorti === v.moi ? 'Tu sors !' : `${nom(v, d.sorti)} sort !`;
-      const contenu = [el('h2', null, titre), page];
-      if (d.elimines.length) contenu.push(el('p', null, d.elimines.includes(v.moi) ? 'Tu as atteint le total : tu es éliminé. Tu peux continuer à regarder.' : `${d.elimines.map((id) => nom(v, id)).join(', ')} ${d.elimines.length > 1 ? 'sont éliminés' : 'est éliminé'}.`));
+      // Titre et boutons à part de la page : ils restent visibles, seule la page défile (16/11).
+      const cote = el('div', 'fd-cote'), haut = el('div', 'fd-tete'), actions = el('div', 'fd-actions');
+      haut.append(el('h2', null, titre));
+      if (d.elimines.length) haut.append(el('p', null, d.elimines.includes(v.moi) ? 'Tu as atteint le total : tu es éliminé. Tu peux continuer à regarder.' : `${d.elimines.map((id) => nom(v, id)).join(', ')} ${d.elimines.length > 1 ? 'sont éliminés' : 'est éliminé'}.`));
       const toutCahier = el('button', 'btn large', 'Voir tout le cahier');
       toutCahier.onclick = () => ouvrirCahier(vueActuelle);
       if (finDePartie) {
         const go = el('button', 'btn principal large', 'Résultat de la partie');
         go.onclick = () => construireFinPartieCahier(vueActuelle);
-        contenu.push(go, toutCahier);
+        actions.append(go, toutCahier);
         // On passe tout seul au résultat une fois le comptage vu.
         setTimeout(() => { if (finDonneOuverte === cle && $('fenetre').dataset.type === 'findonne' && !$('voile').hidden && vueActuelle && vueActuelle.etat === 'finPartie') construireFinPartieCahier(vueActuelle); }, sansAnim ? 2500 : 5000);
       } else {
         if (v.suite) {
           const p = el('p', 'suite-auto');
           p.append('Donne suivante dans ', el('strong', 'decompte-suite', String(Math.ceil(v.suite.resteMs / 1000))), ' s.');
-          contenu.push(p);
+          actions.append(p);
         }
-        if (v.entreRobots) { const b = el('button', 'btn principal large', 'Passer à la fin'); b.onclick = () => envoyer({ type: 'passerFin' }); contenu.push(b); }
-        if (v.hote === v.moi) { const b = el('button', 'btn' + (v.entreRobots ? '' : ' principal') + ' large', 'Donne suivante'); b.onclick = () => envoyer({ type: 'mancheSuivante' }); contenu.push(b); }
-        else if (!v.suite) contenu.push(el('p', null, "En attente de l'hôte pour la donne suivante…"));
-        contenu.push(toutCahier);
+        if (v.entreRobots) { const b = el('button', 'btn principal large', 'Passer à la fin'); b.onclick = () => envoyer({ type: 'passerFin' }); actions.append(b); }
+        if (v.hote === v.moi) { const b = el('button', 'btn' + (v.entreRobots ? '' : ' principal') + ' large', 'Donne suivante'); b.onclick = () => envoyer({ type: 'mancheSuivante' }); actions.append(b); }
+        else if (!v.suite) actions.append(el('p', null, "En attente de l'hôte pour la donne suivante…"));
+        actions.append(toutCahier);
       }
-      ouvrirFenetre(contenu, 'findonne');
+      cote.append(haut, actions);
+      ouvrirFenetre([cote, page], 'findonne');
     } finally { sansAnim = animAvant; }
   }
   function construireFinPartieCahier(v) {
     finDonneOuverte = null;
     if (v && v.etat === 'finPartie') { recapOuvert = null; afficherFinPartie(v, true); }
   }
-  // Le cahier complet : une colonne par joueur, une ligne par donne, les totaux en bas.
+  // Le cahier complet : une colonne par joueur (toi d'abord), une ligne par donne, les totaux en bas.
+  // Noms, numéros de donne et totaux restent visibles quand le tableau défile (16/11).
   function ouvrirCahier(v) {
     if (!v || !v.cahier) return;
     const c = v.cahier;
-    const ids = Object.keys(c.scores);
+    const ids = Object.keys(c.scores).sort((a, b) => (b === v.moi) - (a === v.moi));
+    const classe = (id, autre) => [id === v.moi ? 'moi' : '', v.elimines.includes(id) ? 'out' : '', autre || ''].filter(Boolean).join(' ') || null;
     const page = el('div', 'cahier-page'), scroll = el('div', 'cahier-scroll'), t = el('table', 'cahier-table');
-    const thead = el('thead'), tr = el('tr'); tr.append(el('th'));
-    ids.forEach((id) => tr.append(el('th', v.elimines.includes(id) ? 'out' : null, id === v.moi ? 'Toi' : nom(v, id))));
+    const thead = el('thead'), tr = el('tr'); tr.append(el('th', 'n'));
+    ids.forEach((id) => { const th = el('th', classe(id)); const n = id === v.moi ? 'Toi' : nom(v, id); th.title = n; th.append(el('span', null, n)); tr.append(th); });
     thead.append(tr);
     const tbody = el('tbody');
     c.donnes.forEach((d) => {
       const r = el('tr'); r.append(el('td', 'n', 'D' + d.numero));
-      ids.forEach((id) => { const p = d.points[id]; r.append(el('td', p === 0 ? 'zero' : null, p === undefined ? '' : p === 0 ? '0' : String(p))); });
+      ids.forEach((id) => { const p = d.points[id]; r.append(el('td', [id === v.moi ? 'moi' : '', p === 0 ? 'zero' : ''].filter(Boolean).join(' ') || null, p === undefined ? '' : p === 0 ? '0' : String(p))); });
       tbody.append(r);
     });
-    if (!c.donnes.length) { const r = el('tr'), td = el('td', 'n', 'Rien d\'écrit pour l\'instant : première donne en cours.'); td.colSpan = ids.length + 1; r.append(td); tbody.append(r); }
     const tfoot = el('tfoot'), tf = el('tr'); tf.append(el('td', 'n', 'Total'));
-    ids.forEach((id) => tf.append(el('td', v.elimines.includes(id) ? 'out' : null, String(c.scores[id]))));
+    ids.forEach((id) => {
+      const total = c.scores[id], dehors = v.elimines.includes(id);
+      const td = el('td', classe(id, dehors ? '' : total >= c.total * 0.8 ? 'rouge' : total >= c.total * 0.6 ? 'chaud' : ''), String(total));
+      td.append(el('small', null, dehors ? 'éliminé' : `reste ${Math.max(0, c.total - total)}`));
+      tf.append(td);
+    });
     tfoot.append(tf);
-    t.append(thead, tbody, tfoot); scroll.append(t); page.append(scroll);
+    t.append(thead, tbody, tfoot); scroll.append(t);
+    const tete = el('div', 'tete'); tete.append(el('span', null, c.donnes.length ? `${c.donnes.length} donne${c.donnes.length > 1 ? 's' : ''}` : 'Première donne en cours'), el('span', null, 'éliminé à ' + c.total));
+    page.append(tete, scroll);
+    if (!c.donnes.length) page.append(el('div', 'cahier-vide', 'Rien d\'écrit pour l\'instant.'));
     const ok = el('button', 'btn principal large', 'Fermer');
     ok.onclick = () => { if (vueActuelle && vueActuelle.etat === 'finPartie') { recapOuvert = null; afficherFinPartie(vueActuelle, true); } else fermerFenetre(); };
-    ouvrirFenetre([el('h2', null, 'Cahier'), el('small', 'muted', `Celui qui sort marque 0, les autres comptent leurs cartes. Éliminé à ${c.total} points : le dernier qui reste gagne.`), page, ok], 'cahier');
+    const cote = el('div', 'fd-cote'), haut = el('div', 'fd-tete'), bas = el('div', 'fd-actions');
+    haut.append(el('h2', null, 'Cahier'), el('small', 'muted', `Celui qui sort marque 0, les autres comptent leurs cartes. Éliminé à ${c.total} points : le dernier qui reste gagne.`));
+    bas.append(ok); cote.append(haut, bas);
+    ouvrirFenetre([cote, page], 'cahier');
     scroll.scrollTop = scroll.scrollHeight;
   }
 
