@@ -125,6 +125,26 @@ test('Le journal affiche les pseudos, pas les identifiants', () => {
   const j = S.vue(s, 'p1').manche.journal.join(' ');
   assert.ok(j.includes('Ami2') && !/\bp2\b/.test(j), j);
 });
+test('Entre les manches, chacun garde sa place autour de la table (les éliminés laissent leur place vide)', () => {
+  for (let g = 1; g <= 20; g++) {
+    const s = salleAvec(9, g);
+    const tables = [];
+    let m = null;
+    Object.defineProperty(s, 'manche', { get: () => m, set: (v) => { m = v; if (v) tables.push(v.sieges.slice()); }, configurable: true });
+    S.recevoir(s, 'p1', { type: 'lancer' });
+    jouerPartieParLesVues(s, K.hasard(g));
+    assert.ok(tables.length >= 2, 'plusieurs manches');
+    for (let i = 1; i < tables.length; i++) {
+      const attendu = tables[i - 1].filter((id) => tables[i].includes(id));
+      assert.deepStrictEqual(tables[i], attendu, 'manche ' + (i + 1) + ' : ' + tables[i - 1].join(',') + ' -> ' + tables[i].join(','));
+      assert.strictEqual(tables[i].length, tables[i - 1].length - 1, 'seul l\'éliminé quitte la table');
+    }
+    // Nouvelle partie : les places sont tirées à nouveau.
+    assert.ok(S.recevoir(s, 'p1', { type: 'rejouer' }).ok);
+    assert.strictEqual(s.ordreTable, null);
+  }
+});
+
 test('200 parties de 2 à 9 joueurs jouées uniquement depuis les vues des téléphones', () => {
   const rng = K.hasard(42);
   for (let k = 0; k < 200; k++) {

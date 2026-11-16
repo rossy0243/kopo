@@ -51,6 +51,7 @@
       restants: [],
       elimines: [],
       numeroManche: 0,
+      ordreTable: null, // places autour de la table, tirées à la 1re manche et gardées jusqu'à la fin de la partie
       nulles: 0, // manches nulles rejouées (pioche et défausse vides)
       manche: null,
       vainqueur: null,
@@ -253,7 +254,10 @@
   }
 
   function demarrerManche(s) {
-    const sieges = I.melanger(s.restants, s.rng);
+    // Places tirées au hasard à la 1re manche, puis gardées jusqu'à la fin de la partie :
+    // entre les manches, chacun reste à sa place (les éliminés laissent juste leur place vide).
+    if (!s.ordreTable) s.ordreTable = I.melanger(s.restants, s.rng);
+    const sieges = s.ordreTable.filter((id) => s.restants.includes(id));
     const { mains, pioche } = I.distribuer(sieges, s.paquets, s.rng);
     const premier = choisirPremier(s, sieges);
     s.numeroManche++;
@@ -291,6 +295,7 @@
     s.elimines = [];
     s.cahier = null;
     s.numeroManche = 0;
+    s.ordreTable = null; // nouvelle partie : nouvelles places
     s.nulles = 0;
     s.manche = null;
     s.vainqueur = null;

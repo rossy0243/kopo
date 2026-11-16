@@ -31,6 +31,7 @@
       restants: [], // ids encore dans la partie
       elimines: [], // ids, dans l'ordre d'élimination
       numeroManche: 0,
+      ordreTable: null, // places autour de la table, tirées à la 1re manche et gardées jusqu'à la fin de la partie
       manche: null,
       vainqueur: null,
       delai: 5, // secondes pour jouer, réglables par l'hôte dans le salon
@@ -341,7 +342,10 @@
   function placerDonne(s) {
     const rng = hasardManche(s.donne.graine, s.numeroManche + 1);
     const presents = (l) => l.filter((id) => s.restants.includes(id));
-    const tour = K.melanger(s.donne.ordre, rng); // ordre autour de la table, places vides comprises
+    const tire = K.melanger(s.donne.ordre, rng); // ordre autour de la table, places vides comprises
+    // Les places sont tirées à la 1re manche puis gardées : personne ne change de place entre les manches.
+    if (!s.ordreTable) s.ordreTable = tire;
+    const tour = s.ordreTable;
     const { mains, redistributions } = K.distribuer(presents(s.donne.ordre), rng);
     const depart = Math.floor(rng() * tour.length);
     const ouvreur = presents(tour.slice(depart).concat(tour.slice(0, depart)))[0];
@@ -352,7 +356,10 @@
     let sieges, mains, redistributions, premier;
     if (s.donne) ({ sieges, mains, redistributions, premier } = placerDonne(s));
     else {
-      sieges = K.melanger(s.restants, s.rng);
+      // Places tirées au hasard à la 1re manche, puis gardées jusqu'à la fin de la partie :
+      // entre les manches, chacun reste à sa place (les éliminés laissent juste leur place vide).
+      if (!s.ordreTable) s.ordreTable = K.melanger(s.restants, s.rng);
+      sieges = s.ordreTable.filter((id) => s.restants.includes(id));
       ({ mains, redistributions } = K.distribuer(sieges, s.rng));
       premier = choisirOuvreur(s, sieges);
     }
@@ -386,6 +393,7 @@
     s.restants = [];
     s.elimines = [];
     s.numeroManche = 0;
+    s.ordreTable = null; // nouvelle partie : nouvelles places
     s.manche = null;
     s.vainqueur = null;
     s.echeance = null;

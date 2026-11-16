@@ -4352,6 +4352,7 @@ var qrcode = function() {
       restants: [], // ids encore dans la partie
       elimines: [], // ids, dans l'ordre d'élimination
       numeroManche: 0,
+      ordreTable: null, // places autour de la table, tirées à la 1re manche et gardées jusqu'à la fin de la partie
       manche: null,
       vainqueur: null,
       delai: 5, // secondes pour jouer, réglables par l'hôte dans le salon
@@ -4662,7 +4663,10 @@ var qrcode = function() {
   function placerDonne(s) {
     const rng = hasardManche(s.donne.graine, s.numeroManche + 1);
     const presents = (l) => l.filter((id) => s.restants.includes(id));
-    const tour = K.melanger(s.donne.ordre, rng); // ordre autour de la table, places vides comprises
+    const tire = K.melanger(s.donne.ordre, rng); // ordre autour de la table, places vides comprises
+    // Les places sont tirées à la 1re manche puis gardées : personne ne change de place entre les manches.
+    if (!s.ordreTable) s.ordreTable = tire;
+    const tour = s.ordreTable;
     const { mains, redistributions } = K.distribuer(presents(s.donne.ordre), rng);
     const depart = Math.floor(rng() * tour.length);
     const ouvreur = presents(tour.slice(depart).concat(tour.slice(0, depart)))[0];
@@ -4673,7 +4677,10 @@ var qrcode = function() {
     let sieges, mains, redistributions, premier;
     if (s.donne) ({ sieges, mains, redistributions, premier } = placerDonne(s));
     else {
-      sieges = K.melanger(s.restants, s.rng);
+      // Places tirées au hasard à la 1re manche, puis gardées jusqu'à la fin de la partie :
+      // entre les manches, chacun reste à sa place (les éliminés laissent juste leur place vide).
+      if (!s.ordreTable) s.ordreTable = K.melanger(s.restants, s.rng);
+      sieges = s.ordreTable.filter((id) => s.restants.includes(id));
       ({ mains, redistributions } = K.distribuer(sieges, s.rng));
       premier = choisirOuvreur(s, sieges);
     }
@@ -4707,6 +4714,7 @@ var qrcode = function() {
     s.restants = [];
     s.elimines = [];
     s.numeroManche = 0;
+    s.ordreTable = null; // nouvelle partie : nouvelles places
     s.manche = null;
     s.vainqueur = null;
     s.echeance = null;
@@ -5888,6 +5896,7 @@ var qrcode = function() {
       restants: [],
       elimines: [],
       numeroManche: 0,
+      ordreTable: null, // places autour de la table, tirées à la 1re manche et gardées jusqu'à la fin de la partie
       nulles: 0, // manches nulles rejouées (pioche et défausse vides)
       manche: null,
       vainqueur: null,
@@ -6090,7 +6099,10 @@ var qrcode = function() {
   }
 
   function demarrerManche(s) {
-    const sieges = I.melanger(s.restants, s.rng);
+    // Places tirées au hasard à la 1re manche, puis gardées jusqu'à la fin de la partie :
+    // entre les manches, chacun reste à sa place (les éliminés laissent juste leur place vide).
+    if (!s.ordreTable) s.ordreTable = I.melanger(s.restants, s.rng);
+    const sieges = s.ordreTable.filter((id) => s.restants.includes(id));
     const { mains, pioche } = I.distribuer(sieges, s.paquets, s.rng);
     const premier = choisirPremier(s, sieges);
     s.numeroManche++;
@@ -6128,6 +6140,7 @@ var qrcode = function() {
     s.elimines = [];
     s.cahier = null;
     s.numeroManche = 0;
+    s.ordreTable = null; // nouvelle partie : nouvelles places
     s.nulles = 0;
     s.manche = null;
     s.vainqueur = null;
@@ -7716,7 +7729,7 @@ svg .vb { transform-box: view-box; }
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = '705270809750'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = 'c2bc3f245e78'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: true };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // La musique des menus était coupée par défaut : on l'allume une fois pour tous (le joueur peut la recouper).

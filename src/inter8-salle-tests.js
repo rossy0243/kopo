@@ -140,6 +140,26 @@ test('Une action mal formée est refusée sans casser la salle', () => {
 
 console.log('\nParties complètes');
 
+test('Entre les manches, chacun garde sa place autour de la table (les éliminés laissent leur place vide)', () => {
+  for (let g = 1; g <= 20; g++) {
+    const s = salleAvec(8, g);
+    const tables = [];
+    let m = null;
+    Object.defineProperty(s, 'manche', { get: () => m, set: (v) => { m = v; if (v) tables.push(v.sieges.slice()); }, configurable: true });
+    S.recevoir(s, 'p1', { type: 'lancer' });
+    jouerPartieParLesVues(s, I.hasard(g));
+    assert.ok(tables.length >= 2, 'plusieurs manches');
+    for (let i = 1; i < tables.length; i++) {
+      const attendu = tables[i - 1].filter((id) => tables[i].includes(id));
+      assert.deepStrictEqual(tables[i], attendu, 'manche ' + (i + 1) + ' : ' + tables[i - 1].join(',') + ' -> ' + tables[i].join(','));
+      assert.strictEqual(tables[i].length, tables[i - 1].length - 1, 'seul l\'éliminé quitte la table');
+    }
+    // Nouvelle partie : les places sont tirées à nouveau.
+    assert.ok(S.recevoir(s, 'p1', { type: 'rejouer' }).ok);
+    assert.strictEqual(s.ordreTable, null);
+  }
+});
+
 test('100 parties jouées par les vues (2 à 8 joueurs, simple et délire) : un vainqueur, les autres éliminés', () => {
   const rng = I.hasard(3);
   for (let n = 0; n < 100; n++) {
