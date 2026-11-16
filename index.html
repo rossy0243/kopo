@@ -1256,6 +1256,14 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
 .cahier-table .out { color: var(--marge); text-decoration: line-through; }
 .cahier-table tbody tr:last-child td { border-bottom: 0; }
 .cahier-vide { padding: 12px 0; font-size: 14px; opacity: .7; }
+/* Classement final du cahier (16/11) : rang, nom, sorties, points. */
+.cahier-ligne.cl-ligne { grid-template-columns: 2.2em minmax(0, 1fr) auto auto; padding-block: 6px; }
+.cl-rang { font-size: 20px; font-weight: 700; text-align: center; }
+.cl-sorties { color: #2a7a4b; font-size: 14px; min-width: 3ch; text-align: right; }
+.cahier-ligne.premier .qui, .cahier-ligne.premier .total { color: #b07d16; }
+.cahier-ligne.premier .qui { font-size: 19px; }
+.fenetre[data-type="cahier"] > .cahier-page.classement-cahier { display: block; overflow: auto; }
+@media (orientation: landscape) and (min-width: 700px) { .fenetre[data-type="cahier"]:has(.classement-cahier) { width: min(760px, 100%); } }
 /* Écran large (PC, tablette, téléphone couché) : titre et boutons dans une colonne à gauche. */
 @media (orientation: landscape) and (min-width: 700px) {
   .fenetre[data-type="findonne"], .fenetre[data-type="cahier"] { flex-direction: row; align-items: stretch; gap: 18px; }
@@ -7778,7 +7786,7 @@ svg .vb { transform-box: view-box; }
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = '8fe14791561e'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = 'fd35e59a92ea'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: true };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // La musique des menus était coupée par défaut : on l'allume une fois pour tous (le joueur peut la recouper).
@@ -9873,6 +9881,7 @@ svg .vb { transform-box: view-box; }
     ok.onclick = () => { if (vueActuelle && vueActuelle.etat === 'finPartie') { recapOuvert = null; afficherFinPartie(vueActuelle, true); } else fermerFenetre(); };
     const cote = el('div', 'fd-cote'), haut = el('div', 'fd-tete'), bas = el('div', 'fd-actions');
     haut.append(el('h2', null, 'Cahier'), el('small', 'muted', `Celui qui sort marque 0, les autres comptent leurs cartes. Éliminé à ${c.total} points : le dernier qui reste gagne.`));
+    if (v.etat === 'finPartie') { const cl = el('button', 'btn large', 'Classement final'); cl.onclick = () => ouvrirClassementCahier(vueActuelle || v); bas.append(cl); }
     bas.append(ok); cote.append(haut, bas);
     ouvrirFenetre([cote, page], 'cahier');
     scroll.scrollTop = scroll.scrollHeight;
@@ -10112,11 +10121,11 @@ svg .vb { transform-box: view-box; }
     majSuite();
     boutons.append(suite);
     const rangee = el('div', 'rangee');
-    if (gagne || (r && r.titre)) {
+    if (v.cahier || gagne || (r && r.titre)) {
       const sh = el('button', 'btn btn-whatsapp');
       sh.append(icone('i-partager'), 'Partager'); // libellé court : les trois boutons tiennent sur une ligne
-      sh.setAttribute('aria-label', gagne ? 'Partager ma victoire' : 'Partager mon titre');
-      sh.onclick = () => partagerVictoire(v, r);
+      sh.setAttribute('aria-label', v.cahier ? 'Partager le classement du cahier' : gagne ? 'Partager ma victoire' : 'Partager mon titre');
+      sh.onclick = () => (v.cahier ? partagerCahier(v) : partagerVictoire(v, r)); // Cahier : le classement final, gagné ou non
       rangee.append(sh);
     }
     if (v.hote === v.moi && !v.publique) {
@@ -10125,7 +10134,7 @@ svg .vb { transform-box: view-box; }
       ch.onclick = () => { arreterSuiteAuto(); envoyer({ type: 'rejouer' }); };
       rangee.append(ch);
     }
-    if (v.cahier) { const cb = el('button', 'btn', 'Cahier'); cb.onclick = () => ouvrirCahier(vueActuelle); rangee.append(cb); }
+    if (v.cahier) { const cb = el('button', 'btn', 'Classement'); cb.onclick = () => ouvrirClassementCahier(vueActuelle); rangee.append(cb); }
     const q = el('button', 'btn', 'Quitter'); q.onclick = () => { arreterSuiteAuto(); quitter(); };
     rangee.append(q);
     boutons.append(rangee);
@@ -10135,7 +10144,7 @@ svg .vb { transform-box: view-box; }
     const deux = classement.length >= 5;
     const ul = el('ul', 'bilan' + (deux ? ' deux' : ''));
     if (deux) ul.style.setProperty('--rangs', Math.ceil(classement.length / 2));
-    classement.forEach((id, i) => { const li = el('li' , id === v.moi ? 'moi' : null); li.append(el('span', null, `${i + 1}. ${nom(v, id)}`), el('span', 'pastille ' + (i ? 'neutre' : 'ok'), v.cahier ? (i ? `${v.cahier.scores[id]} pts` : `vainqueur · ${v.cahier.scores[id]} pts`) : i ? `${deux ? '' : 'éliminé '}manche ${v.elimines.length - i + 1}` : 'vainqueur')); ul.append(li); });
+    classement.forEach((id, i) => { const li = el('li' , id === v.moi ? 'moi' : null); li.append(el('span', null, `${i + 1}. ${nom(v, id)}`), el('span', 'pastille ' + (i ? 'neutre' : 'ok'), v.cahier ? `${v.cahier.scores[id]} pts` : i ? `${deux ? '' : 'éliminé '}manche ${v.elimines.length - i + 1}` : 'vainqueur')); ul.append(li); });
     droite.append(ul);
     recap.append(gauche, droite);
 
@@ -10230,6 +10239,90 @@ svg .vb { transform-box: view-box; }
       if (f && navigator.canShare && navigator.canShare({ files: [f] })) { await navigator.share({ files: [f], text: texte }); return; }
     } catch (e) { if (e && e.name === 'AbortError') return; }
     ouvrirWhatsApp(texte);
+  }
+
+  // Mode Cahier (16/11) : le classement final, partagé en image (et en texte pour WhatsApp).
+  // Ordre : le vainqueur, puis les éliminés du dernier au premier (même ordre que le bilan).
+  function classementCahier(v) {
+    const c = v.cahier;
+    const ids = [v.vainqueur].concat(v.elimines.slice().reverse()).filter((id) => id && c.scores[id] !== undefined);
+    for (const id of Object.keys(c.scores)) if (!ids.includes(id)) ids.push(id);
+    return ids.map((id, i) => ({ id, rang: i + 1, nom: nom(v, id), points: c.scores[id], sorties: c.donnes.filter((d) => d.sorti === id).length }));
+  }
+  const MEDAILLES = ['🥇', '🥈', '🥉'];
+  function texteCahier(v) {
+    const c = v.cahier, lignes = classementCahier(v).map((l) => `${MEDAILLES[l.rang - 1] || l.rang + '.'} ${l.nom} · ${l.points} pts`);
+    return `📒 Cahier ${jeuPartage(v.jeu).de} sur Masano (éliminé à ${c.total}, ${c.donnes.length} donne${c.donnes.length > 1 ? 's' : ''})\n${lignes.join('\n')}\nQui veut la revanche ?\n${lienJeu(v.jeu)}`;
+  }
+  async function imageCahier(v) {
+    const lignes = classementCahier(v), c = v.cahier;
+    const W = 1080, H = 1350, cv = document.createElement('canvas');
+    cv.width = W; cv.height = H;
+    const g = cv.getContext('2d');
+    try { await Promise.all([document.fonts.load('200px "Bebas Neue"'), document.fonts.load('600 60px Outfit')]); } catch (e) {}
+    const fond = g.createRadialGradient(W / 2, H * .3, 50, W / 2, H / 2, W * .9);
+    fond.addColorStop(0, '#1f3d63'); fond.addColorStop(1, '#0b1726');
+    g.fillStyle = fond; g.fillRect(0, 0, W, H);
+    g.strokeStyle = '#e2b04a'; g.lineWidth = 8;
+    g.beginPath(); g.roundRect(40, 40, W - 80, H - 80, 40); g.stroke();
+    g.textBaseline = 'middle';
+    const ecrire = (t, x, y, police, couleur, align = 'center', max) => { g.font = police; g.fillStyle = couleur; g.textAlign = align; if (max) g.fillText(t, x, y, max); else g.fillText(t, x, y); };
+    ecrire(jeuPartage(v.jeu).nom.toUpperCase() + ' · CAHIER ' + c.total, W / 2, 130, '64px "Bebas Neue", Impact, sans-serif', '#e2b04a');
+    ecrire('CLASSEMENT FINAL', W / 2, 225, '130px "Bebas Neue", Impact, sans-serif', '#ffffff');
+    ecrire(`${c.donnes.length} donne${c.donnes.length > 1 ? 's' : ''} · éliminé à ${c.total} points`, W / 2, 310, '500 38px Outfit, sans-serif', '#9fb2c8');
+    // La page du cahier : papier ligné, une ligne par joueur.
+    const n = lignes.length, haut = 370, pas = Math.min(100, Math.floor(700 / Math.max(n, 1))), px = 100, pw = W - 200, ph = pas * n + 90;
+    g.save();
+    g.shadowColor = 'rgba(0,0,0,.45)'; g.shadowBlur = 30; g.shadowOffsetY = 10;
+    g.fillStyle = '#f7f1df'; g.beginPath(); g.roundRect(px, haut, pw, ph, 22); g.fill();
+    g.restore();
+    g.fillStyle = 'rgba(214,69,65,.55)'; g.fillRect(px + 70, haut, 3, ph);
+    ecrire('Sorties', px + pw - 230, haut + 42, '600 28px Outfit, sans-serif', '#6a7d99', 'right');
+    ecrire('Points', px + pw - 40, haut + 42, '600 28px Outfit, sans-serif', '#6a7d99', 'right');
+    lignes.forEach((l, i) => {
+      const y = haut + 70 + pas * i + pas / 2;
+      if (l.id === v.moi) { g.fillStyle = 'rgba(58,123,213,.14)'; g.beginPath(); g.roundRect(px + 12, y - pas / 2 + 4, pw - 24, pas - 8, 12); g.fill(); }
+      if (i) { g.strokeStyle = 'rgba(31,58,107,.18)'; g.lineWidth = 2; g.setLineDash([8, 8]); g.beginPath(); g.moveTo(px + 20, y - pas / 2); g.lineTo(px + pw - 20, y - pas / 2); g.stroke(); g.setLineDash([]); }
+      const taille = Math.round(Math.min(48, pas * .5));
+      ecrire(MEDAILLES[i] || String(l.rang), px + 38, y, `700 ${taille}px Outfit, sans-serif`, '#1f3a6b');
+      ecrire(l.nom + (l.id === v.moi ? ' (moi)' : ''), px + 100, y, `${i ? 600 : 700} ${taille}px Outfit, sans-serif`, i ? '#1f3a6b' : '#b07d16', 'left', pw - 400);
+      ecrire(l.sorties ? l.sorties + ' ✓' : '–', px + pw - 230, y, `500 ${Math.round(taille * .8)}px Outfit, sans-serif`, '#2a7a4b', 'right');
+      ecrire(String(l.points), px + pw - 40, y, `700 ${taille}px Outfit, sans-serif`, i ? '#1f3a6b' : '#b07d16', 'right');
+    });
+    ecrire('Viens jouer sur MASANO', W / 2, H - 150, '600 44px Outfit, sans-serif', '#e2b04a');
+    ecrire(lienJeu(v.jeu).replace(/^https?:\/\//, '').replace(/\/$/, ''), W / 2, H - 95, '500 34px Outfit, sans-serif', '#9fb2c8');
+    return new Promise((ok) => cv.toBlob(ok, 'image/png'));
+  }
+  async function partagerCahier(v) {
+    const texte = texteCahier(v);
+    try {
+      const blob = await imageCahier(v);
+      const f = blob && new File([blob], 'cahier-classement.png', { type: 'image/png' });
+      if (f && navigator.canShare && navigator.canShare({ files: [f] })) { await navigator.share({ files: [f], text: texte }); return; }
+    } catch (e) { if (e && e.name === 'AbortError') return; }
+    ouvrirWhatsApp(texte);
+  }
+  // Fenêtre du classement final du Cahier : la page du cahier avec le rang, les sorties et les points de chacun.
+  function ouvrirClassementCahier(v) {
+    if (!v || !v.cahier) return;
+    const c = v.cahier, lignes = classementCahier(v);
+    const page = el('div', 'cahier-page classement-cahier');
+    const tete = el('div', 'tete'); tete.append(el('span', null, `${c.donnes.length} donne${c.donnes.length > 1 ? 's' : ''} · éliminé à ${c.total}`), el('span', null, 'sorties · points'));
+    page.append(tete);
+    for (const l of lignes) {
+      const ligne = el('div', 'cahier-ligne cl-ligne' + (l.id === v.moi ? ' moi' : '') + (l.rang === 1 ? ' premier' : ''));
+      ligne.append(el('span', 'cl-rang', MEDAILLES[l.rang - 1] || String(l.rang)), el('span', 'qui', l.id === v.moi ? 'Toi' : l.nom), el('span', 'cl-sorties', l.sorties ? `${l.sorties} ✓` : '–'), el('span', 'total', String(l.points)));
+      page.append(ligne);
+    }
+    const haut = el('div', 'fd-tete'), bas = el('div', 'fd-actions'), cote = el('div', 'fd-cote');
+    const place = lignes.findIndex((l) => l.id === v.moi) + 1;
+    haut.append(el('h2', null, 'Classement'), el('small', 'muted', (place ? `Tu finis ${place}${place === 1 ? 'er' : 'e'} sur ${lignes.length}. ` : '') + '« Sorties » : les donnes où le joueur a fini le premier.'));
+    const sh = el('button', 'btn btn-whatsapp large'); sh.append(icone('i-partager'), 'Partager'); sh.setAttribute('aria-label', 'Partager le classement'); sh.onclick = () => partagerCahier(v);
+    const tout = el('button', 'btn large', 'Voir tout le cahier'); tout.onclick = () => ouvrirCahier(v);
+    const ok = el('button', 'btn principal large', 'Fermer');
+    ok.onclick = () => { if (vueActuelle && vueActuelle.etat === 'finPartie') { recapOuvert = null; afficherFinPartie(vueActuelle, true); } else fermerFenetre(); };
+    bas.append(sh, tout, ok); cote.append(haut, bas);
+    ouvrirFenetre([cote, page], 'cahier');
   }
 
   function demanderConfirmation(texte, ok, o = {}) {
@@ -13379,7 +13472,7 @@ svg .vb { transform-box: view-box; }
   window.__kopo = { get vue() { return vueActuelle; }, monId, MODE_SERVEUR };
   window.kopoReaction = (emoji) => envoyer({ type: 'reaction', emoji }); // pour les émojis rapides (écoute : événement « kopo-reaction »)
   if (LOCAL) window.__kopo.afficher = afficher; // tests des animations
-  if (new URLSearchParams(location.search).has('test')) Object.assign(window.__kopo, { envoyer, imageVictoire }); // tests automatiques
+  if (new URLSearchParams(location.search).has('test')) Object.assign(window.__kopo, { envoyer, imageVictoire, imageCahier }); // tests automatiques
 })();
 </script>
 </body>
