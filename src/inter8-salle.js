@@ -146,8 +146,10 @@
     if (nouveaux.some((j) => !estRobot(s, j)) && s.robotPret) s.robotPret = Math.max(s.robotPret, s.horloge() + DELAI_ANNONCE);
   }
 
+  // Les places autour de la table sont tirées une fois au début de la partie : entre les donnes,
+  // personne ne change de place (créateur, 16/11). s.restants garde cet ordre.
   function lancer(s) {
-    s.restants = s.joueurs.map((j) => j.id);
+    s.restants = I.melanger(s.joueurs.map((j) => j.id), s.rng);
     s.paquets = I.nombrePaquets(s.mode);
     if (s.publique) s.formule = 'normale';
     s.cahier = s.formule === 'cahier' ? { total: s.totalCahier, scores: Object.fromEntries(s.restants.map((id) => [id, 0])), donnes: [] } : null;
@@ -253,7 +255,7 @@
   }
 
   function demarrerManche(s) {
-    const sieges = I.melanger(s.restants, s.rng);
+    const sieges = s.restants.slice(); // mêmes places qu'à la donne précédente
     const { mains, pioche } = I.distribuer(sieges, s.paquets, s.rng);
     const premier = choisirPremier(s, sieges);
     s.numeroManche++;
