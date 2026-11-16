@@ -165,6 +165,12 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.strictEqual((await srv.comptes.lire(g.json.compte.id)).auth_id, 'google-1');
   });
   await test('sans jeton, pas d\'accès', async () => assert.strictEqual((await api('/api/moi')).statut, 401));
+  await test('connexion anonyme de Supabase refusée (ce n\'est pas un compte Google)', async () => {
+    const anonyme = await new jose.SignJWT({ is_anonymous: true }).setProtectedHeader({ alg: 'HS256' }).setSubject('anonyme-1').setAudience('authenticated').setExpirationTime('1h').sign(new TextEncoder().encode('s'.repeat(40)));
+    const r = await api('/api/connexion', { methode: 'POST', corps: { jetonSupabase: anonyme } });
+    assert.strictEqual(r.statut, 401);
+    assert.strictEqual(await srv.comptes.parAuth('anonyme-1'), null);
+  });
   await test('bonus du jour : 50 la première fois, une seule fois par jour', async () => {
     const r = await invite('Bonus');
     const b1 = await api('/api/bonus-du-jour', { methode: 'POST', jeton: r.jeton });

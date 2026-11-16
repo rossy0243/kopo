@@ -383,6 +383,8 @@ test("Dans le salon, seul l'hôte change le niveau d'un robot ; un remplaçant s
   assert.strictEqual(S.vue(s, 'p3').joueurs[3].niveau, 'forts');
   assert.ok(S.recevoir(s, 'p1', { type: 'lancer' }).ok);
   assert.ok(!S.recevoir(s, 'p1', { type: 'niveauRobot', cible: r.id, niveau: 'faciles' }).ok);
+  assert.ok(!S.recevoir(s, 'p1', { type: 'remplacerParRobot', cible: 'p2' }).ok, 'p2 est connecté');
+  S.deconnecter(s, 'p2');
   assert.ok(S.recevoir(s, 'p1', { type: 'remplacerParRobot', cible: 'p2' }).ok);
   assert.strictEqual(S.niveauDuRobot(s, 'p2'), 'faciles');
   assert.strictEqual(S.importer(S.exporter(s)).joueurs[3].niveau, 'forts');

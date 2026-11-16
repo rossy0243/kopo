@@ -99,6 +99,8 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours,
   r.post('/connexion', enveloppe(async (req, res) => {
     const s = await auth.verifierSupabase(req.body.jetonSupabase);
     if (!s || !s.sub) return res.status(401).json({ erreur: 'Connexion refusée.' });
+    // Connexion « anonyme » de Supabase (si elle était activée par erreur) : ce n'est pas un compte Google.
+    if (s.is_anonymous === true) return res.status(401).json({ erreur: 'Connecte-toi avec Google.' });
     let c = await comptes.parAuth(s.sub);
     if (!c && req.body.jeton) {
       const idInvite = await auth.verifierJoueur(req.body.jeton);
