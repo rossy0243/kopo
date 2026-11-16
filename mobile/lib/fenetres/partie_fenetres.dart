@@ -357,15 +357,16 @@ class _Recap extends StatelessWidget {
       ],
       const Ecart(8),
       Row(children: [
-        if (gagne || r?.titre != null) ...[Expanded(child: Btn('Partager', icone: 'partager', onTap: () => partagerVictoire(v, r))), const SizedBox(width: 6)],
+        // Mode Cahier : « Partager » envoie le classement final (image et texte), gagné ou non.
+        if (cahierDe(v) != null || gagne || r?.titre != null) ...[Expanded(child: Btn('Partager', icone: 'partager', onTap: () => cahierDe(v) != null ? partagerCahier(v) : partagerVictoire(v, r))), const SizedBox(width: 6)],
         if (v['hote'] == v['moi'] && v['publique'] != true) ...[Expanded(child: Btn('Changer', onTap: () { app.arreterSuiteAuto(); app.envoyer({'type': 'rejouer'}); })), const SizedBox(width: 6)],
-        if (cahierDe(v) != null) ...[Expanded(child: Btn('Cahier', onTap: () => ouvrirCahier(v, retour: _resultatCahier))), const SizedBox(width: 6)],
+        if (cahierDe(v) != null) ...[Expanded(child: Btn('Classement', onTap: () => ouvrirClassementCahier(v, retour: _resultatCahier))), const SizedBox(width: 6)],
         Expanded(child: Btn('Quitter', onTap: () { app.arreterSuiteAuto(); app.quitter(); })),
       ]),
       const Ecart(10),
       _DeuxColonnes([
         for (var i = 0; i < classement.length; i++)
-          _LigneBilan('${i + 1}. ${app.nomDe(v, classement[i])}', Pastille(cahierDe(v) != null ? '${i == 0 ? 'vainqueur · ' : ''}${(cahierDe(v)!['scores'] as Map)[classement[i]]} pts' : i == 0 ? 'vainqueur' : '${classement.length >= 5 ? '' : 'éliminé '}manche ${(v['elimines'] as List).length - i + 1}', type: i == 0 ? TypePastille.ok : TypePastille.neutre), moi: classement[i] == v['moi']),
+          _LigneBilan('${i + 1}. ${app.nomDe(v, classement[i])}', Pastille(cahierDe(v) != null ? '${(cahierDe(v)!['scores'] as Map)[classement[i]]} pts' : i == 0 ? 'vainqueur' : '${classement.length >= 5 ? '' : 'éliminé '}manche ${(v['elimines'] as List).length - i + 1}', type: i == 0 ? TypePastille.ok : TypePastille.neutre), moi: classement[i] == v['moi']),
       ], deux: classement.length >= 5),
     ];
 
