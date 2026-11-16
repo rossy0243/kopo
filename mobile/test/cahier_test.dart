@@ -73,6 +73,54 @@ void main() {
     await t.pump(const Duration(seconds: 6)); // le passage automatique au résultat
   });
 
+  test('classement final : vainqueur, puis les éliminés du dernier au premier, avec les sorties', () {
+    final v = _vue(etat: 'finPartie');
+    app.vue = v;
+    final c = classementCahier(v);
+    expect(c.map((l) => l.id), ['a', 'b', 'c']);
+    expect(c.map((l) => l.points), [120, 310, 520]);
+    expect(c.map((l) => l.sorties), [1, 1, 0]);
+    final texte = texteCahier(v);
+    expect(texte, contains('🥇 Ami · 120 pts'));
+    expect(texte, contains('🥉 Cyr · 520 pts'));
+    expect(texte, contains("Cahier d'Inter (8)"));
+  });
+
+  testWidgets('fenêtre Classement : rangs, points et « Partager »', (t) async {
+    final v = _vue(etat: 'finPartie');
+    app.vue = v;
+    ouvrirClassementCahier(v);
+    expect(app.fenetreType, 'cahier');
+    await t.pumpWidget(_fenetre());
+    expect(find.text('Classement'), findsOneWidget);
+    expect(find.text('🥇'), findsOneWidget);
+    expect(find.text('Toi'), findsOneWidget);
+    expect(find.text('310'), findsOneWidget);
+    expect(find.text('Partager'), findsOneWidget);
+    expect(find.text('Voir tout le cahier'), findsOneWidget);
+  });
+
+  testWidgets('image du classement : un PNG 1080×1350', (t) async {
+    final v = _vue(etat: 'finPartie');
+    app.vue = v;
+    final png = await t.runAsync(() => imageCahier(v));
+    expect(png, isNotNull);
+    expect(png!.sublist(1, 4), [0x50, 0x4E, 0x47]); // « PNG »
+  });
+
+  testWidgets('cahier complet sur un téléphone couché : les boutons restent visibles', (t) async {
+    t.view.physicalSize = const Size(844, 390);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    final v = _vue(etat: 'finPartie');
+    app.vue = v;
+    ouvrirCahier(v);
+    await t.pumpWidget(_fenetre());
+    expect(t.takeException(), isNull);
+    expect(find.text('Classement final'), findsOneWidget);
+    expect(find.text('Fermer').hitTestable(), findsOneWidget);
+  });
+
   test('formules du Cahier : trois choix comme sur le site', () {
     expect(App.formulesInter.map((f) => f.$1), ['normale', '500', '1000']);
     expect(K.red, isNotNull);
