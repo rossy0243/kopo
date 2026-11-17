@@ -25,10 +25,9 @@ Pour une version à installer : `flutter build apk --release` (Android) ou `flut
 ## À faire une seule fois
 
 1. **Notifications (Firebase)** : sans ces étapes, l'appli marche mais ne demande pas l'autorisation et ne reçoit rien.
-   - Sur ton ordinateur : `npm install -g firebase-tools`, `firebase login`, `dart pub global activate flutterfire_cli`,
-     puis dans `mobile/` : `flutterfire configure --project=<ton projet Firebase> --platforms=android,ios`
-     (identifiant `com.masano.masano`). Cela crée `android/app/google-services.json` et `ios/Runner/GoogleService-Info.plist`
-     (et l'ajoute au projet Xcode). Ces deux fichiers ne sont pas secrets : les envoyer sur GitHub pour que chaque version les ait.
+   - Projet Firebase : `masano-44770`. Les applis Android et iOS (`com.masano.masano`) y sont créées, et leurs fichiers
+     `android/app/google-services.json` et `ios/Runner/GoogleService-Info.plist` (déjà ajouté au projet Xcode) sont dans
+     le dépôt. Ils ne sont pas secrets. Pour les régénérer : `firebase apps:sdkconfig ANDROID|IOS <id> --project masano-44770`.
      Le plugin Gradle `google-services` s'active tout seul quand `google-services.json` est là.
    - iOS : dans le [portail Apple](https://developer.apple.com/account/resources/authkeys/list), créer une clé APNs (.p8),
      puis la déposer dans la console Firebase (*Paramètres du projet → Cloud Messaging → Configuration de l'appli Apple*).

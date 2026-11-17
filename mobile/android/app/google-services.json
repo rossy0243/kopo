@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "879151597480",
+    "project_id": "masano-44770",
+    "storage_bucket": "masano-44770.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:879151597480:android:f24ede2bef9ca676c2ff9d",
+        "android_client_info": {
+          "package_name": "com.masano.masano"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBK5FlqpzLlrTlsG-kOQeBSIrAszbBGmAA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
