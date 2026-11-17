@@ -2090,7 +2090,10 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   // Quand le serveur est en ligne, les parties tournent sur lui (salles Colyseus) au lieu du
   // téléphone de l'hôte. Sans adresse de serveur, on garde le mode relais (MQTT) ci-dessus.
   const SERVEUR_PAR_DEFAUT = 'https://kopo-serveur.onrender.com'; // ?serveur= dans l'adresse pour en essayer un autre
-  const SERVEUR = (new URLSearchParams(location.search).get('serveur') || SERVEUR_PAR_DEFAUT).replace(/\/$/, '');
+  // Sécurité : ?serveur= n'accepte qu'un serveur sur cet ordinateur (essais). Un lien piégé
+  // (?serveur=https://pirate…) enverrait sinon le jeton de connexion Google à un inconnu.
+  const serveurEssai = (u) => { try { const x = new URL(u); return /^https?:$/.test(x.protocol) && ['localhost', '127.0.0.1', '[::1]'].includes(x.hostname); } catch (e) { return false; } };
+  const SERVEUR = ((p) => (p && serveurEssai(p) ? p : SERVEUR_PAR_DEFAUT))(new URLSearchParams(location.search).get('serveur')).replace(/\/$/, '');
   const MODE_SERVEUR = !!SERVEUR && !LOCAL && typeof Colyseus !== 'undefined';
 
   // Compte invité : créé une fois avec le pseudo, puis gardé sur l'appareil.

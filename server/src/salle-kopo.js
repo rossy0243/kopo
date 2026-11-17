@@ -11,6 +11,7 @@ const K = require('../../moteur/kopo-moteur.js');
 const { idAleatoire } = require('./comptes');
 const { etatJeuPour, NOMS_JEUX } = require('./reglages');
 const ATTENTE_STICKER = require('./stickers').ATTENTE_MS;
+const { permis, SALLES_MAX, actives: limitesActives } = require('./limites');
 
 const salles = new Set(); // salles ouvertes (tableau de bord : en direct)
 const LETTRES = 'ABCDEFGHJKMNPQRSTUVWXYZ';
@@ -109,6 +110,14 @@ class SalleKopo extends Room {
     if (!c || c.statut === 'supprime') throw new Error('Compte inconnu.');
     if (c.statut === 'banni') throw new Error('Ce compte est banni.');
     if (c.statut === 'suspendu') throw new Error('Compte suspendu jusqu\'au ' + new Date(c.suspendu_jusqu).toLocaleString('fr-FR') + '.');
+    // Limites (sécurité) : un compte ne tient pas plus de SALLES_MAX salles à la fois, et n'essaie pas plus de
+    // 30 codes par minute (les codes à 4 lettres des tables entre amis se devinent sinon). Un retour à sa place passe toujours.
+    const dejaAssis = this.salle && this.salle.joueurs.some((j) => j.id === c.id);
+    if (!dejaAssis && limitesActives()) {
+      const ailleurs = [...salles].filter((s) => s !== this && s.clientsParId.has(c.id)).length;
+      if (ailleurs >= SALLES_MAX) throw new Error('Tu as déjà trop de parties ouvertes. Quitte-en une pour en commencer une autre.');
+    }
+    if (!dejaAssis && options.code && !options.retour && !permis('codesCompte', c.id)) throw new Error('Trop de codes essayés. Réessaie dans une minute.');
     // Jeu en maintenance, ou réservé aux testeurs : on n'entre plus (sauf pour reprendre sa place).
     const etat = etatJeuPour(SalleKopo.services.reglages.get('jeux'), this.jeu, c.pseudo);
     const assis = this.salle && this.salle.joueurs.some((j) => j.id === c.id);
@@ -259,6 +268,7 @@ class SalleKopo extends Room {
   recevoir(client, type, msg) {
     const id = client.userData && client.userData.id;
     if (!id) return;
+    if (!permis('messages', client.sessionId)) return; // plus de 20 messages par seconde : ignorés (sécurité)
     msg = Object.assign({}, msg && typeof msg === 'object' ? msg : {}, { type });
     if (type === 'rejoindre') return; // l'entrée passe par onJoin
     // Match du jour : la table est fixée par le serveur (robots, donne), pas de revanche ni de réglages.

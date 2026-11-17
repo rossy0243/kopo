@@ -4,10 +4,15 @@
 
 const TYPES = ['rivalite', 'invitation', 'ami', 'bande'];
 const paire = (x, y) => (x < y ? [x, y] : [y, x]);
+// Sécurité (17/11) : l'XP vient de la copie du profil envoyée par le téléphone. Le serveur la plafonne à ce qu'un
+// très gros joueur peut gagner par jour de jeu (≈ 30 parties à 9 joueurs + missions + défi), donc un niveau inventé
+// (« niveau 100 » le premier jour) ne s'affiche pas chez les amis. Un joueur honnête n'atteint jamais ce plafond.
+const XP_PAR_JOUR = 1500, XP_DEPART = 100;
 // Ce qu'on montre d'un ami ou d'un demandeur dans la fenêtre Amis : son apparence (avatar, cadre)
 // et son XP (le téléphone en tire le niveau, avec le barème du profil).
 const COLONNES_CARTE = `c.equipes->>'avatar' AS apparence, c.equipes->>'cadre' AS cadre,
-  CASE WHEN jsonb_typeof(c.profil->'xp') = 'number' THEN floor((c.profil->>'xp')::numeric)::int END AS xp,
+  CASE WHEN jsonb_typeof(c.profil->'xp') = 'number' THEN least(floor((c.profil->>'xp')::numeric),
+    ${XP_PAR_JOUR} * (SELECT count(*) FROM presences pr WHERE pr.compte_id = c.id) + ${XP_DEPART})::int END AS xp,
   CASE WHEN jsonb_typeof(c.profil->'bareme') = 'number' THEN (c.profil->>'bareme')::int END AS bareme`;
 
 // Écran que l'appli ouvre quand on touche une notification (le site utilise des liens, l'appli ces actions).
