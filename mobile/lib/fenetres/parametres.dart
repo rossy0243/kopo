@@ -108,7 +108,8 @@ class _ParametresState extends State<_Parametres> {
         const Titre3('Notifications'),
         if (!app.avecGoogle) const Muet('Connecte-toi avec Google pour être prévenu des invitations de tes amis.')
         else if (etatPush == null) const Muet('Chargement…')
-        else if (etatPush!['actif'] != true) const Muet('Bientôt disponibles.')
+        else if (etatPush!['actif'] != true || etatPush!['natif'] == false) const Muet('Bientôt disponibles.')
+        else if (!Push.pret) const Muet("Cette version de l'appli n'a pas les notifications : mets-la à jour.")
         else ...[
           Bascule('Sur ce téléphone', pushIci, (v) async {
             try { v ? await Push.activer() : await Push.couper(); setState(() => pushIci = v); } catch (e) { app.toast(e.toString().replaceFirst('Exception: ', '')); }

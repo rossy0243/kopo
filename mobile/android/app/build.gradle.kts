@@ -5,6 +5,15 @@ plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+    id("com.google.gms.google-services") apply false
+}
+
+// Notifications : sans google-services.json, Firebase ne démarre pas et l'appli ne reçoit rien.
+// Le fichier vient de « flutterfire configure » (voir mobile/README.md) ; absent, l'appli se construit quand même.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+} else {
+    logger.warn("Masano : android/app/google-services.json absent, l'appli sera construite SANS notifications push.")
 }
 
 // Clé de publication (Play Store) : android/key.properties, jamais envoyé sur GitHub (voir mobile/README.md).

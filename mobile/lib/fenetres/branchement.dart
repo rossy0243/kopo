@@ -26,6 +26,12 @@ void brancherFenetres() {
   app.resultatMatchJourUi = resultatMatchJour;
   app.onConnecte = () { Push.synchroniser(); };
 
+  // Notification reçue appli ouverte (Android) : un toast, le joueur est déjà dans le jeu.
+  Push.surRecevoir = (titre, texte, d) {
+    final t = [titre, texte].where((x) => x.isNotEmpty).join(' : ');
+    if (t.isNotEmpty) app.toast(t);
+  };
+
   // Notification touchée : l'appli s'ouvre sur la bonne fenêtre.
   Push.surToucher = (d) {
     void ouvrir() {
