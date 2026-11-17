@@ -1,0 +1,37 @@
+# Construit l'APK Android de l'appli (mobile/) et le met en téléchargement sur la page du run (« Artifacts »).
+# Lancement : à la main (onglet Actions > APK Android > Run workflow) ou à chaque envoi sur une branche claude/*.
+# Sans les secrets de publication, l'APK est signé avec une clé de test : il s'installe, mais ne remplace pas
+# une version du Play Store.
+name: APK Android
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['claude/**']
+    paths: ['mobile/**', '.github/workflows/apk.yml']
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter --version
+      - run: flutter pub get
+      - run: flutter build apk --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: masano-apk
+          path: mobile/build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 30
