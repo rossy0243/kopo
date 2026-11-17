@@ -524,8 +524,10 @@ paths:
       tags: [Pièces]
       summary: Pièces gagnées sur le téléphone (missions, défi, bienvenue, installation)
       description: |
-        Plafonnées et sans doublon (même `ref`). mission : 100 max, 5 par jour. defi : 300 max, 1 par semaine.
-        bienvenue : 300 max, 1 par jour, 7 en tout. installation : 200 max, une fois.
+        Plafonnées et sans doublon (même `ref`). mission : `ref` = « texte de la mission:AAAA-MM-JJ » (moins de 3 jours),
+        montant = celui de la mission, 4 par jour. defi : `ref` = « texte du défi:AAAA-MM-JJ », 300, 1 par semaine.
+        bienvenue : `ref` = « jN », montant fixé par le serveur (jours 1, 2, 4, 5, 6), 1 par jour, seulement après N jours de jeu.
+        installation : 200 max, une fois. Toutes les routes : 429 au-delà de 120 appels par minute et par compte.
       requestBody:
         required: true
         content:

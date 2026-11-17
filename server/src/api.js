@@ -4,6 +4,7 @@ const express = require('express');
 const { DEBLOCAGE } = require('./salle-kopo');
 const { etatJeuPour, NOMS_JEUX, communautesPubliques, versionPlusRecente, PLATEFORMES } = require('./reglages');
 const { COLONNES_CARTE } = require('./social');
+const { permis } = require('./limites');
 
 const MOTIFS = ['pseudo', 'insultes', 'triche', 'abandon', 'autre'];
 const enveloppe = (fn) => (req, res) => fn(req, res).catch((e) => res.status(e.statut || 500).json({ erreur: e.statut ? e.message : 'Erreur du serveur.' }) && (e.statut || console.error(e)));
@@ -24,6 +25,8 @@ const adresseSite = (env) => String(env.SITE_URL || 'https://kopo-d655.onrender.
 function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours, parrainage, matchJour, bande, push, stickers, env = process.env }) {
   const r = express.Router();
   r.use(express.json({ limit: '64kb' })); // la copie du profil (PUT /profil) peut faire quelques dizaines de ko
+  // Limite par adresse IP (large : en 4G, beaucoup de joueurs partagent la même adresse).
+  r.use((req, res, next) => (permis('apiIp', req.ip) ? next() : res.status(429).json({ erreur: 'Trop de demandes. Réessaie dans une minute.' })));
 
   // Appli mobile trop ancienne (version minimale du tableau de bord) : 426, avec le lien du store.
   // /config reste ouvert pour que l'appli puisse afficher l'écran « Mets à jour ».
@@ -44,6 +47,7 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours,
     const c = id && (await comptes.statut(id));
     if (!c || c.statut === 'supprime') return res.status(401).json({ erreur: 'Connexion requise.' });
     if (c.statut === 'banni') return res.status(403).json({ erreur: 'Ce compte est banni.' });
+    if (!permis('apiCompte', c.id)) return res.status(429).json({ erreur: 'Trop de demandes. Réessaie dans une minute.' });
     req.compte = c;
     next();
   }

@@ -21,6 +21,10 @@ const nuit = (d) => { const h = heureKinshasa(d); return h >= 22 || h < 8; };
 const erreur = (m, statut = 400) => Object.assign(new Error(m), { statut });
 const texteCourt = (t, max) => String(t == null ? '' : t).replace(/\s+/g, ' ').trim().slice(0, max);
 const PLATEFORMES_NATIVES = ['android', 'ios'];
+// Services de notification des navigateurs (Chrome/Android, Firefox, Safari, Edge) : le serveur n'appelle
+// que ceux-là (sécurité : sinon un joueur pourrait lui faire appeler n'importe quelle adresse).
+const SERVICES_PUSH = [/^fcm\.googleapis\.com$/, /^android\.googleapis\.com$/, /(^|\.)push\.services\.mozilla\.com$/, /(^|\.)push\.apple\.com$/, /(^|\.)notify\.windows\.com$/];
+const servicePushConnu = (hote) => SERVICES_PUSH.some((r) => r.test(String(hote).toLowerCase()));
 
 // Compte de service Firebase (JSON téléchargé dans la console Firebase, tel quel ou en base64).
 function lireCompteService(v) {
@@ -185,6 +189,7 @@ function creerPush(base, reglages, env = process.env) {
       let url;
       try { url = new URL(String(a.endpoint || '')); } catch (e) { throw erreur('Abonnement invalide.'); }
       if (url.protocol !== 'https:' || String(a.endpoint).length > 1000 || typeof k.p256dh !== 'string' || typeof k.auth !== 'string' || k.p256dh.length > 200 || k.auth.length > 100) throw erreur('Abonnement invalide.');
+      if (!servicePushConnu(url.hostname)) throw erreur('Service de notification inconnu.');
       await base.query(`INSERT INTO push_abonnements (endpoint, compte_id, p256dh, auth, appareil) VALUES ($1,$2,$3,$4,$5)
         ON CONFLICT (endpoint) DO UPDATE SET compte_id = $2, p256dh = $3, auth = $4, appareil = $5, vu_le = now()`,
       [a.endpoint, compteId, k.p256dh, k.auth, texteCourt(appareil, 40) || null]);
@@ -311,4 +316,4 @@ function creerPush(base, reglages, env = process.env) {
   return api;
 }
 
-module.exports = { creerPush, TYPES_PUSH, nuit, heureKinshasa };
+module.exports = { creerPush, TYPES_PUSH, nuit, heureKinshasa, servicePushConnu };

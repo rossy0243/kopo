@@ -200,13 +200,25 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     const r = await invite('Mission' + Date.now() % 1000);
     const rec = (corps) => api('/api/recompense', { methode: 'POST', jeton: r.jeton, corps });
     const solde = (await srv.comptes.lire(r.compte.id)).solde;
-    assert.strictEqual((await rec({ motif: 'mission', montant: 60, ref: 'katapss:2026-11-01' })).json.solde, solde + 60);
-    assert.strictEqual((await rec({ motif: 'mission', montant: 60, ref: 'katapss:2026-11-01' })).json.ok, false, 'doublon');
+    const jour = new Date().toISOString().slice(0, 10);
+    assert.strictEqual((await rec({ motif: 'mission', montant: 60, ref: 'Fais un Katapss:' + jour })).json.solde, solde + 60);
+    assert.strictEqual((await rec({ motif: 'mission', montant: 60, ref: 'Fais un Katapss:' + jour })).json.ok, false, 'doublon');
+    assert.strictEqual((await rec({ motif: 'mission', montant: 100, ref: 'Fais un Katapss:' + jour })).statut, 400, 'montant différent de la mission');
+    assert.strictEqual((await rec({ motif: 'mission', montant: 100, ref: 'Mission inventée:' + jour })).statut, 400, 'mission inconnue');
+    assert.strictEqual((await rec({ motif: 'mission', montant: 60, ref: 'Fais un Katapss:2026-01-01' })).statut, 400, 'trop ancienne');
     assert.strictEqual((await rec({ motif: 'mission', montant: 5000, ref: 'x' })).statut, 400);
+    for (const [texte, n] of [['Gagne une partie', 80], ['Atteins une finale', 40], ['Joue 2 parties', 20]]) assert.strictEqual((await rec({ motif: 'mission', montant: n, ref: texte + ':' + jour })).json.ok, true);
+    assert.strictEqual((await rec({ motif: 'mission', montant: 30, ref: 'Joue 3 parties:' + jour })).json.ok, false, '4 missions par jour au plus');
     assert.strictEqual((await rec({ motif: 'jackpot', montant: 10 })).statut, 400);
-    assert.strictEqual((await rec({ motif: 'defi', montant: 300, ref: 'w45' })).json.ok, true);
-    assert.strictEqual((await rec({ motif: 'defi', montant: 300, ref: 'w45b' })).json.ok, false, 'un défi par semaine');
-    assert.strictEqual((await rec({ motif: 'bienvenue', montant: 100, ref: 'j1' })).json.ok, true);
+    assert.strictEqual((await rec({ motif: 'defi', montant: 300, ref: 'Gagne 5 parties cette semaine:' + jour })).json.ok, true);
+    assert.strictEqual((await rec({ motif: 'defi', montant: 300, ref: 'Joue 15 parties cette semaine:' + jour })).json.ok, false, 'un défi par semaine');
+    assert.strictEqual((await rec({ motif: 'defi', montant: 300, ref: 'w45' })).statut, 400, 'défi inconnu');
+    // Bienvenue : montant fixé par le serveur, jour N seulement après N jours de jeu.
+    const b = (await rec({ motif: 'bienvenue', montant: 300, ref: 'j1' })).json;
+    assert.deepStrictEqual([b.ok, b.montant], [true, 100], 'le montant vient du serveur');
+    const r2 = await invite('Bienv' + Date.now() % 1000);
+    assert.strictEqual((await api('/api/recompense', { methode: 'POST', jeton: r2.jeton, corps: { motif: 'bienvenue', montant: 300, ref: 'j6' } })).json.ok, false, 'pas avant 6 jours de jeu');
+    assert.strictEqual((await api('/api/recompense', { methode: 'POST', jeton: r2.jeton, corps: { motif: 'bienvenue', montant: 100, ref: 'j3' } })).statut, 400, 'le jour 3 est un objet');
     assert.strictEqual((await rec({ motif: 'bienvenue', montant: 150, ref: 'j2' })).json.ok, false, 'un cadeau par jour');
     assert.strictEqual((await rec({ motif: 'installation', montant: 500, ref: 'pwa' })).statut, 400, 'cadeau d\'installation plafonné');
     assert.strictEqual((await rec({ motif: 'installation', montant: 200, ref: 'pwa' })).json.ok, true);
@@ -1544,11 +1556,12 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     if (abo.endpoint.includes('perime')) throw Object.assign(new Error('Gone'), { statusCode: 410 });
     envois.push({ endpoint: abo.endpoint, ...JSON.parse(charge), options });
   }, maintenant: midi });
-  const abo = (nom) => ({ endpoint: 'https://push.exemple.com/' + nom, keys: { p256dh: 'p' + nom, auth: 'a' + nom } });
+  const abo = (nom) => ({ endpoint: 'https://fcm.googleapis.com/fcm/send/' + nom, keys: { p256dh: 'p' + nom, auth: 'a' + nom } });
   const pour = (nom) => envois.filter((e) => e.endpoint.endsWith('/' + nom));
   await test('push : abonnement, invitation et demande d\'ami envoyées au téléphone', async () => {
     const a = await invite('PushA'), b = await invite('PushB');
     assert.strictEqual((await api('/api/push/abonnement', { methode: 'POST', jeton: b.jeton, corps: { abonnement: { endpoint: 'http://pas-https', keys: {} } } })).statut, 400);
+    assert.strictEqual((await api('/api/push/abonnement', { methode: 'POST', jeton: b.jeton, corps: { abonnement: { endpoint: 'https://pirate.exemple.com/x', keys: { p256dh: 'p', auth: 'a' } } } })).statut, 400, 'service de notification inconnu');
     assert.strictEqual((await api('/api/push/abonnement', { methode: 'POST', jeton: b.jeton, corps: { abonnement: abo('b1'), appareil: 'Android' } })).statut, 200);
     const e = (await api('/api/push', { jeton: b.jeton })).json;
     assert.strictEqual(e.appareils, 1); assert.deepStrictEqual(e.prefs, { invitation: true, ami: true, match: true, annonce: true });
@@ -1893,6 +1906,51 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.deepStrictEqual(manquantes, [], 'routes sans documentation');
     const res = await fetch(URL_ + '/api/openapi.yaml');
     assert.strictEqual(res.status, 200); assert.match(await res.text(), /^openapi: 3\.1/);
+  });
+  await test('sécurité : limiteur (fenêtre fixe, par clé)', async () => {
+    const { creerLimiteur } = require('../src/limites');
+    const l = creerLimiteur(3, 1000);
+    assert.deepStrictEqual([1, 2, 3, 4].map(() => l.passer('a', 0)), [true, true, true, false]);
+    assert.strictEqual(l.passer('b', 0), true, 'une autre clé a son propre compteur');
+    assert.strictEqual(l.passer('a', 1000), true, 'nouvelle fenêtre');
+  });
+  await test('sécurité : trop de demandes = 429 (API, codes de table)', async () => {
+    process.env.KOPO_LIMITES = '1';
+    const { limiteurs, LIMITES } = require('../src/limites');
+    try {
+      const j = await invite('Presse' + Date.now() % 1000);
+      limiteurs.apiCompte.vider();
+      let dernier;
+      for (let i = 0; i <= LIMITES.apiCompte.max; i++) dernier = await api('/api/pieces', { jeton: j.jeton });
+      assert.strictEqual(dernier.statut, 429);
+      limiteurs.codesIp.vider();
+      for (let i = 0; i <= LIMITES.codesIp.max; i++) dernier = await api('/api/salles/ABCD');
+      assert.strictEqual(dernier.statut, 429);
+    } finally { delete process.env.KOPO_LIMITES; for (const l of Object.values(limiteurs)) l.vider(); }
+  });
+  await test('sécurité : niveau affiché aux amis plafonné selon les jours de jeu', async () => {
+    const a = await invite('Frimeur' + Date.now() % 1000), b = await invite('Copain' + Date.now() % 1000);
+    await api('/api/profil', { methode: 'PUT', jeton: a.jeton, corps: { profil: { xp: 999999, bareme: 2 } } });
+    await srv.base.query('INSERT INTO amis (compte_id, ami_id) VALUES ($1,$2), ($2,$1)', [a.compte.id, b.compte.id]);
+    const moi = (await api('/api/amis', { jeton: b.jeton })).json.find((x) => x.id === a.compte.id);
+    assert.ok(moi.xp <= 1600, 'XP plafonnée : ' + moi.xp);
+    await api('/api/profil', { methode: 'PUT', jeton: a.jeton, corps: { profil: { xp: 120, bareme: 2 } } });
+    assert.strictEqual((await api('/api/amis', { jeton: b.jeton })).json.find((x) => x.id === a.compte.id).xp, 120, 'un vrai niveau passe tel quel');
+  });
+  await test('sécurité : admin, comptes qui jouent trop souvent ensemble', async () => {
+    const a = await invite('Gros' + Date.now() % 1000), b = await invite('Faux' + Date.now() % 1000);
+    for (let i = 0; i < 6; i++) {
+      const id = 'p_suspect_' + i + '_' + Date.now();
+      await srv.base.query("INSERT INTO parties (id, code, publique, nb_joueurs, avec_robots, vainqueur, debut, fin, classee, jeu) VALUES ($1, 'ZZZZ', true, 2, false, $2, now(), now(), true, 'kopo')", [id, a.compte.id]);
+      await srv.base.query('INSERT INTO participations (partie_id, compte_id, place, abandon) VALUES ($1,$2,1,false), ($1,$3,2,false)', [id, a.compte.id, b.compte.id]);
+      await srv.comptes.crediter(a.compte.id, 90, 'pot', id);
+    }
+    const s = (await api('/admin/api/suspects', { jeton: adminJeton })).json;
+    const p = s.paires.find((x) => [x.a, x.b].includes(a.compte.id) && [x.a, x.b].includes(b.compte.id));
+    assert.ok(p, 'la paire est signalée');
+    assert.strictEqual(p.ensemble, 6);
+    assert.strictEqual(p.a === a.compte.id ? p.pots_a : p.pots_b, 540);
+    assert.strictEqual((await api('/admin/api/suspects')).statut, 401, 'réservé à l\'admin');
   });
   await srv.arreter();
   console.log(`\n${reussis} tests réussis, ${echecs} en échec.`);

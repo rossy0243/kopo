@@ -1,6 +1,8 @@
 // Comptes, présence, pièces. Seul le serveur modifie un solde, toujours via le registre.
 'use strict';
 const crypto = require('crypto');
+const R = require('../../src/kopo-retention.js'); // missions et défis du téléphone (textes et montants)
+const DEFI_PIECES = 300;
 
 const jourUTC = (d = new Date()) => d.toISOString().slice(0, 10);
 // Semaine ISO (2026-W45), pour le joker de série.
@@ -27,6 +29,8 @@ function verifierPseudo(p) {
   if (MOTS_INTERDITS.some((m) => n.includes(m))) return { ok: false, erreur: 'Ce pseudo n\'est pas autorisé.' };
   return { ok: true, pseudo };
 }
+// Parcours de bienvenue (kopo-retention.js, BIENVENUE) : pièces des jours 1 à 7 (null = un objet, pas de pièces).
+const BIENVENUE_PIECES = [100, 150, null, 200, 250, 300, null];
 const PSEUDO_PRIS = 'Ce pseudo est déjà pris, choisis-en un autre.';
 // Règle du créateur : le pseudo se choisit une fois, puis se change 2 fois au plus sur 12 mois glissants.
 const CHANGEMENTS_PSEUDO_PAR_AN = 2;
@@ -221,11 +225,29 @@ function creerComptes(base, reglages) {
     // cadeau d'installation : une seule fois par compte, au premier lancement depuis l'icône).
     // Le serveur ne peut pas tout vérifier : il plafonne (montant, nombre par jour / semaine) et refuse les doublons.
     async recompense(id, { motif, montant, ref }) {
-      const L = { mission: { max: 100, parJour: 5 }, defi: { max: 300, parSemaine: 1 }, bienvenue: { max: 300, parJour: 1, total: 7 }, installation: { max: 200, total: 1 } }[motif];
+      const L = { mission: { max: 100, parJour: 4 }, defi: { max: 300, parSemaine: 1 }, bienvenue: { max: 300, parJour: 1, total: 7 }, installation: { max: 200, total: 1 } }[motif];
       montant = Math.trunc(Number(montant));
       if (!L) throw Object.assign(new Error('Récompense inconnue.'), { statut: 400 });
       if (!(montant > 0 && montant <= L.max)) throw Object.assign(new Error('Montant invalide.'), { statut: 400 });
       ref = String(ref || '').slice(0, 80);
+      // Plafonds serrés (sécurité, 17/11) : une mission ou un défi doit exister (son texte), au montant prévu, et dater
+      // de moins de 3 jours. Le calcul reste sur le téléphone (les parties contre les robots du site n'y passent pas).
+      if (motif === 'mission' || motif === 'defi') {
+        const m = /^(.{1,60}):(\d{4}-\d{2}-\d{2})$/.exec(ref);
+        const prevu = m && (motif === 'mission' ? (R.MODELES.find((x) => x.texte.slice(0, 60) === m[1]) || {}).pieces : (R.DEFIS.some((x) => x.texte.slice(0, 60) === m[1]) ? DEFI_PIECES : null));
+        if (!prevu || prevu !== montant) throw Object.assign(new Error('Récompense inconnue.'), { statut: 400 });
+        const age = (Date.now() - Date.parse(m[2] + 'T12:00:00Z')) / 864e5;
+        if (!(age > -2 && age < 3)) throw Object.assign(new Error('Récompense trop ancienne.'), { statut: 400 });
+      }
+      // Bienvenue 7 jours (sécurité, 17/11) : le montant vient du serveur, pas du téléphone. Le cadeau du jour N
+      // (ref « jN ») n'est donné qu'une fois, et seulement si le joueur a ouvert le jeu au moins N jours différents.
+      let jourBienvenue = null;
+      if (motif === 'bienvenue') {
+        const m = /^j([1-7])$/.exec(ref);
+        jourBienvenue = m ? Number(m[1]) : null;
+        if (!jourBienvenue || !BIENVENUE_PIECES[jourBienvenue - 1]) throw Object.assign(new Error('Récompense inconnue.'), { statut: 400 });
+        montant = BIENVENUE_PIECES[jourBienvenue - 1];
+      }
       if (motif === 'bienvenue') motif = 'bienvenue7'; // « bienvenue » est déjà le cadeau de création du compte
       return base.transaction(async (q) => {
         await q.query('SELECT 1 FROM comptes WHERE id = $1 FOR UPDATE', [id]);
@@ -234,6 +256,7 @@ function creerComptes(base, reglages) {
             count(*) FILTER (WHERE ref = $3 AND $3 <> '')::int AS meme
           FROM registre_pieces WHERE compte_id = $1 AND motif = $2`, [id, motif, ref])).rows[0];
         if (n.meme || (L.parJour && n.jour >= L.parJour) || (L.parSemaine && n.semaine >= L.parSemaine) || (L.total && n.total >= L.total)) return { ok: false, erreur: 'Déjà reçu.' };
+        if (jourBienvenue && (await q.query('SELECT count(*)::int AS n FROM presences WHERE compte_id = $1', [id])).rows[0].n < jourBienvenue) return { ok: false, erreur: 'Reviens demain pour ce cadeau.' };
         const solde = await mouvement(q, id, montant, motif, ref || null);
         return { ok: true, montant, solde };
       });
