@@ -19,7 +19,7 @@ Future<void> main() async {
   brancherFenetres();
   runApp(const Masano());
   Google.brancher();
-  Push.initialiser().then((_) => Push.synchroniser());
+  Push.initialiser().then((_) => Push.demanderAuDemarrage());
   app.demarrer();
 }
 

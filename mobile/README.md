@@ -24,9 +24,20 @@ Pour une version à installer : `flutter build apk --release` (Android) ou `flut
 
 ## À faire une seule fois
 
-1. **Notifications (Firebase)** : `dart pub global activate flutterfire_cli`, puis dans `mobile/` :
-   `flutterfire configure --project=<ton projet Firebase>`. Cela ajoute `google-services.json` (Android)
-   et `GoogleService-Info.plist` (iOS). Sans ce fichier, l'appli marche, mais sans notifications.
+1. **Notifications (Firebase)** : sans ces étapes, l'appli marche mais ne demande pas l'autorisation et ne reçoit rien.
+   - Projet Firebase : `masano-44770`. Les applis Android et iOS (`com.masano.masano`) y sont créées, et leurs fichiers
+     `android/app/google-services.json` et `ios/Runner/GoogleService-Info.plist` (déjà ajouté au projet Xcode) sont dans
+     le dépôt. Ils ne sont pas secrets. Pour les régénérer : `firebase apps:sdkconfig ANDROID|IOS <id> --project masano-44770`.
+     Le plugin Gradle `google-services` s'active tout seul quand `google-services.json` est là.
+   - iOS : dans le [portail Apple](https://developer.apple.com/account/resources/authkeys/list), créer une clé APNs (.p8),
+     puis la déposer dans la console Firebase (*Paramètres du projet → Cloud Messaging → Configuration de l'appli Apple*).
+     Le droit « Push Notifications » est déjà dans `ios/Runner/Runner.entitlements` ; vérifier qu'il est coché pour
+     `com.masano.masano` dans le portail Apple (Identifiers) avant de régénérer le profil.
+   - Serveur (Render) : variable `FCM_COMPTE_SERVICE` = le JSON du compte de service (console Firebase → *Paramètres du projet
+     → Comptes de service → Générer une nouvelle clé privée*), tel quel ou en base64. Sans elle, le serveur n'envoie rien aux applis
+     et Paramètres affiche « Bientôt disponibles ».
+   - Vérifier : au premier lancement, le téléphone demande « Autoriser Masano à envoyer des notifications ? ». Une notification
+     d'essai peut partir de la console Firebase (*Messaging → Nouvelle campagne → Envoyer un message test*).
 2. **Connexion Google (Supabase)** : dans Supabase, *Authentication → URL Configuration → Redirect URLs*,
    ajouter `com.masano.masano://login-callback`.
 3. **Identifiant de l'appli** : `com.masano.masano` (Android `applicationId` et iOS bundle id).
