@@ -7792,7 +7792,7 @@ svg .vb { transform-box: view-box; }
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = '5877c8154384'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = '27e3e9f781fa'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: true };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // La musique des menus était coupée par défaut : on l'allume une fois pour tous (le joueur peut la recouper).
@@ -9249,8 +9249,10 @@ svg .vb { transform-box: view-box; }
     const m = v.manche;
     const finale = v.restants.length === 2;
     $('info').innerHTML = '';
-    if (v.cahier) $('info').append(el('strong', null, 'Donne ' + v.numeroManche), document.createTextNode(` · Cahier ${v.cahier.total} · ${v.mode === 'delire' ? 'Délire' : 'Simple'} · ${v.code}`));
-    else $('info').append(el('strong', null, finale ? 'Finale' : 'Manche ' + v.numeroManche), document.createTextNode(` · ${v.mode === 'delire' ? (v.jRetour ? 'Délire · J retour' : 'Délire') : 'Simple'} · ${v.code}`));
+    // Le style s'affiche pareil en Cahier et en partie normale (avec « J retour » quand il est activé).
+    const style = v.mode === 'delire' ? (v.jRetour ? 'Délire · J retour' : 'Délire') : 'Simple';
+    if (v.cahier) $('info').append(el('strong', null, 'Donne ' + v.numeroManche), document.createTextNode(` · Cahier ${v.cahier.total} · ${style} · ${v.code}`));
+    else $('info').append(el('strong', null, finale ? 'Finale' : 'Manche ' + v.numeroManche), document.createTextNode(` · ${style} · ${v.code}`));
     const pause = m.pause;
     dessinerSieges(v);
     // Qui a annoncé, et le sens du jeu (mode délire).

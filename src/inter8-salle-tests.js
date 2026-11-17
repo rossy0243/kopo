@@ -581,5 +581,29 @@ test('Mode Cahier : entre les donnes, personne ne change de place (créateur, 16
   }
 });
 
+
+console.log('\nJ retour et Cahier');
+
+test('Salle en Cahier : le J retour choisi est gardé et agit à chaque donne ; en simple il est toujours coupé', () => {
+  for (const formule of ['normale', 'cahier']) {
+    const s = salleAvec(4);
+    assert.ok(S.recevoir(s, 'p1', { type: 'reglages', mode: 'delire', jRetour: true, formule, total: 500 }).ok);
+    assert.ok(S.recevoir(s, 'p1', { type: 'lancer' }).ok);
+    assert.strictEqual(s.manche.jRetour, true, formule);
+    assert.strictEqual(!!s.manche.cahier, formule === 'cahier');
+    // Un valet posé à 4 joueurs inverse le sens.
+    const m = s.manche, j = m.joueurCourant;
+    m.libre = true; m.demande = null; delete m.departEnAttente; s.pause = null;
+    m.mains[j] = ['VC', '4C', '9K'];
+    const avant = m.sens;
+    assert.ok(S.recevoir(s, j, { type: 'action', action: { type: 'jouer', joueur: j, cartes: ['VC'] } }).ok);
+    assert.strictEqual(m.sens, -avant, formule + ' : le valet change le sens');
+    const t = salleAvec(3);
+    assert.ok(S.recevoir(t, 'p1', { type: 'reglages', mode: 'simple', jRetour: true, formule, total: 500 }).ok);
+    assert.ok(S.recevoir(t, 'p1', { type: 'lancer' }).ok);
+    assert.strictEqual(t.manche.jRetour, false, formule + ' : pas de J retour en simple');
+  }
+});
+
 console.log(`\n${ok} test(s) réussi(s), ${ko} échec(s).`);
 if (ko) process.exit(1);
