@@ -719,6 +719,21 @@ test('Cahier : sans l\'option, la manche continue jusqu\'au dernier', () => {
   assert.strictEqual(m.phase, 'jeu');
   assert.strictEqual(m.points, undefined);
 });
+test('Cahier en délire avec J retour : le valet change le sens, comme en partie normale', () => {
+  const mains = () => ({ A: ['VC', '4C', '9K'], B: ['3P', '4P', '5P'], C: ['3T', '4T', '5T'], D: ['3K', '4K', '5K'] });
+  const m = I.nouvelleManche(['A', 'B', 'C', 'D'], mains(), remplir('5C'), 'A', { mode: 'delire', jRetour: true, graine: 7, cahier: true });
+  assert.strictEqual(m.jRetour, true);
+  J(m, 'A', ['VC']);
+  assert.strictEqual(m.sens, -1);
+  assert.strictEqual(m.joueurCourant, 'D');
+  // Départ sur un valet : le sens change aussi avant le premier coup.
+  const m2 = I.nouvelleManche(['A', 'B', 'C', 'D'], mains(), remplir('VP'), 'A', { mode: 'delire', jRetour: true, graine: 7, cahier: true });
+  assert.strictEqual(m2.sens, -1);
+  // En simple, pas de J retour (règlement), Cahier ou non.
+  const m3 = I.nouvelleManche(['A', 'B', 'C', 'D'], mains(), remplir('5C'), 'A', { mode: 'simple', jRetour: true, graine: 7, cahier: true });
+  J(m3, 'A', ['VC']);
+  assert.strictEqual(m3.joueurCourant, 'B');
+});
 
 console.log(`\n${ok} test(s) réussi(s), ${echecs.length} échec(s).`);
 if (echecs.length) process.exit(1);

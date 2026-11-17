@@ -3226,8 +3226,10 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     const m = v.manche;
     const finale = v.restants.length === 2;
     $('info').innerHTML = '';
-    if (v.cahier) $('info').append(el('strong', null, 'Donne ' + v.numeroManche), document.createTextNode(` · Cahier ${v.cahier.total} · ${v.mode === 'delire' ? 'Délire' : 'Simple'} · ${v.code}`));
-    else $('info').append(el('strong', null, finale ? 'Finale' : 'Manche ' + v.numeroManche), document.createTextNode(` · ${v.mode === 'delire' ? (v.jRetour ? 'Délire · J retour' : 'Délire') : 'Simple'} · ${v.code}`));
+    // Le style s'affiche pareil en Cahier et en partie normale (avec « J retour » quand il est activé).
+    const style = v.mode === 'delire' ? (v.jRetour ? 'Délire · J retour' : 'Délire') : 'Simple';
+    if (v.cahier) $('info').append(el('strong', null, 'Donne ' + v.numeroManche), document.createTextNode(` · Cahier ${v.cahier.total} · ${style} · ${v.code}`));
+    else $('info').append(el('strong', null, finale ? 'Finale' : 'Manche ' + v.numeroManche), document.createTextNode(` · ${style} · ${v.code}`));
     const pause = m.pause;
     dessinerSieges(v);
     // Qui a annoncé, et le sens du jeu (mode délire).
