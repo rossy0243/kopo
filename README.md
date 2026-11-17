@@ -42,7 +42,7 @@ Documentation de l'API pour l'appli mobile (Flutter) : [docs/api/](docs/api/) (O
 - `vendor/` : MQTT.js, colyseus.js, PeerJS et qrcode-generator (licences MIT).
 
 ## Serveur
-Quand une adresse de serveur est renseignée (`SERVEUR_PAR_DEFAUT` dans `src/source.html`, ou `?serveur=https://…` dans l'adresse de la page), les parties, la mise en relation et le compteur en ligne passent par le serveur (`server/`). Sans adresse, le jeu garde le mode relais MQTT.
+Quand une adresse de serveur est renseignée (`SERVEUR_PAR_DEFAUT` dans `src/source.html`, ou `?serveur=http://localhost:2567` dans l'adresse de la page, pour les essais : seuls `localhost` et `127.0.0.1` sont acceptés), les parties, la mise en relation et le compteur en ligne passent par le serveur (`server/`). Sans adresse, le jeu garde le mode relais MQTT.
 
 ## Tests
 ```

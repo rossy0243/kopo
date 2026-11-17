@@ -408,7 +408,8 @@
         return { ok: true };
       }
       case 'retirer': {
-        if (id !== s.hote || s.etat !== 'salon' || msg.cible === s.hote) return { ok: false, erreur: 'Impossible.' };
+        // Salle publique : l'hôte (le premier arrivé) ne choisit pas qui joue (sécurité : pas d'exclusion d'inconnus).
+        if (id !== s.hote || s.etat !== 'salon' || s.publique || msg.cible === s.hote) return { ok: false, erreur: 'Impossible.' };
         s.joueurs = s.joueurs.filter((j) => j.id !== msg.cible);
         return { ok: true };
       }
@@ -432,6 +433,8 @@
       case 'remplacerParRobot': {
         const cible = s.joueurs.find((j) => j.id === msg.cible);
         if (id !== s.hote || !cible || cible.id === s.hote || cible.robot) return { ok: false, erreur: 'Impossible.' };
+        // Seulement un joueur déconnecté (sécurité : sinon l'hôte d'une table à mise pourrait faire jouer ses adversaires par des robots).
+        if (cible.connecte !== false) return { ok: false, erreur: 'Seul un joueur déconnecté peut être remplacé.' };
         if (s.etat === 'salon') return { ok: false, erreur: 'Retire-le plutôt, puis ajoute un robot.' };
         cible.robot = true;
         cible.remplace = true;

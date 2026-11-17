@@ -399,6 +399,7 @@ test("L'hôte remplace un joueur par un robot en cours de partie, et le joueur r
   S.deconnecter(s, 'p2');
   assert.ok(!S.recevoir(s, 'p3', { type: 'remplacerParRobot', cible: 'p2' }).ok, "seul l'hôte");
   assert.ok(S.recevoir(s, 'p1', { type: 'remplacerParRobot', cible: 'p2' }).ok);
+  assert.ok(!S.recevoir(s, 'p1', { type: 'remplacerParRobot', cible: 'p3' }).ok, 'un joueur connecté ne peut pas être remplacé');
   const j = S.vue(s, 'p1').joueurs.find((x) => x.id === 'p2');
   assert.ok(j.robot && j.remplace && j.connecte);
   S.recevoir(s, 'p2', { type: 'rejoindre' });
@@ -873,10 +874,19 @@ test("Dans le salon, seul l'hôte change le niveau d'un robot", () => {
   // Gardé dans la sauvegarde de l'hôte.
   assert.strictEqual(S.importer(S.exporter(s)).joueurs[2].niveau, 'forts');
 });
+test("Salle publique : l'hôte ne retire personne", () => {
+  const s = S.creerSalle('PUBL');
+  S.rendrePublique(s, 3);
+  S.recevoir(s, 'p1', { type: 'rejoindre', nom: 'A' });
+  S.recevoir(s, 'p2', { type: 'rejoindre', nom: 'B' });
+  assert.ok(!S.recevoir(s, 'p1', { type: 'retirer', cible: 'p2' }).ok);
+  assert.strictEqual(s.joueurs.length, 2);
+});
 test('Un robot qui remplace un joueur parti joue au niveau de la table', () => {
   const s = salleAvec(3);
   assert.ok(S.recevoir(s, 'p1', { type: 'reglages', robots: 'faciles', niveau: 1 }).ok);
   assert.ok(S.recevoir(s, 'p1', { type: 'lancer' }).ok);
+  S.deconnecter(s, 'p2');
   assert.ok(S.recevoir(s, 'p1', { type: 'remplacerParRobot', cible: 'p2' }).ok);
   assert.strictEqual(S.forceRobots(s, 'p2'), 0);
   assert.strictEqual(S.vue(s, 'p1').joueurs[1].niveau, null);
@@ -930,7 +940,8 @@ test('Un robot qui remplace un joueur parti ne compte pas comme un robot', () =>
   S.recevoir(s2, 'p2', { type: 'rejoindre', nom: 'Ami' });
   S.recevoir(s2, 'p1', { type: 'ajouterRobot' });
   S.recevoir(s2, 'p1', { type: 'lancer' });
-  S.recevoir(s2, 'p1', { type: 'remplacerParRobot', cible: 'p2' });
+  S.deconnecter(s2, 'p2');
+  assert.ok(S.recevoir(s2, 'p1', { type: 'remplacerParRobot', cible: 'p2' }).ok);
   s2.manche.enJeu = s2.manche.enJeu.filter((j) => j !== 'p1'); // p1 ne joue plus la manche
   assert.strictEqual(S.entreRobots(s2), false);
   assert.ok(!S.recevoir(s2, 'p1', { type: 'passerFin' }).ok);

@@ -92,6 +92,33 @@ function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainag
     res.json({ parJour, soldes, parMotif });
   }));
 
+  // --- Comptes suspects (sécurité, 17/11) : deux comptes qui jouent très souvent seuls ensemble (sans robot),
+  // et où c'est presque toujours le même qui gagne. Signe qu'un joueur se fait donner des pièces (pots des tables à mise)
+  // ou des points de ligue par un faux compte. Rien n'est sanctionné automatiquement : l'admin regarde et décide.
+  r.get('/suspects', enveloppe(async (req, res) => {
+    const jours = Math.min(90, Math.max(1, Math.trunc(Number(req.query.jours)) || 14));
+    const min = Math.min(100, Math.max(2, Math.trunc(Number(req.query.min)) || 5));
+    const l = n((await base.query(`WITH duos AS (
+        SELECT p.id, p.classee, p.vainqueur, array_agg(pa.compte_id ORDER BY pa.compte_id) AS ids
+        FROM parties p JOIN participations pa ON pa.partie_id = p.id
+        WHERE p.fin > now() - make_interval(days => $1) AND NOT p.avec_robots
+        GROUP BY p.id HAVING count(*) = 2),
+      paires AS (
+        SELECT ids[1] AS a, ids[2] AS b, count(*)::int AS ensemble, count(*) FILTER (WHERE classee)::int AS classees,
+          count(*) FILTER (WHERE vainqueur = ids[1])::int AS victoires_a, count(*) FILTER (WHERE vainqueur = ids[2])::int AS victoires_b,
+          array_agg(id) AS parties
+        FROM duos GROUP BY 1, 2)
+      SELECT x.a, ca.pseudo AS pseudo_a, ca.numero AS numero_a, ca.cree_le AS cree_a, ca.statut AS statut_a,
+        x.b, cb.pseudo AS pseudo_b, cb.numero AS numero_b, cb.cree_le AS cree_b, cb.statut AS statut_b,
+        x.ensemble, x.classees, x.victoires_a, x.victoires_b,
+        coalesce((SELECT sum(r.montant) FROM registre_pieces r WHERE r.motif = 'pot' AND r.ref = ANY(x.parties) AND r.compte_id = x.a), 0)::int AS pots_a,
+        coalesce((SELECT sum(r.montant) FROM registre_pieces r WHERE r.motif = 'pot' AND r.ref = ANY(x.parties) AND r.compte_id = x.b), 0)::int AS pots_b
+      FROM paires x JOIN comptes ca ON ca.id = x.a JOIN comptes cb ON cb.id = x.b
+      WHERE x.ensemble >= $2 AND greatest(x.victoires_a, x.victoires_b) >= 0.8 * x.ensemble
+      ORDER BY x.ensemble DESC LIMIT 50`, [jours, min])).rows);
+    res.json({ jours, min, paires: l });
+  }));
+
   // --- Joueurs
   // Les listes de la fiche sont plafonnées ici ; le tableau de bord n'en montre que les premières (bouton « Voir plus »).
   const FICHE = { parties: 50, pieces: 50, signalements: 30, sanctions: 30, titres: 20, inventaire: 100, parrainages: 50 };

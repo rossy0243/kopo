@@ -207,7 +207,14 @@ const afficher = {
       <p class="muted">Créées et détruites doivent rester proches. Si on crée beaucoup plus qu'on ne détruit, augmente la part de la maison ou baisse les gains gratuits (onglet Pilotage).</p>
       <div class="carte">${graphe(e.parJour, [{ cle: 'creees', nom: 'Pièces créées', couleur: '#e2b04a' }, { cle: 'detruites', nom: 'Pièces détruites', couleur: '#c7362f' }])}</div>
       <h3>D'où viennent et où vont les pièces (7 jours)</h3>
-      <div class="carte"><table><tr><th>Motif</th><th class="n">Total</th><th class="n">Opérations</th></tr>${e.parMotif.map((m) => `<tr><td>${esc(MOTIFS[m.motif] || m.motif)}</td><td class="n ${m.total < 0 ? 'ko' : ''}">${nb(m.total)}</td><td class="n">${nb(m.operations)}</td></tr>`).join('') || '<tr><td colspan="3" class="muted">Rien pour l\'instant.</td></tr>'}</table></div>`;
+      <div class="carte"><table><tr><th>Motif</th><th class="n">Total</th><th class="n">Opérations</th></tr>${e.parMotif.map((m) => `<tr><td>${esc(MOTIFS[m.motif] || m.motif)}</td><td class="n ${m.total < 0 ? 'ko' : ''}">${nb(m.total)}</td><td class="n">${nb(m.operations)}</td></tr>`).join('') || '<tr><td colspan="3" class="muted">Rien pour l\'instant.</td></tr>'}</table></div>
+      <h3>Comptes suspects</h3>
+      <p class="muted">Deux comptes qui ont joué au moins 5 parties seuls ensemble ces 14 derniers jours, gagnées à 80 % ou plus par le même : peut-être un joueur qui se fait donner des pièces ou des points de ligue par un faux compte. Ouvre les fiches pour décider.</p>
+      <div id="suspects"><p class="muted">Chargement…</p></div>`;
+    const s = await api('/suspects');
+    const qui = (id, pseudo, numero, cree, statut) => `<button class="lien" data-joueur="${esc(id)}">${esc(pseudo)}#${esc(numero)}</button><br><small class="muted">créé le ${date(cree)}${statut !== 'actif' ? ' · <span class="statut-' + esc(statut) + '">' + esc(statut) + '</span>' : ''}</small>`;
+    $('#suspects').innerHTML = `<div class="carte"><table><tr><th>Gagne le plus</th><th>Perd le plus</th><th class="n">Parties ensemble</th><th class="n">Dont classées</th><th class="n">Victoires</th><th class="n">Pots gagnés</th></tr>${lignes('suspects', s.paires.map((p) => (p.victoires_a >= p.victoires_b ? p : { ...p, a: p.b, b: p.a, pseudo_a: p.pseudo_b, pseudo_b: p.pseudo_a, numero_a: p.numero_b, numero_b: p.numero_a, cree_a: p.cree_b, cree_b: p.cree_a, statut_a: p.statut_b, statut_b: p.statut_a, victoires_a: p.victoires_b, victoires_b: p.victoires_a, pots_a: p.pots_b, pots_b: p.pots_a })), (p) => `<tr><td>${qui(p.a, p.pseudo_a, p.numero_a, p.cree_a, p.statut_a)}</td><td>${qui(p.b, p.pseudo_b, p.numero_b, p.cree_b, p.statut_b)}</td><td class="n">${nb(p.ensemble)}</td><td class="n">${nb(p.classees)}</td><td class="n">${nb(p.victoires_a)} – ${nb(p.victoires_b)}</td><td class="n">${nb(p.pots_a)}</td></tr>`, { par: 20, colonnes: 6, vide: '<tr><td colspan="6" class="muted">Aucun compte suspect.</td></tr>' })}</table></div>`;
+    lierJoueurs();
   },
 
   async ligue() {

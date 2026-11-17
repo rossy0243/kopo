@@ -20,6 +20,7 @@ const { creerMatchJour } = require('./match-jour');
 const { creerBande } = require('./bande');
 const { creerPush } = require('./push');
 const { creerStickers } = require('./stickers');
+const { permis } = require('./limites');
 
 async function demarrer({ port = Number(process.env.PORT || 2567), env = process.env } = {}) {
   const base = await ouvrirBase(env.DATABASE_URL);
@@ -77,6 +78,8 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
 
   // Quelle salle porte ce code (Kopo ou Inter (8)) ? Pour rejoindre un ami sans essayer les deux salles.
   routes.get('/salles/:code', (req, res) => {
+    // Sécurité : pas plus de 60 codes essayés par minute depuis une même adresse (codes à 4 lettres devinables).
+    if (!permis('codesIp', req.ip)) return res.status(429).json({ erreur: 'Trop de codes essayés. Réessaie dans une minute.' });
     const code = String(req.params.code || '').toUpperCase();
     if (!/^[A-Z]{4}$/.test(code)) return res.status(400).json({ erreur: 'Code invalide.' });
     const s = salleParCode(code);
