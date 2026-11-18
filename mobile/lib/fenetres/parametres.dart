@@ -58,7 +58,7 @@ class _ParametresState extends State<_Parametres> {
     final p = App.nettoyerPseudo(pseudo.text);
     pseudo.text = p;
     if (p == avant) return;
-    if (p.length < 3) { app.toast('Le pseudo fait au moins 3 caractères, en un seul mot.'); pseudo.text = avant; return; }
+    if (p.length < 3) { app.toast('Le pseudo fait au moins 3 caractères, en un seul mot.', Niv.alerte); pseudo.text = avant; return; }
     final restants = quota['restants'] as int? ?? 2;
     demanderConfirmation('Ton pseudo deviendra « $p ». ${restants > 1 ? 'Il te restera 1 changement cette année.' : 'Ce sera ton dernier changement pour un an.'}', () async {
       final c = Api.compte;
@@ -67,11 +67,11 @@ class _ParametresState extends State<_Parametres> {
           final j = await Api.patch('/moi', {'pseudo': p});
           c['compte'] = j['compte'];
           Stock.ecrire('kopo-compte-serveur', c);
-        } catch (e) { app.toast(messageErreur(e)); ouvrirParametres(); return; }
+        } catch (e) { app.toast(messageErreur(e), Niv.echec); ouvrirParametres(); return; }
       }
       Stock.ecrire('kopo-pseudo-changements', [..._changementsPseudo(), DateTime.now().toIso8601String()]);
       Stock.ecrire('kopo-pseudo', p);
-      app.toast('Pseudo enregistré.');
+      app.toast('Pseudo enregistré.', Niv.succes);
       ouvrirParametres();
     }, titre: 'Changer de pseudo ?', oui: 'Changer', annuler: ouvrirParametres);
   }
@@ -112,11 +112,11 @@ class _ParametresState extends State<_Parametres> {
         else if (!Push.pret) const Muet("Cette version de l'appli n'a pas les notifications : mets-la à jour.")
         else ...[
           Bascule('Sur ce téléphone', pushIci, (v) async {
-            try { v ? await Push.activer() : await Push.couper(); setState(() => pushIci = v); } catch (e) { app.toast(e.toString().replaceFirst('Exception: ', '')); }
+            try { v ? await Push.activer() : await Push.couper(); setState(() => pushIci = v); } catch (e) { app.toast(e.toString().replaceFirst('Exception: ', ''), Niv.echec); }
           }, aide: 'Même quand Masano est fermé'),
           for (final (t, texte, aide) in const [('invitation', 'Invitations', "Un ami t'invite à sa table"), ('ami', "Demandes d'ami", 'Reçues et acceptées'), ('match', 'Rappel du Match du jour', "À 19 h, si tu ne l'as pas joué"), ('annonce', 'Annonces de Masano', 'Tournois, nouveautés')])
             Bascule(texte, prefsPush[t] != false, (v) async {
-              try { final r = await Api.patch('/push/prefs', {t: v}); setState(() => etatPush = {...etatPush!, 'prefs': r['prefs']}); } catch (e) { app.toast(messageErreur(e)); }
+              try { final r = await Api.patch('/push/prefs', {t: v}); setState(() => etatPush = {...etatPush!, 'prefs': r['prefs']}); } catch (e) { app.toast(messageErreur(e), Niv.echec); }
             }, aide: aide),
         ],
       ],

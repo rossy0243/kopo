@@ -37,7 +37,7 @@ void encaisserMission(String id) {
   app.crediterEnLigne('mission', r['pieces'] as int, '${texte.length > 60 ? texte.substring(0, 60) : texte}:${r['finieLe']}');
   app.vibrer(30);
   if ((r['niveauApres'] as Niveau).niveau > (r['niveauAvant'] as Niveau).niveau) app.tampon('NIVEAU ${(r['niveauApres'] as Niveau).niveau}');
-  app.toast('+${r['pieces']} pièces · +${r['xp']} XP');
+  app.toast('+${r['pieces']} pièces · +${r['xp']} XP', Niv.succes);
   ouvrirMissions();
 }
 
@@ -382,7 +382,7 @@ Future<void> ouvrirBoutique() async {
   try {
     if (!await app.compteEnLigneOuCreer()) { app.lirePseudo(); return; }
     B = await Api.get('/boutique') as Map;
-  } catch (e) { app.toast(messageErreur(e)); return; }
+  } catch (e) { app.toast(messageErreur(e), Niv.echec); return; }
   app.soldeServeur(B['solde']);
   await app.chargerStickers();
   for (final o in (B['objets'] as List)) { app.objetDuServeur(o as Map); }
@@ -480,9 +480,9 @@ void _acheterStickers(Map s, int solde, {String? sticker, String? pack, required
                 app.soldeServeur(r['solde']);
                 if (app.stickers != null) app.stickers!['soldes'] = r['soldes'];
                 app.vibrer(40);
-                app.toast('Merci ! ${r['texte']} (${App.formatPieces(r['pieces'] as num)} pièces)');
+                app.toast('Merci ! ${r['texte']} (${App.formatPieces(r['pieces'] as num)} pièces)', Niv.succes);
                 ouvrirBoutique();
-              } catch (e) { app.toast(messageErreur(e)); setState(() => enCours = false); }
+              } catch (e) { app.toast(messageErreur(e), Niv.echec); setState(() => enCours = false); }
             };
             return i == 0 ? Btn.principal(null, enfant: contenu, large: true, onTap: faire) : Btn(null, enfant: contenu, large: true, onTap: faire);
           }),
@@ -526,9 +526,9 @@ void _confirmerAchat(Map o, int solde) {
               final q = app.lireProfil(); R.donnerObjet(q, o['id'] as String); R.equiper(q, o['id'] as String); app.ecrireProfil(q);
               await Api.post('/collection/equiper', {'objet': o['id']}).catchError((_) => null);
               app.vibrer(40);
-              app.toast('${o['nom']} est à toi (équipé)');
+              app.toast('${o['nom']} est à toi (équipé)', Niv.succes);
               ouvrirBoutique();
-            } catch (e) { app.toast(messageErreur(e)); setState(() => enCours = false); }
+            } catch (e) { app.toast(messageErreur(e), Niv.echec); setState(() => enCours = false); }
           }),
           const Ecart(8),
           Btn('Retour', large: true, onTap: ouvrirBoutique),

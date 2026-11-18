@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 
 import '../commun/apparences.dart';
 import '../commun/retention.dart';
-import '../commun/stickers.dart';
 import '../commun/stock.dart';
 import '../commun/theme.dart';
 import '../ecrans/accueil.dart' show creer;
@@ -61,7 +60,7 @@ const motifs = [('insultes', 'Insultes ou propos haineux'), ('pseudo', 'Pseudo i
 void toastAjoutAmi(Object? r, [String? nom]) {
   final m = r is Map ? r : const {};
   final n = (m['ami'] is Map ? m['ami']['pseudo'] : null) ?? nom ?? 'Ce joueur';
-  app.toast(m['etat'] == 'ami' ? '$n est dans tes amis.' : "Demande envoyée à $n. Il doit l'accepter.");
+  app.toast(m['etat'] == 'ami' ? '$n est dans tes amis.' : "Demande envoyée à $n. Il doit l'accepter.", Niv.succes);
 }
 
 void ficheJoueur(String id, String nom) {
@@ -72,15 +71,15 @@ void ficheJoueur(String id, String nom) {
     return Fenetre(titre: nom.isEmpty ? 'Joueur' : nom, enfants: [
       if (!avecCompte) Text('Amis, blocage et signalement arrivent avec les comptes en ligne.', style: K.texte(15))
       else ...[
-        Btn.principal('Ajouter en ami', large: true, onTap: () async { try { toastAjoutAmi(await Api.post('/amis', {'cible': id}), nom); retour(); } catch (e) { app.toast(messageErreur(e)); } }),
+        Btn.principal('Ajouter en ami', large: true, onTap: () async { try { toastAjoutAmi(await Api.post('/amis', {'cible': id}), nom); retour(); } catch (e) { app.toast(messageErreur(e), Niv.echec); } }),
         const Ecart(8),
         Btn(bloque ? 'Débloquer' : 'Bloquer', large: true, onTap: () async {
           try {
-            if (bloque) { await Api.delete('/bloques/${Uri.encodeComponent(id)}'); app.bloques.remove(id); app.toast('Joueur débloqué.'); }
-            else { await Api.post('/bloques', {'cible': id}); app.bloques.add(id); app.toast('Joueur bloqué : tu ne verras plus ses réactions.'); }
+            if (bloque) { await Api.delete('/bloques/${Uri.encodeComponent(id)}'); app.bloques.remove(id); app.toast('Joueur débloqué.', Niv.succes); }
+            else { await Api.post('/bloques', {'cible': id}); app.bloques.add(id); app.toast('Joueur bloqué : tu ne verras plus ses réactions.', Niv.succes); }
             Stock.ecrire('kopo-bloques', app.bloques.toList());
             retour();
-          } catch (e) { app.toast(messageErreur(e)); }
+          } catch (e) { app.toast(messageErreur(e), Niv.echec); }
         }),
         const Ecart(8),
         Btn('Signaler', large: true, onTap: () => _signaler(id, nom)),
@@ -101,12 +100,12 @@ void _signaler(String id, String nom) {
         Champ(details, indice: 'Détails (facultatif)', max: 300),
         const Ecart(10),
         Btn.principal('Envoyer le signalement', large: true, onTap: () async {
-          if (motif == null) { app.toast('Choisis un motif.'); return; }
+          if (motif == null) { app.toast('Choisis un motif.', Niv.alerte); return; }
           try {
             await Api.post('/signaler', {'cible': id, 'motif': motif, 'details': details.text, 'partie': app.vue?['code']});
-            app.toast('Merci, ton signalement a été envoyé.');
+            app.toast('Merci, ton signalement a été envoyé.', Niv.succes);
             app.fermerFenetre();
-          } catch (e) { app.toast(messageErreur(e)); }
+          } catch (e) { app.toast(messageErreur(e), Niv.echec); }
         }),
         const Ecart(8),
         Btn('Annuler', large: true, onTap: app.fermerFenetre),
@@ -145,7 +144,7 @@ class _LigneInviterState extends State<_LigneInviter> {
           if (widget.a['en_ligne'] == true) const TextSpan(text: '● en ligne', style: TextStyle(color: K.good, fontSize: 12)),
         ]))),
         Btn(invite ? 'Invité' : 'Inviter', onTap: invite ? null : () async {
-          try { await Api.post('/amis/${Uri.encodeComponent(widget.a['id'].toString())}/inviter', {'code': widget.code}); setState(() => invite = true); } catch (e) { app.toast(messageErreur(e)); }
+          try { await Api.post('/amis/${Uri.encodeComponent(widget.a['id'].toString())}/inviter', {'code': widget.code}); setState(() => invite = true); } catch (e) { app.toast(messageErreur(e), Niv.echec); }
         }),
       ]);
 }
@@ -292,7 +291,7 @@ class _AmisState extends State<_Amis> {
                 for (final x in recents!) { for (final y in (x['joueurs'] as List).cast<Map>()) { if (y['id'] == j['id']) { if (r is Map && r['etat'] == 'ami') { y['ami'] = true; } else { y['envoyee'] = true; } } } }
                 if (r is Map && r['etat'] == 'ami' && j['recue'] == true) { app.demandesAmi = math.max(0, app.demandesAmi - 1); app.maj(); }
                 setState(() {});
-              } catch (e) { app.toast(messageErreur(e)); }
+              } catch (e) { app.toast(messageErreur(e), Niv.echec); }
             }),
           ]));
         }
@@ -307,8 +306,8 @@ class _AmisState extends State<_Amis> {
             Text.rich(TextSpan(children: [TextSpan(text: '${x['pseudo']} ', style: K.texte(15, poids: FontWeight.w700)), TextSpan(text: '#${x['numero']}', style: K.texte(12, couleur: K.muted))])),
             const Muet('veut être ton ami', taille: 12),
           ])),
-          Btn.principal('Accepter', marge: const EdgeInsets.symmetric(horizontal: 12, vertical: 7), onTap: () async { try { await repondreDemande(x['id'].toString(), true); app.toast('${x['pseudo']} est dans tes amis.'); } catch (e) { app.toast(messageErreur(e)); } _dessiner(); }),
-          IconButton(icon: const Icon(Icons.close, color: K.muted), tooltip: 'Refuser', onPressed: () async { try { await repondreDemande(x['id'].toString(), false); } catch (e) { app.toast(messageErreur(e)); } _dessiner(); }),
+          Btn.principal('Accepter', marge: const EdgeInsets.symmetric(horizontal: 12, vertical: 7), onTap: () async { try { await repondreDemande(x['id'].toString(), true); app.toast('${x['pseudo']} est dans tes amis.', Niv.succes); } catch (e) { app.toast(messageErreur(e), Niv.echec); } _dessiner(); }),
+          IconButton(icon: const Icon(Icons.close, color: K.muted), tooltip: 'Refuser', onPressed: () async { try { await repondreDemande(x['id'].toString(), false); } catch (e) { app.toast(messageErreur(e), Niv.echec); } _dessiner(); }),
         ]));
       }
       for (final x in envoyees) {
@@ -319,7 +318,7 @@ class _AmisState extends State<_Amis> {
             Text.rich(TextSpan(children: [TextSpan(text: '${x['pseudo']} ', style: K.texte(15, poids: FontWeight.w700)), TextSpan(text: '#${x['numero']}', style: K.texte(12, couleur: K.muted))])),
             const Muet('Demande envoyée', taille: 12),
           ])),
-          IconButton(icon: const Icon(Icons.close, color: K.muted), tooltip: 'Annuler la demande', onPressed: () async { try { await Api.delete('/amis/demandes/${Uri.encodeComponent(x['id'].toString())}'); } catch (e) { app.toast(messageErreur(e)); } _dessiner(); }),
+          IconButton(icon: const Icon(Icons.close, color: K.muted), tooltip: 'Annuler la demande', onPressed: () async { try { await Api.delete('/amis/demandes/${Uri.encodeComponent(x['id'].toString())}'); } catch (e) { app.toast(messageErreur(e), Niv.echec); } _dessiner(); }),
         ], absent: true));
       }
     }
@@ -360,7 +359,7 @@ class _AmisState extends State<_Amis> {
   Future<void> _ajouter() async {
     final v = widget.champ.text.trim();
     if (v.isEmpty) return;
-    try { toastAjoutAmi(await Api.post('/amis', {'cible': v})); widget.champ.clear(); setState(() => ajout = false); _dessiner(); } catch (e) { app.toast(messageErreur(e)); }
+    try { toastAjoutAmi(await Api.post('/amis', {'cible': v})); widget.champ.clear(); setState(() => ajout = false); _dessiner(); } catch (e) { app.toast(messageErreur(e), Niv.echec); }
   }
 
   void _plus(Map a) {
@@ -368,7 +367,7 @@ class _AmisState extends State<_Amis> {
           Text('${a['pseudo']}#${a['numero']}', style: K.texte(15)),
           const Ecart(12),
           Btn('Retirer de mes amis', large: true, onTap: () => demanderConfirmation('${a['pseudo']} ne sera plus dans tes amis.', () async {
-                try { await Api.delete('/amis/${Uri.encodeComponent(a['id'].toString())}'); } catch (e) { app.toast(messageErreur(e)); }
+                try { await Api.delete('/amis/${Uri.encodeComponent(a['id'].toString())}'); } catch (e) { app.toast(messageErreur(e), Niv.echec); }
                 _rouvrir();
               }, titre: 'Retirer ${a['pseudo']} ?', oui: 'Retirer', annuler: _rouvrir)),
           const Ecart(8),
@@ -459,7 +458,7 @@ void ouvrirParrainage({VoidCallback? retour}) {
                   Expanded(child: Champ(champ, indice: 'Code de ton ami', max: 6, majuscules: true)),
                   const SizedBox(width: 8),
                   Btn('Valider', onTap: () async {
-                    try { final r = await Api.post('/parrainage', {'code': champ.text.trim()}); app.toast("${r['parrain']} t'a invité : joue tes premières parties pour gagner ton cadeau !"); recharger(); } catch (e) { app.toast(messageErreur(e)); }
+                    try { final r = await Api.post('/parrainage', {'code': champ.text.trim()}); app.toast("${r['parrain']} t'a invité : joue tes premières parties pour gagner ton cadeau !", Niv.succes); recharger(); } catch (e) { app.toast(messageErreur(e), Niv.echec); }
                   }),
                 ]),
               ],
@@ -499,14 +498,14 @@ void ouvrirBloques() {
 
 // ---------------------------------------------------------------- notifications de l'accueil
 void montrerNotification(Map a) {
+  if (!App.notifEnFenetre(a)) { app.pastilleNotification(a); return; } // sans action : une pastille
   final d = (a['donnees'] as Map?) ?? const {};
   void suite() { app.fermerFenetre(); Future.delayed(const Duration(milliseconds: 400), app.lireNotifications); }
   Widget fermer([String t = 'OK']) => Btn(t, large: true, onTap: suite);
   Future<void> couper(String cle, String message) async {
-    try { await Api.patch('/moi', {'notifs': {cle: false}}); app.toast(message); } catch (e) { app.toast(messageErreur(e)); }
+    try { await Api.patch('/moi', {'notifs': {cle: false}}); app.toast(message, Niv.succes); } catch (e) { app.toast(messageErreur(e), Niv.echec); }
     app.fermerFenetre();
   }
-  void relireSolde() => Api.get('/moi').then((m) => app.soldeServeur(m['compte']['solde'])).catchError((_) => null);
   String icone;
   final contenu = <Widget>[];
   final boutons = <Widget>[];
@@ -516,63 +515,27 @@ void montrerNotification(Map a) {
       icone = 'rejoindre';
       contenu.addAll([titre(a['texte'].toString()), Text('${d['code']}', textAlign: TextAlign.center, style: K.titre(64, couleur: Colors.white).copyWith(letterSpacing: 10))]);
       boutons.addAll([Btn.principal('Rejoindre', large: true, onTap: () => app.rejoindreCode(d['code'].toString())), fermer('Pas maintenant')]);
-    case 'rivalite':
-      icone = 'revanche';
-      contenu.addAll([
-        titre('Rivalité'),
-        Row(mainAxisAlignment: MainAxisAlignment.center, children: [Text('Toi', style: K.texte(15)), const SizedBox(width: 10), Text('${d['toi']} – ${d['lui']}', style: K.titre(30, couleur: Colors.white)), const SizedBox(width: 10), Text('${d['pseudo'] ?? '?'}', style: K.texte(15))]),
-        Text(a['texte'].toString(), textAlign: TextAlign.center, style: K.texte(15)),
-        const Muet("Retrouve-le en ligne pour reprendre l'avantage !", align: TextAlign.center),
-      ]);
-      boutons.addAll([fermer('À moi de jouer !'), Btn('Ne plus recevoir les rivalités', large: true, onTap: () => couper('rivalite', 'Notifications de rivalité coupées.'))]);
-    case 'cadeau':
-      // Stickers offerts par l'équipe : le message dit pourquoi, puis ce qui est reçu.
-      icone = 'cadeau';
-      final ids = ((d['stickers'] as List?) ?? const []).map((e) => e.toString()).where(Stickers.connu).toList();
-      final n = (d['utilisations'] as num?)?.toInt() ?? 0;
-      contenu.addAll([
-        titre("Cadeau de l'équipe Masano"),
-        if (d['message'] != null) Text(d['message'].toString(), textAlign: TextAlign.center, style: K.texte(15)) else Text(a['texte'].toString(), textAlign: TextAlign.center, style: K.texte(15)),
-        if (ids.isNotEmpty) Wrap(alignment: WrapAlignment.center, spacing: 6, runSpacing: 6, children: [for (final id in ids.take(10)) CaseSticker(id, verrou: false, reste: n, taille: 56)]),
-        Muet('$n utilisation${n > 1 ? 's' : ''} de chaque sticker, à envoyer depuis le chat en partie${app.stickersActifs ? '' : ' dès que les stickers seront ouverts'}.', align: TextAlign.center),
-      ]);
-      app.stickers = null; // relu à la prochaine ouverture du chat
-      boutons.add(fermer('Merci !'));
-    case 'parrainage':
-      icone = 'cadeau';
-      contenu.addAll([titre('Parrainage'), Text(a['texte'].toString(), textAlign: TextAlign.center, style: K.texte(15)), if (d['titre'] != null) Text('« ${d['titre']} »', textAlign: TextAlign.center, style: K.texte(16, couleur: K.brass, poids: FontWeight.w700))]);
-      relireSolde();
-      boutons.addAll([Btn.principal("Inviter d'autres amis", large: true, onTap: () => ouvrirParrainage()), fermer()]);
     case 'bande':
       icone = 'bande';
       contenu.addAll([titre('La Bande'), Text(a['texte'].toString(), textAlign: TextAlign.center, style: K.texte(15))]);
-      if (d['rappel'] == true) {
-        boutons.addAll([
-          Btn.principal('Jouer mon Match du jour', large: true, onTap: () { app.fermerFenetre(); ouvrirMatchJour(); }),
-          fermer('Plus tard'),
-          Btn('Ne plus recevoir ces rappels', large: true, onTap: () => couper('bande', 'Rappels coupés.')),
-        ]);
-      } else {
-        relireSolde();
-        if (d['bande'] != null) boutons.add(Btn.principal('Voir la Bande', large: true, onTap: () { app.fermerFenetre(); ouvrirBande(id: d['bande'].toString()); }));
-        boutons.add(fermer());
-      }
+      boutons.addAll([
+        Btn.principal('Jouer mon Match du jour', large: true, onTap: () { app.fermerFenetre(); ouvrirMatchJour(); }),
+        fermer('Plus tard'),
+        Btn('Ne plus recevoir ces rappels', large: true, onTap: () => couper('bande', 'Rappels coupés.')),
+      ]);
     case 'ami':
       icone = 'creer';
       contenu.add(titre(a['texte'].toString()));
       if (d['demande'] != null && d['demande'] != false) {
         contenu.addAll([Text('${d['pseudo']}#${d['numero']}', textAlign: TextAlign.center, style: K.texte(15)), const Muet('Vous pourrez vous inviter à vos tables et vous comparer dans la ligue.', align: TextAlign.center)]);
         boutons.addAll([
-          Btn.principal('Accepter', large: true, onTap: () async { try { await repondreDemande(d['de'].toString(), true); app.toast('${d['pseudo']} est dans tes amis.'); } catch (e) { app.toast(messageErreur(e)); } suite(); }),
-          Btn('Refuser', large: true, onTap: () async { try { await repondreDemande(d['de'].toString(), false); app.toast('Demande refusée.'); } catch (e) { app.toast(messageErreur(e)); } suite(); }),
+          Btn.principal('Accepter', large: true, onTap: () async { try { await repondreDemande(d['de'].toString(), true); app.toast('${d['pseudo']} est dans tes amis.', Niv.succes); } catch (e) { app.toast(messageErreur(e), Niv.echec); } suite(); }),
+          Btn('Refuser', large: true, onTap: () async { try { await repondreDemande(d['de'].toString(), false); app.toast('Demande refusée.', Niv.succes); } catch (e) { app.toast(messageErreur(e), Niv.echec); } suite(); }),
           fermer('Plus tard'),
         ]);
-      } else if (d['accepte'] != null && d['accepte'] != false) {
-        contenu.add(const Muet("Invite-le à ta table depuis le salon d'une partie.", align: TextAlign.center));
-        boutons.add(fermer());
       } else {
         boutons.addAll([
-          Btn.principal("L'ajouter aussi", large: true, onTap: () async { try { toastAjoutAmi(await Api.post('/amis', {'cible': '${d['pseudo']}#${d['numero']}'}), d['pseudo'] as String?); } catch (e) { app.toast(messageErreur(e)); } suite(); }),
+          Btn.principal("L'ajouter aussi", large: true, onTap: () async { try { toastAjoutAmi(await Api.post('/amis', {'cible': '${d['pseudo']}#${d['numero']}'}), d['pseudo'] as String?); } catch (e) { app.toast(messageErreur(e), Niv.echec); } suite(); }),
           fermer('Plus tard'),
         ]);
       }

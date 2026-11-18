@@ -48,12 +48,12 @@ Future<void> ouvrirWhatsApp(String texte) async {
 Future<void> ouvrirLien(String url) => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
 Future<void> copier(String texte, [String message = 'Copié.']) async {
   await Clipboard.setData(ClipboardData(text: texte));
-  app.toast(message);
+  app.toast(message, Niv.succes);
 }
 
 void connecterGoogle([String? supabase]) {
   final s = supabase ?? app.config?['google'] as String?;
-  if (s == null) { app.toast('La connexion Google arrive très bientôt.'); return; }
+  if (s == null) { app.toast('La connexion Google arrive très bientôt.', Niv.alerte); return; }
   Google.connecter(s);
 }
 
