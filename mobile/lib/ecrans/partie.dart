@@ -13,6 +13,7 @@ import '../fenetres/communes.dart';
 import '../fenetres/parametres.dart';
 import '../fenetres/partie_fenetres.dart';
 import '../fenetres/social.dart';
+import '../fenetres/vocal_ui.dart';
 
 class Partie extends StatelessWidget {
   const Partie({super.key});
@@ -54,6 +55,7 @@ class Partie extends StatelessWidget {
                 style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 6), minimumSize: const Size(0, 36)),
                 child: Text('${(cahier['scores'] as Map)[v['moi']] ?? '–'} / ${cahier['total']}', style: K.texte(14, couleur: K.brass, poids: FontWeight.w700)),
               ),
+            BoutonsMicro(v),
             IconButton(onPressed: ouvrirChat, icon: const Icon(Icons.chat_bubble_outline, color: K.brass), tooltip: 'Chat'),
             IconButton(onPressed: ouvrirParametres, icon: const Ico('reglages', taille: 22), tooltip: 'Paramètres'),
           ]),
@@ -63,7 +65,9 @@ class Partie extends StatelessWidget {
         else ...[table, ConstrainedBox(constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * .56), child: SingleChildScrollView(reverse: true, child: bas))],
       ]),
     );
-    if (v['enPause'] != true) return contenu;
+    // Qui parle (abonnés Kopo+ en vocal), sous l'en-tête, sans pousser la table.
+    final parleurs = Positioned(top: MediaQuery.of(context).padding.top + 50, left: 0, right: 0, child: IgnorePointer(child: BandeauParleurs(v)));
+    if (v['enPause'] != true) return Stack(children: [contenu, parleurs]);
     // Partie en pause : la table est voilée jusqu'à « Reprendre ».
     return Stack(children: [
       contenu,
@@ -191,6 +195,7 @@ class _Siege extends StatelessWidget {
     final robot = j['robot'] == true;
     final pause = m['pause'] as Map?;
     final meneur = (pause?['annonce'] as Map?)?['meneur'] == id;
+    final parle = app.vocal.parleurs.contains(id); // en vocal (abonnés Kopo+) : le siège s'éclaire en vert
     final pastilles = <Widget>[
       if (q >= 0) Pastille(qualifies[q]['raison'] == 'Katapss' ? 'Katapss ✓' : q == 0 ? 'qualifié 1er' : 'qualifié ${q + 1}e', type: TypePastille.ok)
       else if (m['elimine'] == id) const Pastille('éliminé', type: TypePastille.ko)
@@ -222,12 +227,15 @@ class _Siege extends StatelessWidget {
           decoration: BoxDecoration(
             color: courant ? K.brass : const Color(0xCC0B1828),
             borderRadius: BorderRadius.circular(99),
-            border: Border.all(color: meneur ? K.good : courant ? const Color(0xFFF3D48A) : K.line, width: meneur ? 2 : 1),
-            boxShadow: courant ? const [BoxShadow(color: Color(0x80E2B04A), blurRadius: 12)] : null,
+            border: Border.all(color: meneur || parle ? K.good : courant ? const Color(0xFFF3D48A) : K.line, width: meneur || parle ? 2 : 1),
+            boxShadow: parle ? const [BoxShadow(color: Color(0x733FBF7F), blurRadius: 12)] : courant ? const [BoxShadow(color: Color(0x80E2B04A), blurRadius: 12)] : null,
           ),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
-            if (robot) Padding(padding: const EdgeInsets.only(right: 4), child: Ico('robots', taille: 15, couleur: courant ? K.encre : null)),
-            Flexible(child: Text(moi ? 'Toi' : (j['nom'] ?? '?').toString(), overflow: TextOverflow.ellipsis, style: K.texte(13, couleur: courant ? K.encre : K.ink, poids: FontWeight.w700))),
+            if (robot) Padding(padding: const EdgeInsets.only(right: 4), child: Ico('robots', taille: 15, couleur: courant ? K.encre : null))
+            else if (j['voix'] == true) Padding(padding: const EdgeInsets.only(right: 3), child: Ico(j['muet'] == true ? 'micro-coupe' : 'micro', taille: 14, couleur: courant ? K.encre : parle ? K.good : null)),
+            // Pas la place pour le pseudo : son initiale.
+            Flexible(child: NomOuInitiale(moi ? 'Toi' : (j['nom'] ?? '?').toString(), style: K.texte(13, couleur: courant ? K.encre : K.ink, poids: FontWeight.w700))),
+            if (j['plus'] == true) Padding(padding: const EdgeInsets.only(left: 3), child: CouronnePlus(taille: 13, couleur: courant ? K.encre : K.brass)),
             if (nb > 0) ...[
               const SizedBox(width: 5),
               Container(

@@ -61,6 +61,10 @@ Pour une version à installer : `flutter build apk --release` (Android) ou `flut
 5. **Liens des stores** : une fois l'appli publiée, coller les liens Play Store et App Store dans le tableau de bord,
    onglet *Pilotage*, « Applis mobiles » (ils servent au message « mets à jour »).
 6. **iOS** : régler l'équipe Apple dans Xcode (*Signing & Capabilities*).
+7. **Micro des abonnés Kopo+** (paquet `livekit_client`) : rien à régler dans l'appli, le serveur donne l'adresse et le
+   jeton LiveKit. Les autorisations sont déjà déclarées (Android : `RECORD_AUDIO` ; iOS : `NSMicrophoneUsageDescription`) ;
+   le téléphone ne demande le micro qu'au premier toucher du bouton micro en partie, par un abonné. Après la mise à jour du
+   paquet, lancer `pod install` dans `ios/` (Xcode le fait aussi au premier `flutter build ipa`).
 
 ## Organisation du code
 
@@ -68,6 +72,6 @@ Pour une version à installer : `flutter build apk --release` (Android) ou `flut
 - `lib/reseau/` : API `/api/v1`, salles Colyseus (WebSocket), connexion Google, notifications.
 - `lib/ecrans/` : accueil, salon, partie (Kopo et Inter), racine (fenêtres, toasts, animations).
 - `lib/fenetres/` : toutes les fenêtres (fin de manche, récap, amis, ligue, missions, profil, boutique, paramètres, tutoriel…).
-- `lib/commun/` : thème, cartes, sons, stockage local, rétention.
+- `lib/commun/` : thème, cartes, sons, stockage local, rétention, micro des abonnés (`vocal.dart`, LiveKit).
 
 `flutter analyze` et `flutter test` doivent passer avant chaque envoi.

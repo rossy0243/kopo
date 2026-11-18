@@ -8,6 +8,7 @@ import '../etat.dart';
 import '../fenetres/communes.dart';
 import '../fenetres/partie_fenetres.dart';
 import '../fenetres/social.dart';
+import '../fenetres/vocal_ui.dart';
 
 class Salon extends StatelessWidget {
   const Salon({super.key});
@@ -73,8 +74,8 @@ class Salon extends StatelessWidget {
     ]);
 
     return SafeArea(
-      child: Column(children: [
-        _EnTete(publique ? 'Salle publique · $code' : 'Salon · $code'),
+      child: Stack(children: [Column(children: [
+        _EnTete(publique ? 'Salle publique · $code' : 'Salon · $code', v),
         Expanded(
           child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(14, 6, 14, 20),
@@ -88,6 +89,9 @@ class Salon extends StatelessWidget {
             ),
           ),
         ),
+      ]),
+      // Qui parle (abonnés Kopo+ en vocal), sous l'en-tête.
+      Positioned(top: 50, left: 0, right: 0, child: IgnorePointer(child: BandeauParleurs(v))),
       ]),
     );
   }
@@ -131,13 +135,15 @@ void envoyerRobot(String niveau) => app.envoyer({'type': 'ajouterRobot', 'niveau
 
 class _EnTete extends StatelessWidget {
   final String info;
-  const _EnTete(this.info);
+  final Map v;
+  const _EnTete(this.info, this.v);
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.fromLTRB(6, 4, 6, 0),
         child: Row(children: [
           IconButton(onPressed: demanderQuitter, icon: const Icon(Icons.arrow_back, color: K.muted), tooltip: 'Quitter'),
           Expanded(child: Text(info, overflow: TextOverflow.ellipsis, style: K.texte(15, couleur: K.muted, poids: FontWeight.w600))),
+          BoutonsMicro(v),
         ]),
       );
 }
@@ -165,13 +171,16 @@ class _LigneJoueur extends StatelessWidget {
     final robot = j['robot'] == true;
     final avecNiveau = robot && j['niveau'] != null && v['robots'] != 'gentils';
     final nom = (j['nom'] ?? '?').toString();
+    final parle = app.vocal.parleurs.contains(j['id']);
     return Container(
       key: app.cleSiege(j['id'].toString()),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(color: const Color(0x0FFFFFFF), borderRadius: BorderRadius.circular(10), border: Border.all(color: K.line)),
+      decoration: BoxDecoration(color: const Color(0x0FFFFFFF), borderRadius: BorderRadius.circular(10), border: Border.all(color: parle ? K.good : K.line, width: parle ? 1.5 : 1)),
       child: Row(children: [
         if (robot) const Padding(padding: EdgeInsets.only(right: 6), child: Ico('robots', taille: 20)),
         Flexible(child: Text(avecNiveau ? nom.replaceFirst(RegExp(r'^Robot '), '') : nom, overflow: TextOverflow.ellipsis, style: K.texte(15, poids: FontWeight.w600))),
+        if (j['plus'] == true) const Padding(padding: EdgeInsets.only(left: 5), child: CouronnePlus(taille: 15)),
+        if (j['voix'] == true) Padding(padding: const EdgeInsets.only(left: 5), child: Ico(j['muet'] == true ? 'micro-coupe' : 'micro', taille: 16, couleur: parle ? K.good : null)),
         const SizedBox(width: 6),
         Expanded(
           child: Wrap(spacing: 4, runSpacing: 4, children: [

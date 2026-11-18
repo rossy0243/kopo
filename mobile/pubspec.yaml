@@ -23,6 +23,7 @@ dependencies:
   firebase_messaging: ^17.0.1
   package_info_plus: ^10.2.2
   app_links: ^7.2.2
+  livekit_client: ^2.13.2
 
 dev_dependencies:
   flutter_test:

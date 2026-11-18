@@ -12,6 +12,7 @@ import 'commun/retention.dart';
 import 'commun/sons.dart';
 import 'commun/stickers.dart';
 import 'commun/stock.dart';
+import 'commun/vocal.dart';
 import 'reseau/api.dart';
 import 'reseau/salle.dart';
 
@@ -123,6 +124,15 @@ class App extends ChangeNotifier {
 
   // ---------------------------------------------------------------- utilitaires
   void maj() { Sons.surMenu(ecran != 'partie'); notifyListeners(); }
+
+  /// Micro des abonnés Kopo+ (LiveKit), voir commun/vocal.dart.
+  late final Vocal vocal = Vocal(envoyer: envoyer, maj: maj, toast: (t, n) => toast(t, Niv.values.firstWhere((x) => x.name == n, orElse: () => Niv.info)));
+  /// Tests et captures d'écran : le micro s'affiche sans salle sur le serveur.
+  bool microEssai = false;
+  /// Le micro a un sens à cette table : partie sur le serveur, avec au moins un autre humain.
+  bool get microDispo => (_salle != null || microEssai) && vue != null && (vue!['joueurs'] as List).cast<Map>().any((j) => j['id'] != vue!['moi'] && j['robot'] != true);
+  /// Abonné Kopo+ (couronne dorée) : d'après la table si on y est, sinon d'après le compte.
+  bool get kopoPlus => compte?['kopoPlus'] == true;
   String jourLocal([DateTime? d]) => R.jourDe(d ?? DateTime.now());
   String get pseudo => (Stock.lire('kopo-pseudo') as String?) ?? '';
   Map<String, dynamic>? get compte => Api.compte?['compte'] is Map ? (Api.compte!['compte'] as Map).cast<String, dynamic>() : null;
@@ -708,6 +718,8 @@ class App extends ChangeNotifier {
           if (d is Map) _sticker(d);
         case 'stickers':
           if (d is Map) _resteSticker(d);
+        case 'vocal':
+          if (d is Map) vocal.recevoir(d);
         case 'exclu':
           quitter();
           toast(d?.toString() ?? 'Tu as été exclu de la partie.', Niv.echec);
@@ -745,6 +757,7 @@ class App extends ChangeNotifier {
       essayer(0);
     });
     room.envoyer('sync');
+    if (vocal.actif) vocal.signaler();
   }
   void Function(Map r)? resultatMatchJourUi;
 
@@ -760,6 +773,7 @@ class App extends ChangeNotifier {
     for (final a in _abonnements) { a.cancel(); }
     _abonnements.clear();
     if (s != null) { s.quitter().catchError((_) => 1000); }
+    vocal.arreter();
     vue = vueAvant = null;
     _minuteurFenetre?.cancel();
     robotsAComposer = false;

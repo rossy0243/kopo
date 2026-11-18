@@ -58,6 +58,8 @@
 	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Le micro sert à parler avec les autres abonnés Kopo+ de ta table, pendant la partie.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>
