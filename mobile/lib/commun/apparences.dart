@@ -1,4 +1,4 @@
-// Avatars et cadres (identifiants du site : av-…, cadre-…).
+// Avatars (identifiants du site : av-…). Les cadres (cadre-…) sont retirés depuis le 18/11.
 import 'package:flutter/material.dart';
 
 import 'theme.dart';
@@ -39,32 +39,14 @@ LinearGradient _bandes(List<Color> cols, {List<double>? stops, Alignment debut =
   }
 }
 
-List<BoxShadow> ombresCadre(String? id) {
-  BoxShadow a(Color c, double r, [double flou = 0]) => BoxShadow(color: c, spreadRadius: r, blurRadius: flou);
-  switch (id) {
-    case 'cadre-kinshasa': return [a(const Color(0xFFCE1021), 5), a(const Color(0xFF3B8FD6), 3)];
-    case 'cadre-lubumbashi': return [a(const Color(0xFF5A2E0E), 5), a(const Color(0xFFB87333), 3)];
-    case 'cadre-abidjan': return [a(const Color(0xFF009E60), 5), a(const Color(0xFFF77F00), 3)];
-    case 'cadre-dakar': return [a(const Color(0xFFFDEF42), 5), a(const Color(0xFF00853F), 3)];
-    case 'cadre-douala': return [a(const Color(0xFFCE1126), 5), a(const Color(0xFF007A5E), 3)];
-    case 'cadre-brazzaville': return [a(const Color(0xFFDC241F), 5), a(const Color(0xFF009543), 3)];
-    case 'cadre-fondateurs': return [a(K.brass, 7), a(K.encre, 5), a(K.brass, 3)];
-    case 'cadre-legende': return [a(const Color(0x99E0564C), 4, 14), a(K.brass, 6), a(const Color(0xFFE0564C), 3)];
-    case 'cadre-ambassadeur': return [a(K.brass, 5), a(const Color(0xFF1F8A5B), 3)];
-    case 'cadre-ambassadeur-or': return [a(const Color(0x8CE2B04A), 4, 14), a(K.brass, 7), a(const Color(0xFFFFF3C8), 5), a(K.brass, 3)];
-    default: return const [];
-  }
-}
-
-/// Rond avec l'initiale du pseudo, l'apparence et le cadre équipés, et la pastille de niveau.
+/// Rond avec l'initiale du pseudo, l'avatar équipé et la pastille de niveau.
 class Avatar extends StatelessWidget {
   final String nom;
   final String? avatar;
-  final String? cadre;
   final double taille;
   final int? niveau;
   final bool gris;
-  const Avatar(this.nom, {super.key, this.avatar, this.cadre, this.taille = 40, this.niveau, this.gris = false});
+  const Avatar(this.nom, {super.key, this.avatar, this.taille = 40, this.niveau, this.gris = false});
 
   @override
   Widget build(BuildContext context) {
@@ -79,7 +61,6 @@ class Avatar extends StatelessWidget {
         color: s.fond,
         gradient: s.degrade,
         border: s.anneau == null ? null : Border.all(color: s.anneau!, width: 2),
-        boxShadow: ombresCadre(cadre),
       ),
       child: Text(lettre, style: TextStyle(fontFamily: K.display, fontSize: taille * .6, height: 1, color: s.encre, shadows: s.ombreTexte ? const [Shadow(color: Color(0x99000000), blurRadius: 3, offset: Offset(0, 1))] : null)),
     );

@@ -68,6 +68,8 @@ class R {
   }
 
   // ------------------------------------------------------------------ objets de collection
+  // retire: true = cadres, retirés du jeu le 18/11 (comme sur le site) : plus donnés, plus montrés ni équipables.
+  // Gardés ici et dans les profils pour pouvoir les réutiliser autrement plus tard.
   static final Map<String, Map<String, dynamic>> objets = {
     'av-laiton': {'type': 'avatar', 'nom': 'Laiton', 'd': 'De base'},
     'av-nuit': {'type': 'avatar', 'nom': 'Nuit', 'd': 'Niveau 2'},
@@ -75,17 +77,16 @@ class R {
     'av-fleuve': {'type': 'avatar', 'nom': 'Fleuve', 'd': 'Niveau 5'},
     'dos-laiton': {'type': 'dos', 'nom': 'Laiton', 'd': 'De base'},
     'dos-kinshasa': {'type': 'dos', 'nom': 'RD Congo', 'd': 'Bienvenue, jour 7'},
-    'cadre-kinshasa': {'type': 'cadre', 'nom': 'RD Congo', 'd': 'Défi de la semaine'},
-    'cadre-abidjan': {'type': 'cadre', 'nom': "Côte d'Ivoire", 'd': 'Défi de la semaine'},
-    'cadre-dakar': {'type': 'cadre', 'nom': 'Sénégal', 'd': 'Défi de la semaine'},
-    'cadre-douala': {'type': 'cadre', 'nom': 'Cameroun', 'd': 'Défi de la semaine'},
-    'cadre-brazzaville': {'type': 'cadre', 'nom': 'Congo', 'd': 'Défi de la semaine'},
-    'cadre-lubumbashi': {'type': 'cadre', 'nom': 'Lubumbashi', 'd': 'Ancien défi', 'ville': true},
+    'cadre-kinshasa': {'type': 'cadre', 'nom': 'RD Congo', 'd': 'Défi de la semaine', 'retire': true},
+    'cadre-abidjan': {'type': 'cadre', 'nom': "Côte d'Ivoire", 'd': 'Défi de la semaine', 'retire': true},
+    'cadre-dakar': {'type': 'cadre', 'nom': 'Sénégal', 'd': 'Défi de la semaine', 'retire': true},
+    'cadre-douala': {'type': 'cadre', 'nom': 'Cameroun', 'd': 'Défi de la semaine', 'retire': true},
+    'cadre-brazzaville': {'type': 'cadre', 'nom': 'Congo', 'd': 'Défi de la semaine', 'retire': true},
+    'cadre-lubumbashi': {'type': 'cadre', 'nom': 'Lubumbashi', 'd': 'Ancien défi', 'ville': true, 'retire': true},
   };
   static const categories = [
     {'type': 'avatar', 'nom': 'Avatars'},
     {'type': 'dos', 'nom': 'Dos de cartes'},
-    {'type': 'cadre', 'nom': 'Cadres'},
   ];
   /// Range des objets ({id, type, …}) par catégorie ; les catégories vides sont omises.
   static List<({String nom, List<Map<String, dynamic>> objets})> parCategorie(List<Map<String, dynamic>> liste) => [
@@ -105,16 +106,15 @@ class R {
   }
   static bool donnerObjet(Profil p, String id) {
     final c = collection(p), o = objets[id];
-    if (o == null || (c['possedes'] as List).contains(id)) return false;
+    if (o == null || o['retire'] == true || (c['possedes'] as List).contains(id)) return false;
     (c['possedes'] as List).add(id);
     (c['equipes'] as Map)[o['type']] = id;
     return true;
   }
   static bool equiper(Profil p, String id) {
     final c = collection(p), o = objets[id];
-    if (o == null) return false;
+    if (o == null || o['retire'] == true) return false;
     final eq = c['equipes'] as Map;
-    if (o['type'] == 'cadre' && eq['cadre'] == id) { eq['cadre'] = null; return true; }
     if (!(c['possedes'] as List).contains(id)) return false;
     eq[o['type']] = id;
     return true;
@@ -215,18 +215,17 @@ class R {
     Modele('katapss3', 'Fais 3 Katapss cette semaine', 3, 0, (e) => e.katapss),
     Modele('finales6', 'Atteins 6 finales cette semaine', 6, 0, (e) => e.finale ? 1 : 0),
   ];
-  static const cadres = ['cadre-kinshasa', 'cadre-abidjan', 'cadre-dakar', 'cadre-douala', 'cadre-brazzaville'];
   static const defiPieces = 300, defiXp = 30;
   static Map<String, dynamic> defiSemaine(Profil p, String jour) {
     final sem = semaineDe(jour);
     if (p['defi'] is! Map || p['defi']['semaine'] != sem) {
       final n = int.parse(sem.substring(sem.length - 2)) + int.parse(sem.substring(0, 4)) * 53;
-      p['defi'] = {'semaine': sem, 'id': defis[n % defis.length].id, 'cadre': cadres[n % cadres.length], 'avance': 0, 'finie': false};
+      p['defi'] = {'semaine': sem, 'id': defis[n % defis.length].id, 'avance': 0, 'finie': false};
     }
     final pd = p['defi'] as Map;
     final d = defis.firstWhere((x) => x.id == pd['id'], orElse: () => defis.first);
     final fin = decaler(jour, 6 - (dateDe(jour).weekday - 1));
-    return {'texte': d.texte, 'cible': d.cible, 'avance': math.min((pd['avance'] as num).toInt(), d.cible), 'finie': pd['finie'] == true, 'pieces': defiPieces, 'xp': defiXp, 'cadre': pd['cadre'], 'nomCadre': objets[pd['cadre']]?['nom'] ?? '', 'joursRestants': ecart(jour, fin) + 1};
+    return {'texte': d.texte, 'cible': d.cible, 'avance': math.min((pd['avance'] as num).toInt(), d.cible), 'finie': pd['finie'] == true, 'pieces': defiPieces, 'xp': defiXp, 'joursRestants': ecart(jour, fin) + 1};
   }
 
   // ------------------------------------------------------------------ parcours de bienvenue (7 jours de jeu)
@@ -362,7 +361,7 @@ class R {
       if (n > 0) {
         final avant = _n(pd['avance']);
         pd['avance'] = math.min(d.cible, avant + n);
-        if (_n(pd['avance']) >= d.cible) { pd['finie'] = true; piecesGagnees += defiPieces; xpMissions += defiXp; donnerObjet(p, pd['cadre'] as String); }
+        if (_n(pd['avance']) >= d.cible) { pd['finie'] = true; piecesGagnees += defiPieces; xpMissions += defiXp; }
         defi = LigneMission(d.texte, avant, _n(pd['avance']), d.cible, pd['finie'] == true, false, defiPieces, defi: true);
       }
     }
