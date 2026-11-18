@@ -30,7 +30,7 @@ class Google {
     if (jeton != null && jeton.isNotEmpty) {
       app.finirConnexionGoogle(jeton);
     } else if (f['error_description'] != null) {
-      app.toast('Connexion Google annulée.');
+      app.toast('Connexion Google annulée.', Niv.alerte);
     }
     // Liens du site : ?parrain=CODE, ?bande=CODE, #CODE (une table).
     final q = u.queryParameters;
@@ -46,6 +46,6 @@ class Google {
     final retour = kIsWeb ? Uri.base.replace(fragment: '', query: '').toString() : retourAppli;
     final url = Uri.parse('$origine/auth/v1/authorize?provider=google&redirect_to=${Uri.encodeComponent(retour)}');
     final ok = await launchUrl(url, mode: kIsWeb ? LaunchMode.platformDefault : LaunchMode.externalApplication, webOnlyWindowName: kIsWeb ? '_self' : null);
-    if (!ok) app.toast("Impossible d'ouvrir la connexion Google.");
+    if (!ok) app.toast("Impossible d'ouvrir la connexion Google.", Niv.echec);
   }
 }

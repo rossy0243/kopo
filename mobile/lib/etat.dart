@@ -17,6 +17,9 @@ import 'reseau/salle.dart';
 
 typedef Vue = Map<String, dynamic>;
 
+/// Niveau d'une notification (toast) : la couleur de la pastille. Comme toast(t, 'succes') sur le site.
+enum Niv { info, succes, alerte, echec }
+
 /// Un effet du calque d'animations : bulle au-dessus d'un siège, tampon au milieu de l'écran.
 class Effet {
   static int _n = 0;
@@ -72,6 +75,7 @@ class App extends ChangeNotifier {
   WidgetBuilder? fenetre;
   String fenetreType = '';
   String? toastTexte;
+  Niv toastNiveau = Niv.info;
   Timer? _minuteurToast;
   String? bandeau;
   final effets = <Effet>[];
@@ -143,10 +147,12 @@ class App extends ChangeNotifier {
   }
   String nouveauCode() { final r = math.Random(); return List.generate(4, (_) => lettresCode[r.nextInt(lettresCode.length)]).join(); }
 
-  void toast(String t) {
+  // Une pastille en bas de l'écran (en haut pendant une partie) : succès = vert, alerte = ambre, échec = rouge, info = neutre.
+  void toast(String t, [Niv niveau = Niv.info]) {
     toastTexte = t;
+    toastNiveau = niveau;
     _minuteurToast?.cancel();
-    _minuteurToast = Timer(const Duration(milliseconds: 3500), () { toastTexte = null; maj(); });
+    _minuteurToast = Timer(Duration(milliseconds: (t.length * 60).clamp(3500, 6000)), () { toastTexte = null; maj(); });
     maj();
   }
   void vibrer([int ms = 60]) { if (prefs['vibrations'] == true) { ms > 80 ? HapticFeedback.mediumImpact() : HapticFeedback.lightImpact(); } }
@@ -228,7 +234,7 @@ class App extends ChangeNotifier {
       final p = lireProfil();
       if (r is Map && r['profil'] != null && R.fusionnerProfils(p, r['profil'], 'max')) {
         ecrireProfil(p);
-        toast('Ton niveau et tes statistiques ont été récupérés.');
+        toast('Ton niveau et tes statistiques ont été récupérés.', Niv.succes);
       }
     } catch (_) {}
     sauvegarderProfil();
@@ -263,7 +269,7 @@ class App extends ChangeNotifier {
     if (p == null || p == Stock.lire('kopo-pseudo')) return;
     final avant = Stock.lire('kopo-pseudo') as String?;
     Stock.ecrire('kopo-pseudo', p);
-    if (avant != null && avant.toLowerCase() != p.toLowerCase()) toast(aLaCreation ? '« $avant » était déjà pris : ton pseudo est $p.' : 'Ton pseudo en ligne est $p.');
+    if (avant != null && avant.toLowerCase() != p.toLowerCase()) toast(aLaCreation ? '« $avant » était déjà pris : ton pseudo est $p.' : 'Ton pseudo en ligne est $p.', Niv.alerte);
     maj();
   }
   Future<Map<String, dynamic>?>? _compteEnCours;
@@ -292,7 +298,7 @@ class App extends ChangeNotifier {
   String? lirePseudo() {
     final p = nettoyerPseudo(pseudo);
     if (p.length >= 3) return p;
-    toast("Choisis d'abord ton pseudo.");
+    toast("Choisis d'abord ton pseudo.", Niv.alerte);
     return null;
   }
 
@@ -381,7 +387,7 @@ class App extends ChangeNotifier {
   void _splash(double p, String t) { splash = p; splashEtat = t; maj(); }
   void finirSplash(bool reveil) {
     if (ecran != 'splash') return;
-    if (reveil) toast('Le serveur se réveille encore : les parties en ligne seront prêtes dans un instant.');
+    if (reveil) toast('Le serveur se réveille encore : les parties en ligne seront prêtes dans un instant.', Niv.alerte);
     _apresSplash();
   }
   void _apresSplash() {
@@ -453,11 +459,10 @@ class App extends ChangeNotifier {
       Stock.ecrire('kopo-remise-a-flot', jourLocal());
       if (r is Map && r['ok'] == true) {
         soldeServeur(r['solde']);
-        if (fenetre == null) { remiseAFlotUi?.call((r['solde'] as num).toInt()); } else { toast('Remise à flot : ${formatPieces(r['solde'] as num)} pièces.'); }
+        toast('Remise à flot : ton solde remonte à ${formatPieces(r['solde'] as num)} pièces (une fois par jour).', Niv.succes);
       }
     } catch (_) {}
   }
-  void Function(int solde)? remiseAFlotUi;
 
   Future<void> lireEnLigneServeur() async {
     try {
@@ -529,22 +534,51 @@ class App extends ChangeNotifier {
   }
   void synchroEquiper(String id) { if (enLigne) Api.post('/collection/equiper', {'objet': id}).catchError((_) => null); }
 
-  // Notifications du jeu (invitation, rivalité, ami…) : montrées sur l'accueil, une à la fois.
+  // Notifications du jeu, une à la fois. Celles qui demandent une action (invitation, demande d'ami, rappel de la Bande)
+  // ouvrent une fenêtre, sur l'accueil seulement. Les autres (rivalité, cadeau, parrainage, résultat de la Bande,
+  // ami accepté) sont une pastille, partout, même en partie.
   void Function(Map a)? notificationUi;
+  static bool notifEnFenetre(Map a) {
+    final d = (a['donnees'] as Map?) ?? const {};
+    bool vrai(Object? v) => v != null && v != false;
+    return a['type'] == 'invitation' || (a['type'] == 'ami' && !vrai(d['accepte'])) || (a['type'] == 'bande' && d['rappel'] == true);
+  }
+  void pastilleNotification(Map a) {
+    final d = (a['donnees'] as Map?) ?? const {};
+    final texte = a['texte'].toString();
+    switch (a['type']) {
+      case 'cadeau':
+        final n = ((d['stickers'] as List?) ?? const []).map((e) => e.toString()).where(Stickers.connu).length;
+        stickers = null; // relu à la prochaine ouverture du chat
+        toast("Cadeau de l'équipe Masano${d['message'] != null ? ' : ${d['message']}' : ''}${n > 0 ? ' ($n sticker${n > 1 ? 's' : ''} à envoyer depuis le chat)' : ''}", Niv.succes);
+      case 'parrainage':
+        Api.get('/moi').then((m) => soldeServeur(m['compte']['solde'])).catchError((_) => null);
+        toast('$texte${d['titre'] != null ? ' « ${d['titre']} »' : ''}', Niv.succes);
+      case 'bande':
+        Api.get('/moi').then((m) => soldeServeur(m['compte']['solde'])).catchError((_) => null);
+        toast(texte);
+      case 'ami':
+        toast(texte, Niv.succes);
+      default:
+        toast(texte); // rivalité
+    }
+  }
   Future<void> lireNotifications() async {
-    if (!enLigne || ecran != 'accueil' || fenetre != null) return;
+    bool surAccueil() => ecran == 'accueil' && fenetre == null;
+    if (!enLigne || (!surAccueil() && toastTexte != null)) return;
     Map n;
     try { n = await Api.get('/notifications') as Map; } catch (_) { return; }
     if (n['demandesAmi'] is num) { demandesAmi = (n['demandesAmi'] as num).toInt(); maj(); }
     final liste = ((n['liste'] as List?) ?? []).cast<Map>();
-    final nonLues = liste.where((x) => x['lue'] != true && !_notifsVues.contains(x['id'].toString())).toList().reversed.toList();
+    final nonLues = liste.where((x) => x['lue'] != true && !_notifsVues.contains(x['id'].toString()) && (surAccueil() || !notifEnFenetre(x))).toList().reversed.toList();
     bool recente(Map x) => DateTime.now().difference(DateTime.parse(x['cree_le'].toString())).inMinutes < 10;
     Map? a;
     for (final x in nonLues) { if (x['type'] == 'invitation' && recente(x)) { a = x; break; } }
     a ??= nonLues.isEmpty ? null : nonLues.first;
-    if (a == null || ecran != 'accueil' || fenetre != null) return;
+    if (a == null || (notifEnFenetre(a) && !surAccueil())) return;
     _notifsVues.add(a['id'].toString());
     Api.post('/notifications/lues', {'ids': [a['id']]}).catchError((_) => null);
+    if (!notifEnFenetre(a)) { pastilleNotification(a); Timer(const Duration(milliseconds: 4500), lireNotifications); return; }
     if (a['type'] == 'invitation' && !recente(a)) { lireNotifications(); return; }
     notificationUi?.call(a);
   }
@@ -627,7 +661,7 @@ class App extends ChangeNotifier {
         if (facon['retente'] == null) { entrerServeur(nom, {...facon, 'retente': true}); return; }
       }
       quitter();
-      toast(texte);
+      toast(texte, Niv.echec);
     }
   }
 
@@ -653,13 +687,13 @@ class App extends ChangeNotifier {
           memoriser(v['code'].toString());
           afficher(v);
         case 'erreur':
-          toast(d.toString());
+          toast(d.toString(), Niv.echec);
         case 'solde':
           if (d is Map) soldeServeur(d['solde']);
         case 'mise':
           if (d is Map) toast('Mise de ${formatPieces(d['mise'] as num)} pièces payée. Pot : ${formatPieces(d['pot'] as num)} pièces.');
         case 'pot':
-          if (d is Map) toast((d['gain'] as num) > 0 ? 'Tu gagnes ${formatPieces(d['gain'] as num)} pièces du pot !' : 'Pas de part du pot cette fois (${formatPieces(d['pot'] as num)} pièces en jeu).');
+          if (d is Map) toast((d['gain'] as num) > 0 ? 'Tu gagnes ${formatPieces(d['gain'] as num)} pièces du pot !' : 'Pas de part du pot cette fois (${formatPieces(d['pot'] as num)} pièces en jeu).', (d['gain'] as num) > 0 ? Niv.succes : Niv.info);
         case 'classee':
           if (d is Map && d['classee'] == true) toast('Partie classée : tes points de ligue sont en jeu.');
         case 'ligue':
@@ -676,7 +710,7 @@ class App extends ChangeNotifier {
           if (d is Map) _resteSticker(d);
         case 'exclu':
           quitter();
-          toast(d?.toString() ?? 'Tu as été exclu de la partie.');
+          toast(d?.toString() ?? 'Tu as été exclu de la partie.', Niv.echec);
         case 'matchJour':
           if (d is Map) {
             if (d['fin'] == true) { _depart = true; quitter(); Timer(const Duration(milliseconds: 250), () => resultatMatchJourUi?.call(d)); }
@@ -686,7 +720,7 @@ class App extends ChangeNotifier {
     }));
     room.fermee.then((code) {
       if (_client != moi || _depart) return;
-      if (code == 4000 || code == 4001) { quitter(); toast(code == 4000 ? 'Ta partie est ouverte sur un autre appareil.' : 'Tu as été exclu de la partie.'); return; }
+      if (code == 4000 || code == 4001) { quitter(); toast(code == 4000 ? 'Ta partie est ouverte sur un autre appareil.' : 'Tu as été exclu de la partie.', code == 4000 ? Niv.alerte : Niv.echec); return; }
       bandeau = 'Connexion perdue. Reconnexion…';
       maj();
       Future<void> essayer(int n) async {
@@ -705,7 +739,7 @@ class App extends ChangeNotifier {
           if (_client == moi) { _brancher(r, nom, facon); } else { r.abandonner(); }
         } catch (_) {
           if (_client == moi && n < 40) { Timer(const Duration(seconds: 3), () => essayer(n + 1)); }
-          else if (_client == moi) { quitter(); toast('Connexion au serveur perdue.'); }
+          else if (_client == moi) { quitter(); toast('Connexion au serveur perdue.', Niv.echec); }
         }
       }
       essayer(0);
@@ -757,7 +791,7 @@ class App extends ChangeNotifier {
       return;
     }
     final m = v['manche'] as Map?;
-    if (v['etat'] == 'manche' && !(v['joueurs'] as List).any((j) => j['id'] == v['moi'])) { quitter(); toast('La revanche est partie sans toi.'); return; }
+    if (v['etat'] == 'manche' && !(v['joueurs'] as List).any((j) => j['id'] == v['moi'])) { quitter(); toast('La revanche est partie sans toi.', Niv.alerte); return; }
     ecran = 'partie';
     try { v['jeu'] == 'inter8' ? _animerInter(A, v) : _animer(A, v); } catch (_) {}
     try { v['jeu'] == 'inter8' ? _sonnerInter(A, v) : _sonner(A, v); } catch (_) {}
@@ -968,7 +1002,7 @@ class App extends ChangeNotifier {
     final id = d['sticker']?.toString(), n = (d['restants'] as num?)?.toInt() ?? 0;
     if (id == null || stickers == null) return;
     final soldes = Map<String, dynamic>.from((stickers!['soldes'] as Map?) ?? const {});
-    if (n > 0) { soldes[id] = n; } else { soldes.remove(id); toast('Plus d\'utilisations pour « ${nomSticker(id)} » : il se reverrouille.'); }
+    if (n > 0) { soldes[id] = n; } else { soldes.remove(id); toast('Plus d\'utilisations pour « ${nomSticker(id)} » : il se reverrouille.', Niv.alerte); }
     stickers!['soldes'] = soldes;
     maj();
   }
@@ -1136,7 +1170,7 @@ class App extends ChangeNotifier {
     amiAInviter = null;
     if (quand == null || DateTime.now().difference(quand).inMinutes >= 3) return;
     final nom = amiAInviterPseudo;
-    Api.post('/amis/${Uri.encodeComponent(id)}/inviter', {'code': v['code']}).then((_) => toast('Invitation envoyée à $nom.'), onError: (e) => toast(e.toString()));
+    Api.post('/amis/${Uri.encodeComponent(id)}/inviter', {'code': v['code']}).then((_) => toast('Invitation envoyée à $nom.', Niv.succes), onError: (e) => toast(e.toString(), Niv.echec));
   }
 
   // ---------------------------------------------------------------- Google (Supabase)
@@ -1151,20 +1185,20 @@ class App extends ChangeNotifier {
       Stock.ecrire('kopo-compte-serveur', {'serveur': Api.serveur, 'jeton': j['jeton'], 'compte': j['compte']});
       Stock.ecrire('kopo-entree', 'google');
       if (j['compte']?['pseudo'] != null) Stock.ecrire('kopo-pseudo', j['compte']['pseudo']);
-      toast('Connecté avec Google : ${j['compte']['pseudo']}#${j['compte']['numero']}');
+      toast('Connecté avec Google : ${j['compte']['pseudo']}#${j['compte']['numero']}', Niv.succes);
       majBloques();
       Timer(const Duration(seconds: 3), restaurerProfil);
       relireConfig();
       final pr = j['parrainage'];
       if (pr is Map) {
         Stock.effacer('kopo-parrain');
-        Timer(const Duration(milliseconds: 3800), () => toast(pr['ok'] == true ? "${pr['parrain']} t'a invité : joue tes premières parties pour gagner ton cadeau !" : pr['erreur'].toString()));
+        Timer(const Duration(milliseconds: 3800), () => toast(pr['ok'] == true ? "${pr['parrain']} t'a invité : joue tes premières parties pour gagner ton cadeau !" : pr['erreur'].toString(), pr['ok'] == true ? Niv.succes : Niv.echec));
       }
       if (ecran == 'bienvenue') afficherAccueil(premiere: true);
       maj();
       onConnecte?.call();
     } catch (e) {
-      toast(e.toString());
+      toast(e.toString(), Niv.echec);
     }
   }
   void Function()? onConnecte;
