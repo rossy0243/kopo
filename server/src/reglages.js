@@ -51,6 +51,8 @@ const DEFAUTS = {
   communautes: [],
   // Stickers animés : interrupteur éteint au départ (tout grisé), offres en pièces et en argent réel, pas encore en vente.
   stickers: { actif: false, vente: false, remisePack: require('./stickers').REMISE_PACK, offres: require('./stickers').OFFRES_DEFAUT },
+  // Bouquets de pièces (argent réel, du moins cher au plus cher, 40 000 FC au plus) : au taux des stickers, bonus croissant.
+  bouquets: { bouquets: require('./bouquets').BOUQUETS_DEFAUT },
   messagesRapides: ['👏', '😂', '😮', '🔥', '😡', '👍', '😭', '🙏', 'Bien joué !', 'Bravo !', 'Joli coup !', 'Belle carte !', 'Bien vu !', 'Trop fort !', 'Merci !', 'Désolé !', 'Oups !', 'Aïe !', 'Pas de chance !', 'Je ramasse…', 'Je t’ai eu !', 'Katapss !', 'Vite !', 'Prends ton temps', 'À toi !', 'Encore une !', 'Bonne chance !', 'Bonne partie !', 'GG !', 'Revanche ?', 'On en refait une ?', 'Je reviens', 'Salut tout le monde !', 'À la prochaine !'],
 };
 // Version actuelle de l'appli (const VERSION dans src/source.html). La version minimale demandée
@@ -254,6 +256,7 @@ function creerReglages(base) {
       }
       if (cle === 'bande') valeur = verifierBande(valeur);
       if (cle === 'stickers') valeur = require('./stickers').verifierReglage(valeur);
+      if (cle === 'bouquets') valeur = require('./bouquets').verifierReglage(valeur);
       if (cle === 'durcissement') {
         if (valeur.enAttente) {
           verifierLigue({ ...DEFAUTS.ligue, seuils: valeur.seuils });
