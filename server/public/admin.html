@@ -90,8 +90,27 @@ const $ = (s) => document.querySelector(s);
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const nb = (x) => (x ?? 0).toLocaleString('fr-FR');
 const date = (d) => d ? new Date(d).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : '—';
-const MOTIFS = { bienvenue: 'Bienvenue', bonus_jour: 'Bonus du jour', manche: 'Manches survécues', katapss: 'Katapss', victoire: 'Victoires', deuxieme: '2e places', remise_a_flot: 'Remise à flot', admin: 'Corrections admin', cadeau: 'Cadeaux', mise: 'Mises', pot: 'Pots', saison: 'Récompenses de saison', parcours: 'Parcours de saison', boutique: 'Boutique', parrainage: 'Parrainage (parrains)', parrainage_filleul: 'Parrainage (filleuls)', mission: 'Missions du jour', defi: 'Défis de la semaine', bienvenue7: 'Bienvenue 7 jours', mise_bande: 'Mises de Bande', pot_bande: 'Pots de Bande (Chefs)', mise_rendue_bande: 'Mises rendues (2e de Bande)', remboursement_bande: 'Mises de Bande remboursées' };
+const MOTIFS = { bienvenue: 'Bienvenue', bonus_jour: 'Bonus du jour', manche: 'Manches survécues', katapss: 'Katapss', victoire: 'Victoires', deuxieme: '2e places', remise_a_flot: 'Remise à flot', admin: 'Corrections admin', cadeau: 'Cadeaux', mise: 'Mises', pot: 'Pots', saison: 'Récompenses de saison', parcours: 'Parcours de saison', boutique: 'Boutique', parrainage: 'Parrainage (parrains)', parrainage_filleul: 'Parrainage (filleuls)', mission: 'Missions du jour', defi: 'Défis de la semaine', bienvenue7: 'Bienvenue 7 jours', mise_bande: 'Mises de Bande', pot_bande: 'Pots de Bande (Chefs)', mise_rendue_bande: 'Mises rendues (2e de Bande)', remboursement_bande: 'Mises de Bande remboursées', achat_pieces: 'Bouquets de pièces (achats)' };
 const DIV = { bois: 'Bois', bronze: 'Bronze', argent: 'Argent', or: 'Or', diamant: 'Diamant', legende: 'Légende' };
+// Bouquets de pièces (argent réel) : les prix du jeu, et un bouquet livré à la main tant que le mobile money n'est pas branché.
+async function bouquetsAdmin() {
+  const B = await api('/bouquets');
+  $('#bouquets').innerHTML = `<div class="carte"><table><tr><th>Bouquet</th><th class="n">Prix</th><th class="n">Pièces</th><th class="n">dont bonus</th></tr>
+      ${B.bouquets.map((b) => `<tr><td>${esc(b.nom)}</td><td class="n">${nb(b.francs)} FC</td><td class="n">${nb(b.pieces)}</td><td class="n">${b.bonus ? `+${nb(b.bonus)} <span class="muted">(${b.bonusPct} %)</span>` : '<span class="muted">—</span>'}</td></tr>`).join('')}</table>
+      <p class="muted" style="margin:8px 0 0">Même taux que les stickers : 200 pièces ≈ 500 FC. Plus le bouquet est gros, plus le bonus monte. Les joueurs voient ces bouquets dans « Acheter des pièces » ; le paiement mobile money n'est pas encore branché (« Bientôt »).</p></div>
+    <div class="carte"><b>Livrer un bouquet</b> <span class="muted">(paiement mobile money reçu à la main)</span>
+      <div class="ligne"><input id="bqJoueur" placeholder="Pseudo#1234" style="width:180px"><select id="bqQuoi">${B.bouquets.map((b) => `<option value="${b.id}">${esc(b.nom)} · ${nb(b.francs)} FC → ${nb(b.pieces)} pièces</option>`).join('')}</select>
+        <input id="bqRef" placeholder="Référence (ex. n° de transaction)" style="flex:1;min-width:200px"><button class="btn principal" id="bqLivrer">Livrer</button></div>
+      <p class="muted" style="margin:6px 0 0">Le joueur reçoit les pièces et une notification « Merci ! Ton bouquet est arrivé ». Noté au Journal.</p></div>
+    <div class="carte"><table><tr><th>Date</th><th>Joueur</th><th class="n">Pièces</th><th>Référence</th></tr>
+      ${lignes('bqLivraisons', B.livraisons, (l) => `<tr><td>${date(l.cree_le)}</td><td><button class="lien" data-joueur="${esc(l.compte)}">${esc(l.pseudo)}#${esc(l.numero)}</button></td><td class="n">${nb(l.pieces)}</td><td>${esc(l.ref || '')}</td></tr>`, { par: 10, colonnes: 4, vide: '<tr><td class="muted" colspan="4">Aucun bouquet livré pour l\'instant.</td></tr>' })}</table></div>`;
+  $('#bqLivrer').onclick = async () => {
+    const b = B.bouquets[Number($('#bqQuoi').value)], j = $('#bqJoueur').value.trim();
+    if (!/#\d{4}$/.test(j)) return message('Écris le joueur sous la forme Pseudo#1234.');
+    if (!confirm(`Livrer le bouquet « ${b.nom} » (${nb(b.pieces)} pièces) à ${j} ? Fais-le seulement si le paiement de ${nb(b.francs)} FC est bien reçu.`)) return;
+    try { const r = await api('/bouquets/livrer', { methode: 'POST', corps: { joueur: j, bouquet: b.id, message: $('#bqRef').value } }); message(`${nb(r.bouquet.pieces)} pièces livrées à ${r.joueur.nom}.`); aller('economie'); } catch (e) { message(e.message); }
+  };
+}
 let jeton = sessionStorage.getItem('kopo-admin');
 let page = 'direct', minuteur = null;
 
@@ -208,9 +227,12 @@ const afficher = {
       <div class="carte">${graphe(e.parJour, [{ cle: 'creees', nom: 'Pièces créées', couleur: '#e2b04a' }, { cle: 'detruites', nom: 'Pièces détruites', couleur: '#c7362f' }])}</div>
       <h3>D'où viennent et où vont les pièces (7 jours)</h3>
       <div class="carte"><table><tr><th>Motif</th><th class="n">Total</th><th class="n">Opérations</th></tr>${e.parMotif.map((m) => `<tr><td>${esc(MOTIFS[m.motif] || m.motif)}</td><td class="n ${m.total < 0 ? 'ko' : ''}">${nb(m.total)}</td><td class="n">${nb(m.operations)}</td></tr>`).join('') || '<tr><td colspan="3" class="muted">Rien pour l\'instant.</td></tr>'}</table></div>
+      <h3>Bouquets de pièces</h3>
+      <div id="bouquets"><p class="muted">Chargement…</p></div>
       <h3>Comptes suspects</h3>
       <p class="muted">Deux comptes qui ont joué au moins 5 parties seuls ensemble ces 14 derniers jours, gagnées à 80 % ou plus par le même : peut-être un joueur qui se fait donner des pièces ou des points de ligue par un faux compte. Ouvre les fiches pour décider.</p>
       <div id="suspects"><p class="muted">Chargement…</p></div>`;
+    await bouquetsAdmin();
     const s = await api('/suspects');
     const qui = (id, pseudo, numero, cree, statut) => `<button class="lien" data-joueur="${esc(id)}">${esc(pseudo)}#${esc(numero)}</button><br><small class="muted">créé le ${date(cree)}${statut !== 'actif' ? ' · <span class="statut-' + esc(statut) + '">' + esc(statut) + '</span>' : ''}</small>`;
     $('#suspects').innerHTML = `<div class="carte"><table><tr><th>Gagne le plus</th><th>Perd le plus</th><th class="n">Parties ensemble</th><th class="n">Dont classées</th><th class="n">Victoires</th><th class="n">Pots gagnés</th></tr>${lignes('suspects', s.paires.map((p) => (p.victoires_a >= p.victoires_b ? p : { ...p, a: p.b, b: p.a, pseudo_a: p.pseudo_b, pseudo_b: p.pseudo_a, numero_a: p.numero_b, numero_b: p.numero_a, cree_a: p.cree_b, cree_b: p.cree_a, statut_a: p.statut_b, statut_b: p.statut_a, victoires_a: p.victoires_b, victoires_b: p.victoires_a, pots_a: p.pots_b, pots_b: p.pots_a })), (p) => `<tr><td>${qui(p.a, p.pseudo_a, p.numero_a, p.cree_a, p.statut_a)}</td><td>${qui(p.b, p.pseudo_b, p.numero_b, p.cree_b, p.statut_b)}</td><td class="n">${nb(p.ensemble)}</td><td class="n">${nb(p.classees)}</td><td class="n">${nb(p.victoires_a)} – ${nb(p.victoires_b)}</td><td class="n">${nb(p.pots_a)}</td></tr>`, { par: 20, colonnes: 6, vide: '<tr><td colspan="6" class="muted">Aucun compte suspect.</td></tr>' })}</table></div>`;

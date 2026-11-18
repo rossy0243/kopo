@@ -4,7 +4,7 @@ const express = require('express');
 const { enveloppe, publicCompte } = require('./api');
 const { emailSupabase } = require('./comptes');
 
-function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainage, bande, push, stickers, salles, demarrage }) {
+function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainage, bande, push, stickers, bouquets, salles, demarrage }) {
   const r = express.Router();
   r.use(express.json({ limit: '50kb' }));
 
@@ -240,6 +240,14 @@ function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainag
     const x = await stickers.offrir(req.body || {});
     await journal('stickers:cadeau', x.cible.type === 'joueur' ? x.cible.id : null, { cible: x.cible, stickers: x.stickers, utilisations: x.utilisations, message: req.body.message, joueurs: x.joueurs });
     res.json({ ok: true, ...x });
+  }));
+
+  // --- Bouquets de pièces : la liste, et un bouquet livré à un joueur (paiement mobile money reçu à la main).
+  r.get('/bouquets', enveloppe(async (req, res) => res.json(n2(await bouquets.resumeAdmin()))));
+  r.post('/bouquets/livrer', enveloppe(async (req, res) => {
+    const x = await bouquets.livrer(req.body || {});
+    await journal('bouquet:livre', x.joueur.id, { bouquet: x.bouquet.nom, francs: x.bouquet.francs, pieces: x.bouquet.pieces, message: req.body.message });
+    res.json(x);
   }));
 
   // --- Notifications push : abonnés, annonces envoyées, nouvelle annonce (essai à un joueur d'abord)
