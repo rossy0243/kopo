@@ -17,6 +17,7 @@ import 'communes.dart';
 import 'compet.dart';
 import 'parametres.dart';
 import 'social.dart';
+import 'vocal_ui.dart';
 
 Widget ligneXp(Niveau n) => Row(children: [
       Container(width: 38, height: 38, alignment: Alignment.center, decoration: BoxDecoration(shape: BoxShape.circle, color: K.brass, border: Border.all(color: const Color(0xFFF3D48A), width: 2)), child: Text('${n.niveau}', style: K.titre(22, couleur: K.encre))),
@@ -252,7 +253,7 @@ class _Profil extends StatefulWidget {
 }
 
 class _ProfilState extends State<_Profil> {
-  Map? ligue, srv;
+  Map? ligue, srv, abonnement;
   int? nbAmis;
   @override
   void initState() {
@@ -261,6 +262,7 @@ class _ProfilState extends State<_Profil> {
       Api.get('/ligue').then((L) { if (mounted) setState(() => ligue = L as Map); }).catchError((_) => null);
       Api.get('/amis').then((a) { if (mounted) setState(() => nbAmis = (a as List).length); }).catchError((_) => null);
       Api.get('/statistiques').then((s) { if (mounted) setState(() => srv = s as Map); }).catchError((_) => null);
+      Api.get('/abonnement').then((a) { if (mounted) setState(() => abonnement = a as Map); }).catchError((_) => null);
     }
   }
 
@@ -280,6 +282,7 @@ class _ProfilState extends State<_Profil> {
       }
     }
     final c = app.compte;
+    final plus = abonnement?['actif'] == true || (abonnement == null && c?['kopoPlus'] == true);
     final pseudo = app.pseudo.isEmpty ? 'Joueur' : app.pseudo;
     final n = R.niveauDe(p['xp'] as num? ?? 0);
     final titre = R.titre(p);
@@ -313,10 +316,28 @@ class _ProfilState extends State<_Profil> {
           Text.rich(TextSpan(children: [
             TextSpan(text: '$pseudo ', style: K.texte(20, poids: FontWeight.w700)),
             if (c?['numero'] != null) TextSpan(text: '#${c!['numero']} ', style: K.texte(13, couleur: K.muted)),
+            if (plus) const WidgetSpan(alignment: PlaceholderAlignment.middle, child: Padding(padding: EdgeInsets.only(right: 5), child: CouronnePlus(taille: 17))),
             TextSpan(text: drapeau),
           ])),
           Text(titre ?? 'Petit nouveau', style: K.texte(14, couleur: K.brass).copyWith(fontStyle: FontStyle.italic)),
           Muet(depuis, taille: 12),
+          // Kopo+ : la couronne et le micro ; un toucher ouvre l'abonnement (prix, date de fin).
+          if (app.enLigne)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: GestureDetector(
+                onTap: () => ouvrirAbonnement(),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(color: plus ? K.brass : const Color(0x1AE2B04A), border: Border.all(color: K.brass), borderRadius: BorderRadius.circular(99)),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    CouronnePlus(taille: 14, couleur: plus ? K.encre : K.brass),
+                    const SizedBox(width: 6),
+                    Flexible(child: Text(plus ? 'Kopo+ actif' : 'Passe à Kopo+ : le micro en partie', overflow: TextOverflow.ellipsis, style: K.texte(13, couleur: plus ? K.encre : K.brass, poids: FontWeight.w600))),
+                  ]),
+                ),
+              ),
+            ),
         ])),
         IconButton(onPressed: app.fermerFenetre, icon: const Icon(Icons.close, color: K.muted)),
       ]),

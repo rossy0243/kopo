@@ -9,6 +9,7 @@ import 'compet.dart';
 import 'partie_fenetres.dart';
 import 'progres.dart';
 import 'social.dart';
+import 'vocal_ui.dart';
 
 void brancherFenetres() {
   // Après le bonus du jour : la nouveauté, le tutoriel la toute première fois, sinon le cadeau de bienvenue du jour.
@@ -23,6 +24,7 @@ void brancherFenetres() {
   app.finMancheUi = afficherFinManche;
   app.finPartieUi = afficherFinPartie;
   app.resultatMatchJourUi = resultatMatchJour;
+  app.vocal.inviterAbonnement = (offre) => ouvrirAbonnement(offre);
   app.onConnecte = () { Push.synchroniser(); };
 
   // Notification reçue appli ouverte (Android) : un toast, le joueur est déjà dans le jeu.

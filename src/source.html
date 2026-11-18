@@ -196,6 +196,35 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
 .vocal { display: flex; gap: 6px; align-items: center; flex: none; }
 header .vocal .btn { padding: 5px 9px; font-size: 15px; line-height: 1.2; }
 .vocal .btn.ouvert { background: rgba(63,191,127,.18); border-color: var(--good); color: var(--good); }
+.vocal .btn.verrou { opacity: .75; }
+@media (orientation: portrait) and (max-width: 420px) { .vocal .btn.son-autres { display: none; } } /* place comptée : le son des autres se coupe aussi dans les Paramètres */
+.vocal .btn.verrou::after { content: "+"; font-weight: 800; color: var(--brass); margin-left: 2px; }
+.parleurs { position: fixed; z-index: 25; top: calc(env(safe-area-inset-top, 0px) + 54px); left: 50%; transform: translateX(-50%); max-width: min(calc(100vw - 32px), 420px); display: flex; gap: 6px; align-items: center; overflow: hidden; white-space: nowrap; padding: 4px 10px; border-radius: 99px; background: rgba(15,25,40,.94); border: 1px solid var(--good); color: var(--ink); font-size: 13px; pointer-events: none; }
+.parleurs .ico { width: 1em; height: 1em; color: var(--good); flex: none; }
+.parleurs .parleur { font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+.parleurs .parleur + .parleur::before { content: "·"; margin-right: 6px; color: var(--muted); }
+.parleurs .parleur.court { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--good); color: #10251a; font-weight: 800; }
+.parleurs .parleur.court::before { content: none; }
+.siege.parle { box-shadow: 0 0 0 2px var(--good), 0 0 14px 2px rgba(63,191,127,.45) !important; }
+#listeJoueurs li.parle { border-color: var(--good); }
+.badge-plus { display: inline-flex; vertical-align: -.12em; margin-left: 4px; flex: none; }
+.ico.plus-ico { width: .95em; height: .95em; fill: #e2b04a; stroke: #e2b04a; --acc: #c7362f; }
+.ico.plus-ico.grand { width: 30px; height: 30px; }
+.pf-plus { margin-top: 6px; justify-self: start; display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 99px; border: 1px solid var(--brass); background: rgba(226,176,74,.1); color: var(--brass); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.pf-plus.actif { background: var(--brass); color: #1d1606; }
+.pf-plus.actif .plus-ico { fill: #1d1606; stroke: #1d1606; }
+.abonnement { display: grid; gap: 10px; }
+.abonnement .ab-tete { display: flex; align-items: center; justify-content: center; gap: 8px; font-family: var(--display); font-size: 28px; letter-spacing: 1px; color: var(--brass); }
+.abonnement p { margin: 0; text-align: center; }
+.abonnement .ab-actif { color: var(--good); font-weight: 600; }
+.ab-avantages { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 14px; }
+.ab-avantages .ico { color: var(--brass); }
+.ab-formules { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ab-formule { position: relative; display: grid; gap: 2px; justify-items: center; padding: 14px 8px 10px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.04); color: var(--ink); font: inherit; cursor: pointer; }
+.ab-formule.top { border-color: var(--brass); background: rgba(226,176,74,.1); }
+.ab-formule .nom { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 1.2px; }
+.ab-formule .px { font-family: var(--display); font-size: 24px; color: var(--brass); white-space: nowrap; }
+.ab-formule .ruban { position: absolute; top: -9px; background: var(--brass); color: #1d1606; font-size: 11px; font-weight: 700; border-radius: 6px; padding: 2px 7px; white-space: nowrap; }
 .vocal .btn.coupe { background: rgba(239,107,95,.15); border-color: var(--bad); color: var(--bad); }
 .reglage { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; color: var(--muted); font-size: 14px; }
 .reglage .btn { padding: 6px 12px; font-size: 14px; }
@@ -1456,6 +1485,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     <button class="btn" id="btnQuitter" hidden>Quitter</button>
   </header>
   <div class="bandeau" id="bandeau" hidden></div>
+  <div class="parleurs" id="parleurs" hidden role="status"></div>
   <div id="audios" hidden></div>
 
   <!-- Accueil : les différentes parties du jeu -->
@@ -2336,6 +2366,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     room.onMessage('reaction', (e) => window.dispatchEvent(new CustomEvent('kopo-reaction', { detail: e })));
     room.onMessage('sticker', (e) => window.dispatchEvent(new CustomEvent('kopo-sticker', { detail: e })));
     room.onMessage('stickers', (e) => window.dispatchEvent(new CustomEvent('kopo-stickers', { detail: e })));
+    room.onMessage('vocal', (d) => { if (moi === client) vocal.recevoir(d); });
     room.onMessage('exclu', (raison) => { quitter(); toast(raison || 'Tu as été exclu de la partie.', 'echec'); });
     // Match du jour : au début, essai officiel ou entraînement ; à la fin (éliminé, vainqueur), le score sur 100.
     room.onMessage('matchJour', (d) => {
@@ -3022,9 +3053,11 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     for (const j of v.joueurs) {
       const li = el('li');
       li.dataset.id = j.id;
+      if (vocal.parleurs.has(j.id)) li.classList.add('parle');
       // Robot avec son niveau : l'icône dit déjà « robot », on garde le numéro pour laisser la place au niveau.
       const avecNiveau = j.robot && j.niveau && v.robots !== 'gentils';
       li.append(j.robot ? avecIco(el('span'), 'robots', avecNiveau ? j.nom.replace(/^Robot /, '') : j.nom) : el('span', null, j.nom));
+      if (j.plus) li.firstChild.after(badgePlus());
       if (avecNiveau) li.firstChild.setAttribute('aria-label', j.nom);
       if (j.id === v.hote) li.append(el('span', 'pastille tour', 'hôte'));
       if (j.id === v.moi) li.append(el('span', 'pastille neutre', 'toi'));
@@ -3108,6 +3141,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     ordre.forEach((id) => {
       const d = el('div', 'siege');
       d.dataset.id = id;
+      if (vocal.parleurs.has(id)) d.classList.add('parle');
       const jj = v.joueurs.find((j) => j.id === id) || {};
       if (id !== v.moi && !jj.robot) { d.classList.add('cliquable'); d.onclick = () => ficheJoueur(id, jj.nom); }
       if (pause && pause.annonce && pause.annonce.meneur === id) d.classList.add('meneur');
@@ -3125,6 +3159,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       const ligne = el('div', 'ligne');
       const nomJ = id === v.moi ? 'Toi' : joueur.nom || '?', icoJ = joueur.robot ? 'robots' : joueur.voix ? (joueur.muet ? 'micro-coupe' : 'micro') : null;
       ligne.append(icoJ ? avecIco(el('span', 'nom'), icoJ, nomJ) : el('span', 'nom', nomJ));
+      if (joueur.plus) ligne.firstChild.after(badgePlus());
       if (m.nbCartes[id]) { const n = el('span', 'compte', String(m.nbCartes[id])); n.setAttribute('aria-label', m.nbCartes[id] + ' carte' + (m.nbCartes[id] > 1 ? 's' : '')); ligne.append(n); }
       d.append(ligne);
       if (id === m.joueurCourant) d.setAttribute('aria-current', 'true');
@@ -3143,6 +3178,17 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       box.append(d);
     });
     placerSieges();
+    initialesSieges(box);
+  }
+  // Pseudo qui ne tient pas dans son siège (téléphone étroit, couronne, micro) : on montre son initiale, le pseudo entier reste en infobulle.
+  function initialesSieges(box) {
+    for (const n of box.querySelectorAll('.siege .nom')) {
+      const t = n.lastChild;
+      if (!t || t.nodeType !== 3 || n.scrollWidth <= n.clientWidth + 1 || n.clientWidth > 40) continue;
+      const nom = t.textContent.trim(); n.title = nom; n.setAttribute('aria-label', nom);
+      t.textContent = (n.firstChild === t ? '' : ' ') + initiale(nom);
+      if (n.scrollWidth > n.clientWidth + 1 && n.firstChild !== t) { n.firstChild.remove(); t.textContent = initiale(nom); } // toujours trop serré : l'initiale seule (le siège s'éclaire quand il parle)
+    }
   }
 
   function afficherPartie(v) {
@@ -3816,124 +3862,158 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   }
   (function boucle() { majChrono(); requestAnimationFrame(boucle); })();
 
-  // ------------------------------------------------------------------ micro
-  // Chaque téléphone appelle directement les autres (audio seulement). Le micro est coupé
-  // tant que le joueur ne l'a pas activé, et chacun peut le couper à tout moment.
-  // Micro désactivé partout (14/11) : trop de réglages (relais audio) pour l'instant. Le bouton n'apparaît plus.
-  const MICRO_ACTIF = false;
+  // ------------------------------------------------------------------ micro (abonnés Kopo+)
+  // Seuls les abonnés Kopo+ parlent et s'entendent : la voix passe par un serveur LiveKit, et le serveur du jeu
+  // donne l'accès au salon vocal de la table seulement à un abonné assis (message « vocal »). Un non-abonné qui
+  // touche le micro voit l'invitation à s'abonner, avec les prix. Sans serveur (relais MQTT), pas de micro.
+  // Qui parle : son pseudo s'allume dans l'en-tête, ou son initiale quand la place manque, et son siège s'éclaire.
+  const MICRO_ACTIF = true;
+  let chargementLiveKit = null;
+  const chargerLiveKit = () => (window.LivekitClient ? Promise.resolve() : (chargementLiveKit = chargementLiveKit || new Promise((ok, ko) => {
+    const s = document.createElement('script'); s.src = SERVEUR + '/vendor/livekit-client.js'; s.async = true;
+    s.onload = ok; s.onerror = () => { chargementLiveKit = null; ko(new Error('livekit')); }; document.head.append(s);
+  })));
+  const initiale = (nom) => (Array.from(String(nom || '?').trim())[0] || '?').toUpperCase();
   const vocal = {
-    actif: false, muet: true, sonCoupe: !!prefs.sonAutresCoupe, flux: null, appels: new Map(), vue: null,
-    pair: null,
-    peer() { return this.pair; },
-    // Connexion audio directe entre téléphones (WebRTC). Les serveurs TURN relaient le son
-    // quand deux téléphones ne peuvent pas se joindre directement (par exemple 4G contre 4G).
-    ouvrirPair() {
-      if (this.pair && !this.pair.destroyed) return;
-      this.pair = new Peer({ config: { iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: ['turn:eu-0.turn.peerjs.com:3478', 'turn:us-0.turn.peerjs.com:3478'], username: 'peerjs', credential: 'peerjsp' },
-        { urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443', 'turn:openrelay.metered.ca:443?transport=tcp'], username: 'openrelayproject', credential: 'openrelayproject' },
-      ] } });
-      this.pair.on('open', () => { this.signaler(); if (this.vue) this.maj(this.vue); });
-      this.pair.on('call', (appel) => this.recevoirAppel(appel));
-      this.pair.on('disconnected', () => { setTimeout(() => { try { this.pair && !this.pair.destroyed && this.pair.reconnect(); } catch (e) {} }, 2000); });
-      this.pair.on('error', () => {});
+    actif: false, muet: true, parler: false, sonCoupe: !!prefs.sonAutresCoupe, salle: null, vue: null, demande: false,
+    parleurs: new Set(), coupes: new Set(), // identifiants (= comptes) qui parlent ; joueurs rendus muets pour moi seul
+    dispo() { return MODE_SERVEUR && !LOCAL && !!client && !!client.serveur && !!this.vue && this.vue.joueurs.some((j) => j.id !== this.vue.moi && !j.robot); },
+    activer() {
+      if (!this.dispo() || this.demande) return;
+      this.demande = true; this.dessiner();
+      envoyer({ type: 'vocal' });
+      setTimeout(() => { if (this.demande) { this.demande = false; this.dessiner(); } }, 8000);
     },
-    async activer() {
-      if (!MICRO_ACTIF) return;
-      try {
-        this.flux = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false });
-        this.muet = false;
-      } catch (e) {
-        // Micro refusé : on écoute quand même, avec un flux silencieux.
-        try { const ctx = new (window.AudioContext || window.webkitAudioContext)(); this.flux = ctx.createMediaStreamDestination().stream; } catch (e2) { this.flux = null; }
-        this.muet = true;
-        toast("Micro non autorisé : tu entends les autres mais ils ne t'entendent pas.", 'alerte');
+    // Réponse du serveur : le jeton du salon vocal, ou la raison du refus (pas abonné, micro pas encore réglé…).
+    async recevoir(d) {
+      this.demande = false; this.dessiner();
+      if (!d || d.refuse) {
+        if (d && d.refuse === 'abonnement') return ouvrirAbonnement(d);
+        if (d && d.refuse === 'bientot') return toast('Le micro des abonnés arrive bientôt.', 'info');
+        if (d && d.refuse === 'seul') return toast('Le micro sert à parler avec les autres joueurs de la table.', 'info');
+        return toast('Micro indisponible pour l\'instant. Réessaie dans un moment.', 'echec');
       }
-      this.actif = true;
-      this.ouvrirPair();
-      this.appliquerMuet();
-      this.signaler();
-      this.dessiner();
-      if (this.vue) this.maj(this.vue);
-    },
-    appliquerMuet() { if (this.flux) this.flux.getAudioTracks().forEach((t) => (t.enabled = !this.muet)); },
-    basculerMicro() {
-      if (!this.flux || !this.flux.getAudioTracks().some((t) => t.label !== '' || t.kind === 'audio')) return;
-      this.muet = !this.muet; this.appliquerMuet(); this.signaler(); this.dessiner();
-    },
-    basculerSon() {
-      this.sonCoupe = !this.sonCoupe;
-      $('audios').querySelectorAll('audio').forEach((a) => (a.muted = this.sonCoupe));
-      this.dessiner();
-    },
-    signaler() { envoyer({ type: 'micro', voix: this.actif, muet: this.muet, peerId: this.pair && this.pair.open ? this.pair.id : null }); },
-    brancher(appel) {
-      const pid = appel.peer;
-      const ancien = this.appels.get(pid);
-      if (ancien && ancien !== appel) try { ancien.close(); } catch (e) {}
-      this.appels.set(pid, appel);
-      appel.on('stream', (flux) => {
-        let a = $('audios').querySelector(`audio[data-peer="${CSS.escape(pid)}"]`);
-        if (!a) { a = document.createElement('audio'); a.dataset.peer = pid; a.autoplay = true; a.setAttribute('playsinline', ''); $('audios').append(a); }
-        a.srcObject = flux; a.muted = this.sonCoupe;
-        a.play().catch(() => {});
+      try { await chargerLiveKit(); } catch (e) { return toast('Micro : chargement impossible. Vérifie ta connexion.', 'echec'); }
+      if (!client || !client.serveur) return;
+      const LK = window.LivekitClient;
+      if (this.salle) this.couper();
+      const salle = new LK.Room({ adaptiveStream: false, dynacast: false, audioCaptureDefaults: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+      this.salle = salle;
+      salle.on(LK.RoomEvent.TrackSubscribed, (piste, pub, p) => {
+        if (piste.kind !== 'audio') return;
+        const a = piste.attach(); a.dataset.peer = p.identity; a.muted = this.sonCoupe || this.coupes.has(p.identity);
+        $('audios').append(a);
       });
-      const fin = () => { if (this.appels.get(pid) === appel) { this.appels.delete(pid); const a = $('audios').querySelector(`audio[data-peer="${CSS.escape(pid)}"]`); if (a) a.remove(); } };
-      appel.on('close', fin); appel.on('error', fin);
+      salle.on(LK.RoomEvent.TrackUnsubscribed, (piste) => piste.detach().forEach((a) => a.remove()));
+      salle.on(LK.RoomEvent.ActiveSpeakersChanged, (ps) => { this.parleurs = new Set(ps.map((p) => p.identity)); this.dessinerParleurs(); });
+      salle.on(LK.RoomEvent.AudioPlaybackStatusChanged, () => this.dessiner());
+      salle.on(LK.RoomEvent.Disconnected, () => { if (this.salle === salle) { this.salle = null; this.actif = false; this.muet = true; this.parleurs.clear(); this.signaler(); this.dessiner(); this.dessinerParleurs(); } });
+      try { await salle.connect(d.url, d.jeton); } catch (e) { if (this.salle === salle) this.salle = null; return toast('Micro : connexion au salon vocal impossible.', 'echec'); }
+      if (this.salle !== salle) { salle.disconnect(); return; }
+      salle.startAudio().catch(() => {});
+      this.actif = true; this.parler = !!d.parler; this.muet = true;
+      if (d.parler) {
+        try { await salle.localParticipant.setMicrophoneEnabled(true); this.muet = false; }
+        catch (e) { toast('Micro non autorisé : tu entends les autres abonnés mais ils ne t\'entendent pas.', 'alerte'); }
+      } else toast('Ton micro a été coupé par la modération : tu entends les autres abonnés.', 'alerte');
+      this.signaler(); this.dessiner();
     },
-    recevoirAppel(appel) {
-      if (!this.actif || !this.flux) { try { appel.close(); } catch (e) {} return; }
-      appel.answer(this.flux);
-      this.brancher(appel);
+    async basculerMicro() {
+      if (!this.salle || !this.parler) return;
+      const muet = !this.muet;
+      try { await this.salle.localParticipant.setMicrophoneEnabled(!muet); this.muet = muet; }
+      catch (e) { toast('Micro non autorisé sur ce téléphone.', 'alerte'); }
+      this.signaler(); this.dessiner();
     },
-    // À chaque mise à jour : appeler les joueurs qui ont activé le son et qu'on n'entend pas encore.
-    // Pour éviter les appels croisés, c'est l'identifiant le plus petit qui appelle.
-    maj(v) {
-      this.vue = v;
-      this.dessiner();
-      const pr = this.peer();
-      if (!this.actif || !this.flux || !pr || !pr.open) return;
-      const voulus = new Set();
-      for (const j of v.joueurs) {
-        if (j.id === v.moi || !j.voix || !j.peerId || !j.connecte) continue;
-        voulus.add(j.peerId);
-        if (!this.appels.has(j.peerId) && pr.id < j.peerId) this.brancher(pr.call(j.peerId, this.flux));
-      }
-      for (const [pid, appel] of this.appels) if (!voulus.has(pid)) try { appel.close(); } catch (e) {}
-    },
-    arreter() {
-      for (const appel of this.appels.values()) try { appel.close(); } catch (e) {}
-      this.appels.clear();
-      if (this.flux) this.flux.getTracks().forEach((t) => t.stop());
-      if (this.pair) try { this.pair.destroy(); } catch (e) {}
-      this.pair = null;
-      this.flux = null; this.actif = false; this.muet = true; this.vue = null;
+    appliquerSon() { $('audios').querySelectorAll('audio').forEach((a) => (a.muted = this.sonCoupe || this.coupes.has(a.dataset.peer))); },
+    basculerSon() { this.sonCoupe = !this.sonCoupe; this.appliquerSon(); this.dessiner(); },
+    // Rendre muet un abonné pour moi seul (les autres l'entendent toujours).
+    basculerJoueur(id) { if (this.coupes.has(id)) this.coupes.delete(id); else this.coupes.add(id); this.appliquerSon(); },
+    signaler() { envoyer({ type: 'micro', voix: this.actif, muet: this.muet }); },
+    maj(v) { this.vue = v; this.dessiner(); this.dessinerParleurs(); },
+    couper() {
+      const s = this.salle; this.salle = null;
+      if (s) try { s.disconnect(); } catch (e) {}
+      this.actif = false; this.muet = true; this.parleurs.clear();
       $('audios').replaceChildren();
-      this.dessiner();
     },
+    arreter() { this.couper(); this.vue = null; this.demande = false; this.coupes.clear(); this.dessiner(); this.dessinerParleurs(); },
     dessiner() {
       const box = $('vocal');
       box.hidden = !this.vue;
       if (!this.vue) return;
       box.replaceChildren();
-      if (LOCAL || !MICRO_ACTIF) { box.hidden = true; return; }
+      if (!MICRO_ACTIF || !this.dispo()) { box.hidden = true; return; }
       const etiquette = (b, texte) => { b.title = texte; b.setAttribute('aria-label', texte); return b; };
+      const moi = this.vue.joueurs.find((j) => j.id === this.vue.moi) || {};
       if (!this.actif) {
-        const b = etiquette(avecIco(el('button', 'btn'), 'micro', 'Micro'), 'Activer le micro pour discuter avec les autres');
+        const b = etiquette(avecIco(el('button', 'btn' + (moi.plus ? '' : ' verrou')), 'micro'), moi.plus ? 'Activer le micro pour parler avec les abonnés de la table' : 'Micro réservé aux abonnés Kopo+');
+        if (this.demande) b.disabled = true;
         b.onclick = () => this.activer();
         box.append(b);
         return;
       }
+      if (this.salle && !this.salle.canPlaybackAudio) {
+        const e = etiquette(avecIco(el('button', 'btn ouvert'), 'son', 'Écouter'), 'Toucher pour entendre les autres abonnés');
+        e.onclick = () => this.salle && this.salle.startAudio().then(() => this.dessiner()).catch(() => {});
+        box.append(e);
+      }
       const n = this.vue.joueurs.filter((j) => j.voix && j.id !== this.vue.moi).length;
-      const enVocal = n ? ` (${n} autre${n > 1 ? 's' : ''} en vocal)` : " (personne d'autre en vocal)";
-      const m = etiquette(avecIco(el('button', 'btn ' + (this.muet ? 'coupe' : 'ouvert')), this.muet ? 'micro-coupe' : 'micro'), (this.muet ? 'Micro coupé, toucher pour parler' : 'Micro ouvert, toucher pour couper') + enVocal);
+      const enVocal = n ? ` (${n} autre${n > 1 ? 's' : ''} abonné${n > 1 ? 's' : ''} en vocal)` : ' (aucun autre abonné en vocal)';
+      const m = etiquette(avecIco(el('button', 'btn ' + (this.muet ? 'coupe' : 'ouvert')), this.muet ? 'micro-coupe' : 'micro'), (!this.parler ? 'Micro coupé par la modération' : this.muet ? 'Micro coupé, toucher pour parler' : 'Micro ouvert, toucher pour couper') + enVocal);
       m.onclick = () => this.basculerMicro();
-      const so = etiquette(avecIco(el('button', 'btn' + (this.sonCoupe ? ' coupe' : '')), this.sonCoupe ? 'son-coupe' : 'son'), this.sonCoupe ? 'Son des autres coupé, toucher pour le remettre' : 'Couper le son des autres');
+      const so = etiquette(avecIco(el('button', 'btn son-autres' + (this.sonCoupe ? ' coupe' : '')), this.sonCoupe ? 'son-coupe' : 'son'), this.sonCoupe ? 'Son des autres coupé, toucher pour le remettre' : 'Couper le son des autres');
       so.onclick = () => this.basculerSon();
       box.append(m, so);
     },
+    // Qui parle : pseudo s'il tient dans l'en-tête, sinon l'initiale. Le siège de celui qui parle s'éclaire aussi.
+    dessinerParleurs() {
+      const z = $('parleurs');
+      document.querySelectorAll('.siege.parle, #listeJoueurs li.parle').forEach((e) => e.classList.remove('parle'));
+      const v = this.vue, ids = v ? [...this.parleurs].filter((id) => v.joueurs.some((j) => j.id === id)) : [];
+      z.hidden = !ids.length;
+      z.replaceChildren();
+      if (!ids.length) return;
+      for (const id of ids) document.querySelectorAll(`.siege[data-id="${CSS.escape(id)}"], #listeJoueurs li[data-id="${CSS.escape(id)}"]`).forEach((e) => e.classList.add('parle'));
+      const nom = (id) => (id === v.moi ? 'Toi' : (v.joueurs.find((j) => j.id === id) || {}).nom || '?');
+      const pastilles = (court) => ids.map((id) => { const p = el('span', 'parleur' + (court ? ' court' : ''), court ? initiale(nom(id)) : nom(id)); p.title = nom(id) + ' parle'; return p; });
+      z.setAttribute('aria-label', ids.map(nom).join(', ') + (ids.length > 1 ? ' parlent' : ' parle'));
+      z.append(ico('micro'), ...pastilles(false));
+      if (z.scrollWidth > z.clientWidth + 1) z.replaceChildren(ico('micro'), ...pastilles(true)); // pas la place : initiales
+    },
   };
+
+  // Invitation à s'abonner (Kopo+) : ce que ça donne, les deux prix en francs congolais, et comment payer.
+  async function ouvrirAbonnement(offre) {
+    let A = offre && offre.formules ? offre : null;
+    if (!A || !('actif' in A)) {
+      try { if (MODE_SERVEUR && compteLocal()) A = await apiJoueur('/abonnement'); } catch (e) {}
+    }
+    if (!A) A = { actif: false, paiement: false, formules: [{ id: 'mois', nom: '1 mois', francs: 2500, jours: 30 }, { id: 'an', nom: '1 an', francs: 25000, jours: 365, note: '2 mois offerts' }], avantages: ['Parle et entends les autres abonnés de ta table', 'Couronne dorée à côté de ton pseudo', 'Voie Kopo+ du parcours de saison (apparences en plus)'] };
+    const z = el('div', 'abonnement');
+    const tete = el('div', 'ab-tete'); tete.append(ico('couronne', 'plus-ico grand'), el('b', null, 'Kopo+'));
+    z.append(tete);
+    if (A.actif && A.jusqu) z.append(el('p', 'ab-actif', `Tu es abonné jusqu'au ${new Date(A.jusqu).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}.`));
+    else z.append(el('p', 'muted', 'Le micro en partie est réservé aux abonnés : à la table, seuls les abonnés parlent et s\'entendent.'));
+    const ul = el('ul', 'ab-avantages');
+    (A.avantages || []).forEach((a, i) => { const li = el('li'); li.append(ico(['micro', 'couronne', 'cadeau'][i] || 'cadeau'), ' ' + a); ul.append(li); });
+    z.append(ul);
+    const l = el('div', 'ab-formules');
+    for (const f of A.formules) {
+      const b = el('button', 'ab-formule' + (f.id === 'an' ? ' top' : ''));
+      b.append(el('div', 'nom', f.nom), el('div', 'px', formatPieces(f.francs) + ' FC'));
+      if (f.note) b.append(el('span', 'ruban', f.note));
+      b.setAttribute('aria-label', `Kopo+ ${f.nom} : ${f.francs} francs congolais`);
+      b.onclick = () => toast(`Kopo+ ${f.nom} : le paiement mobile money arrive bientôt.`, 'alerte');
+      l.append(b);
+    }
+    z.append(l, el('small', 'muted', A.paiement ? 'Paiement en francs congolais par mobile money.' : 'Paiement en francs congolais (mobile money : M-Pesa, Orange Money, Airtel Money) : bientôt. Kopo+ ne donne jamais d\'avantage pour gagner.'));
+    const ret = el('button', 'btn principal large', 'Fermer'); ret.onclick = fermerFenetre;
+    ouvrirFenetre([el('h2', null, A.actif ? 'Ton abonnement' : 'Le micro en partie'), z, ret], 'boutique');
+  }
+  window.ouvrirAbonnement = ouvrirAbonnement;
+  // Couronne dorée des abonnés Kopo+ (à côté du pseudo).
+  function badgePlus() { const s = el('span', 'badge-plus'); s.append(ico('couronne', 'plus-ico')); s.title = 'Abonné Kopo+'; s.setAttribute('aria-label', 'Abonné Kopo+'); return s; }
 
   function jouerCarte(c) {
     if (!c) return;
@@ -4551,7 +4631,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     bascule('effetsSonores', 'Effets sonores', 'Cartes, tour, Katapss, chat', () => Sons.jouer('essai'));
     bascule('musique', 'Musique d\'ambiance', 'Plus basse pendant les parties', null);
     bascule('vibrations', 'Vibrations', 'Quand c\'est à toi de jouer', () => vibrer(60));
-    if (MICRO_ACTIF) bascule('sonAutresCoupe', 'Couper le micro des autres', 'Au début de chaque partie', null);
+    if (MICRO_ACTIF && MODE_SERVEUR) bascule('sonAutresCoupe', 'Couper le micro des autres', 'Au début de chaque partie', null);
     titre('Jeu');
     choix('tri', 'Ranger ma main', null, [['couleur', 'Par couleur'], ['valeur', 'Par valeur']]);
     bascule('confirmerToutPoser', 'Confirmer avant « Tout poser »', 'Évite de sortir par erreur', null);
@@ -6549,6 +6629,19 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     };
     majDepuis();
     id.append(nomL, el('span', 'titre', titre || 'Petit nouveau'), depuis);
+    // Kopo+ : la couronne à côté du pseudo ; un toucher ouvre l'abonnement (le micro, les prix, la date de fin).
+    if (enLigne) {
+      const kp = el('button', 'pf-plus'), couronne = badgePlus();
+      const majPlus = (actif) => {
+        kp.classList.toggle('actif', actif);
+        kp.replaceChildren(ico('couronne', 'plus-ico'), ' ' + (actif ? 'Kopo+ actif' : 'Passe à Kopo+ : le micro en partie'));
+        if (actif) nomL.insertBefore(couronne, drapeau); else couronne.remove();
+      };
+      majPlus(!!c.compte.kopoPlus);
+      kp.onclick = () => ouvrirAbonnement();
+      id.append(kp);
+      apiJoueur('/abonnement').then((A) => { majPlus(!!A.actif); const x = compteLocal(); if (x && x.compte && x.compte.kopoPlus !== !!A.actif) { x.compte.kopoPlus = !!A.actif; stock.ecrire('kopo-compte-serveur', x); } }).catch(() => {});
+    }
     const fermerX = el('button', 'pf-fermer', '✕'); fermerX.setAttribute('aria-label', 'Fermer');
     tete.append(av, id, fermerX);
     // XP

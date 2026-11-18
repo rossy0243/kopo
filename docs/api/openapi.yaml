@@ -619,6 +619,25 @@ paths:
                   paiement: { type: boolean }
                   taux: { type: object, properties: { piecesPour500FC: { type: integer } } }
                   bouquets: { type: array, items: { $ref: '#/components/schemas/Bouquet' } }
+  /abonnement:
+    get:
+      tags: [Pièces, Boutique et parcours]
+      summary: Abonnement Kopo+ (micro en salle, couronne dorée, voie Kopo+) et ses prix
+      description: "Prix en francs congolais seulement : 2 500 FC le mois, 25 000 FC l'an. `paiement` est faux tant que le mobile money n'est pas branché (l'admin active l'abonnement payé à la main). `micro` est faux tant que le serveur vocal (LiveKit) n'est pas réglé."
+      responses:
+        '200':
+          description: Abonnement
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  actif: { type: boolean }
+                  jusqu: { type: [string, 'null'], format: date-time }
+                  paiement: { type: boolean }
+                  micro: { type: boolean }
+                  formules: { type: array, items: { type: object, properties: { id: { enum: [mois, an] }, nom: { type: string }, francs: { type: integer }, jours: { type: integer }, note: { type: [string, 'null'] } } } }
+                  avantages: { type: array, items: { type: string } }
   /boutique:
     get:
       tags: [Boutique et parcours]
@@ -1092,6 +1111,7 @@ components:
         pays: { type: [string, 'null'] }
         notifs: { type: object, properties: { rivalite: { type: boolean }, invitation: { type: boolean }, ami: { type: boolean }, bande: { type: boolean } } }
         kopoPlus: { type: boolean }
+        kopoPlusJusqu: { type: [string, 'null'], format: date-time }
         google: { type: boolean }
     QuotaPseudo:
       type: object

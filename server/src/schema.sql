@@ -443,3 +443,18 @@ CREATE TABLE IF NOT EXISTS stickers_mouvements (
   cree_le    timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS stickers_mouvements_compte ON stickers_mouvements (compte_id, id DESC);
+
+-- ===== Abonnement Kopo+ (18/11) : micro en salle, couronne dorée, voie Kopo+ =====
+-- Chaque abonnement payé (activé à la main par l'admin tant que le mobile money n'est pas branché).
+-- comptes.kopo_plus_jusqu garde la date de fin ; cette table garde l'historique des paiements.
+CREATE TABLE IF NOT EXISTS abonnements (
+  id         bigserial PRIMARY KEY,
+  compte_id  text NOT NULL REFERENCES comptes(id),
+  formule    text NOT NULL,                       -- mois, an
+  francs     integer NOT NULL,                    -- prix payé, en francs congolais
+  jours      integer NOT NULL,
+  ref        text,                                -- référence du paiement (mobile money)
+  jusqu      timestamptz NOT NULL,                -- fin de l'abonnement après cette activation
+  cree_le    timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS abonnements_compte ON abonnements (compte_id, id DESC);

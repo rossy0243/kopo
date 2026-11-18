@@ -90,7 +90,7 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
 }
 
 (async () => {
-  srv = await demarrer({ port: 0, env: { NODE_ENV: 'test', SECRET_SERVEUR: 'x'.repeat(40), ADMIN_MOT_DE_PASSE: 'motdepasse-admin', ADMIN_TOTP: TOTP, SUPABASE_JWT_SECRET: 's'.repeat(40) } });
+  srv = await demarrer({ port: 0, env: { NODE_ENV: 'test', SECRET_SERVEUR: 'x'.repeat(40), ADMIN_MOT_DE_PASSE: 'motdepasse-admin', ADMIN_TOTP: TOTP, SUPABASE_JWT_SECRET: 's'.repeat(40), LIVEKIT_URL: 'wss://essai.livekit.cloud', LIVEKIT_API_KEY: 'APIessai', LIVEKIT_API_SECRET: 'l'.repeat(40) } });
   URL_ = 'http://localhost:' + srv.port;
   let adminJeton;
 
@@ -1825,6 +1825,72 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     const adm = (await api('/admin/api/bouquets', { jeton: adminJeton })).json;
     assert.strictEqual(adm.livraisons[0].pieces, 850); assert.match(adm.livraisons[0].ref, /MP-123456/);
     assert.ok((await api('/admin/api/journal', { jeton: adminJeton })).json.some((l) => l.action === 'bouquet:livre'));
+  });
+  await test('abonnement Kopo+ : 2 500 FC le mois, 25 000 FC l\'an, activé par l\'admin, prolongé, couronne à la table', async () => {
+    const a = await invite('AboA'), b = await invite('AboB');
+    const o = (await api('/api/v1/abonnement', { jeton: a.jeton })).json;
+    assert.deepStrictEqual(o.formules.map((f) => [f.id, f.francs, f.jours]), [['mois', 2500, 30], ['an', 25000, 365]]);
+    assert.strictEqual(o.actif, false); assert.strictEqual(o.paiement, false); assert.strictEqual(o.micro, true);
+    assert.ok(!JSON.stringify(o).includes('$'), 'francs congolais seulement');
+    assert.strictEqual((await api('/api/v1/abonnement')).statut, 401);
+    const nom = a.compte.pseudo + '#' + a.compte.numero;
+    assert.strictEqual((await api('/admin/api/abonnements/activer', { methode: 'POST', jeton: a.jeton, corps: { joueur: nom, formule: 'mois', message: 'MP-1' } })).statut, 401);
+    assert.strictEqual((await api('/admin/api/abonnements/activer', { methode: 'POST', jeton: adminJeton, corps: { joueur: nom, formule: 'mois', message: '' } })).statut, 400);
+    assert.strictEqual((await api('/admin/api/abonnements/activer', { methode: 'POST', jeton: adminJeton, corps: { joueur: nom, formule: 'semaine', message: 'MP-1' } })).statut, 400);
+    assert.strictEqual((await api('/admin/api/abonnements/activer', { methode: 'POST', jeton: adminJeton, corps: { joueur: 'Personne#0000', formule: 'mois', message: 'MP-1' } })).statut, 404);
+
+    // b n'est pas abonné : à la table, le micro lui renvoie les prix ; a est abonné : jeton LiveKit, couronne visible de tous.
+    const client = new Client(URL_.replace('http', 'ws'));
+    const sa = await client.create('kopo', { jeton: a.jeton, code: 'ABOX', rapide: true });
+    const sb = await client.joinById(sa.roomId, { jeton: b.jeton });
+    const recu = { a: [], b: [] }, vues = { a: null, b: null };
+    for (const [k, s] of [['a', sa], ['b', sb]]) { s.onMessage('vocal', (m) => recu[k].push(m)); s.onMessage('vue', (v) => { vues[k] = v; }); s.onMessage('*', () => {}); }
+    sb.send('vocal'); sa.send('vocal');
+    await attendre(300);
+    assert.strictEqual(recu.b[0].refuse, 'abonnement'); assert.strictEqual(recu.b[0].formules[0].francs, 2500);
+    assert.strictEqual(recu.a[0].refuse, 'abonnement');
+    sb.send('micro', { voix: true, muet: false });
+    await attendre(200);
+    const jb = vues.a.joueurs.find((j) => j.id === b.compte.id);
+    assert.strictEqual(jb.voix, false, 'un non-abonné n\'entre pas en vocal'); assert.ok(!jb.plus);
+
+    const r = await api('/admin/api/abonnements/activer', { methode: 'POST', jeton: adminJeton, corps: { joueur: nom, formule: 'mois', message: 'MP-777' } });
+    assert.strictEqual(r.statut, 200);
+    const fin1 = new Date(r.json.jusqu).getTime();
+    assert.ok(Math.abs(fin1 - (Date.now() + 30 * 864e5)) < 60e3);
+    await attendre(200);
+    assert.strictEqual(vues.b.joueurs.find((j) => j.id === a.compte.id).plus, true, 'couronne de a vue par b');
+    assert.ok(vues.b.joueurs.every((j) => j.peerId === null));
+    sa.send('vocal');
+    await attendre(300);
+    const v = recu.a.at(-1);
+    assert.strictEqual(v.url, 'wss://essai.livekit.cloud'); assert.strictEqual(v.parler, true); assert.strictEqual(v.salon, 'table-' + sa.roomId);
+    const [t, c, sig] = v.jeton.split('.');
+    assert.strictEqual(require('crypto').createHmac('sha256', 'l'.repeat(40)).update(t + '.' + c).digest('base64url'), sig);
+    const corps = JSON.parse(Buffer.from(c, 'base64url').toString());
+    assert.strictEqual(corps.iss, 'APIessai'); assert.strictEqual(corps.sub, a.compte.id); assert.strictEqual(corps.video.room, 'table-' + sa.roomId); assert.strictEqual(corps.video.canPublish, true);
+    sa.send('micro', { voix: true, muet: false });
+    await attendre(200);
+    assert.strictEqual(vues.b.joueurs.find((j) => j.id === a.compte.id).voix, true);
+
+    // Sanction « micro » : toujours abonné, il écoute mais ne parle plus.
+    await api(`/admin/api/joueurs/${encodeURIComponent(a.compte.id)}/sanction`, { methode: 'POST', jeton: adminJeton, corps: { type: 'micro', motif: 'Insultes' } });
+    sa.send('vocal');
+    await attendre(300);
+    assert.strictEqual(recu.a.at(-1).parler, false);
+    await api(`/admin/api/joueurs/${encodeURIComponent(a.compte.id)}/sanction`, { methode: 'POST', jeton: adminJeton, corps: { type: 'levee', motif: 'Fin' } });
+    await sa.leave(); await sb.leave();
+
+    // Un an de plus, ajouté à la fin du mois en cours.
+    const r2 = await api('/admin/api/abonnements/activer', { methode: 'POST', jeton: adminJeton, corps: { joueur: nom, formule: 'an', message: 'MP-778' } });
+    assert.ok(Math.abs(new Date(r2.json.jusqu).getTime() - (fin1 + 365 * 864e5)) < 60e3);
+    const moi = (await api('/api/moi', { jeton: a.jeton })).json.compte;
+    assert.strictEqual(moi.kopoPlus, true); assert.ok(moi.kopoPlusJusqu);
+    assert.ok((await api('/api/notifications', { jeton: a.jeton })).json.liste.some((n) => /Kopo\+ \(1 mois\).*micro/.test(n.texte)));
+    const adm = (await api('/admin/api/abonnements', { jeton: adminJeton })).json;
+    assert.ok(adm.actifs >= 1); assert.ok(adm.francs30j >= 27500);
+    assert.strictEqual(adm.activations[0].formule, 'an'); assert.match(adm.activations[0].ref, /MP-778/);
+    assert.ok((await api('/admin/api/journal', { jeton: adminJeton })).json.some((l) => l.action === 'abonnement:active'));
   });
   await test('stickers : éteints au départ, cadeaux de l\'admin (joueur, tous, groupe) avec message, envoi décompté', async () => {
     assert.deepStrictEqual((await api('/api/config')).json.stickers, { actif: false, vente: false });

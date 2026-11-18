@@ -96,7 +96,7 @@ final r = await Supabase.instance.client.auth.signInWithIdToken(
 - **XP, niveau, missions du jour, défi de la semaine, parcours de bienvenue, joker de série** : sur le site, ils sont calculés sur le téléphone (`src/kopo-retention.js`, avec ses tests). L'appli Flutter doit reprendre ces règles en Dart (le fichier et ses tests servent de référence), garder le profil sur le téléphone, l'envoyer après chaque partie (`PUT /profil`, retrouvé avec `GET /profil` sur un autre téléphone), et demander les pièces gagnées avec `POST /recompense` (le serveur plafonne et refuse les doublons).
 - **Sons et musique** : générés sur le téléphone (Web Audio sur le site, `src/kopo-sons.js`).
 - **Robots hors ligne** : pas dans l'appli Flutter (les moteurs sont en JavaScript). Les parties contre les robots passent par la salle `entrainement`, donc demandent du réseau.
-- **Micro** : WebRTC par PeerJS, facultatif (voir temps-reel.md).
+- **Micro** : abonnés Kopo+ seulement, par LiveKit (paquet `livekit_client`) ; jeton donné par la salle (message `vocal`, voir temps-reel.md §5). Prix et abonnement : `GET /api/v1/abonnement`.
 - **Liens d'invitation qui ouvrent l'appli** (`<site>#CODE`, `?parrain=`, `?bande=`) : il faudra publier `assetlinks.json` (Android) et `apple-app-site-association` (iOS) sur le site quand les identifiants des applis seront connus.
 - **Achats dans l'appli** (pièces, Kopo+) : rien côté serveur pour l'instant.
 

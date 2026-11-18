@@ -38,6 +38,7 @@ Les tables sont créées toutes seules au premier démarrage (`src/schema.sql`).
 | `VAPID_CONTACT` | Notifications push : adresse de contact donnée aux services de push (`https://…` ou `mailto:…`) |
 | `FCM_COMPTE_SERVICE` | Notifications push des applis Android et iOS (Firebase Cloud Messaging) : le JSON du compte de service Firebase, tel quel ou en base64. Sans lui, pas de push dans les applis |
 | `SUPABASE_ANON_KEY` | Clé publique *anon* de Supabase, donnée aux applis par `/api/config` pour la connexion Google native |
+| `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` | Micro des abonnés Kopo+ : adresse du serveur LiveKit (`wss://….livekit.cloud`), clé et secret de l'API (LiveKit Cloud → *Settings → Keys*). Sans eux, le micro affiche « Bientôt » ; l'abonnement marche quand même |
 | `SITE_URL`, `SUPPORT_URL` | Adresse du site (liens CGU et confidentialité de `/api/config`) et contact du support (facultatif) |
 
 ## API (pour l'application)
