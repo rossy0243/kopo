@@ -3908,7 +3908,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       salle.on(LK.RoomEvent.ActiveSpeakersChanged, (ps) => { this.parleurs = new Set(ps.map((p) => p.identity)); this.dessinerParleurs(); });
       salle.on(LK.RoomEvent.AudioPlaybackStatusChanged, () => this.dessiner());
       salle.on(LK.RoomEvent.Disconnected, () => { if (this.salle === salle) { this.salle = null; this.actif = false; this.muet = true; this.parleurs.clear(); this.signaler(); this.dessiner(); this.dessinerParleurs(); } });
-      try { await salle.connect(d.url, d.jeton); } catch (e) { if (this.salle === salle) this.salle = null; return toast('Micro : connexion au salon vocal impossible.', 'echec'); }
+      try { await salle.connect(d.url, d.jeton); } catch (e) { if (this.salle === salle) this.salle = null; console.warn('Micro :', e); const r = String((e && e.message) || '').slice(0, 90); return toast('Micro : connexion au salon vocal impossible.' + (r ? ' (' + r + ')' : ''), 'echec'); }
       if (this.salle !== salle) { salle.disconnect(); return; }
       salle.startAudio().catch(() => {});
       this.actif = true; this.parler = !!d.parler; this.muet = true;

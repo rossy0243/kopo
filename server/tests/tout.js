@@ -1826,6 +1826,25 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.strictEqual(adm.livraisons[0].pieces, 850); assert.match(adm.livraisons[0].ref, /MP-123456/);
     assert.ok((await api('/admin/api/journal', { jeton: adminJeton })).json.some((l) => l.action === 'bouquet:livre'));
   });
+  await test('LiveKit : adresse corrigée, valeurs nettoyées, vérification depuis le tableau de bord', async () => {
+    const { creerAbonnement, adresseLiveKit } = require('../src/abonnement');
+    assert.strictEqual(adresseLiveKit('https://kopo-x.livekit.cloud/'), 'wss://kopo-x.livekit.cloud');
+    assert.strictEqual(adresseLiveKit('kopo-x.livekit.cloud'), 'wss://kopo-x.livekit.cloud');
+    assert.strictEqual(adresseLiveKit('wss://kopo-x.livekit.cloud'), 'wss://kopo-x.livekit.cloud');
+    const ab = creerAbonnement(null, { LIVEKIT_URL: ' "https://kopo-x.livekit.cloud" ', LIVEKIT_API_KEY: ' APIabc\n', LIVEKIT_API_SECRET: 's'.repeat(40) + ' ' });
+    const v = ab.jetonVocal({ compte: { id: 'c1', pseudo: 'A' }, salon: 'table-1', parler: true });
+    assert.strictEqual(v.url, 'wss://kopo-x.livekit.cloud');
+    const corps = JSON.parse(Buffer.from(v.jeton.split('.')[1], 'base64url').toString());
+    assert.strictEqual(corps.iss, 'APIabc');
+    let vu = null;
+    const ok = await ab.verifierLiveKit(async (u) => { vu = u; return { ok: true, status: 200, text: async () => 'success' }; });
+    assert.ok(ok.ok); assert.match(vu, /^https:\/\/kopo-x\.livekit\.cloud\/rtc\/validate\?access_token=/);
+    const refus = await ab.verifierLiveKit(async () => ({ ok: false, status: 401, text: async () => 'invalid API key' }));
+    assert.ok(!refus.ok); assert.match(refus.raison, /LIVEKIT_API_SECRET/);
+    const loin = await ab.verifierLiveKit(async () => { throw new Error('getaddrinfo ENOTFOUND'); });
+    assert.match(loin.raison, /injoignable/);
+    assert.ok(!(await creerAbonnement(null, {}).verifierLiveKit()).ok);
+  });
   await test('abonnement Kopo+ : 2 500 FC le mois, 25 000 FC l\'an, activé par l\'admin, prolongé, couronne à la table', async () => {
     const a = await invite('AboA'), b = await invite('AboB');
     const o = (await api('/api/v1/abonnement', { jeton: a.jeton })).json;
