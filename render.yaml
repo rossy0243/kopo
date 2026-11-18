@@ -37,6 +37,12 @@ services:
         value: https://kopo-d655.onrender.com/
       - key: FCM_COMPTE_SERVICE    # push des applis Android/iOS : JSON du compte de service Firebase (ou ce JSON en base64)
         sync: false
+      - key: LIVEKIT_URL           # micro des abonnés Kopo+ : wss://<projet>.livekit.cloud (LiveKit Cloud → Settings)
+        sync: false
+      - key: LIVEKIT_API_KEY
+        sync: false
+      - key: LIVEKIT_API_SECRET
+        sync: false
       - key: SUPABASE_ANON_KEY     # clé publique « anon » de Supabase, donnée aux applis pour la connexion Google
         sync: false
       - key: SUPPORT_URL           # facultatif : page ou adresse de contact affichée dans l'appli

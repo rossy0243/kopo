@@ -8,7 +8,7 @@ const { permis } = require('./limites');
 
 const MOTIFS = ['pseudo', 'insultes', 'triche', 'abandon', 'autre'];
 const enveloppe = (fn) => (req, res) => fn(req, res).catch((e) => res.status(e.statut || 500).json({ erreur: e.statut ? e.message : 'Erreur du serveur.' }) && (e.statut || console.error(e)));
-const publicCompte = (c) => c && { id: c.id, pseudo: c.pseudo, numero: c.numero, avatar: c.avatar, solde: c.solde, statut: c.statut, serieBonus: c.serie_bonus, dernierBonus: c.dernier_bonus, pays: c.pays || null, notifs: { rivalite: true, invitation: true, ami: true, bande: true, ...(c.notifs || {}) }, kopoPlus: !!(c.kopo_plus_jusqu && new Date(c.kopo_plus_jusqu) > new Date()), google: !!c.auth_id };
+const publicCompte = (c) => c && { id: c.id, pseudo: c.pseudo, numero: c.numero, avatar: c.avatar, solde: c.solde, statut: c.statut, serieBonus: c.serie_bonus, dernierBonus: c.dernier_bonus, pays: c.pays || null, notifs: { rivalite: true, invitation: true, ami: true, bande: true, ...(c.notifs || {}) }, kopoPlus: !!(c.kopo_plus_jusqu && new Date(c.kopo_plus_jusqu) > new Date()), kopoPlusJusqu: c.kopo_plus_jusqu && new Date(c.kopo_plus_jusqu) > new Date() ? c.kopo_plus_jusqu : null, google: !!c.auth_id };
 
 // Pays déduit du réseau (en-tête posé par Cloudflare quand il existe), sinon choisi par le joueur.
 const paysReseau = (req) => { const p = String(req.get('cf-ipcountry') || '').toUpperCase(); return /^[A-Z]{2}$/.test(p) && p !== 'XX' ? p : null; };
@@ -22,7 +22,7 @@ function clientMobile(req) {
 // Adresse publique du site (liens légaux, liens d'invitation).
 const adresseSite = (env) => String(env.SITE_URL || 'https://kopo-d655.onrender.com/').replace(/\/?$/, '/');
 
-function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours, parrainage, matchJour, bande, push, stickers, bouquets, env = process.env }) {
+function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours, parrainage, matchJour, bande, push, stickers, bouquets, abonnement, env = process.env }) {
   const r = express.Router();
   r.use(express.json({ limit: '64kb' })); // la copie du profil (PUT /profil) peut faire quelques dizaines de ko
   // Limite par adresse IP (large : en 4G, beaucoup de joueurs partagent la même adresse).
@@ -162,6 +162,8 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours,
   r.post('/stickers/acheter', joueur, enveloppe(async (req, res) => res.json(await stickers.acheter(req.compte, req.body || {}))));
   // Bouquets de pièces (argent réel) : prix fixés ici, au taux des stickers ; le paiement mobile money n'est pas encore branché.
   r.get('/bouquets', joueur, (req, res) => res.json({ solde: req.compte.solde, ...bouquets.pourJoueur() }));
+  // Abonnement Kopo+ (micro en salle, couronne dorée) : prix en francs congolais, l'abonnement du joueur, micro prêt ou non.
+  r.get('/abonnement', joueur, (req, res) => res.json(abonnement.pourJoueur(req.compte)));
   r.get('/boutique', joueur, enveloppe(async (req, res) => res.json({ solde: req.compte.solde, objets: parcours.catalogue(), ...(await parcours.collection(req.compte)) })));
   r.post('/boutique/acheter', joueur, enveloppe(async (req, res) => res.json(await parcours.acheter(req.compte, req.body.objet))));
 

@@ -273,18 +273,51 @@ class SalleKopo extends Room {
     if (type === 'rejoindre') return; // l'entrée passe par onJoin
     // Match du jour : la table est fixée par le serveur (robots, donne), pas de revanche ni de réglages.
     if (this.jour && ['lancer', 'ajouterRobot', 'niveauRobot', 'retirer', 'remplacerParRobot', 'reglages', 'revanche', 'revancheNon', 'rejouer', 'passerFin', 'enPause'].includes(type)) { client.send('erreur', 'Pas pendant le Match du jour.'); return; }
-    if (type === 'sync') { client.send('vue', this.S.vue(this.salle, id)); return; } // la page demande sa vue dès qu'elle écoute
+    if (type === 'sync') { client.send('vue', this.vuePour(id)); return; } // la page demande sa vue dès qu'elle écoute
     if (type === 'reaction') { // chat : seulement les messages choisis dans le tableau de bord
       const liste = SalleKopo.services.reglages.get('messagesRapides') || [];
       if (!liste.includes(typeof msg.emoji === 'string' ? msg.emoji.trim() : '')) { client.send('erreur', 'Ce message n\'est plus proposé.'); return; }
     }
     if (type === 'sticker') { this.envoyerSticker(client, id, msg.sticker).catch((e) => { console.error('Sticker :', e.message); client.send('erreur', 'Sticker non envoyé.'); }); return; }
-    if (type === 'micro' && this.comptes.get(id) && this.comptes.get(id).micro_coupe) msg.voix = false; // sanction
+    if (type === 'vocal') { this.donnerVocal(client, id).catch((e) => { console.error('Vocal :', e.message); client.send('vocal', { refuse: 'erreur' }); }); return; }
+    // Micro réservé aux abonnés Kopo+ (et coupé par la sanction « micro ») : le serveur décide, jamais le téléphone.
+    if (type === 'micro') { const c = this.comptes.get(id); if (!this.abonne(id) || (c && c.micro_coupe)) { msg.voix = !!msg.voix && this.abonne(id); msg.muet = true; } }
     const r = this.S.recevoir(this.salle, id, msg);
     if (!r.ok) { client.send('erreur', r.erreur); return; }
     if (r.evenement) { this.broadcast(r.evenement.type, r.evenement); return; } // émoji rapide : relayé à toute la table
     if (type === 'action' && msg.action && msg.action.type === 'katapss' && this.partie) this.partie.katapss.set(id, (this.partie.katapss.get(id) || 0) + 1);
     this.apresChangement();
+  }
+
+  abonne(id) { const { abonnement } = SalleKopo.services; return !!abonnement && abonnement.estAbonne(this.comptes.get(id)); }
+
+  // Vue d'un joueur : celle de la salle, avec la couronne des abonnés Kopo+ (`plus`). Le micro passe par LiveKit :
+  // plus d'identifiant PeerJS envoyé aux autres.
+  vuePour(id) {
+    const v = this.S.vue(this.salle, id);
+    v.joueurs = v.joueurs.map((j) => Object.assign({}, j, { peerId: null }, this.abonne(j.id) ? { plus: true } : null));
+    return v;
+  }
+
+  // L'admin vient d'activer (ou de retirer) Kopo+ : la couronne suit tout de suite à la table.
+  majAbonne(id, jusqu) {
+    const c = this.comptes.get(id);
+    if (!c) return;
+    c.kopo_plus_jusqu = jusqu;
+    for (const [i, cl] of this.clientsParId) cl.send('vue', this.vuePour(i));
+  }
+
+  // Micro : jeton du salon vocal de cette table (LiveKit), pour un abonné Kopo+ assis ici. Un non-abonné reçoit les prix.
+  // Le compte est relu en base : un abonnement activé pendant la partie compte tout de suite.
+  async donnerVocal(client, id) {
+    const { abonnement, comptes } = SalleKopo.services;
+    if (!this.salle.joueurs.some((j) => j.id === id && !j.robot)) return;
+    if (this.entrainement || this.jour) { client.send('vocal', { refuse: 'seul' }); return; }
+    const c = (await comptes.lire(id)) || this.comptes.get(id);
+    if (c && this.comptes.has(id)) Object.assign(this.comptes.get(id), { kopo_plus_jusqu: c.kopo_plus_jusqu, micro_coupe: c.micro_coupe });
+    if (!abonnement.estAbonne(c)) { client.send('vocal', { refuse: 'abonnement', ...abonnement.offre() }); return; }
+    if (!abonnement.microPret()) { client.send('vocal', { refuse: 'bientot' }); return; }
+    client.send('vocal', abonnement.jetonVocal({ compte: c, salon: 'table-' + this.roomId, parler: !c.micro_coupe }));
   }
 
   // Sticker animé : interrupteur de l'admin allumé, joueur assis, un toutes les 5 s, et une utilisation à décompter
@@ -314,7 +347,7 @@ class SalleKopo extends Room {
     if (this.jour) { // pas de pièces, de ligue ni de parcours : seulement le score du jour
       this.suivreJour();
       if (s.etat !== 'salon' && !this.locked) this.lock();
-      for (const [id, c] of this.clientsParId) c.send('vue', this.S.vue(s, id));
+      for (const [id, c] of this.clientsParId) c.send('vue', this.vuePour(id));
       return;
     }
     if (s.etat === 'manche' && s.numeroManche === 1 && (!this.partie || this.partie.enregistree)) {
@@ -336,7 +369,7 @@ class SalleKopo extends Room {
     if (s.etat === 'salon' && this.maxClients !== places) this.maxClients = places; // place ajoutée par reserverRetour
     if (s.etat === 'salon' && this.locked && s.joueurs.length < places) this.unlock();
     this.setMetadata(this.meta(s.etat, s.joueurs.filter((j) => !j.robot).length));
-    for (const [id, c] of this.clientsParId) c.send('vue', this.S.vue(s, id));
+    for (const [id, c] of this.clientsParId) c.send('vue', this.vuePour(id));
   }
 
   // Mises : prélevées au début de la partie. Un joueur qui n'a plus assez (dépensé entre-temps)

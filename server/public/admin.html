@@ -111,6 +111,25 @@ async function bouquetsAdmin() {
     try { const r = await api('/bouquets/livrer', { methode: 'POST', corps: { joueur: j, bouquet: b.id, message: $('#bqRef').value } }); message(`${nb(r.bouquet.pieces)} pièces livrées à ${r.joueur.nom}.`); aller('economie'); } catch (e) { message(e.message); }
   };
 }
+// Abonnement Kopo+ (micro en salle, couronne dorée) : prix, abonnés, et un abonnement activé à la main (paiement reçu).
+async function abonnementsAdmin() {
+  const A = await api('/abonnements');
+  $('#abonnements').innerHTML = `<div class="carte"><div class="ligne"><span><b>${nb(A.actifs)}</b> abonné${A.actifs > 1 ? 's' : ''} en cours</span><span class="muted">·</span><span><b>${nb(A.francs30j)} FC</b> encaissés sur 30 jours (${nb(A.activations30j)} activation${A.activations30j > 1 ? 's' : ''})</span></div>
+      <table><tr><th>Formule</th><th class="n">Prix</th><th class="n">Durée</th></tr>${A.formules.map((f) => `<tr><td>${esc(f.nom)}${f.note ? ` <span class="muted">(${esc(f.note)})</span>` : ''}</td><td class="n">${nb(f.francs)} FC</td><td class="n">${nb(f.jours)} jours</td></tr>`).join('')}</table>
+      <p class="muted" style="margin:8px 0 0">Kopo+ donne le micro en salle (seuls les abonnés parlent et s'entendent), la couronne dorée et la voie Kopo+ du parcours. ${A.micro ? 'Serveur vocal LiveKit réglé.' : '<b>Micro éteint</b> : LIVEKIT_URL, LIVEKIT_API_KEY et LIVEKIT_API_SECRET absents sur Render.'} Paiement mobile money pas encore branché.</p></div>
+    <div class="carte"><b>Activer un abonnement</b> <span class="muted">(paiement mobile money reçu à la main)</span>
+      <div class="ligne"><input id="abJoueur" placeholder="Pseudo#1234" style="width:180px"><select id="abQuoi">${A.formules.map((f) => `<option value="${esc(f.id)}">${esc(f.nom)} · ${nb(f.francs)} FC</option>`).join('')}</select>
+      <input id="abRef" placeholder="Référence du paiement" style="width:200px"><button class="btn" id="abActiver">Activer</button></div>
+      <p class="muted" style="margin:6px 0 0">S'il reste des jours, la nouvelle période s'ajoute à la fin. Le joueur reçoit une notification ; la couronne apparaît tout de suite à sa table. Noté au Journal.</p></div>
+    <div class="carte"><table><tr><th>Date</th><th>Joueur</th><th>Formule</th><th class="n">Prix</th><th>Jusqu'au</th><th>Référence</th></tr>
+      ${lignes('abActivations', A.activations, (l) => `<tr><td>${date(l.cree_le)}</td><td><button class="lien" data-joueur="${esc(l.compte)}">${esc(l.pseudo)}#${esc(l.numero)}</button></td><td>${l.formule === 'an' ? '1 an' : '1 mois'}</td><td class="n">${nb(l.francs)} FC</td><td>${date(l.jusqu)}</td><td>${esc(l.ref || '')}</td></tr>`, { par: 10, colonnes: 6, vide: '<tr><td class="muted" colspan="6">Aucun abonnement activé pour l\'instant.</td></tr>' })}</table></div>`;
+  $('#abActiver').onclick = async () => {
+    const f = A.formules.find((x) => x.id === $('#abQuoi').value), j = $('#abJoueur').value.trim();
+    if (!/#\d{4}$/.test(j)) return message('Écris le joueur sous la forme Pseudo#1234.');
+    if (!confirm(`Activer Kopo+ (${f.nom}) pour ${j} ? Fais-le seulement si le paiement de ${nb(f.francs)} FC est bien reçu.`)) return;
+    try { const r = await api('/abonnements/activer', { methode: 'POST', corps: { joueur: j, formule: f.id, message: $('#abRef').value } }); message(`Kopo+ activé pour ${r.joueur.nom} jusqu'au ${date(r.jusqu)}.`); aller('economie'); } catch (e) { message(e.message); }
+  };
+}
 let jeton = sessionStorage.getItem('kopo-admin');
 let page = 'direct', minuteur = null;
 
@@ -229,10 +248,13 @@ const afficher = {
       <div class="carte"><table><tr><th>Motif</th><th class="n">Total</th><th class="n">Opérations</th></tr>${e.parMotif.map((m) => `<tr><td>${esc(MOTIFS[m.motif] || m.motif)}</td><td class="n ${m.total < 0 ? 'ko' : ''}">${nb(m.total)}</td><td class="n">${nb(m.operations)}</td></tr>`).join('') || '<tr><td colspan="3" class="muted">Rien pour l\'instant.</td></tr>'}</table></div>
       <h3>Bouquets de pièces</h3>
       <div id="bouquets"><p class="muted">Chargement…</p></div>
+      <h3>Abonnements Kopo+ (micro)</h3>
+      <div id="abonnements"><p class="muted">Chargement…</p></div>
       <h3>Comptes suspects</h3>
       <p class="muted">Deux comptes qui ont joué au moins 5 parties seuls ensemble ces 14 derniers jours, gagnées à 80 % ou plus par le même : peut-être un joueur qui se fait donner des pièces ou des points de ligue par un faux compte. Ouvre les fiches pour décider.</p>
       <div id="suspects"><p class="muted">Chargement…</p></div>`;
     await bouquetsAdmin();
+    await abonnementsAdmin();
     const s = await api('/suspects');
     const qui = (id, pseudo, numero, cree, statut) => `<button class="lien" data-joueur="${esc(id)}">${esc(pseudo)}#${esc(numero)}</button><br><small class="muted">créé le ${date(cree)}${statut !== 'actif' ? ' · <span class="statut-' + esc(statut) + '">' + esc(statut) + '</span>' : ''}</small>`;
     $('#suspects').innerHTML = `<div class="carte"><table><tr><th>Gagne le plus</th><th>Perd le plus</th><th class="n">Parties ensemble</th><th class="n">Dont classées</th><th class="n">Victoires</th><th class="n">Pots gagnés</th></tr>${lignes('suspects', s.paires.map((p) => (p.victoires_a >= p.victoires_b ? p : { ...p, a: p.b, b: p.a, pseudo_a: p.pseudo_b, pseudo_b: p.pseudo_a, numero_a: p.numero_b, numero_b: p.numero_a, cree_a: p.cree_b, cree_b: p.cree_a, statut_a: p.statut_b, statut_b: p.statut_a, victoires_a: p.victoires_b, victoires_b: p.victoires_a, pots_a: p.pots_b, pots_b: p.pots_a })), (p) => `<tr><td>${qui(p.a, p.pseudo_a, p.numero_a, p.cree_a, p.statut_a)}</td><td>${qui(p.b, p.pseudo_b, p.numero_b, p.cree_b, p.statut_b)}</td><td class="n">${nb(p.ensemble)}</td><td class="n">${nb(p.classees)}</td><td class="n">${nb(p.victoires_a)} – ${nb(p.victoires_b)}</td><td class="n">${nb(p.pots_a)}</td></tr>`, { par: 20, colonnes: 6, vide: '<tr><td colspan="6" class="muted">Aucun compte suspect.</td></tr>' })}</table></div>`;

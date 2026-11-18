@@ -112,7 +112,8 @@ Après l'entrée, envoyer **`sync`** : le serveur répond par la vue. Toutes les
 | `pret` | `{ pret: bool }` | Un joueur, salon (indicatif) |
 | `reaction` | `{ emoji: texte }` | **Chat** : seulement un des messages de `GET /api/v1/config` → `messages` (pas de texte libre). Un par seconde au plus. Relayé à toute la table par le message `reaction` |
 | `sticker` | `{ sticker: id }` | **Sticker animé** (`GET /api/v1/stickers`) : seulement quand l'admin a allumé les stickers (sinon `Les stickers arrivent bientôt.`), un toutes les 5 s, et s'il reste au moins une utilisation (une de moins à chaque envoi). Relayé à toute la table par le message `sticker` ; l'envoyeur reçoit aussi `stickers` |
-| `micro` | `{ voix: bool, muet: bool, peerId? }` | Micro (voir 5) |
+| `micro` | `{ voix: bool, muet: bool }` | Micro (voir 5) : `voix` reste faux pour un non-abonné |
+| `vocal` | rien | Micro (voir 5) : demande le jeton du salon vocal de la table. Réponse : message `vocal` |
 | `mancheSuivante` | rien | L'hôte, entre deux manches (sinon elle part seule après 10 s) |
 | `revanche` / `revancheNon` | rien | Chaque joueur, en fin de partie (15 s). La revanche part quand tout le monde a répondu, ou à la fin du temps avec 2 joueurs au moins |
 | `rejouer` | rien | L'hôte, fin de partie : retour au salon avec les mêmes joueurs |
@@ -190,9 +191,18 @@ Champs communs (Kopo et Inter (8)) :
 - **Kopo** : `<valeur><couleur>`, valeur 2 à 10, couleur `P` pique ♠, `C` cœur ♥, `K` carreau ♦, `T` trèfle ♣. Exemple : `10K` = 10♦.
 - **Inter (8)** : valeur `A 2 3 4 5 6 7 8 9 10 V D R` (à l'écran : A, 2…10, J, Q, K), mêmes couleurs ; jokers `XR` (rouge) et `XN` (noir). En Délire (2 paquets), les cartes du second paquet finissent par `*` (`RK*`). Exemple : `VK` = valet de carreau. Une `demande` (après un 8) est une valeur (`'R'`, `'7'`…).
 
-## 5. Micro (facultatif)
+## 5. Micro (abonnés Kopo+)
 
-Le micro passe de téléphone à téléphone en WebRTC par PeerJS (serveur PeerJS public, relais TURN) : le serveur Masano ne fait que transmettre `peerId`, `voix` et `muet` dans la vue. Pour l'appli, c'est une fonction à part (paquet WebRTC compatible PeerJS), à faire plus tard si besoin ; sans elle, l'appli envoie simplement `micro` avec `voix: false`.
+Le micro est réservé aux abonnés Kopo+ (`GET /api/v1/abonnement`). La voix passe par un serveur LiveKit : chaque abonné de la table entre dans le salon vocal `table-<roomId>`, et seuls les abonnés y sont admis.
+
+1. Au toucher du bouton micro, l'appli envoie `vocal`.
+2. Le serveur répond par le message `vocal` :
+   - `{ url, jeton, salon, parler }` : se connecter à LiveKit (`url`, `jeton`), publier le micro si `parler` est vrai (faux = sanction « micro » : on écoute seulement) ;
+   - `{ refuse: 'abonnement', formules, avantages, paiement }` : pas abonné, montrer la fenêtre « Abonne-toi » avec les prix ;
+   - `{ refuse: 'bientot' }` : serveur vocal pas encore réglé ; `{ refuse: 'seul' }` : entraînement ou Match du jour.
+3. L'appli envoie ensuite `micro` `{ voix: true, muet }` pour que la table voie l'icône. Le serveur force `voix: false` pour un non-abonné.
+
+Dans la vue, `joueurs[].plus` vaut `true` pour un abonné (couronne dorée). `peerId` vaut toujours `null` (ancien micro PeerJS).
 
 ## 6. Exemple complet en Dart
 

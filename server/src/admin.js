@@ -4,7 +4,7 @@ const express = require('express');
 const { enveloppe, publicCompte } = require('./api');
 const { emailSupabase } = require('./comptes');
 
-function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainage, bande, push, stickers, bouquets, salles, demarrage }) {
+function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainage, bande, push, stickers, bouquets, abonnement, salles, demarrage }) {
   const r = express.Router();
   r.use(express.json({ limit: '50kb' }));
 
@@ -204,6 +204,7 @@ function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainag
     const r2 = await base.query('UPDATE comptes SET kopo_plus_jusqu = $2 WHERE id = $1 RETURNING id', [req.params.id, jusqu]);
     if (!r2.rows.length) return res.status(404).json({ erreur: 'Joueur introuvable.' });
     await journal('kopo-plus', req.params.id, { jours });
+    for (const s of salles) if (s.majAbonne) s.majAbonne(req.params.id, jusqu);
     res.json({ ok: true, jusqu });
   }));
   // Parrainage : un créateur vérifié (influenceur) n'a pas de plafond de parrainages par mois.
@@ -247,6 +248,15 @@ function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainag
   r.post('/bouquets/livrer', enveloppe(async (req, res) => {
     const x = await bouquets.livrer(req.body || {});
     await journal('bouquet:livre', x.joueur.id, { bouquet: x.bouquet.nom, francs: x.bouquet.francs, pieces: x.bouquet.pieces, message: req.body.message });
+    res.json(x);
+  }));
+
+  // --- Abonnement Kopo+ (micro) : formules, abonnés, et un abonnement activé à la main (paiement mobile money reçu).
+  r.get('/abonnements', enveloppe(async (req, res) => res.json(n2(await abonnement.resumeAdmin()))));
+  r.post('/abonnements/activer', enveloppe(async (req, res) => {
+    const x = await abonnement.activer(req.body || {});
+    await journal('abonnement:active', x.joueur.id, { formule: x.formule.id, francs: x.formule.francs, jusqu: x.jusqu, message: req.body.message });
+    for (const s of salles) if (s.majAbonne) s.majAbonne(x.joueur.id, x.jusqu); // la couronne apparaît tout de suite à la table
     res.json(x);
   }));
 
