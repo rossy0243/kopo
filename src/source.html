@@ -2315,6 +2315,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       else if (facon.mise) room = await cli.joinOrCreate(facon.jeu === 'inter8' ? 'inter8-mise' : 'kopo-mise', { jeton: c.jeton, publique: true, taille: facon.taille, mise: facon.mise });
       else room = await cli.joinOrCreate(facon.jeu === 'inter8' ? 'inter8' : 'kopo', { jeton: c.jeton, publique: true, taille: facon.taille });
       clearTimeout(reveil);
+      if (!facon.reconnexion && !facon.matchJour) vocal.annoncer = true; // « Nouveau : le micro » à la première vue de la table
       brancherSalleServeur(cli, room, nom, facon);
     } catch (e) {
       clearTimeout(reveil);
@@ -2665,7 +2666,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     if (!ancienne || ancienne.etat !== v.etat || ancienne.numeroManche !== v.numeroManche) { carteChoisie = null; choixInter = []; cartesRecues.clear(); }
     if (v.jeu !== 'inter8') suivrePartie(v); // Inter (8) : l'XP et les missions viendront à l'étape de la progression
     if (v.etat !== 'finPartie') arreterSuiteAuto();
-    if (v.etat === 'salon') { if (!chatOuvert()) fermerFenetre(); return afficherSalon(v); } // le chat reste ouvert quand quelqu'un arrive ou se dit prêt
+    if (v.etat === 'salon') { if (!chatOuvert() && !annonceMicroOuverte()) fermerFenetre(); return afficherSalon(v); } // le chat reste ouvert quand quelqu'un arrive ou se dit prêt
     if (v.etat === 'manche' && client && !v.joueurs.some((j) => j.id === v.moi)) { quitter(); toast('La revanche est partie sans toi.', 'alerte'); return; }
     if (v.jeu === 'inter8') {
       const avant = positionsAvant();
@@ -3887,6 +3888,10 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     // Réponse du serveur : le jeton du salon vocal, ou la raison du refus (pas abonné, micro pas encore réglé…).
     async recevoir(d) {
       this.demande = false; this.dessiner();
+      if (d && d.fin) {
+        const etait = !!this.salle; this.couper(); this.signaler(); this.dessiner(); this.dessinerParleurs();
+        return etait ? toast('Ton abonnement Kopo+ est terminé : micro coupé.', 'info') : undefined;
+      }
       if (!d || d.refuse) {
         if (d && d.refuse === 'abonnement') return ouvrirAbonnement(d);
         if (d && d.refuse === 'bientot') return toast('Le micro des abonnés arrive bientôt.', 'info');
@@ -3930,7 +3935,10 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     // Rendre muet un abonné pour moi seul (les autres l'entendent toujours).
     basculerJoueur(id) { if (this.coupes.has(id)) this.coupes.delete(id); else this.coupes.add(id); this.appliquerSon(); },
     signaler() { envoyer({ type: 'micro', voix: this.actif, muet: this.muet }); },
-    maj(v) { this.vue = v; this.dessiner(); this.dessinerParleurs(); },
+    maj(v) {
+      this.vue = v; this.dessiner(); this.dessinerParleurs();
+      if (this.annoncer && v) { this.annoncer = false; const me = v.joueurs.find((j) => j.id === v.moi); if (me && !me.plus) setTimeout(annoncerMicro, 1200); }
+    },
     couper() {
       const s = this.salle; this.salle = null;
       if (s) try { s.disconnect(); } catch (e) {}
@@ -3985,6 +3993,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
 
   // Invitation à s'abonner (Kopo+) : ce que ça donne, les deux prix en francs congolais, et comment payer.
   async function ouvrirAbonnement(offre) {
+    const annonce = !!(offre && offre.annonce);
     let A = offre && offre.formules ? offre : null;
     if (!A || !('actif' in A)) {
       try { if (MODE_SERVEUR && compteLocal()) A = await apiJoueur('/abonnement'); } catch (e) {}
@@ -3994,6 +4003,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     const tete = el('div', 'ab-tete'); tete.append(ico('couronne', 'plus-ico grand'), el('b', null, 'Kopo+'));
     z.append(tete);
     if (A.actif && A.jusqu) z.append(el('p', 'ab-actif', `Tu es abonné jusqu'au ${new Date(A.jusqu).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}.`));
+    else if (annonce) z.append(el('p', 'muted', 'Tu peux maintenant parler avec les autres joueurs de ta table pendant la partie. Le micro est réservé aux abonnés Kopo+ : seuls les abonnés parlent et s\'entendent.'));
     else z.append(el('p', 'muted', 'Le micro en partie est réservé aux abonnés : à la table, seuls les abonnés parlent et s\'entendent.'));
     const ul = el('ul', 'ab-avantages');
     (A.avantages || []).forEach((a, i) => { const li = el('li'); li.append(ico(['micro', 'couronne', 'cadeau'][i] || 'cadeau'), ' ' + a); ul.append(li); });
@@ -4008,10 +4018,21 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       l.append(b);
     }
     z.append(l, el('small', 'muted', A.paiement ? 'Paiement en francs congolais par mobile money.' : 'Paiement en francs congolais (mobile money : M-Pesa, Orange Money, Airtel Money) : bientôt. Kopo+ ne donne jamais d\'avantage pour gagner.'));
-    const ret = el('button', 'btn principal large', 'Fermer'); ret.onclick = fermerFenetre;
-    ouvrirFenetre([el('h2', null, A.actif ? 'Ton abonnement' : 'Le micro en partie'), z, ret], 'boutique');
+    const ret = el('button', 'btn principal large', annonce ? 'Plus tard' : 'Fermer'); ret.onclick = fermerFenetre;
+    ouvrirFenetre([el('h2', null, A.actif ? 'Ton abonnement' : annonce ? 'Nouveau : le micro en partie' : 'Le micro en partie'), z, ret], 'boutique');
+    if (annonce) $('fenetre').dataset.annonce = 'micro'; // reste ouverte quand un joueur arrive au salon
   }
   window.ouvrirAbonnement = ouvrirAbonnement;
+  // Annonce du micro aux non-abonnés : en créant ou en rejoignant une table en ligne, 10 fois au plus sur cet appareil.
+  const ANNONCES_MICRO = 10;
+  function annoncerMicro() {
+    if (!MICRO_ACTIF || !vocal.vue || !$('voile').hidden) return; // pas par-dessus une autre fenêtre (elle ne compte pas)
+    let n = 0;
+    try { n = Number(localStorage.getItem('kopo-annonce-micro')) || 0; } catch (e) {}
+    if (n >= ANNONCES_MICRO) return;
+    try { localStorage.setItem('kopo-annonce-micro', String(n + 1)); } catch (e) {}
+    ouvrirAbonnement({ annonce: true });
+  }
   // Couronne dorée des abonnés Kopo+ (à côté du pseudo).
   function badgePlus() { const s = el('span', 'badge-plus'); s.append(ico('couronne', 'plus-ico')); s.title = 'Abonné Kopo+'; s.setAttribute('aria-label', 'Abonné Kopo+'); return s; }
 
@@ -4021,7 +4042,8 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     envoyer({ type: 'action', action: { type: 'jouer', carte: c } });
   }
 
-  function ouvrirFenetre(contenu, type) { $('fenetre').replaceChildren(...contenu); $('fenetre').dataset.type = type || ''; $('voile').hidden = false; }
+  function ouvrirFenetre(contenu, type) { $('fenetre').replaceChildren(...contenu); $('fenetre').dataset.type = type || ''; delete $('fenetre').dataset.annonce; $('voile').hidden = false; }
+  const annonceMicroOuverte = () => $('fenetre').dataset.annonce === 'micro' && !$('voile').hidden;
   function fermerFenetre() { $('voile').hidden = true; }
   const chatOuvert = () => $('fenetre').dataset.type === 'chat' && !$('voile').hidden;
 

@@ -86,11 +86,40 @@ function creerAbonnement(base_, env = process.env) {
       return { ok: true, jusqu, joueur: { id: c.id, nom: `${c.pseudo}#${c.numero}` }, formule: f };
     },
 
+    // Tableau de bord : annuler une activation (essai, erreur). Ses jours sont retirés de la date de fin (plus d'abonnement
+    // si elle est passée) et ses francs sortent du total. Une activation ne s'annule qu'une fois.
+    async annuler(id) {
+      const n = Math.trunc(Number(id));
+      if (!(n > 0)) throw erreur('Activation inconnue.', 404);
+      return base_.transaction(async (q) => {
+        const a = (await q.query('UPDATE abonnements SET annule_le = now() WHERE id = $1 AND annule_le IS NULL RETURNING compte_id, formule, francs, jours', [n])).rows[0];
+        if (!a) throw erreur('Activation introuvable ou déjà annulée.', 404);
+        const r = await q.query(`UPDATE comptes SET kopo_plus_jusqu = CASE WHEN kopo_plus_jusqu - make_interval(days => $2) > now()
+          THEN kopo_plus_jusqu - make_interval(days => $2) ELSE NULL END WHERE id = $1 RETURNING kopo_plus_jusqu, pseudo, numero`, [a.compte_id, a.jours]);
+        const c = r.rows[0];
+        return { ok: true, compte: a.compte_id, joueur: `${c.pseudo}#${c.numero}`, formule: a.formule, francs: a.francs, jusqu: c.kopo_plus_jusqu };
+      });
+    },
+
+    // Salle : couper tout de suite le micro d'un joueur qui n'est plus abonné (RoomService.RemoveParticipant de LiveKit).
+    async retirerDuVocal({ salon, identite }, fetcher = globalThis.fetch) {
+      if (!livekit) return false;
+      const t = Math.floor(Date.now() / 1000), b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
+      const tete = b64({ alg: 'HS256', typ: 'JWT' }) + '.' + b64({ iss: livekit.cle, sub: 'kopo-serveur', nbf: t - 10, exp: t + 60, video: { room: salon, roomAdmin: true } });
+      const jeton = tete + '.' + crypto.createHmac('sha256', livekit.secret).update(tete).digest('base64url');
+      try {
+        const r = await fetcher(livekit.url.replace(/^ws/i, 'http') + '/twirp/livekit.RoomService/RemoveParticipant', {
+          method: 'POST', headers: { Authorization: 'Bearer ' + jeton, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ room: salon, identity: identite }), signal: AbortSignal.timeout(8000) });
+        return r.ok;
+      } catch { return false; }
+    },
+
     // Tableau de bord : formules, abonnés en cours, francs encaissés sur 30 jours, dernières activations.
     async resumeAdmin() {
       const actifs = (await base_.query("SELECT count(*)::int AS n FROM comptes WHERE kopo_plus_jusqu > now() AND statut = 'actif'")).rows[0].n;
-      const mois = (await base_.query("SELECT COALESCE(sum(francs), 0)::int AS f, count(*)::int AS n FROM abonnements WHERE cree_le > now() - interval '30 days'")).rows[0];
-      const activations = (await base_.query(`SELECT a.id::int AS id, a.formule, a.francs, a.ref, a.jusqu, a.cree_le, c.id AS compte, c.pseudo, c.numero
+      const mois = (await base_.query("SELECT COALESCE(sum(francs), 0)::int AS f, count(*)::int AS n FROM abonnements WHERE cree_le > now() - interval '30 days' AND annule_le IS NULL")).rows[0];
+      const activations = (await base_.query(`SELECT a.id::int AS id, a.formule, a.francs, a.ref, a.jusqu, a.cree_le, a.annule_le, c.id AS compte, c.pseudo, c.numero
         FROM abonnements a JOIN comptes c ON c.id = a.compte_id ORDER BY a.id DESC LIMIT 30`)).rows;
       return { ...offre(), actifs, francs30j: mois.f, activations30j: mois.n, activations };
     },

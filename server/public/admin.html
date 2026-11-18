@@ -121,8 +121,14 @@ async function abonnementsAdmin() {
       <div class="ligne"><input id="abJoueur" placeholder="Pseudo#1234" style="width:180px"><select id="abQuoi">${A.formules.map((f) => `<option value="${esc(f.id)}">${esc(f.nom)} · ${nb(f.francs)} FC</option>`).join('')}</select>
       <input id="abRef" placeholder="Référence du paiement" style="width:200px"><button class="btn" id="abActiver">Activer</button></div>
       <p class="muted" style="margin:6px 0 0">S'il reste des jours, la nouvelle période s'ajoute à la fin. Le joueur reçoit une notification ; la couronne apparaît tout de suite à sa table. Noté au Journal.</p></div>
-    <div class="carte"><table><tr><th>Date</th><th>Joueur</th><th>Formule</th><th class="n">Prix</th><th>Jusqu'au</th><th>Référence</th></tr>
-      ${lignes('abActivations', A.activations, (l) => `<tr><td>${date(l.cree_le)}</td><td><button class="lien" data-joueur="${esc(l.compte)}">${esc(l.pseudo)}#${esc(l.numero)}</button></td><td>${l.formule === 'an' ? '1 an' : '1 mois'}</td><td class="n">${nb(l.francs)} FC</td><td>${date(l.jusqu)}</td><td>${esc(l.ref || '')}</td></tr>`, { par: 10, colonnes: 6, vide: '<tr><td class="muted" colspan="6">Aucun abonnement activé pour l\'instant.</td></tr>' })}</table></div>`;
+    <div class="carte"><table><tr><th>Date</th><th>Joueur</th><th>Formule</th><th class="n">Prix</th><th>Jusqu'au</th><th>Référence</th><th></th></tr>
+      ${lignes('abActivations', A.activations, (l) => `<tr${l.annule_le ? ' class="muted"' : ''}><td>${date(l.cree_le)}</td><td><button class="lien" data-joueur="${esc(l.compte)}">${esc(l.pseudo)}#${esc(l.numero)}</button></td><td>${l.formule === 'an' ? '1 an' : '1 mois'}</td><td class="n">${l.annule_le ? `<s>${nb(l.francs)} FC</s>` : nb(l.francs) + ' FC'}</td><td>${date(l.jusqu)}</td><td>${esc(l.ref || '')}</td><td>${l.annule_le ? 'Annulée le ' + date(l.annule_le) : `<button class="btn" data-ab-annuler="${l.id}" data-ab-nom="${esc(l.pseudo)}#${esc(l.numero)}" data-ab-jours="${l.formule === 'an' ? 365 : 30}">Annuler</button>`}</td></tr>`, { par: 10, colonnes: 7, vide: '<tr><td class="muted" colspan="7">Aucun abonnement activé pour l\'instant.</td></tr>' })}</table></div>`;
+  $('#abonnements').onclick = async (ev) => {
+    const b = ev.target.closest('[data-ab-annuler]');
+    if (!b) return;
+    if (!confirm(`Annuler cette activation pour ${b.dataset.abNom} ? Ses ${b.dataset.abJours} jours sont retirés (plus de Kopo+ s'il n'en reste pas), son micro est coupé tout de suite et le prix sort du total encaissé.`)) return;
+    try { const r = await api(`/abonnements/${b.dataset.abAnnuler}/annuler`, { methode: 'POST' }); message(r.jusqu ? `Activation annulée. ${r.joueur} garde Kopo+ jusqu'au ${date(r.jusqu)}.` : `Activation annulée. ${r.joueur} n'a plus Kopo+.`); aller('economie'); } catch (e) { message(e.message); }
+  };
   if (A.micro) api('/abonnements/livekit').then((v) => { const e = $('#abLivekit'); if (e) e.innerHTML = v.ok ? `<b class="ok">Serveur vocal LiveKit joignable, clé acceptée</b> (${esc(v.url)}).` : `<b class="ko">Micro en panne</b> : ${esc(v.raison)}`; }).catch(() => {});
   $('#abActiver').onclick = async () => {
     const f = A.formules.find((x) => x.id === $('#abQuoi').value), j = $('#abJoueur').value.trim();

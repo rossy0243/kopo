@@ -10,6 +10,8 @@ class Vocal {
   final void Function(String texte, String niveau) toast;
   /// Non-abonné : la fenêtre « Le micro en partie » avec les prix (fenetres/progres.dart).
   void Function(Map offre)? inviterAbonnement;
+  /// Annonce « Nouveau : le micro en partie » (la même fenêtre, avec « Plus tard »).
+  void Function()? annoncer;
   Vocal({required this.envoyer, required this.maj, required this.toast});
 
   lk.Room? _salle;
@@ -31,6 +33,14 @@ class Vocal {
   Future<void> recevoir(Map d) async {
     demande = false;
     maj();
+    if (d['fin'] != null) {
+      final etait = _salle != null;
+      await couper();
+      signaler();
+      maj();
+      if (etait) toast('Ton abonnement Kopo+ est terminé : micro coupé.', 'info');
+      return;
+    }
     final refus = d['refuse'];
     if (refus != null) {
       if (refus == 'abonnement') { inviterAbonnement?.call(d); return; }

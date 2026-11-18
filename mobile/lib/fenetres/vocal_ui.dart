@@ -134,12 +134,14 @@ const _offreParDefaut = {
 };
 
 /// Ouvre la fenêtre Kopo+ : l'offre reçue de la salle (non-abonné qui touche le micro), sinon celle du serveur.
-Future<void> ouvrirAbonnement([Map? offre]) async {
+/// annonce : « Nouveau : le micro en partie », à l'entrée d'une table (voir App.annoncerMicro).
+Future<void> ouvrirAbonnement([Map? offre, bool annonce = false]) async {
   Map A = offre ?? _offreParDefaut;
   if (offre == null || !offre.containsKey('actif')) {
     try { if (app.enLigne) A = await Api.get('/abonnement') as Map; } catch (_) {}
   }
-  app.ouvrirFenetre((context) => fenetreAbonnement(A), 'boutique');
+  if (annonce && (app.vue == null || app.fenetre != null)) return;
+  app.ouvrirFenetre((context) => fenetreAbonnement(A, annonce: annonce), annonce ? 'annonce-micro' : 'boutique');
 }
 
 String _date(String iso) {
@@ -149,7 +151,7 @@ String _date(String iso) {
 }
 
 /// La fenêtre elle-même (séparée pour les captures d'écran).
-Widget fenetreAbonnement(Map A) {
+Widget fenetreAbonnement(Map A, {bool annonce = false}) {
   final actif = A['actif'] == true;
   final formules = ((A['formules'] as List?) ?? const []).cast<Map>();
   final avantages = ((A['avantages'] as List?) ?? const []).map((e) => e.toString()).toList();
@@ -184,11 +186,13 @@ Widget fenetreAbonnement(Map A) {
     ));
   }
   const icones = ['micro', 'couronne', 'cadeau'];
-  return Fenetre(titre: actif ? 'Ton abonnement' : 'Le micro en partie', enfants: [
+  return Fenetre(titre: actif ? 'Ton abonnement' : annonce ? 'Nouveau : le micro en partie' : 'Le micro en partie', enfants: [
     Row(mainAxisAlignment: MainAxisAlignment.center, children: [const CouronnePlus(taille: 28), const SizedBox(width: 8), Text('KOPO+', style: K.titre(28))]),
     const Ecart(6),
     if (actif && A['jusqu'] != null)
       Text("Tu es abonné jusqu'au ${_date(A['jusqu'].toString())}.", textAlign: TextAlign.center, style: K.texte(14, couleur: K.good, poids: FontWeight.w600))
+    else if (annonce)
+      const Muet("Tu peux maintenant parler avec les autres joueurs de ta table pendant la partie. Le micro est réservé aux abonnés Kopo+ : seuls les abonnés parlent et s'entendent.", taille: 13)
     else
       const Muet("Le micro en partie est réservé aux abonnés : à la table, seuls les abonnés parlent et s'entendent.", taille: 13),
     const Ecart(8),
@@ -198,6 +202,6 @@ Widget fenetreAbonnement(Map A) {
     const Ecart(10),
     Muet(A['paiement'] == true ? 'Paiement en francs congolais par mobile money.' : "Paiement en francs congolais (mobile money : M-Pesa, Orange Money, Airtel Money) : bientôt. Kopo+ ne donne jamais d'avantage pour gagner.", taille: 12),
     const Ecart(10),
-    Btn.principal('Fermer', large: true, onTap: app.fermerFenetre),
+    Btn.principal(annonce ? 'Plus tard' : 'Fermer', large: true, onTap: app.fermerFenetre),
   ]);
 }

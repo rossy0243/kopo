@@ -458,3 +458,4 @@ CREATE TABLE IF NOT EXISTS abonnements (
   cree_le    timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS abonnements_compte ON abonnements (compte_id, id DESC);
+ALTER TABLE abonnements ADD COLUMN IF NOT EXISTS annule_le timestamptz; -- activation annulée par l'admin (test, erreur) : jours retirés, francs hors du total
