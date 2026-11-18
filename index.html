@@ -672,12 +672,6 @@ body.dos-kinshasa { --dos-motif: linear-gradient(135deg, transparent 38%, #f7d03
 .avatar.av-nuit { background: var(--table); color: var(--brass); box-shadow: inset 0 0 0 2px var(--brass); }
 .avatar.av-kinshasa { background: linear-gradient(135deg, #3b8fd6 0 38%, #f7d038 38% 44%, #ce1021 44% 56%, #f7d038 56% 62%, #3b8fd6 62%); color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.6); }
 .avatar.av-fleuve { background: radial-gradient(circle at 30% 30%, #5fb3c9, #1d5f7a 70%); color: #fff; }
-.avatar.cadre-kinshasa { box-shadow: 0 0 0 3px #3b8fd6, 0 0 0 5px #ce1021; }
-.avatar.cadre-lubumbashi { box-shadow: 0 0 0 3px #b87333, 0 0 0 5px #5a2e0e; }
-.avatar.cadre-abidjan { box-shadow: 0 0 0 3px #f77f00, 0 0 0 5px #009e60; }
-.avatar.cadre-dakar { box-shadow: 0 0 0 3px #00853f, 0 0 0 5px #fdef42; }
-.avatar.cadre-douala { box-shadow: 0 0 0 3px #007a5e, 0 0 0 5px #ce1126; }
-.avatar.cadre-brazzaville { box-shadow: 0 0 0 3px #009543, 0 0 0 5px #dc241f; }
 .niveau-pastille { position: absolute; right: -5px; bottom: -4px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: var(--table); border: 1.5px solid var(--brass); color: var(--brass); font: 600 11px/15px var(--body); font-style: normal; text-align: center; text-shadow: none; }
 .xp-mini { display: block; height: 4px; border-radius: 2px; background: rgba(255,255,255,.12); overflow: hidden; margin-top: 3px; }
 .xp-mini span { display: block; height: 100%; width: 0; background: var(--brass); border-radius: 2px; transition: width .6s ease-out; }
@@ -1122,8 +1116,6 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
 .avatar.av-brazzaville { background: linear-gradient(135deg, #009543 0 40%, #fbde4a 40% 60%, #dc241f 60%); color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.6); }
 .avatar.av-goma { background: radial-gradient(circle at 50% 110%, #ff7a2f, #a3200f 45%, #1b0b07 80%); color: #ffd7a8; }
 .avatar.av-fondateur { background: radial-gradient(circle at 30% 25%, #f6dc9a, #e2b04a 55%, #8a6420); color: #1d1606; box-shadow: inset 0 0 0 2px #1d1606; }
-.avatar.cadre-fondateurs { box-shadow: 0 0 0 3px #e2b04a, 0 0 0 5px #1d1606, 0 0 0 7px #e2b04a; }
-.avatar.cadre-legende { box-shadow: 0 0 0 3px #e0564c, 0 0 0 6px #e2b04a, 0 0 14px 4px rgba(224,86,76,.6); }
 body.dos-lubumbashi { --dos-motif: repeating-linear-gradient(45deg, #b87333 0 5px, #5a2e0e 5px 10px); --dos-motif-petit: repeating-linear-gradient(45deg, #b87333 0 3px, #5a2e0e 3px 6px); }
 body.dos-abidjan { --dos-motif: linear-gradient(90deg, #f77f00 0 33%, #fff 33% 66%, #009e60 66%); --dos-motif-petit: linear-gradient(90deg, #f77f00 0 33%, #fff 33% 66%, #009e60 66%); }
 body.dos-dakar { --dos-motif: linear-gradient(90deg, #00853f 0 33%, #fdef42 33% 66%, #e31b23 66%); --dos-motif-petit: linear-gradient(90deg, #00853f 0 33%, #fdef42 33% 66%, #e31b23 66%); }
@@ -1141,8 +1133,6 @@ body.dos-fondateurs { --dos-motif: radial-gradient(circle, #e2b04a 18%, transpar
 .mini-dos { display: inline-block; width: 26px; height: 38px; border-radius: 4px; border: 2px solid #f3e3bd; background: repeating-linear-gradient(45deg, var(--brass) 0 4px, #9c7524 4px 8px); }
 /* Parrainage : apparences des paliers et écran d'invitation. */
 .avatar.av-ambassadeur { background: radial-gradient(circle at 50% 30%, #fff3c8, #e2b04a 45%, #1f4d3a 46%, #123326); color: #1d1606; }
-.avatar.cadre-ambassadeur { box-shadow: 0 0 0 3px #1f8a5b, 0 0 0 5px #e2b04a; }
-.avatar.cadre-ambassadeur-or { box-shadow: 0 0 0 3px #e2b04a, 0 0 0 5px #fff3c8, 0 0 0 7px #e2b04a, 0 0 14px 4px rgba(226,176,74,.55); }
 body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0 16%, transparent 17%), repeating-linear-gradient(90deg, #1f8a5b 0 6px, #155f3f 6px 12px); --dos-motif-petit: radial-gradient(circle, #e2b04a 0 22%, transparent 23%), #1f8a5b; }
 .mini-dos.dos-ambassadeur { background: radial-gradient(circle, #e2b04a 0 22%, transparent 23%), #1f8a5b !important; }
 .parrainage { display: grid; gap: 10px; justify-items: stretch; }
@@ -6785,6 +6775,8 @@ var qrcode = function() {
   // Thème des pays (depuis le 02/11, avant : villes). Rien n'aide à gagner : ce sont des apparences.
   // Les identifiants gardent leur ancien nom de ville (déjà dans les collections) ; seul le nom affiché change.
   // ville: true = objet de l'ancien thème, plus proposé, mais toujours valable pour qui l'a déjà.
+  // retire: true = cadres, retirés du jeu le 18/11 : plus donnés, plus montrés ni équipables.
+  // Gardés ici (et dans les profils) pour pouvoir les réutiliser autrement plus tard.
   const OBJETS = {
     'av-laiton': { type: 'avatar', nom: 'Laiton', d: 'De base' },
     'av-nuit': { type: 'avatar', nom: 'Nuit', d: 'Niveau 2' },
@@ -6792,18 +6784,17 @@ var qrcode = function() {
     'av-fleuve': { type: 'avatar', nom: 'Fleuve', d: 'Niveau 5' },
     'dos-laiton': { type: 'dos', nom: 'Laiton', d: 'De base' },
     'dos-kinshasa': { type: 'dos', nom: 'RD Congo', d: 'Bienvenue, jour 7' },
-    'cadre-kinshasa': { type: 'cadre', nom: 'RD Congo', d: 'Défi de la semaine' },
-    'cadre-abidjan': { type: 'cadre', nom: "Côte d'Ivoire", d: 'Défi de la semaine' },
-    'cadre-dakar': { type: 'cadre', nom: 'Sénégal', d: 'Défi de la semaine' },
-    'cadre-douala': { type: 'cadre', nom: 'Cameroun', d: 'Défi de la semaine' },
-    'cadre-brazzaville': { type: 'cadre', nom: 'Congo', d: 'Défi de la semaine' },
-    'cadre-lubumbashi': { type: 'cadre', nom: 'Lubumbashi', d: 'Ancien défi', ville: true },
+    'cadre-kinshasa': { type: 'cadre', nom: 'RD Congo', d: 'Défi de la semaine', retire: true },
+    'cadre-abidjan': { type: 'cadre', nom: "Côte d'Ivoire", d: 'Défi de la semaine', retire: true },
+    'cadre-dakar': { type: 'cadre', nom: 'Sénégal', d: 'Défi de la semaine', retire: true },
+    'cadre-douala': { type: 'cadre', nom: 'Cameroun', d: 'Défi de la semaine', retire: true },
+    'cadre-brazzaville': { type: 'cadre', nom: 'Congo', d: 'Défi de la semaine', retire: true },
+    'cadre-lubumbashi': { type: 'cadre', nom: 'Lubumbashi', d: 'Ancien défi', ville: true, retire: true },
   };
   // Ordre d'affichage des catégories (boutique et collection).
   const CATEGORIES = [
     { type: 'avatar', nom: 'Avatars', un: 'Avatar' },
     { type: 'dos', nom: 'Dos de cartes', un: 'Dos de cartes' },
-    { type: 'cadre', nom: 'Cadres', un: 'Cadre' },
   ];
   // Range une liste d'objets ({ id, type, … }) par catégorie, dans l'ordre de CATEGORIES ; les catégories vides sont omises.
   function parCategorie(liste) {
@@ -6822,15 +6813,14 @@ var qrcode = function() {
   // Donne un objet ; on l'équipe tout de suite pour que le joueur le voie.
   function donnerObjet(p, id) {
     const c = collection(p), o = OBJETS[id];
-    if (!o || c.possedes.includes(id)) return false;
+    if (!o || o.retire || c.possedes.includes(id)) return false;
     c.possedes.push(id);
     c.equipes[o.type] = id;
     return true;
   }
   function equiper(p, id) {
     const c = collection(p), o = OBJETS[id];
-    if (!o) return false;
-    if (o.type === 'cadre' && c.equipes.cadre === id) { c.equipes.cadre = null; return true; } // retirer le cadre
+    if (!o || o.retire) return false;
     if (!c.possedes.includes(id)) return false;
     c.equipes[o.type] = id;
     return true;
@@ -6929,17 +6919,16 @@ var qrcode = function() {
     { id: 'katapss3', texte: 'Fais 3 Katapss cette semaine', cible: 3, compte: (e) => e.katapss },
     { id: 'finales6', texte: 'Atteins 6 finales cette semaine', cible: 6, compte: (e) => (e.finale ? 1 : 0) },
   ];
-  const CADRES = ['cadre-kinshasa', 'cadre-abidjan', 'cadre-dakar', 'cadre-douala', 'cadre-brazzaville']; // pays seulement
   const DEFI_PIECES = 300, DEFI_XP = 30;
   function defiSemaine(p, jour) {
     const sem = semaineDe(jour);
     if (!p.defi || p.defi.semaine !== sem) {
       const n = parseInt(sem.slice(-2), 10) + parseInt(sem.slice(0, 4), 10) * 53;
-      p.defi = { semaine: sem, id: DEFIS[n % DEFIS.length].id, cadre: CADRES[n % CADRES.length], avance: 0, finie: false };
+      p.defi = { semaine: sem, id: DEFIS[n % DEFIS.length].id, avance: 0, finie: false }; // plus de cadre (retirés le 18/11)
     }
     const d = DEFIS.find((x) => x.id === p.defi.id) || DEFIS[0];
     const fin = decaler(jour, 6 - ((dateDe(jour).getDay() + 6) % 7));
-    return { texte: d.texte, cible: d.cible, avance: Math.min(p.defi.avance, d.cible), finie: p.defi.finie, pieces: DEFI_PIECES, xp: DEFI_XP, cadre: p.defi.cadre, nomCadre: OBJETS[p.defi.cadre].nom, joursRestants: ecart(jour, fin) + 1 };
+    return { texte: d.texte, cible: d.cible, avance: Math.min(p.defi.avance, d.cible), finie: p.defi.finie, pieces: DEFI_PIECES, xp: DEFI_XP, joursRestants: ecart(jour, fin) + 1 };
   }
 
   // ------------------------------------------------------------------ parcours de bienvenue (7 jours)
@@ -7082,8 +7071,8 @@ var qrcode = function() {
       if (n) {
         const avant = p.defi.avance;
         p.defi.avance = Math.min(d.cible, avant + n);
-        if (p.defi.avance >= d.cible) { p.defi.finie = true; piecesGagnees += DEFI_PIECES; xpMissions += DEFI_XP; donnerObjet(p, p.defi.cadre); }
-        defi = { texte: d.texte, avant, apres: p.defi.avance, cible: d.cible, finie: p.defi.finie, pieces: DEFI_PIECES, cadre: p.defi.finie ? OBJETS[p.defi.cadre].nom : null };
+        if (p.defi.avance >= d.cible) { p.defi.finie = true; piecesGagnees += DEFI_PIECES; xpMissions += DEFI_XP; }
+        defi = { texte: d.texte, avant, apres: p.defi.avance, cible: d.cible, finie: p.defi.finie, pieces: DEFI_PIECES };
       }
     }
     if (piecesGagnees) crediter(p, piecesGagnees);
@@ -7927,7 +7916,7 @@ svg .vb { transform-box: view-box; }
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = '2b668b26a78d'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = '25c5f445772b'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: true };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // La musique des menus était coupée par défaut : on l'allume une fois pour tous (le joueur peut la recouper).
@@ -10233,7 +10222,7 @@ svg .vb { transform-box: view-box; }
       for (const id of r.objets) {
         const o = R.OBJETS[id];
         const l = el('div', 'ligne-mission finie');
-        l.append(el('b', null, `Nouveau : ${o.type === 'avatar' ? 'avatar' : o.type === 'dos' ? 'dos de cartes' : 'cadre'} ${o.nom}`), el('span', null, 'équipé'));
+        l.append(el('b', null, `Nouveau : ${o.type === 'avatar' ? 'avatar' : 'dos de cartes'} ${o.nom}`), el('span', null, 'équipé'));
         prog.append(l);
       }
       if (r.titre) prog.append(el('div', 'recap-titre', r.titre));
@@ -11429,7 +11418,7 @@ svg .vb { transform-box: view-box; }
     if (r.pieces) return pieceEl();
     const o = R.OBJETS[r.objet] || { type: r.type };
     if (o.type === 'dos') return el('span', 'mini-dos ' + r.objet);
-    const a = el('span', 'avatar ' + (o.type === 'cadre' ? 'av-laiton ' : '') + r.objet);
+    const a = el('span', 'avatar ' + r.objet);
     a.append(el('b', null, ($('pseudo').value.trim()[0] || '?').toUpperCase()));
     return a;
   }
@@ -11548,7 +11537,7 @@ svg .vb { transform-box: view-box; }
     ouvrirBoutique();
   }
   function confirmerAchat(o, solde) {
-    const nomType = o.type === 'avatar' ? 'l\'avatar' : o.type === 'dos' ? 'le dos de cartes' : 'le cadre';
+    const nomType = o.type === 'avatar' ? 'l\'avatar' : 'le dos de cartes';
     const corps = el('div', 'bonus-jour');
     corps.append(el('h2', null, o.nom), apercuObjet(o.id));
     if (o.prix > solde) {
@@ -11916,7 +11905,7 @@ svg .vb { transform-box: view-box; }
     return R.niveauDe(p.xp).niveau;
   }
   function avatarAmi(a, enLigne) {
-    const av = el('span', 'avatar ' + (a.apparence || 'av-laiton') + (a.cadre ? ' ' + a.cadre : ''));
+    const av = el('span', 'avatar ' + (a.apparence || 'av-laiton'));
     av.append(el('b', null, (a.pseudo || '?')[0].toUpperCase()));
     const n = niveauAmi(a);
     if (n) av.append(el('i', 'niveau-pastille', String(n)));
@@ -12476,7 +12465,7 @@ svg .vb { transform-box: view-box; }
   function appliquerCollection(p) {
     p = p || lireProfil();
     const c = R.collection(p);
-    $('avatar').className = 'avatar ' + c.equipes.avatar + (c.equipes.cadre ? ' ' + c.equipes.cadre : '');
+    $('avatar').className = 'avatar ' + c.equipes.avatar; // plus de cadre (retirés le 18/11)
     for (const k of [...document.body.classList]) if (k.startsWith('dos-')) document.body.classList.remove(k);
     if (c.equipes.dos && c.equipes.dos !== 'dos-laiton') document.body.classList.add(c.equipes.dos);
     const n = R.niveauDe(p.xp || 0);
@@ -12488,7 +12477,7 @@ svg .vb { transform-box: view-box; }
   function apercuObjet(id) {
     const o = R.OBJETS[id];
     if (o.type === 'dos') return el('span', 'mini-dos ' + id);
-    const a = el('span', 'avatar ' + (o.type === 'cadre' ? 'av-laiton ' : '') + id);
+    const a = el('span', 'avatar ' + id);
     a.append(el('b', null, ($('pseudo').value.trim()[0] || '?').toUpperCase()));
     return a;
   }
@@ -12658,9 +12647,9 @@ svg .vb { transform-box: view-box; }
     h('Défi de la semaine', d.joursRestants > 1 ? `encore ${d.joursRestants} jours` : 'dernier jour');
     const cd = el('div', 'carte-mission defi' + (d.finie ? ' finie' : ''));
     const b3 = el('div', 'barre-xp'), s3 = el('span'); b3.append(s3);
-    const dr = el('div', 'droite'); dr.append(d.finie ? el('small', null, 'Fait') : recompenseEl(d.pieces), apercuObjet(d.cadre));
+    const dr = el('div', 'droite'); dr.append(d.finie ? el('small', null, 'Fait') : recompenseEl(d.pieces));
     const mil = el('div', 'milieu');
-    mil.append(el('b', null, d.texte), b3, el('small', null, `${d.avance}/${d.cible} · cadre ${d.nomCadre} · ${d.xp} XP`));
+    mil.append(el('b', null, d.texte), b3, el('small', null, `${d.avance}/${d.cible} · ${d.xp} XP`));
     cd.append(icone('i-couronne'), mil, dr);
     remplir(s3, 0, d.avance / d.cible, 500);
     z.append(cd);
@@ -12673,7 +12662,7 @@ svg .vb { transform-box: view-box; }
     const visibles = Object.entries(R.OBJETS).map(([id, o]) => Object.assign({ id }, o)).filter((o) => {
       const a = c.possedes.includes(o.id);
       if (!a && o.ville) return false; // ancien thème des villes : seulement pour qui l'a déjà
-      if (!a && o.type === 'cadre' && o.id !== d.cadre) return false; // les autres cadres reviendront avec leur semaine (ou en boutique)
+      if (o.retire) return false; // cadres : retirés du jeu (gardés dans le profil, plus montrés)
       return true;
     }).sort((x, y) => c.possedes.includes(y.id) - c.possedes.includes(x.id)); // ce que j'ai d'abord
     for (const cat of R.parCategorie(visibles)) {

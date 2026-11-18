@@ -415,7 +415,7 @@ class _Recap extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.only(top: 8),
           child: Row(children: [
-            Expanded(child: Text('Nouveau : ${R.objets[id]?['type'] == 'avatar' ? 'avatar' : R.objets[id]?['type'] == 'dos' ? 'dos de cartes' : 'cadre'} ${R.objets[id]?['nom'] ?? id}', style: K.texte(13, couleur: K.good, poids: FontWeight.w600))),
+            Expanded(child: Text('Nouveau : ${R.objets[id]?['type'] == 'avatar' ? 'avatar' : 'dos de cartes'} ${R.objets[id]?['nom'] ?? id}', style: K.texte(13, couleur: K.good, poids: FontWeight.w600))),
             Text('équipé', style: K.texte(12, couleur: K.muted)),
           ]),
         ),

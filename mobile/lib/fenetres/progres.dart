@@ -56,7 +56,7 @@ void ouvrirMissions() {
     final eq = c['equipes'] as Map;
     final visibles = [
       for (final e in R.objets.entries)
-        if (!(!possedes.contains(e.key) && e.value['ville'] == true) && !(!possedes.contains(e.key) && e.value['type'] == 'cadre' && e.key != d['cadre'])) {'id': e.key, ...e.value},
+        if (e.value['retire'] != true && !(!possedes.contains(e.key) && e.value['ville'] == true)) {'id': e.key, ...e.value},
     ]..sort((x, y) => (possedes.contains(y['id']) ? 1 : 0) - (possedes.contains(x['id']) ? 1 : 0));
     Widget carte(String ico, String texte, String sous, double f, Widget droite, {bool finie = false}) => Container(
           margin: const EdgeInsets.only(bottom: 6),
@@ -87,10 +87,8 @@ void ouvrirMissions() {
           if (peutChanger && !m.finie && m.avance == 0) Padding(padding: const EdgeInsets.only(top: 4), child: Btn('Changer', taille: 12, marge: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), onTap: () { final q = app.lireProfil(); if (R.changerMission(q, jour, m.id)) { app.ecrireProfil(q); } })),
         ]), finie: m.finie),
       Titre3('Défi de la semaine', sous: (d['joursRestants'] as int) > 1 ? 'encore ${d['joursRestants']} jours' : 'dernier jour'),
-      carte('couronne', d['texte'] as String, '${d['avance']}/${d['cible']} · cadre ${d['nomCadre']} · ${d['xp']} XP', (d['avance'] as int) / (d['cible'] as int), Column(mainAxisSize: MainAxisSize.min, children: [
+      carte('couronne', d['texte'] as String, '${d['avance']}/${d['cible']} · ${d['xp']} XP', (d['avance'] as int) / (d['cible'] as int), Column(mainAxisSize: MainAxisSize.min, children: [
         d['finie'] == true ? const Muet('Fait', taille: 12) : recompense(d['pieces'] as int, taille: 13),
-        const SizedBox(height: 4),
-        apercuObjet(d['cadre'] as String, taille: 30),
       ]), finie: d['finie'] == true),
       if (b['termine'] != true) ...[
         Titre3('Bienvenue', sous: '${b['recus']}/7 cadeaux'),
@@ -309,7 +307,7 @@ class _ProfilState extends State<_Profil> {
 
     final col1 = <Widget>[
       Row(children: [
-        Avatar(pseudo, avatar: app.avatarEquipe, cadre: app.cadreEquipe, taille: 64, niveau: n.niveau),
+        Avatar(pseudo, avatar: app.avatarEquipe, taille: 64, niveau: n.niveau),
         const SizedBox(width: 12),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text.rich(TextSpan(children: [
@@ -584,7 +582,7 @@ Future<void> _equiperDepuisBoutique(String id) async {
 }
 
 void _confirmerAchat(Map o, int solde) {
-  final nomType = o['type'] == 'avatar' ? "l'avatar" : o['type'] == 'dos' ? 'le dos de cartes' : 'le cadre';
+  final nomType = o['type'] == 'avatar' ? "l'avatar" : 'le dos de cartes';
   final prix = (o['prix'] as num).toInt();
   var enCours = false;
   app.ouvrirFenetre((context) => StatefulBuilder(builder: (context, setState) => Fenetre(enfants: [

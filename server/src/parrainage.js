@@ -14,14 +14,14 @@
 const crypto = require('crypto');
 
 const LETTRES = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-const OBJET_AMBASSADEUR = 'cadre-ambassadeur';
+const OBJET_AMBASSADEUR = 'av-ambassadeur'; // le cadre Ambassadeur est retiré (18/11)
 // Paliers : nombre d'amis venus jouer (parrainages validés). Chacun ne se gagne qu'une fois.
 const PALIERS = [
-  { n: 3, objet: 'cadre-ambassadeur' },
+  { n: 3, pieces: 500 }, // avant : cadre Ambassadeur (cadres retirés le 18/11)
   { n: 10, pieces: 1000, objet: 'av-ambassadeur', titre: 'Ambassadeur' },
   { n: 25, pieces: 2500, objet: 'dos-ambassadeur' },
   { n: 50, pieces: 5000, titre: 'Grand ambassadeur' },
-  { n: 100, pieces: 10000, objet: 'cadre-ambassadeur-or', titre: "Ambassadeur d'or" },
+  { n: 100, pieces: 10000, titre: "Ambassadeur d'or" },
   { n: 250, pieces: 20000, titre: 'Star du Kopo' },
   { n: 500, pieces: 30000, titre: 'Ambassadeur légendaire' },
   { n: 1000, pieces: 50000, titre: 'Légende du Kopo' },

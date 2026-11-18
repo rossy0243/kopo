@@ -1,7 +1,7 @@
 // Parcours de saison (retention.md §3.5) et collection d'apparences (§3.6), gardés par le serveur.
 // Se termine en jouant environ 3 à 4 parties par jour, 4 jours par semaine (≈ 55 parties en 4 semaines).
 'use strict';
-const { OBJETS, DE_BASE, contenuParcours } = require('./catalogue');
+const { OBJETS, DE_BASE, contenuParcours, estRetire } = require('./catalogue');
 
 const erreur = (m, statut = 400) => Object.assign(new Error(m), { statut });
 
@@ -9,9 +9,16 @@ function creerParcours(base, reglages, comptes, ligue) {
   const cfg = () => reglages.get('parcours');
   const kopoPlus = (c) => !!(c && c.kopo_plus_jusqu && new Date(c.kopo_plus_jusqu) > new Date());
 
+  // Les objets retirés (cadres) restent dans l'inventaire en base, mais ne sont plus montrés.
   async function possedes(q, compteId) {
-    return new Set([...DE_BASE, ...(await q.query('SELECT objet FROM inventaire WHERE compte_id = $1', [compteId])).rows.map((r) => r.objet)]);
+    return new Set([...DE_BASE, ...(await q.query('SELECT objet FROM inventaire WHERE compte_id = $1', [compteId])).rows.map((r) => r.objet).filter((id) => !estRetire(id))]);
   }
+  // Ce que le joueur porte : avatar et dos (un ancien cadre équipé reste en base, mais n'est plus renvoyé).
+  const equipesDe = (compte) => {
+    const e = Object.assign({ avatar: 'av-laiton', dos: 'dos-laiton' }, compte.equipes || {});
+    delete e.cadre;
+    return e;
+  };
   async function donner(q, compteId, objet, source) {
     if (!OBJETS[objet]) throw erreur('Objet inconnu.');
     const r = await q.query('INSERT INTO inventaire (compte_id, objet, source) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING RETURNING 1', [compteId, objet, source]);
@@ -92,18 +99,18 @@ function creerParcours(base, reglages, comptes, ligue) {
     // --- Collection
     async collection(compte) {
       const p = await possedes(base, compte.id);
-      const e = Object.assign({ avatar: 'av-laiton', dos: 'dos-laiton', cadre: null }, compte.equipes || {});
-      return { possedes: [...p], equipes: e };
+      return { possedes: [...p], equipes: equipesDe(compte) };
     },
     async equiper(compte, objet) {
       const o = OBJETS[objet];
       if (!o) throw erreur('Objet inconnu.');
+      if (o.retire) throw erreur('Cet objet n\'est plus disponible.');
       const p = await possedes(base, compte.id);
-      const e = Object.assign({ avatar: 'av-laiton', dos: 'dos-laiton', cadre: null }, compte.equipes || {});
-      if (o.type === 'cadre' && e.cadre === objet) e.cadre = null; // retirer le cadre
-      else { if (!p.has(objet)) throw erreur('Tu ne possèdes pas cet objet.', 403); e[o.type] = objet; }
+      if (!p.has(objet)) throw erreur('Tu ne possèdes pas cet objet.', 403);
+      // On garde en base ce qui y est déjà (dont un ancien cadre) ; seuls avatar et dos sont renvoyés.
+      const e = Object.assign({ avatar: 'av-laiton', dos: 'dos-laiton' }, compte.equipes || {}, { [o.type]: objet });
       await base.query('UPDATE comptes SET equipes = $2 WHERE id = $1', [compte.id, JSON.stringify(e)]);
-      return { possedes: [...p], equipes: e };
+      return { possedes: [...p], equipes: equipesDe({ equipes: e }) };
     },
     // Boutique : acheter un objet à prix affiché (strategie-pieces §4.3). Pas de hasard, pas de fausse urgence.
     async acheter(compte, objet) {
@@ -117,7 +124,25 @@ function creerParcours(base, reglages, comptes, ligue) {
         return { ok: true, solde, objet: { id: objet, ...o } };
       });
     },
-    catalogue() { return Object.entries(OBJETS).map(([id, o]) => ({ id, ...o })); },
+    catalogue() { return Object.entries(OBJETS).filter(([, o]) => !o.retire).map(([id, o]) => ({ id, ...o })); },
+    // Cadres retirés (18/11) : chaque cadre acheté en boutique est remboursé une fois, du montant payé.
+    // Sans danger à relancer : un remboursement déjà fait (motif + ref) n'est pas refait.
+    async rembourserCadres() {
+      return base.transaction(async (q) => {
+        const r = await q.query(`SELECT a.compte_id, a.ref AS objet, -SUM(a.montant)::int AS paye
+          FROM registre_pieces a
+          WHERE a.motif = 'boutique' AND a.ref LIKE 'cadre-%' AND a.montant < 0
+            AND NOT EXISTS (SELECT 1 FROM registre_pieces b WHERE b.compte_id = a.compte_id AND b.motif = 'remboursement_cadre' AND b.ref = a.ref)
+          GROUP BY a.compte_id, a.ref`);
+        let total = 0;
+        for (const x of r.rows) {
+          if (!estRetire(x.objet) || !(x.paye > 0)) continue;
+          await comptes.mouvement(q, x.compte_id, x.paye, 'remboursement_cadre', x.objet);
+          total += x.paye;
+        }
+        return { remboursements: r.rows.length, pieces: total };
+      });
+    },
     donner: (compteId, objet, source) => donner(base, compteId, objet, source),
     kopoPlus,
   };

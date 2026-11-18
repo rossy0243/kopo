@@ -250,7 +250,7 @@ class _Haut extends StatelessWidget {
             padding: EdgeInsets.fromLTRB(4, 4, tresEtroit ? 8 : 12, 4),
             decoration: BoxDecoration(color: const Color(0x4D000000), borderRadius: BorderRadius.circular(99), border: Border.all(color: K.line)),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Avatar(pseudo.isEmpty ? '?' : pseudo, avatar: app.avatarEquipe, cadre: app.cadreEquipe, taille: tresEtroit ? 32 : 36, niveau: (p['xp'] ?? 0) == 0 ? null : n.niveau),
+              Avatar(pseudo.isEmpty ? '?' : pseudo, avatar: app.avatarEquipe, taille: tresEtroit ? 32 : 36, niveau: (p['xp'] ?? 0) == 0 ? null : n.niveau),
               SizedBox(width: tresEtroit ? 5 : 8),
               Flexible(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [

@@ -105,11 +105,11 @@ Widget recompense(int n, {double taille = 15}) => Row(mainAxisSize: MainAxisSize
       Piece(taille: taille + 3),
     ]);
 
-/// Aperçu d'un objet de la collection (avatar, cadre ou dos).
+/// Aperçu d'un objet de la collection (avatar ou dos).
 Widget apercuObjet(String id, {double taille = 36}) {
   final o = R.objets[id];
   if (o?['type'] == 'dos') return DosCarte(l: taille * .72, h: taille * 1.05, dos: id, rayon: 4);
-  return Avatar(app.pseudo.isEmpty ? '?' : app.pseudo, avatar: o?['type'] == 'cadre' ? 'av-laiton' : id, cadre: o?['type'] == 'cadre' ? id : null, taille: taille);
+  return Avatar(app.pseudo.isEmpty ? '?' : app.pseudo, avatar: id, taille: taille);
 }
 
 /// Fenêtre « Oui / Annuler ».

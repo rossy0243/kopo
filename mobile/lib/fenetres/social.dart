@@ -173,7 +173,7 @@ int niveauAmi(Map a) {
 Widget avatarAmi(Map a, [bool enLigne = false]) {
   final n = niveauAmi(a);
   return Stack(clipBehavior: Clip.none, children: [
-    Avatar((a['pseudo'] ?? '?').toString(), avatar: (a['apparence'] as String?) ?? 'av-laiton', cadre: a['cadre'] as String?, taille: 38, niveau: n == 0 ? null : n),
+    Avatar((a['pseudo'] ?? '?').toString(), avatar: (a['apparence'] as String?) ?? 'av-laiton', taille: 38, niveau: n == 0 ? null : n),
     if (enLigne) Positioned(right: -1, bottom: -1, child: Container(width: 11, height: 11, decoration: BoxDecoration(color: K.good, shape: BoxShape.circle, border: Border.all(color: K.table2, width: 2)))),
   ]);
 }

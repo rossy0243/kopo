@@ -672,12 +672,6 @@ body.dos-kinshasa { --dos-motif: linear-gradient(135deg, transparent 38%, #f7d03
 .avatar.av-nuit { background: var(--table); color: var(--brass); box-shadow: inset 0 0 0 2px var(--brass); }
 .avatar.av-kinshasa { background: linear-gradient(135deg, #3b8fd6 0 38%, #f7d038 38% 44%, #ce1021 44% 56%, #f7d038 56% 62%, #3b8fd6 62%); color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.6); }
 .avatar.av-fleuve { background: radial-gradient(circle at 30% 30%, #5fb3c9, #1d5f7a 70%); color: #fff; }
-.avatar.cadre-kinshasa { box-shadow: 0 0 0 3px #3b8fd6, 0 0 0 5px #ce1021; }
-.avatar.cadre-lubumbashi { box-shadow: 0 0 0 3px #b87333, 0 0 0 5px #5a2e0e; }
-.avatar.cadre-abidjan { box-shadow: 0 0 0 3px #f77f00, 0 0 0 5px #009e60; }
-.avatar.cadre-dakar { box-shadow: 0 0 0 3px #00853f, 0 0 0 5px #fdef42; }
-.avatar.cadre-douala { box-shadow: 0 0 0 3px #007a5e, 0 0 0 5px #ce1126; }
-.avatar.cadre-brazzaville { box-shadow: 0 0 0 3px #009543, 0 0 0 5px #dc241f; }
 .niveau-pastille { position: absolute; right: -5px; bottom: -4px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: var(--table); border: 1.5px solid var(--brass); color: var(--brass); font: 600 11px/15px var(--body); font-style: normal; text-align: center; text-shadow: none; }
 .xp-mini { display: block; height: 4px; border-radius: 2px; background: rgba(255,255,255,.12); overflow: hidden; margin-top: 3px; }
 .xp-mini span { display: block; height: 100%; width: 0; background: var(--brass); border-radius: 2px; transition: width .6s ease-out; }
@@ -1122,8 +1116,6 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
 .avatar.av-brazzaville { background: linear-gradient(135deg, #009543 0 40%, #fbde4a 40% 60%, #dc241f 60%); color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.6); }
 .avatar.av-goma { background: radial-gradient(circle at 50% 110%, #ff7a2f, #a3200f 45%, #1b0b07 80%); color: #ffd7a8; }
 .avatar.av-fondateur { background: radial-gradient(circle at 30% 25%, #f6dc9a, #e2b04a 55%, #8a6420); color: #1d1606; box-shadow: inset 0 0 0 2px #1d1606; }
-.avatar.cadre-fondateurs { box-shadow: 0 0 0 3px #e2b04a, 0 0 0 5px #1d1606, 0 0 0 7px #e2b04a; }
-.avatar.cadre-legende { box-shadow: 0 0 0 3px #e0564c, 0 0 0 6px #e2b04a, 0 0 14px 4px rgba(224,86,76,.6); }
 body.dos-lubumbashi { --dos-motif: repeating-linear-gradient(45deg, #b87333 0 5px, #5a2e0e 5px 10px); --dos-motif-petit: repeating-linear-gradient(45deg, #b87333 0 3px, #5a2e0e 3px 6px); }
 body.dos-abidjan { --dos-motif: linear-gradient(90deg, #f77f00 0 33%, #fff 33% 66%, #009e60 66%); --dos-motif-petit: linear-gradient(90deg, #f77f00 0 33%, #fff 33% 66%, #009e60 66%); }
 body.dos-dakar { --dos-motif: linear-gradient(90deg, #00853f 0 33%, #fdef42 33% 66%, #e31b23 66%); --dos-motif-petit: linear-gradient(90deg, #00853f 0 33%, #fdef42 33% 66%, #e31b23 66%); }
@@ -1141,8 +1133,6 @@ body.dos-fondateurs { --dos-motif: radial-gradient(circle, #e2b04a 18%, transpar
 .mini-dos { display: inline-block; width: 26px; height: 38px; border-radius: 4px; border: 2px solid #f3e3bd; background: repeating-linear-gradient(45deg, var(--brass) 0 4px, #9c7524 4px 8px); }
 /* Parrainage : apparences des paliers et écran d'invitation. */
 .avatar.av-ambassadeur { background: radial-gradient(circle at 50% 30%, #fff3c8, #e2b04a 45%, #1f4d3a 46%, #123326); color: #1d1606; }
-.avatar.cadre-ambassadeur { box-shadow: 0 0 0 3px #1f8a5b, 0 0 0 5px #e2b04a; }
-.avatar.cadre-ambassadeur-or { box-shadow: 0 0 0 3px #e2b04a, 0 0 0 5px #fff3c8, 0 0 0 7px #e2b04a, 0 0 14px 4px rgba(226,176,74,.55); }
 body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0 16%, transparent 17%), repeating-linear-gradient(90deg, #1f8a5b 0 6px, #155f3f 6px 12px); --dos-motif-petit: radial-gradient(circle, #e2b04a 0 22%, transparent 23%), #1f8a5b; }
 .mini-dos.dos-ambassadeur { background: radial-gradient(circle, #e2b04a 0 22%, transparent 23%), #1f8a5b !important; }
 .parrainage { display: grid; gap: 10px; justify-items: stretch; }
@@ -4213,7 +4203,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       for (const id of r.objets) {
         const o = R.OBJETS[id];
         const l = el('div', 'ligne-mission finie');
-        l.append(el('b', null, `Nouveau : ${o.type === 'avatar' ? 'avatar' : o.type === 'dos' ? 'dos de cartes' : 'cadre'} ${o.nom}`), el('span', null, 'équipé'));
+        l.append(el('b', null, `Nouveau : ${o.type === 'avatar' ? 'avatar' : 'dos de cartes'} ${o.nom}`), el('span', null, 'équipé'));
         prog.append(l);
       }
       if (r.titre) prog.append(el('div', 'recap-titre', r.titre));
@@ -5409,7 +5399,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     if (r.pieces) return pieceEl();
     const o = R.OBJETS[r.objet] || { type: r.type };
     if (o.type === 'dos') return el('span', 'mini-dos ' + r.objet);
-    const a = el('span', 'avatar ' + (o.type === 'cadre' ? 'av-laiton ' : '') + r.objet);
+    const a = el('span', 'avatar ' + r.objet);
     a.append(el('b', null, ($('pseudo').value.trim()[0] || '?').toUpperCase()));
     return a;
   }
@@ -5528,7 +5518,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     ouvrirBoutique();
   }
   function confirmerAchat(o, solde) {
-    const nomType = o.type === 'avatar' ? 'l\'avatar' : o.type === 'dos' ? 'le dos de cartes' : 'le cadre';
+    const nomType = o.type === 'avatar' ? 'l\'avatar' : 'le dos de cartes';
     const corps = el('div', 'bonus-jour');
     corps.append(el('h2', null, o.nom), apercuObjet(o.id));
     if (o.prix > solde) {
@@ -5896,7 +5886,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     return R.niveauDe(p.xp).niveau;
   }
   function avatarAmi(a, enLigne) {
-    const av = el('span', 'avatar ' + (a.apparence || 'av-laiton') + (a.cadre ? ' ' + a.cadre : ''));
+    const av = el('span', 'avatar ' + (a.apparence || 'av-laiton'));
     av.append(el('b', null, (a.pseudo || '?')[0].toUpperCase()));
     const n = niveauAmi(a);
     if (n) av.append(el('i', 'niveau-pastille', String(n)));
@@ -6456,7 +6446,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   function appliquerCollection(p) {
     p = p || lireProfil();
     const c = R.collection(p);
-    $('avatar').className = 'avatar ' + c.equipes.avatar + (c.equipes.cadre ? ' ' + c.equipes.cadre : '');
+    $('avatar').className = 'avatar ' + c.equipes.avatar; // plus de cadre (retirés le 18/11)
     for (const k of [...document.body.classList]) if (k.startsWith('dos-')) document.body.classList.remove(k);
     if (c.equipes.dos && c.equipes.dos !== 'dos-laiton') document.body.classList.add(c.equipes.dos);
     const n = R.niveauDe(p.xp || 0);
@@ -6468,7 +6458,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   function apercuObjet(id) {
     const o = R.OBJETS[id];
     if (o.type === 'dos') return el('span', 'mini-dos ' + id);
-    const a = el('span', 'avatar ' + (o.type === 'cadre' ? 'av-laiton ' : '') + id);
+    const a = el('span', 'avatar ' + id);
     a.append(el('b', null, ($('pseudo').value.trim()[0] || '?').toUpperCase()));
     return a;
   }
@@ -6638,9 +6628,9 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     h('Défi de la semaine', d.joursRestants > 1 ? `encore ${d.joursRestants} jours` : 'dernier jour');
     const cd = el('div', 'carte-mission defi' + (d.finie ? ' finie' : ''));
     const b3 = el('div', 'barre-xp'), s3 = el('span'); b3.append(s3);
-    const dr = el('div', 'droite'); dr.append(d.finie ? el('small', null, 'Fait') : recompenseEl(d.pieces), apercuObjet(d.cadre));
+    const dr = el('div', 'droite'); dr.append(d.finie ? el('small', null, 'Fait') : recompenseEl(d.pieces));
     const mil = el('div', 'milieu');
-    mil.append(el('b', null, d.texte), b3, el('small', null, `${d.avance}/${d.cible} · cadre ${d.nomCadre} · ${d.xp} XP`));
+    mil.append(el('b', null, d.texte), b3, el('small', null, `${d.avance}/${d.cible} · ${d.xp} XP`));
     cd.append(icone('i-couronne'), mil, dr);
     remplir(s3, 0, d.avance / d.cible, 500);
     z.append(cd);
@@ -6653,7 +6643,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     const visibles = Object.entries(R.OBJETS).map(([id, o]) => Object.assign({ id }, o)).filter((o) => {
       const a = c.possedes.includes(o.id);
       if (!a && o.ville) return false; // ancien thème des villes : seulement pour qui l'a déjà
-      if (!a && o.type === 'cadre' && o.id !== d.cadre) return false; // les autres cadres reviendront avec leur semaine (ou en boutique)
+      if (o.retire) return false; // cadres : retirés du jeu (gardés dans le profil, plus montrés)
       return true;
     }).sort((x, y) => c.possedes.includes(y.id) - c.possedes.includes(x.id)); // ce que j'ai d'abord
     for (const cat of R.parCategorie(visibles)) {
