@@ -172,7 +172,8 @@ class _ParametresState extends State<_Parametres> {
       const Titre3('Aide'),
       Btn('Apprendre à jouer', large: true, onTap: ouvrirTutoriel),
       const Ecart(8),
-      Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+      // Wrap : sur un écran étroit, les deux liens passent l'un sous l'autre au lieu de sortir de la fenêtre.
+      Wrap(alignment: WrapAlignment.center, crossAxisAlignment: WrapCrossAlignment.center, children: [
         TextButton(onPressed: () => ouvrirLien('${lienJeu.replaceAll(RegExp(r'#.*$'), '')}legal/conditions.html'), child: Text("Conditions d'utilisation", style: K.texte(13, couleur: K.brass))),
         Text('·', style: K.texte(13, couleur: K.muted)),
         TextButton(onPressed: () => ouvrirLien('${lienJeu.replaceAll(RegExp(r'#.*$'), '')}legal/confidentialite.html'), child: Text('Confidentialité', style: K.texte(13, couleur: K.brass))),

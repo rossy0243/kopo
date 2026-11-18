@@ -444,6 +444,18 @@ body.salon:has(#voile:not([hidden])) #filChat { display: none; } /* fenêtre du 
   .salon-bas .btn.large { padding: 11px 10px; }
   body.salon #filChat { bottom: calc(18px + env(safe-area-inset-bottom)); left: max(24px, env(safe-area-inset-left)); max-width: min(34vw, 320px); } /* en bas de la colonne de gauche, libre */
 }
+/* Salon couché sur un écran bas (Fold fermé couché) : tout tient, bouton Lancer compris. */
+@media (orientation: landscape) and (max-height: 330px) {
+  body.salon .app { padding: 4px 10px 4px; gap: 4px; }
+  #ecranSalon { padding: 6px 10px; }
+  #ecranSalon .code-geant { font-size: 28px; }
+  #ecranSalon .qr svg { width: 64px; height: 64px; padding: 3px; }
+  #listeJoueurs li { min-height: 30px; padding: 2px 2px 2px 6px; }
+  .salon-bas .btn.large { padding: 8px 10px; font-size: 15px; }
+}
+#listeJoueurs li > span:first-child { flex: 1 1 auto; min-width: 2.6em; } /* le nom (ou le numéro du robot) reste visible à côté des pastilles */
+#listeJoueurs .niveau-robot { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#listeJoueurs li .btn.retirer { flex: none; }
 
 /* Animations : cartes qui volent, bulles au-dessus des joueurs, tampons. */
 /* Pause contre les robots : tout s'arrête, la table est voilée. */
@@ -642,7 +654,8 @@ ul.regles, ol.regles { margin: 0; padding-left: 20px; display: grid; gap: 6px; c
 .reglages { display: grid; gap: 14px; }
 .reglages h3 { margin: 6px 0 0; font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--brass); }
 .reglage-ligne { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.reglage-ligne > span { display: grid; gap: 2px; }
+.reglage-ligne { flex-wrap: wrap; } /* un choix trop large passe sous son texte au lieu de sortir de la fenêtre */
+.reglage-ligne > span { display: grid; gap: 2px; flex: 1 1 130px; min-width: 0; }
 .reglage-ligne small { color: var(--muted); font-size: 12px; }
 .bascule { flex: none; width: 52px; height: 30px; border-radius: 15px; border: 1px solid var(--line); background: rgba(255,255,255,.1); position: relative; padding: 0; }
 .bascule::after { content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: var(--ink); transition: transform .15s; }
@@ -754,8 +767,8 @@ body.dos-kinshasa { --dos-motif: linear-gradient(135deg, transparent 38%, #f7d03
 .pf-tete { display: flex; align-items: center; gap: 14px; }
 .pf-tete .avatar { width: 68px; height: 68px; font-size: 34px; flex: none; }
 .pf-tete .niveau-pastille { min-width: 24px; height: 24px; border-radius: 12px; font-size: 13px; line-height: 21px; right: -6px; bottom: -5px; }
-.pf-id { display: grid; gap: 2px; min-width: 0; }
-.pf-id .nom { font-size: 20px; font-weight: 700; display: flex; align-items: center; gap: 6px; min-width: 0; }
+.pf-id { display: grid; gap: 2px; min-width: 0; flex: 1 1 auto; }
+.pf-id .nom { font-size: 20px; font-weight: 700; display: flex; flex-wrap: wrap; align-items: center; gap: 0 6px; min-width: 0; overflow-wrap: anywhere; }
 .pf-id .nom small { color: var(--muted); font-weight: 400; font-size: 14px; }
 .pf-id .drapeau { font-size: 20px; line-height: 1; }
 .pf-id .titre { color: var(--brass); font-size: 13px; font-weight: 600; }
@@ -1333,6 +1346,104 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
 .chip.chip-cahier { cursor: pointer; border: 1px solid var(--brass); }
 .siege .pts-cahier { font-size: 10px; font-weight: 700; color: #1d1606; background: var(--brass); border-radius: 99px; padding: 0 6px; justify-self: start; }
 .siege .pts-cahier.rouge { background: var(--bad); color: #fff; }
+
+/* Pas de défilement sur le côté : la page tient toujours dans la largeur de l'écran (filet de sécurité,
+   les causes sont corrigées une à une plus haut et ci-dessous). « clip » ne crée pas de zone de défilement. */
+html { overflow-x: hidden; }
+body { overflow-x: hidden; overflow-x: clip; }
+body.accueil { overflow-x: clip; }
+
+/* En partie, téléphone droit : « Manche 1 · CODE » sur deux lignes plutôt que coupé, le logo seul. */
+@media (max-width: 420px) and (orientation: portrait) {
+  body.en-jeu header .logo > span { display: none; }
+  body.en-jeu header .info { font-size: 12px; line-height: 1.2; white-space: normal; overflow-wrap: break-word; }
+}
+
+/* Écrans étroits : Galaxy Fold fermé (280 à 344 px), petits téléphones, texte agrandi dans les réglages du téléphone. */
+@media (max-width: 359px) {
+  .app { padding: 8px 8px 20px; }
+  header { gap: 6px; }
+  header .logo { font-size: 26px; }
+  header .logo > span { display: none; } /* le logo seul : la place va au nom de la salle et aux boutons */
+  header .btn { padding: 6px 8px; }
+  header .btn.btn-ico { padding: 5px 6px; }
+  header .ico-k { width: 22px; height: 22px; }
+  body.en-jeu header .btn.btn-ico { padding: 4px 5px; }
+  body.en-jeu header .ico-k { width: 20px; height: 20px; }
+  body.en-jeu #btnQuitter { padding: 6px 7px; font-size: 12px; }
+  header .info { font-size: 13px; line-height: 1.2; }
+  /* Fenêtres : moins de marges pour garder la place au contenu */
+  .voile { padding: 8px; }
+  .fenetre { padding: 14px; gap: 10px; }
+  .fenetre h2 { font-size: 30px; }
+  .fenetre[data-type="profil"] { padding: 12px; }
+  .pf-tete { gap: 10px; }
+  .pf-tete .avatar { width: 52px; height: 52px; font-size: 26px; }
+  .pf-id .nom { font-size: 17px; }
+  .carte-mission { grid-template-columns: auto minmax(0, 1fr); padding: 8px 10px; }
+  .carte-mission .droite { grid-column: 2; justify-content: space-between; }
+  /* Accueil */
+  .hub { gap: 8px; padding-left: max(8px, env(safe-area-inset-left)); padding-right: max(8px, env(safe-area-inset-right)); }
+  .hub-haut, .hub-haut:has(.btn-amis:not([hidden])) { gap: 5px; }
+  .hub-haut .logo > span { display: none; }
+  .hub-haut .logo .marque { height: 34px; width: 34px; }
+  .bourse { padding: 3px 9px 3px 3px; gap: 5px; flex: none; }
+  .bourse .piece { width: 26px; height: 26px; font-size: 15px; }
+  .bourse-txt b { font-size: 18px; white-space: nowrap; }
+  .profil { padding: 3px 10px 3px 3px; gap: 6px; flex: 1 1 0; }
+  .avatar { width: 36px; height: 36px; font-size: 21px; }
+  .profil-champ input { font-size: 14px; max-width: none; }
+  .choix-jeu button { font-size: 17px; letter-spacing: 1px; gap: 6px; padding: 8px 4px; white-space: nowrap; }
+  .choix-jeu button i { width: 18px; height: 26px; font-size: 13px; }
+  .modes { gap: 8px; }
+  .mode { padding: 12px 6px; gap: 5px; }
+  .mode b { font-size: 17px; letter-spacing: 1px; }
+  .mode small { font-size: 10.5px; }
+  .mode-icone { font-size: 34px; }
+  .barre-bas { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 0; }
+  .onglet { padding: 4px 1px; font-size: min(10.5px, 3.5vw); line-height: 1.15; text-align: center; }
+  .onglet span { font-size: 22px; }
+  /* Salon : une colonne de joueurs, pour que chaque nom reste lisible */
+  #listeJoueurs { grid-template-columns: minmax(0, 1fr); }
+  #ecranSalon .reglage { flex-wrap: wrap; }
+  #ecranSalon .reglage .btn { padding: 7px 0; min-width: 0; }
+  .salon-invite .btn-whatsapp { font-size: 14px; }
+  .salon-invite > .btn:not(.btn-whatsapp) { padding: 11px 10px; }
+}
+@media (max-width: 359px) and (orientation: portrait) {
+  .mode:not(.mode-creer) { aspect-ratio: auto; min-height: 118px; }
+  .mode-creer { min-height: 100px; }
+  .mode-creer b { font-size: 21px; }
+}
+
+/* Paysage sur un écran bas (téléphone couché, Fold fermé couché : 280 à 430 px de haut) :
+   l'accueil tient dans l'écran, barre du bas comprise, et les cartes de modes se partagent la largeur. */
+@media (orientation: landscape) and (max-height: 430px) {
+  .hub { gap: 6px; padding-top: max(6px, env(safe-area-inset-top)); padding-bottom: max(4px, env(safe-area-inset-bottom)); }
+  .hub-haut .logo { font-size: 28px; }
+  .hub-haut .logo .marque { height: 32px; width: 32px; }
+  .avatar { width: 34px; height: 34px; font-size: 20px; }
+  .bourse .piece { width: 26px; height: 26px; font-size: 15px; }
+  .bourse-txt b { font-size: 18px; }
+  .btn-amis { width: 38px; height: 38px; }
+  .modes { flex: 1 1 auto; min-height: 0; padding: 4px; }
+  .mode, .mode-creer { flex: 0 1 auto; min-width: 92px; height: min(168px, calc(100dvh - 178px)); min-height: 96px; }
+  .mode-creer { height: min(188px, calc(100dvh - 166px)); }
+  .mode { padding: 8px 6px; gap: 4px; }
+  .mode b { font-size: 16px; }
+  .mode small { font-size: 10.5px; }
+  .mode-icone { font-size: 30px; }
+  .barre-bas { gap: 0; }
+  .onglet { padding: 2px 10px; font-size: 11px; }
+  .onglet span { font-size: 20px; }
+}
+@media (orientation: landscape) and (max-height: 330px) {
+  .hub-haut .bourse-txt small, .hub-haut .profil-champ small { display: none; }
+  .mode, .mode-creer { aspect-ratio: auto; width: 112px; }
+  .mode-icone { font-size: 24px; }
+  .onglet { grid-auto-flow: column; display: flex; align-items: center; gap: 4px; padding: 2px 8px; }
+  .onglet span { font-size: 18px; }
+}
 </style>
 <script>
 // Avant tout affichage : coupe les animations CSS si le joueur l'a choisi, ou si le téléphone en demande moins
@@ -1415,7 +1526,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   </section>
   <section class="hub" id="ecranAccueil" hidden>
     <div class="hub-haut">
-      <div class="logo"><img class="marque" src="icons/masano-logo.svg" alt="">MASANO</div>
+      <div class="logo"><img class="marque" src="icons/masano-logo.svg" alt=""><span>MASANO</span></div>
       <button class="bourse" id="btnBourse" title="Tes pièces d'essai"><span class="piece" aria-hidden="true">M</span><span class="bourse-txt"><b id="solde">500</b><small>pièces d'essai</small></span></button>
       <button class="btn-amis" id="btnAmis" title="Amis" aria-label="Amis" hidden><svg class="ico"><use href="#i-amis"/></svg><i class="compte" id="compteAmis" hidden></i></button>
       <label class="profil" id="profil" title="Ton pseudo">
@@ -2986,8 +3097,11 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     sieges.forEach((d) => {
       const cible = L[N] * (Number(d.dataset.rang) + 0.5) / n;
       let i = L.findIndex((l) => l >= cible); if (i < 0) i = N;
-      d.style.setProperty('--x', pts[i][0].toFixed(1) + '%');
-      d.style.setProperty('--y', pts[i][1].toFixed(1) + '%');
+      // Sur un écran étroit ou bas, le nom du joueur (jusqu'à 118 px de large) reste entier dans l'écran
+      // et ne passe pas sous l'en-tête.
+      const mx = 62 / W * 100, my = 66 / H * 100;
+      d.style.setProperty('--x', Math.min(100 - mx, Math.max(mx, pts[i][0])).toFixed(1) + '%');
+      d.style.setProperty('--y', Math.max(my, pts[i][1]).toFixed(1) + '%');
     });
   }
   window.addEventListener('resize', placerSieges);
