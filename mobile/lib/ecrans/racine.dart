@@ -74,8 +74,11 @@ class _RacineState extends State<Racine> {
                 const Positioned.fill(child: IgnorePointer(child: CalqueEffets())),
                 if (app.bandeau != null)
                   Positioned(top: MediaQuery.of(context).padding.top + 8, left: 0, right: 0, child: Center(child: _Bandeau(app.bandeau!))),
+                // Pastille : en bas, sauf pendant une partie où elle passe en haut pour ne pas cacher la main.
                 if (app.toastTexte != null)
-                  Positioned(bottom: MediaQuery.of(context).padding.bottom + 24, left: 16, right: 16, child: Center(child: _Toast(app.toastTexte!))),
+                  app.ecran == 'partie'
+                      ? Positioned(top: MediaQuery.of(context).padding.top + 48, left: 16, right: 16, child: Center(child: PastilleToast(app.toastTexte!, app.toastNiveau)))
+                      : Positioned(bottom: MediaQuery.of(context).padding.bottom + 24, left: 16, right: 16, child: Center(child: PastilleToast(app.toastTexte!, app.toastNiveau))),
                 if (app.annonceOuverte && app.maintenance == null) const Positioned.fill(child: _Annonce()),
                 if (app.maintenance != null) const Positioned.fill(child: _Maintenance()),
                 if (app.miseAJourStore != null) const Positioned.fill(child: _MiseAJour()),
@@ -120,24 +123,45 @@ class _Bandeau extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(color: const Color(0xEB0B1828), borderRadius: BorderRadius.circular(10), border: Border.all(color: K.brass)),
-        child: Text(t, style: K.texte(14, poids: FontWeight.w600)),
+        decoration: BoxDecoration(color: const Color(0xEB2E2410), borderRadius: BorderRadius.circular(10), border: Border.all(color: K.warn)),
+        child: Text(t, style: K.texte(14, couleur: const Color(0xFFFFE7B0), poids: FontWeight.w600)),
       );
 }
 
-class _Toast extends StatelessWidget {
+/// Pastille de notification. Mêmes couleurs que .toast.succes / .alerte / .echec sur le site.
+class PastilleToast extends StatelessWidget {
   final String t;
-  const _Toast(this.t);
+  final Niv niveau;
+  const PastilleToast(this.t, this.niveau, {super.key});
+  // (fond, bord, texte, icône)
+  static const _styles = {
+    Niv.info: (Color(0xF20B1828), K.line, K.ink, null),
+    Niv.succes: (Color(0xF20D2A1E), K.good, Color(0xFFC9F2DC), Icons.check_rounded),
+    Niv.alerte: (Color(0xF22E2410), K.warn, Color(0xFFFFE7B0), Icons.priority_high_rounded),
+    Niv.echec: (Color(0xF22A1716), K.bad, Color(0xFFFFD7D3), Icons.close_rounded),
+  };
   @override
-  Widget build(BuildContext context) => Material(
+  Widget build(BuildContext context) {
+    final (fond, bord, texte, icone) = _styles[niveau]!;
+    return Semantics(
+      liveRegion: true,
+      child: Material(
         color: Colors.transparent,
         child: Container(
           constraints: const BoxConstraints(maxWidth: 480),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-          decoration: BoxDecoration(color: const Color(0xF20B1828), borderRadius: BorderRadius.circular(12), border: Border.all(color: K.line), boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 18, offset: Offset(0, 6))]),
-          child: Text(t, textAlign: TextAlign.center, style: K.texte(14.5)),
+          padding: EdgeInsets.fromLTRB(icone == null ? 16 : 9, 9, 16, 9),
+          decoration: BoxDecoration(color: fond, borderRadius: BorderRadius.circular(999), border: Border.all(color: bord), boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 18, offset: Offset(0, 6))]),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            if (icone != null) ...[
+              Container(width: 22, height: 22, decoration: BoxDecoration(color: bord, shape: BoxShape.circle), child: Icon(icone, size: 15, color: fond.withAlpha(255))),
+              const SizedBox(width: 9),
+            ],
+            Flexible(child: Text(t, textAlign: TextAlign.center, style: K.texte(14.5, couleur: texte))),
+          ]),
         ),
-      );
+      ),
+    );
+  }
 }
 
 // ------------------------------------------------------------------ écran de démarrage
@@ -228,8 +252,8 @@ class _BienvenueState extends State<Bienvenue> {
 
   void _invite() {
     final p = App.nettoyerPseudo(_pseudo.text);
-    if (p.isEmpty) { app.toast('Choisis ton pseudo pour jouer.'); return; }
-    if (p.length < 3) { app.toast('Le pseudo fait au moins 3 caractères, en un seul mot.'); return; }
+    if (p.isEmpty) { app.toast('Choisis ton pseudo pour jouer.', Niv.alerte); return; }
+    if (p.length < 3) { app.toast('Le pseudo fait au moins 3 caractères, en un seul mot.', Niv.alerte); return; }
     Stock.ecrire('kopo-pseudo', p);
     Stock.ecrire('kopo-entree', 'invite');
     app.afficherAccueil(premiere: true);

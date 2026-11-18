@@ -18,7 +18,6 @@ void brancherFenetres() {
   };
   app.fenetrePiecesUi = fenetrePieces;
   app.cadeauFondateurUi = cadeauFondateur;
-  app.remiseAFlotUi = fenetreRemiseAFlot;
   app.notificationUi = montrerNotification;
   app.exigerGoogleUi = fenetreJouerEnLigne;
   app.finMancheUi = afficherFinManche;
@@ -38,7 +37,7 @@ void brancherFenetres() {
       final code = (d['code'] ?? '').toString().toUpperCase();
       final action = d['action'];
       if (action == 'table' && RegExp(r'^[A-Z]{4}$').hasMatch(code)) {
-        if (app.ecran != 'accueil') { app.toast("Invitation à la table $code : termine ta partie d'abord."); return; }
+        if (app.ecran != 'accueil') { app.toast("Invitation à la table $code : termine ta partie d'abord.", Niv.alerte); return; }
         app.fermerFenetre();
         app.rejoindreCode(code);
       } else if (action == 'amis' && app.ecran == 'accueil') {

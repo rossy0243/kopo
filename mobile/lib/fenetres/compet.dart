@@ -31,7 +31,7 @@ Future<void> ouvrirLigue() async {
   try {
     if (!await app.compteEnLigneOuCreer()) { app.lirePseudo(); return; }
     L = await Api.get('/ligue') as Map;
-  } catch (e) { app.toast(messageErreur(e)); return; }
+  } catch (e) { app.toast(messageErreur(e), Niv.echec); return; }
   app.pointLigue = false;
   app.majOngletLigue();
   if (L['recompense'] is Map) { fenetreFinSaison(L['recompense'] as Map, ouvrirLigue); return; }
@@ -96,7 +96,7 @@ class _LigueState extends State<_Ligue> {
         const SizedBox(width: 8),
         Btn.principal('OK', onTap: () async {
           final v = paysChoisi; if (v == null) return;
-          try { await Api.patch('/moi', {'pays': v}); m['pays'] = v; _charger('pays'); } catch (e) { app.toast(messageErreur(e)); }
+          try { await Api.patch('/moi', {'pays': v}); m['pays'] = v; _charger('pays'); } catch (e) { app.toast(messageErreur(e), Niv.echec); }
         }),
       ]));
     } else if (erreur != null) {
@@ -166,7 +166,7 @@ void fenetreFinSaison(Map r, [VoidCallback? suite]) {
 // ---------------------------------------------------------------- Parcours de saison
 Future<void> ouvrirParcours() async {
   Map P;
-  try { await app.chargerCatalogue(); P = await Api.get('/parcours') as Map; } catch (e) { app.toast(messageErreur(e)); return; }
+  try { await app.chargerCatalogue(); P = await Api.get('/parcours') as Map; } catch (e) { app.toast(messageErreur(e), Niv.echec); return; }
   Future<void> recuperer(int n, String voie) async {
     try {
       final r = await Api.post('/parcours/recuperer', {'palier': n, 'voie': voie}) as Map;
@@ -177,13 +177,13 @@ Future<void> ouvrirParcours() async {
         R.donnerObjet(q, o['id'] as String);
         app.ecrireProfil(q);
         app.synchroEquiper(o['id'] as String);
-        app.toast('Nouveau : ${o['nom']} (équipé)');
+        app.toast('Nouveau : ${o['nom']} (équipé)', Niv.succes);
       } else {
-        app.toast('+${r['pieces']} pièces');
+        app.toast('+${r['pieces']} pièces', Niv.succes);
       }
       app.soldeServeur(r['solde']);
       ouvrirParcours();
-    } catch (e) { app.toast(messageErreur(e)); }
+    } catch (e) { app.toast(messageErreur(e), Niv.echec); }
   }
   final fini = (P['palier'] as num) >= (P['paliersMax'] as num);
   final xp = (P['xp'] as num).toInt(), xpPalier = (P['xpPalier'] as num).toInt();
@@ -265,7 +265,7 @@ Future<void> ouvrirMatchJour() async {
     if (!await app.compteEnLigneOuCreer()) { app.lirePseudo(); return; }
     e = await Api.get('/match-jour') as Map;
     app.etatJour = e.cast<String, dynamic>();
-  } catch (x) { app.toast(messageErreur(x)); return; }
+  } catch (x) { app.toast(messageErreur(x), Niv.echec); return; }
   if (e['google'] != true) {
     fenetreGoogle('Match du jour', "Chaque jour, la même partie pour tous les joueurs, contre 8 robots Forts. Connecte-toi avec Google pour jouer : c'est ce qui garantit un seul essai par personne.");
     return;
@@ -380,9 +380,9 @@ Future<void> ouvrirBande({bool creer = false, String? id}) async {
     if (!await app.compteEnLigneOuCreer()) { app.lirePseudo(); return; }
     b = await Api.get('/bandes') as Map;
     app.etatBandes = b.cast<String, dynamic>();
-  } catch (x) { app.toast(messageErreur(x)); return; }
+  } catch (x) { app.toast(messageErreur(x), Niv.echec); return; }
   if (b['google'] != true) { fenetreGoogle('La Bande', 'Défie tes amis chaque semaine : chacun mise, et le meilleur après 7 Matchs du jour gagne le pot. Connecte-toi avec Google pour créer ou rejoindre une Bande.'); return; }
-  if (b['actif'] != true) { app.toast('Les Bandes sont en pause. Reviens bientôt !'); return; }
+  if (b['actif'] != true) { app.toast('Les Bandes sont en pause. Reviens bientôt !', Niv.alerte); return; }
   if (id != null) { ouvrirUneBande(id); return; }
   final bandes = ((b['bandes'] as List?) ?? []).cast<Map>();
   if (creer || bandes.isEmpty) { fenetreNouvelleBande(b); return; }
@@ -421,8 +421,8 @@ void fenetreNouvelleBande(Map b) {
         Bascule('Bande ouverte', ouverte, (v) => setState(() => ouverte = v), aide: 'Les inconnus de ton pays peuvent demander à entrer. Sinon, seulement par ton lien.'),
         const Ecart(10),
         Btn.principal('Créer ma Bande', large: true, onTap: () async {
-          try { final x = await Api.post('/bandes', {'nom': nom.text, 'mise': mise, 'ouverte': ouverte}) as Map; app.toast('Ta Bande est créée : invite tes amis !'); afficherBande(x); }
-          catch (e) { app.toast(messageErreur(e)); }
+          try { final x = await Api.post('/bandes', {'nom': nom.text, 'mise': mise, 'ouverte': ouverte}) as Map; app.toast('Ta Bande est créée : invite tes amis !', Niv.succes); afficherBande(x); }
+          catch (e) { app.toast(messageErreur(e), Niv.echec); }
         }),
         const Ecart(8),
         Btn('Trouver une Bande ouverte', large: true, onTap: fenetreBandesOuvertes),
@@ -435,7 +435,7 @@ void fenetreNouvelleBande(Map b) {
 
 Future<void> fenetreBandesOuvertes() async {
   Map l;
-  try { l = await Api.get('/bandes/ouvertes') as Map; } catch (e) { app.toast(messageErreur(e)); return; }
+  try { l = await Api.get('/bandes/ouvertes') as Map; } catch (e) { app.toast(messageErreur(e), Niv.echec); return; }
   final liste = ((l['liste'] as List?) ?? []).cast<Map>();
   final demandees = <String>{for (final x in liste) if (x['demandee'] == true) x['id'].toString()};
   app.ouvrirFenetre((context) => StatefulBuilder(builder: (context, setState) => Fenetre(titre: 'Bandes ouvertes', enfants: [
@@ -443,7 +443,7 @@ Future<void> fenetreBandesOuvertes() async {
           Padding(
             padding: const EdgeInsets.only(bottom: 6),
             child: Btn(null, large: true, onTap: demandees.contains(x['id'].toString()) ? null : () async {
-              try { await Api.post('/bandes/${x['id']}/demander'); app.toast('Demande envoyée : le créateur de la Bande va te répondre.'); setState(() => demandees.add(x['id'].toString())); } catch (e) { app.toast(messageErreur(e)); }
+              try { await Api.post('/bandes/${x['id']}/demander'); app.toast('Demande envoyée : le créateur de la Bande va te répondre.', Niv.succes); setState(() => demandees.add(x['id'].toString())); } catch (e) { app.toast(messageErreur(e), Niv.echec); }
             }, enfant: Row(children: [
               Expanded(child: Text('${x['nom']}', style: K.texte(15, poids: FontWeight.w600))),
               Muet('${x['membres']} membres · mise ${_p(x['mise'])}${demandees.contains(x['id'].toString()) ? ' · demandé' : ''}', taille: 12),
@@ -457,7 +457,7 @@ Future<void> fenetreBandesOuvertes() async {
 
 Future<void> ouvrirUneBande(String id) async {
   Map x;
-  try { x = await Api.get('/bandes/$id') as Map; } catch (e) { app.toast(messageErreur(e)); return; }
+  try { x = await Api.get('/bandes/$id') as Map; } catch (e) { app.toast(messageErreur(e), Niv.echec); return; }
   final t = x['titres'] as Map?;
   if (t != null && t['semaine'] != null && Stock.lire('kopo-bande-vu-$id') != t['semaine'] && ((t['classement'] as List?) ?? []).any((l) => l['id'] == monCompteId)) {
     Stock.ecrire('kopo-bande-vu-$id', t['semaine']);
@@ -553,8 +553,8 @@ void afficherBande(Map x) {
             Btn.principal('Miser ${_p(s['mise'])}', large: true, onTap: moi['peutMiser'] != true ? null : () => demanderConfirmation(
                   'Tu mises ${_p(s['mise'])} pièces pour cette semaine. Le meilleur après 7 Matchs gagne le pot ; le dernier est Loser de la semaine.',
                   () async {
-                    try { final y = await Api.post('/bandes/${x['id']}/miser') as Map; Api.get('/moi').then((mm) => app.soldeServeur(mm['compte']['solde'])).catchError((_) => null); app.toast('Mise payée : bonne semaine !'); afficherBande(y); app.majCartesCompetition(); }
-                    catch (e) { app.toast(messageErreur(e)); afficherBande(x); }
+                    try { final y = await Api.post('/bandes/${x['id']}/miser') as Map; Api.get('/moi').then((mm) => app.soldeServeur(mm['compte']['solde'])).catchError((_) => null); app.toast('Mise payée : bonne semaine !', Niv.succes); afficherBande(y); app.majCartesCompetition(); }
+                    catch (e) { app.toast(messageErreur(e), Niv.echec); afficherBande(x); }
                   },
                   titre: 'Miser ?', oui: 'Miser ${_p(s['mise'])}', annuler: () => afficherBande(x),
                 )),
@@ -563,15 +563,15 @@ void afficherBande(Map x) {
         ],
         Bascule('Remiser automatiquement chaque semaine', auto, (v) async {
           setState(() => auto = v);
-          try { await Api.post('/bandes/${x['id']}/auto', {'auto': v}); app.toast(v ? 'Tu mises automatiquement chaque lundi.' : 'Mise automatique coupée.'); }
-          catch (e) { app.toast(messageErreur(e)); setState(() => auto = !v); }
+          try { await Api.post('/bandes/${x['id']}/auto', {'auto': v}); app.toast(v ? 'Tu mises automatiquement chaque lundi.' : 'Mise automatique coupée.', Niv.succes); }
+          catch (e) { app.toast(messageErreur(e), Niv.echec); setState(() => auto = !v); }
         }),
         for (final d in ((x['demandes'] as List?) ?? []).cast<Map>())
           Row(children: [
             Expanded(child: Text('${d['pseudo']}#${d['numero']} veut entrer', style: K.texte(14))),
-            Btn.principal('Accepter', taille: 13, marge: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), onTap: () async { try { afficherBande(await Api.post('/bandes/${x['id']}/demandes/${d['id']}', {'accepter': true}) as Map); } catch (e) { app.toast(messageErreur(e)); } }),
+            Btn.principal('Accepter', taille: 13, marge: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), onTap: () async { try { afficherBande(await Api.post('/bandes/${x['id']}/demandes/${d['id']}', {'accepter': true}) as Map); } catch (e) { app.toast(messageErreur(e), Niv.echec); } }),
             const SizedBox(width: 6),
-            Btn('Refuser', taille: 13, marge: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), onTap: () async { try { afficherBande(await Api.post('/bandes/${x['id']}/demandes/${d['id']}', {'accepter': false}) as Map); } catch (e) { app.toast(messageErreur(e)); } }),
+            Btn('Refuser', taille: 13, marge: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), onTap: () async { try { afficherBande(await Api.post('/bandes/${x['id']}/demandes/${d['id']}', {'accepter': false}) as Map); } catch (e) { app.toast(messageErreur(e), Niv.echec); } }),
           ]),
         if (pasInscrits.isNotEmpty) Muet('Pas encore inscrits : ${pasInscrits.map((m) => m['pseudo']).join(', ')}', taille: 12),
         const Ecart(10),
@@ -580,7 +580,7 @@ void afficherBande(Map x) {
         if (x['createur'] == true) ...[const Ecart(8), Btn('Réglages de la Bande', large: true, onTap: () => reglagesBande(x))],
         const Ecart(8),
         Btn('Quitter la Bande', large: true, onTap: () => demanderConfirmation(moi['inscrit'] == true ? 'Ta mise de cette semaine reste dans le pot.' : "Tu pourras revenir avec le lien d'un ami.", () async {
-              try { await Api.post('/bandes/${x['id']}/quitter'); app.toast('Tu as quitté la Bande.'); app.majCartesCompetition(); } catch (e) { app.toast(messageErreur(e)); }
+              try { await Api.post('/bandes/${x['id']}/quitter'); app.toast('Tu as quitté la Bande.', Niv.succes); app.majCartesCompetition(); } catch (e) { app.toast(messageErreur(e), Niv.echec); }
             }, titre: 'Quitter la Bande ?', oui: 'Quitter', annuler: () => afficherBande(x))),
         const Ecart(8),
         Btn('Fermer', large: true, onTap: app.fermerFenetre),
@@ -603,11 +603,11 @@ void reglagesBande(Map x) {
         for (final m in membres)
           Row(children: [
             Expanded(child: Text('${m['pseudo']}', style: K.texte(15))),
-            Btn('Retirer', onTap: () async { try { await Api.delete('/bandes/${x['id']}/membres/${m['id']}'); ouvrirUneBande(x['id'].toString()); } catch (e) { app.toast(messageErreur(e)); } }),
+            Btn('Retirer', onTap: () async { try { await Api.delete('/bandes/${x['id']}/membres/${m['id']}'); ouvrirUneBande(x['id'].toString()); } catch (e) { app.toast(messageErreur(e), Niv.echec); } }),
           ]),
         const Ecart(10),
         Btn.principal('Enregistrer', large: true, onTap: () async {
-          try { afficherBande(await Api.patch('/bandes/${x['id']}', {'nom': nom.text, 'mise': mise, 'ouverte': ouverte}) as Map); app.toast('Bande mise à jour.'); } catch (e) { app.toast(messageErreur(e)); }
+          try { afficherBande(await Api.patch('/bandes/${x['id']}', {'nom': nom.text, 'mise': mise, 'ouverte': ouverte}) as Map); app.toast('Bande mise à jour.', Niv.succes); } catch (e) { app.toast(messageErreur(e), Niv.echec); }
         }),
         const Ecart(8),
         Btn('Retour', large: true, onTap: () => afficherBande(x)),
@@ -625,12 +625,12 @@ Future<void> ouvrirLienBande(Map l) async {
   try {
     final x = await Api.post('/bandes/rejoindre', {'code': l['code']}) as Map;
     Stock.effacer('kopo-bande-lien');
-    app.toast('Bienvenue dans « ${x['nom']} » !');
+    app.toast('Bienvenue dans « ${x['nom']} » !', Niv.succes);
     afficherBande(x);
     app.majCartesCompetition();
   } catch (e) {
     final m = messageErreur(e);
-    app.toast(m);
+    app.toast(m, Niv.echec);
     if (RegExp('inconnu|complète|maximum').hasMatch(m)) { Stock.effacer('kopo-bande-lien'); } else { lienBandeVu = false; }
   }
 }

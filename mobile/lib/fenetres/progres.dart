@@ -37,7 +37,7 @@ void encaisserMission(String id) {
   app.crediterEnLigne('mission', r['pieces'] as int, '${texte.length > 60 ? texte.substring(0, 60) : texte}:${r['finieLe']}');
   app.vibrer(30);
   if ((r['niveauApres'] as Niveau).niveau > (r['niveauAvant'] as Niveau).niveau) app.tampon('NIVEAU ${(r['niveauApres'] as Niveau).niveau}');
-  app.toast('+${r['pieces']} pièces · +${r['xp']} XP');
+  app.toast('+${r['pieces']} pièces · +${r['xp']} XP', Niv.succes);
   ouvrirMissions();
 }
 
@@ -382,7 +382,7 @@ Future<void> ouvrirBoutique() async {
   try {
     if (!await app.compteEnLigneOuCreer()) { app.lirePseudo(); return; }
     B = await Api.get('/boutique') as Map;
-  } catch (e) { app.toast(messageErreur(e)); return; }
+  } catch (e) { app.toast(messageErreur(e), Niv.echec); return; }
   app.soldeServeur(B['solde']);
   await app.chargerStickers();
   for (final o in (B['objets'] as List)) { app.objetDuServeur(o as Map); }
@@ -392,7 +392,10 @@ Future<void> ouvrirBoutique() async {
   final enVente = ((B['objets'] as List).cast<Map>().where((o) => o['prix'] != null && o['ville'] != true).map((o) => o.cast<String, dynamic>()).toList())
     ..sort((a, b) { final d = (a['prix'] as num).compareTo(b['prix'] as num); return d != 0 ? d : a['nom'].toString().compareTo(b['nom'].toString()); });
   app.ouvrirFenetre((context) => Fenetre(titre: 'Boutique', enfants: [
-        Row(children: [const Piece(taille: 26), const SizedBox(width: 8), Text(App.formatPieces(solde), style: K.titre(30))]),
+        Row(children: [
+          const Piece(taille: 26), const SizedBox(width: 8), Text(App.formatPieces(solde), style: K.titre(30)), const Spacer(),
+          Btn('+ Acheter des pièces', taille: 13, onTap: () => ouvrirAchatPieces(retour: ouvrirBoutique)),
+        ]),
         const Muet("Des apparences seulement : rien n'aide à gagner. Les pièces se gagnent en jouant.", taille: 12),
         for (final cat in R.parCategorie(enVente)) ...[
           Titre3(cat.nom),
@@ -480,9 +483,9 @@ void _acheterStickers(Map s, int solde, {String? sticker, String? pack, required
                 app.soldeServeur(r['solde']);
                 if (app.stickers != null) app.stickers!['soldes'] = r['soldes'];
                 app.vibrer(40);
-                app.toast('Merci ! ${r['texte']} (${App.formatPieces(r['pieces'] as num)} pièces)');
+                app.toast('Merci ! ${r['texte']} (${App.formatPieces(r['pieces'] as num)} pièces)', Niv.succes);
                 ouvrirBoutique();
-              } catch (e) { app.toast(messageErreur(e)); setState(() => enCours = false); }
+              } catch (e) { app.toast(messageErreur(e), Niv.echec); setState(() => enCours = false); }
             };
             return i == 0 ? Btn.principal(null, enfant: contenu, large: true, onTap: faire) : Btn(null, enfant: contenu, large: true, onTap: faire);
           }),
@@ -492,6 +495,84 @@ void _acheterStickers(Map s, int solde, {String? sticker, String? pack, required
         const Ecart(8),
         Btn('Retour', large: true, onTap: ouvrirBoutique),
       ])), 'boutique');
+}
+
+// ---------------------------------------------------------------- acheter des pièces
+// Bouquets du moins cher (500 FC) au plus cher (40 000 FC), prix fixés par le serveur au taux des stickers
+// (200 pièces ≈ 500 FC), avec un bonus qui grandit avec le bouquet. Le paiement mobile money n'est pas encore branché.
+Future<void> ouvrirAchatPieces({VoidCallback? retour}) async {
+  Map B;
+  try {
+    if (!await app.compteEnLigneOuCreer()) { app.lirePseudo(); return; }
+    B = await Api.get('/bouquets') as Map;
+  } catch (e) { app.toast(messageErreur(e), Niv.echec); return; }
+  app.soldeServeur(B['solde']);
+  app.ouvrirFenetre((context) => fenetreAchatPieces(B, retour: retour), 'boutique');
+}
+
+/// La fenêtre elle-même (séparée pour les captures d'écran).
+Widget fenetreAchatPieces(Map B, {VoidCallback? retour}) {
+  final liste = ((B['bouquets'] as List?) ?? const []).cast<Map>();
+  final paiement = B['paiement'] == true;
+  final meilleur = liste.isEmpty ? null : liste.reduce((m, b) => (b['bonusPct'] as num) > (m['bonusPct'] as num) ? b : m);
+  Widget tas(int n) => SizedBox(width: 50, height: 40, child: Stack(children: [
+        for (var k = 0; k < n; k++) Positioned(left: k < 3 ? k * 12.0 : (k - 3) * 12.0 + 6, top: k < 3 ? 14 : 0, child: const Piece(taille: 24)),
+      ]));
+  Widget ligne(int i, Map b) {
+    final top = identical(b, meilleur) && (b['bonus'] as num) > 0;
+    final carte = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: top ? const Color(0x1AE2B04A) : const Color(0x0AFFFFFF),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: top ? K.brass : K.line),
+      ),
+      child: Row(children: [
+        tas(i + 1 > 6 ? 6 : i + 1),
+        const SizedBox(width: 10),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('${b['nom']}'.toUpperCase(), style: K.texte(11, couleur: K.muted).copyWith(letterSpacing: 1.2)),
+          Text(App.formatPieces(b['pieces'] as num), style: K.titre(26)),
+          if ((b['bonus'] as num) > 0)
+            Container(
+              margin: const EdgeInsets.only(top: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              decoration: BoxDecoration(color: const Color(0xFF6FBF8F), borderRadius: BorderRadius.circular(6)),
+              child: Text('+${App.formatPieces(b['bonus'] as num)} offertes', style: K.texte(12, couleur: K.encre, poids: FontWeight.w700)),
+            ),
+        ])),
+        Text('${App.formatPieces(b['francs'] as num)} FC', style: K.texte(16, poids: FontWeight.w700)),
+      ]),
+    );
+    return Padding(
+      padding: EdgeInsets.only(top: top ? 12 : 8),
+      child: Semantics(
+        button: true,
+        label: '${b['nom']} : ${b['pieces']} pièces pour ${b['francs']} francs congolais',
+        child: GestureDetector(
+          onTap: () => app.toast(paiement ? 'Paiement mobile money : bientôt.' : 'Bouquet « ${b['nom']} » : le paiement mobile money arrive bientôt.', Niv.alerte),
+          child: Stack(clipBehavior: Clip.none, children: [
+            carte,
+            if (top)
+              Positioned(top: -9, right: 12, child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(color: K.brass, borderRadius: BorderRadius.circular(6)),
+                child: Text('Le plus avantageux · +${b['bonusPct']} %', style: K.texte(11, couleur: K.encre, poids: FontWeight.w700)),
+              )),
+          ]),
+        ),
+      ),
+    );
+  }
+  return Fenetre(titre: 'Acheter des pièces', enfants: [
+    Row(mainAxisAlignment: MainAxisAlignment.center, children: [const Piece(taille: 26), const SizedBox(width: 8), Text(App.formatPieces((B['solde'] as num?) ?? app.solde), style: K.titre(30))]),
+    const Muet('Plus le bouquet est gros, plus il y a de pièces offertes. Des pièces pour les tables à mise, les apparences et les stickers ; elles ne se revendent pas.', taille: 12),
+    for (final (i, b) in liste.indexed) ligne(i, b),
+    const Ecart(8),
+    Muet(paiement ? 'Paiement en francs congolais par mobile money.' : 'Paiement en francs congolais (mobile money : M-Pesa, Orange Money, Airtel Money) : bientôt.', taille: 12),
+    const Ecart(10),
+    Btn.principal(retour != null ? 'Retour' : 'Fermer', large: true, onTap: retour ?? app.fermerFenetre),
+  ]);
 }
 
 Future<void> _equiperDepuisBoutique(String id) async {
@@ -514,7 +595,9 @@ void _confirmerAchat(Map o, int solde) {
         if (prix > solde) ...[
           Text('Il te manque ${App.formatPieces(prix - solde)} pièces pour $nomType ${o['nom']}. Missions, bonus du jour et parties en ligne en rapportent.', textAlign: TextAlign.center, style: K.texte(15)),
           const Ecart(12),
-          Btn.principal('Retour', large: true, onTap: ouvrirBoutique),
+          Btn.principal('Acheter des pièces', large: true, onTap: () => ouvrirAchatPieces(retour: ouvrirBoutique)),
+          const Ecart(8),
+          Btn('Retour', large: true, onTap: ouvrirBoutique),
         ] else ...[
           Text('Acheter $nomType ${o['nom']} pour ${App.formatPieces(prix)} pièces ? Il te restera ${App.formatPieces(solde - prix)} pièces.', textAlign: TextAlign.center, style: K.texte(15)),
           const Ecart(12),
@@ -526,9 +609,9 @@ void _confirmerAchat(Map o, int solde) {
               final q = app.lireProfil(); R.donnerObjet(q, o['id'] as String); R.equiper(q, o['id'] as String); app.ecrireProfil(q);
               await Api.post('/collection/equiper', {'objet': o['id']}).catchError((_) => null);
               app.vibrer(40);
-              app.toast('${o['nom']} est à toi (équipé)');
+              app.toast('${o['nom']} est à toi (équipé)', Niv.succes);
               ouvrirBoutique();
-            } catch (e) { app.toast(messageErreur(e)); setState(() => enCours = false); }
+            } catch (e) { app.toast(messageErreur(e), Niv.echec); setState(() => enCours = false); }
           }),
           const Ecart(8),
           Btn('Retour', large: true, onTap: ouvrirBoutique),

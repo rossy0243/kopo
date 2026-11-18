@@ -28,7 +28,7 @@
 <style>
 :root {
   --table: #10233a; --table-2: #183252; --ink: #eef2f7; --muted: #9fb2c8; --brass: #e2b04a;
-  --card: #fbf7ee; --card-ink: #1b2533; --red: #c7362f; --good: #3fbf7f; --bad: #ef6b5f;
+  --card: #fbf7ee; --card-ink: #1b2533; --red: #c7362f; --good: #3fbf7f; --warn: #f0a63a; --bad: #ef6b5f;
   --line: rgba(255,255,255,.12);
   --display: "Bebas Neue", Impact, "Arial Narrow Bold", sans-serif;
   --body: "Outfit", "Segoe UI", system-ui, -apple-system, sans-serif;
@@ -60,6 +60,7 @@ header .btn { padding: 6px 10px; font-size: 13px; flex: none; }
 .btn.katapss { background: var(--red); border-color: var(--red); color: #fff; letter-spacing: 2px; font-family: var(--display); font-size: 30px; padding: 6px 18px; width: 100%; animation: pulse 1.6s ease-in-out infinite; }
 @keyframes pulse { 50% { box-shadow: 0 0 0 8px rgba(199,54,47,.25); } }
 .bandeau { background: rgba(239,107,95,.15); color: var(--bad); border: 1px solid rgba(239,107,95,.4); border-radius: 10px; padding: 8px 12px; font-size: 14px; }
+.bandeau.alerte { background: rgba(240,166,58,.14); color: var(--warn); border-color: rgba(240,166,58,.45); }
 .bandeau.info-hote { background: rgba(226,176,74,.1); color: var(--brass); border-color: rgba(226,176,74,.35); }
 
 /* Panneaux */
@@ -215,7 +216,18 @@ header .vocal .btn { padding: 5px 9px; font-size: 15px; line-height: 1.2; }
 .tirer-actualiser.pret { background: var(--brass); color: var(--table); }
 .tirer-actualiser.tourne span { animation: tourner-actu .8s linear infinite; }
 @keyframes tourner-actu { to { transform: rotate(360deg); } }
-.toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: #2a1716; color: #ffd7d3; border: 1px solid var(--bad); border-radius: 10px; padding: 10px 14px; z-index: 20; max-width: 90vw; font-size: 14px; }
+.toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; align-items: center; gap: 9px; background: #0b1828f2; color: var(--ink); border: 1px solid var(--line); z-index: 30; max-width: min(90vw, 480px); width: max-content; font-size: 14px; line-height: 1.3; box-shadow: 0 6px 18px rgba(0,0,0,.45); border-radius: 999px; padding: 8px 16px 8px 10px; }
+.toast.info { padding-left: 16px; }
+body.en-jeu .toast { bottom: auto; top: calc(48px + env(safe-area-inset-top)); }
+/* Un seul jeu de couleurs pour toutes les notifications : succès = vert, avertissement = ambre, échec = rouge, info = neutre. */
+.toast .ico-toast { flex: none; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; font-size: 12px; font-weight: 700; line-height: 1; }
+.toast.info .ico-toast { display: none; }
+.toast.succes { background: #0d2a1e; color: #c9f2dc; border-color: var(--good); }
+.toast.succes .ico-toast { background: var(--good); color: #062014; }
+.toast.alerte { background: #2e2410; color: #ffe7b0; border-color: var(--warn); }
+.toast.alerte .ico-toast { background: var(--warn); color: #2a1c02; }
+.toast.echec { background: #2a1716; color: #ffd7d3; border-color: var(--bad); }
+.toast.echec .ico-toast { background: var(--bad); color: #2a0b08; }
 
 /* Partie sur téléphone : tout tient sur un écran, sans défilement. */
 #ecranPartie { display: grid; gap: 8px; }
@@ -901,6 +913,18 @@ body.en-jeu #filChat { display: flex; }
 .boutique .st-offre { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 8px 10px; border: 1px dashed var(--line); border-radius: 10px; color: var(--muted); font-size: 13px; }
 .boutique .st-offre b { color: var(--ink); }
 .boutique .st-tete-pack .btn { padding: 5px 10px; font-size: 13px; }
+.bouquets { display: grid; gap: 8px; }
+.bouquet { display: grid; grid-template-columns: 58px 1fr auto; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.04); color: var(--ink); font: inherit; text-align: left; cursor: pointer; position: relative; }
+.bouquet:hover, .bouquet:focus-visible { border-color: var(--brass); }
+.bouquet.top { border-color: var(--brass); background: rgba(226,176,74,.1); }
+.bouquet .tas { position: relative; height: 40px; }
+.bouquet .tas .piece { position: absolute; width: 26px; height: 26px; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,.35); }
+.bouquet .qte { display: flex; align-items: center; gap: 6px; font-family: var(--display); font-size: 26px; letter-spacing: 1px; color: var(--brass); line-height: 1; }
+.bouquet .nom { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 1.2px; }
+.bouquet .bonus { display: inline-block; margin-top: 3px; font-size: 12px; font-weight: 700; color: #1d1606; background: #6fbf8f; border-radius: 6px; padding: 1px 6px; }
+.bouquet .px { text-align: right; font-weight: 700; font-size: 16px; white-space: nowrap; }
+.bouquet .ruban { position: absolute; top: -9px; right: 12px; background: var(--brass); color: #1d1606; font-size: 11px; font-weight: 700; border-radius: 6px; padding: 2px 7px; }
+.boutique .acheter-pieces { margin: 2px auto 4px; display: flex; }
 .boutique .st-tete-pack { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 10px 0 4px; }
 .boutique button.st-case { color: inherit; font: inherit; }
 .fenetre[data-type="boutique"] .st-prix { display: inline-flex; align-items: center; gap: 4px; vertical-align: middle; }
@@ -1753,7 +1777,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     <small>Le jeu se rouvrira tout seul dès la fin de la maintenance.</small>
   </div>
 </div>
-<div class="toast" id="toast" hidden role="status"></div>
+<div class="toast info" id="toast" hidden role="status"><span class="ico-toast" aria-hidden="true"></span><span class="texte-toast"></span></div>
 <div class="maj-dispo" id="majDispo" hidden role="status"><span>Nouvelle version de Masano disponible.</span><button class="btn principal" id="btnMajDispo">Mettre à jour</button><button class="btn" id="btnMajPlusTard" aria-label="Plus tard">✕</button></div>
 <div class="tirer-actualiser" id="tirerActualiser" hidden aria-hidden="true"><span>↻</span></div>
 <div class="voile voile-tourner" id="voileTourner" hidden>
@@ -2235,7 +2259,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     stock.ecrire('kopo-pseudo', p);
     if ($('pseudo')) { $('pseudo').value = p; majAvatar(); }
     figerPseudo();
-    if (avant && avant.toLowerCase() !== p.toLowerCase()) toast(aLaCreation ? '« ' + avant + ' » était déjà pris : ton pseudo est ' + p + '.' : 'Ton pseudo en ligne est ' + p + '.');
+    if (avant && avant.toLowerCase() !== p.toLowerCase()) toast(aLaCreation ? '« ' + avant + ' » était déjà pris : ton pseudo est ' + p + '.' : 'Ton pseudo en ligne est ' + p + '.', 'alerte');
   }
   // Le pseudo se choisit une fois : ensuite le champ de l'accueil est figé (toucher ouvre le profil)
   // et il ne se change plus que dans les Paramètres, 2 fois par an.
@@ -2277,7 +2301,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
         // Compte gardé sur l'appareil mais inconnu du serveur : on en recrée un, une seule fois.
         if (!facon.retente) return entrerServeur(nom, Object.assign({}, facon, { retente: true }));
       }
-      quitter(); toast(texte);
+      quitter(); toast(texte, 'echec');
     }
   }
 
@@ -2305,10 +2329,10 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     // Une salle quittée (partie suivante, Quitter) peut encore envoyer une vue avant de fermer : on l'ignore,
     // sinon le bilan de l'ancienne partie se rouvrait (et rejouait son animation) par-dessus la nouvelle recherche.
     room.onMessage('vue', (v) => { if (moi !== client) return; cacherBandeau(); memoriser(v.code); afficher(v); });
-    room.onMessage('erreur', (t) => { if (moi === client) toast(t); });
+    room.onMessage('erreur', (t) => { if (moi === client) toast(t, 'echec'); });
     room.onMessage('solde', (d) => soldeServeur(d && d.solde));
     room.onMessage('mise', (d) => { if (moi === client && d) toast(`Mise de ${formatPieces(d.mise)} pièces payée. Pot : ${formatPieces(d.pot)} pièces.`); });
-    room.onMessage('pot', (d) => { if (moi === client && d) toast(d.gain > 0 ? `Tu gagnes ${formatPieces(d.gain)} pièces du pot !` : `Pas de part du pot cette fois (${formatPieces(d.pot)} pièces en jeu).`); });
+    room.onMessage('pot', (d) => { if (moi === client && d) toast(d.gain > 0 ? `Tu gagnes ${formatPieces(d.gain)} pièces du pot !` : `Pas de part du pot cette fois (${formatPieces(d.pot)} pièces en jeu).`, d.gain > 0 ? 'succes' : 'info'); });
     room.onMessage('classee', (d) => window.dispatchEvent(new CustomEvent('kopo-classee', { detail: d })));
     room.onMessage('ligue', (d) => window.dispatchEvent(new CustomEvent('kopo-ligue', { detail: d })));
     room.onMessage('parcours', (d) => window.dispatchEvent(new CustomEvent('kopo-parcours', { detail: d })));
@@ -2316,7 +2340,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     room.onMessage('reaction', (e) => window.dispatchEvent(new CustomEvent('kopo-reaction', { detail: e })));
     room.onMessage('sticker', (e) => window.dispatchEvent(new CustomEvent('kopo-sticker', { detail: e })));
     room.onMessage('stickers', (e) => window.dispatchEvent(new CustomEvent('kopo-stickers', { detail: e })));
-    room.onMessage('exclu', (raison) => { quitter(); toast(raison || 'Tu as été exclu de la partie.'); });
+    room.onMessage('exclu', (raison) => { quitter(); toast(raison || 'Tu as été exclu de la partie.', 'echec'); });
     // Match du jour : au début, essai officiel ou entraînement ; à la fin (éliminé, vainqueur), le score sur 100.
     room.onMessage('matchJour', (d) => {
       if (moi !== client || !d) return;
@@ -2325,14 +2349,14 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     });
     room.onLeave((code) => {
       if (moi !== client || moi.depart) return;
-      if (code === 4000 || code === 4001) { quitter(); toast(code === 4000 ? 'Ta partie est ouverte sur un autre appareil.' : 'Tu as été exclu de la partie.'); return; }
+      if (code === 4000 || code === 4001) { quitter(); toast(code === 4000 ? 'Ta partie est ouverte sur un autre appareil.' : 'Tu as été exclu de la partie.', code === 4000 ? 'alerte' : 'echec'); return; }
       // Coupure réseau : le serveur garde la place. Le jeton de reconnexion vaut 2 minutes ; ensuite on
       // reprend la place avec le code de la salle, tant que la partie existe.
       montrerBandeau('Connexion perdue. Reconnexion…');
       const essayer = (n) => cli.reconnect(room.reconnectionToken)
         .catch(() => session && session.code ? compteServeur(nom).then((c) => reprendreServeur(cli, c.jeton, session.code)).then((r) => r || Promise.reject(new Error('reprendre'))) : Promise.reject(new Error('reconnexion')))
         .then((r) => { if (moi === client) brancherSalleServeur(cli, r, nom, facon); else try { r.leave(); } catch (e) {} })
-        .catch(() => { if (moi === client && n < 40) setTimeout(() => essayer(n + 1), 3000); else if (moi === client) { quitter(); toast('Connexion au serveur perdue.'); } });
+        .catch(() => { if (moi === client && n < 40) setTimeout(() => essayer(n + 1), 3000); else if (moi === client) { quitter(); toast('Connexion au serveur perdue.', 'echec'); } });
       essayer(0);
     });
     room.send('sync');
@@ -2396,7 +2420,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       return;
     }
     if (!r.ok) {
-      if (id === monId) toast(r.erreur);
+      if (id === monId) toast(r.erreur, 'echec');
       else hote.reseau.envoyer(id, { type: 'erreur', texte: r.erreur, refus: msg && msg.type === 'rejoindre' });
     }
     diffuser();
@@ -2447,11 +2471,11 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
             // La salle publique vient de se remplir : on en cherche une autre de la même taille.
             client.reseau.fermer(); client = null; vueActuelle = null;
             chercherSalle(nom, taille, (exclus || []).concat(code));
-          } else if (msg.refus) { quitter(); toast(msg.texte); } else toast(msg.texte);
+          } else if (msg.refus) { quitter(); toast(msg.texte, 'echec'); } else toast(msg.texte, 'echec');
         }
       },
       ferme() { montrerBandeau("Connexion perdue avec l'hôte. Reconnexion…"); },
-      erreur(texte) { if (!vueActuelle) $('texteConnexion').textContent = texte; else montrerBandeau(texte); },
+      erreur(texte) { if (!vueActuelle) $('texteConnexion').textContent = texte; else montrerBandeau(texte, 'echec'); },
     });
   }
   // Signe de vie toutes les 2 s ; sans nouvelles de l'hôte depuis 10 s, on se reconnecte.
@@ -2540,10 +2564,20 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   // Texte précédé d'une icône (dans un bouton, un nom…).
   function avecIco(e, nom, texte) { e.append(ico(nom)); if (texte) e.append(' ' + texte); return e; }
   function el(tag, cls, texte) { const e = document.createElement(tag); if (cls) e.className = cls; if (texte != null) e.textContent = texte; return e; }
-  function montrerBandeau(t) { $('bandeau').textContent = t; $('bandeau').hidden = false; }
+  function montrerBandeau(t, niveau = 'alerte') { $('bandeau').textContent = t; $('bandeau').className = 'bandeau' + (niveau === 'alerte' ? ' alerte' : ''); $('bandeau').hidden = false; }
   function cacherBandeau() { $('bandeau').hidden = true; }
   let minuteurToast = null;
-  function toast(t) { $('toast').textContent = t; $('toast').hidden = false; clearTimeout(minuteurToast); minuteurToast = setTimeout(() => ($('toast').hidden = true), 3500); }
+  // Niveau de la notification : 'succes' (vert), 'alerte' (ambre), 'echec' (rouge) ou 'info' (neutre, par défaut).
+  const ICONES_TOAST = { succes: '✓', alerte: '!', echec: '✕', info: '' };
+  function toast(t, niveau = 'info') {
+    if (!(niveau in ICONES_TOAST)) niveau = 'info';
+    const b = $('toast');
+    b.className = 'toast ' + niveau;
+    b.setAttribute('role', niveau === 'echec' ? 'alert' : 'status');
+    b.querySelector('.ico-toast').textContent = ICONES_TOAST[niveau];
+    b.querySelector('.texte-toast').textContent = t;
+    b.hidden = false; clearTimeout(minuteurToast); minuteurToast = setTimeout(() => (b.hidden = true), Math.min(6000, Math.max(3500, t.length * 60)));
+  }
 
   function afficherAccueil() {
     montrerEcran('ecranAccueil');
@@ -2605,7 +2639,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     if (v.jeu !== 'inter8') suivrePartie(v); // Inter (8) : l'XP et les missions viendront à l'étape de la progression
     if (v.etat !== 'finPartie') arreterSuiteAuto();
     if (v.etat === 'salon') { if (!chatOuvert()) fermerFenetre(); return afficherSalon(v); } // le chat reste ouvert quand quelqu'un arrive ou se dit prêt
-    if (v.etat === 'manche' && client && !v.joueurs.some((j) => j.id === v.moi)) { quitter(); toast('La revanche est partie sans toi.'); return; }
+    if (v.etat === 'manche' && client && !v.joueurs.some((j) => j.id === v.moi)) { quitter(); toast('La revanche est partie sans toi.', 'alerte'); return; }
     if (v.jeu === 'inter8') {
       const avant = positionsAvant();
       afficherPartieInter(v);
@@ -3769,7 +3803,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
         // Micro refusé : on écoute quand même, avec un flux silencieux.
         try { const ctx = new (window.AudioContext || window.webkitAudioContext)(); this.flux = ctx.createMediaStreamDestination().stream; } catch (e2) { this.flux = null; }
         this.muet = true;
-        toast("Micro non autorisé : tu entends les autres mais ils ne t'entendent pas.");
+        toast("Micro non autorisé : tu entends les autres mais ils ne t'entendent pas.", 'alerte');
       }
       this.actif = true;
       this.ouvrirPair();
@@ -4500,18 +4534,18 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       const avant = stock.lire('kopo-pseudo') || '';
       const p = nettoyerPseudo(ps.value); ps.value = p;
       if (p === avant) return;
-      if (p.length < 3) { toast('Le pseudo fait au moins 3 caractères, en un seul mot.'); ps.value = avant; return; }
+      if (p.length < 3) { toast('Le pseudo fait au moins 3 caractères, en un seul mot.', 'alerte'); ps.value = avant; return; }
       const fenetrePrecedente = [...$('fenetre').childNodes];
       const retour = () => { ouvrirFenetre(fenetrePrecedente); };
       demanderConfirmation('Ton pseudo deviendra « ' + p + ' ». ' + (restantsPs > 1 ? 'Il te restera 1 changement cette année.' : 'Ce sera ton dernier changement pour un an.'), async () => {
         const c = compteLocal();
         if (c) {
           try { const j = await apiJoueur('/moi', 'PATCH', { pseudo: p }); c.compte = j.compte; stock.ecrire('kopo-compte-serveur', c); if (j.quotaPseudo) montrerQuota(j.quotaPseudo); }
-          catch (e) { toast(e.message); ps.value = avant; retour(); return; }
+          catch (e) { toast(e.message, 'echec'); ps.value = avant; retour(); return; }
         }
         noterChangementPseudo(); if (!c) montrerQuota(quotaPseudoLocal());
         stock.ecrire('kopo-pseudo', p); if ($('pseudo')) { $('pseudo').value = p; majAvatar(); }
-        toast('Pseudo enregistré.'); retour();
+        toast('Pseudo enregistré.', 'succes'); retour();
       }, { titre: 'Changer de pseudo ?', oui: 'Changer', annuler: () => { ps.value = avant; retour(); } });
     };
     const lPs = ligne('Pseudo', null, ps); lPs.style.flexWrap = 'wrap'; lPs.firstChild.append(aidePs);
@@ -4667,7 +4701,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     try {
       if (!compteLocal()) { const p = lirePseudo(); if (!p) return; await compteServeur(p); } // la ligue demande un compte en ligne (invité suffit)
       L = await apiJoueur('/ligue');
-    } catch (e) { toast(e.message); return; }
+    } catch (e) { toast(e.message, 'echec'); return; }
     $('pointLigue').hidden = true;
     majOngletLigue();
     if (L.recompense) return fenetreFinSaison(L.recompense, ouvrirLigue);
@@ -4723,7 +4757,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       const ok = el('button', 'btn principal', 'OK');
       ok.onclick = async () => {
         if (!/^[A-Z]{2}$/.test(sel.value)) return;
-        try { await apiJoueur('/moi', 'PATCH', { pays: sel.value }); m.pays = sel.value; charger('pays'); } catch (e) { toast(e.message); }
+        try { await apiJoueur('/moi', 'PATCH', { pays: sel.value }); m.pays = sel.value; charger('pays'); } catch (e) { toast(e.message, 'echec'); }
       };
       f.append(sel, ok);
       const d = el('div'); d.append(el('small', 'muted', 'Pour le classement de ton pays.'), f);
@@ -4836,9 +4870,9 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   }
 
   async function ouvrirMatchJour() {
-    if (!MODE_SERVEUR) return toast('Le Match du jour se joue en ligne.');
+    if (!MODE_SERVEUR) return toast('Le Match du jour se joue en ligne.', 'alerte');
     let e;
-    try { if (!(await compteEnLigne())) return; e = etatJour = await apiJoueur('/match-jour'); } catch (x) { return toast(x.message); }
+    try { if (!(await compteEnLigne())) return; e = etatJour = await apiJoueur('/match-jour'); } catch (x) { return toast(x.message, 'echec'); }
     if (!e.google) return fenetreGoogle('Match du jour', 'Chaque jour, la même partie pour tous les joueurs, contre 8 robots Forts. Connecte-toi avec Google pour jouer : c\'est ce qui garantit un seul essai par personne.');
     if (!stock.lire('kopo-jour-explique')) return expliquerMatchJour(ouvrirMatchJour);
     $('pointJour').hidden = true;
@@ -5020,11 +5054,11 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
 
   // ----- La Bande
   async function ouvrirBande(o = {}) {
-    if (!MODE_SERVEUR) return toast('La Bande se joue en ligne.');
+    if (!MODE_SERVEUR) return toast('La Bande se joue en ligne.', 'alerte');
     let b;
-    try { if (!(await compteEnLigne())) return; b = etatBandes = await apiJoueur('/bandes'); } catch (x) { return toast(x.message); }
+    try { if (!(await compteEnLigne())) return; b = etatBandes = await apiJoueur('/bandes'); } catch (x) { return toast(x.message, 'echec'); }
     if (!b.google) return fenetreGoogle('La Bande', 'Défie tes amis chaque semaine : chacun mise, et le meilleur après 7 Matchs du jour gagne le pot. Connecte-toi avec Google pour créer ou rejoindre une Bande.');
-    if (!b.actif) return toast('Les Bandes sont en pause. Reviens bientôt !');
+    if (!b.actif) return toast('Les Bandes sont en pause. Reviens bientôt !', 'alerte');
     if (o.id) return ouvrirUneBande(o.id);
     if (o.creer || !b.bandes.length) return fenetreNouvelleBande(b);
     if (b.bandes.length === 1) return ouvrirUneBande(b.bandes[0].id);
@@ -5057,8 +5091,8 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     z.append(lNom, lMise, lOuv);
     const creer = el('button', 'btn principal large', 'Créer ma Bande');
     creer.onclick = async () => {
-      try { const x = await apiJoueur('/bandes', 'POST', { nom: nom.value, mise: Number(mise.value), ouverte: ouverte.checked }); toast('Ta Bande est créée : invite tes amis !'); afficherBande(x); }
-      catch (e) { toast(e.message); }
+      try { const x = await apiJoueur('/bandes', 'POST', { nom: nom.value, mise: Number(mise.value), ouverte: ouverte.checked }); toast('Ta Bande est créée : invite tes amis !', 'succes'); afficherBande(x); }
+      catch (e) { toast(e.message, 'echec'); }
     };
     const trouver = el('button', 'btn large', 'Trouver une Bande ouverte'); trouver.onclick = fenetreBandesOuvertes;
     const f = el('button', 'btn large', 'Fermer'); f.onclick = fermerFenetre;
@@ -5066,13 +5100,13 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     setTimeout(() => nom.focus(), 50);
   }
   async function fenetreBandesOuvertes() {
-    let l; try { l = await apiJoueur('/bandes/ouvertes'); } catch (e) { return toast(e.message); }
+    let l; try { l = await apiJoueur('/bandes/ouvertes'); } catch (e) { return toast(e.message, 'echec'); }
     const z = el('div', 'bande-choix');
     for (const x of l.liste) {
       const bt = el('button', 'btn large');
       bt.append(el('span', null, x.nom), el('small', null, `${x.membres} membres · mise ${formatPieces(x.mise)}${x.demandee ? ' · demandé' : ''}`));
       bt.disabled = x.demandee;
-      bt.onclick = async () => { try { await apiJoueur(`/bandes/${x.id}/demander`, 'POST'); toast('Demande envoyée : le créateur de la Bande va te répondre.'); bt.disabled = true; } catch (e) { toast(e.message); } };
+      bt.onclick = async () => { try { await apiJoueur(`/bandes/${x.id}/demander`, 'POST'); toast('Demande envoyée : le créateur de la Bande va te répondre.', 'succes'); bt.disabled = true; } catch (e) { toast(e.message, 'echec'); } };
       z.append(bt);
     }
     if (!l.liste.length) z.append(el('p', 'muted', l.pays ? `Pas encore de Bande ouverte en ${nomPays(l.pays)}. Crée la tienne !` : 'Pas encore de Bande ouverte. Crée la tienne !'));
@@ -5081,7 +5115,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   }
 
   async function ouvrirUneBande(id) {
-    let x; try { x = await apiJoueur('/bandes/' + id); } catch (e) { return toast(e.message); }
+    let x; try { x = await apiJoueur('/bandes/' + id); } catch (e) { return toast(e.message, 'echec'); }
     // Une semaine vient de se terminer : l'écran du dimanche, une fois.
     const t = x.titres;
     if (t && t.semaine && stock.lire('kopo-bande-vu-' + id) !== t.semaine && t.classement && t.classement.some((l) => l.id === monCompteId())) {
@@ -5158,22 +5192,22 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
         const b = el('button', 'btn principal large', `Miser ${formatPieces(s.mise)}`);
         if (!x.moi.peutMiser) { b.disabled = true; m.append(el('small', null, 'Pour miser, il te faut : ' + x.moi.manque.join(', ') + '.')); }
         b.onclick = () => demanderConfirmation(`Tu mises ${formatPieces(s.mise)} pièces pour cette semaine. Le meilleur après 7 Matchs gagne le pot ; le dernier est Loser de la semaine.`, async () => {
-          try { const y = await apiJoueur(`/bandes/${x.id}/miser`, 'POST'); apiJoueur('/moi').then((mm) => soldeServeur(mm.compte.solde)).catch(() => {}); toast('Mise payée : bonne semaine !'); afficherBande(y); majCartesCompetition(); }
-          catch (e) { toast(e.message); afficherBande(x); }
+          try { const y = await apiJoueur(`/bandes/${x.id}/miser`, 'POST'); apiJoueur('/moi').then((mm) => soldeServeur(mm.compte.solde)).catch(() => {}); toast('Mise payée : bonne semaine !', 'succes'); afficherBande(y); majCartesCompetition(); }
+          catch (e) { toast(e.message, 'echec'); afficherBande(x); }
         }, { titre: 'Miser ?', oui: `Miser ${formatPieces(s.mise)}`, annuler: () => afficherBande(x) });
         m.append(b);
       } else m.append(el('small', null, 'Les inscriptions sont fermées depuis mercredi 23 h. Rendez-vous lundi !'));
       z.append(m);
     }
     const auto = el('input'); auto.type = 'checkbox'; auto.checked = x.moi.auto;
-    auto.onchange = async () => { try { await apiJoueur(`/bandes/${x.id}/auto`, 'POST', { auto: auto.checked }); toast(auto.checked ? 'Tu mises automatiquement chaque lundi.' : 'Mise automatique coupée.'); } catch (e) { toast(e.message); auto.checked = !auto.checked; } };
+    auto.onchange = async () => { try { await apiJoueur(`/bandes/${x.id}/auto`, 'POST', { auto: auto.checked }); toast(auto.checked ? 'Tu mises automatiquement chaque lundi.' : 'Mise automatique coupée.', 'succes'); } catch (e) { toast(e.message, 'echec'); auto.checked = !auto.checked; } };
     const lAuto = el('label', 'reglage-ligne'); lAuto.append(el('span', null, 'Remiser automatiquement chaque semaine'), auto);
     z.append(lAuto);
     // Demandes d'entrée (créateur d'une Bande ouverte)
     for (const d of x.demandes || []) {
       const l = el('div', 'reglage-ligne'); l.append(el('span', null, `${d.pseudo}#${d.numero} veut entrer`));
       const oui = el('button', 'btn principal', 'Accepter'), non = el('button', 'btn', 'Refuser');
-      const rep = async (a) => { try { afficherBande(await apiJoueur(`/bandes/${x.id}/demandes/${d.id}`, 'POST', { accepter: a })); } catch (e) { toast(e.message); } };
+      const rep = async (a) => { try { afficherBande(await apiJoueur(`/bandes/${x.id}/demandes/${d.id}`, 'POST', { accepter: a })); } catch (e) { toast(e.message, 'echec'); } };
       oui.onclick = () => rep(true); non.onclick = () => rep(false);
       const bs = el('span'); bs.append(oui, non); l.append(bs); z.append(l);
     }
@@ -5185,7 +5219,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     if (x.createur) { const r = el('button', 'btn large', 'Réglages de la Bande'); r.onclick = () => reglagesBande(x); boutons.push(r); }
     const q = el('button', 'btn large', 'Quitter la Bande');
     q.onclick = () => demanderConfirmation(x.moi.inscrit ? 'Ta mise de cette semaine reste dans le pot.' : 'Tu pourras revenir avec le lien d\'un ami.', async () => {
-      try { await apiJoueur(`/bandes/${x.id}/quitter`, 'POST'); toast('Tu as quitté la Bande.'); majCartesCompetition(); } catch (e) { toast(e.message); }
+      try { await apiJoueur(`/bandes/${x.id}/quitter`, 'POST'); toast('Tu as quitté la Bande.', 'succes'); majCartesCompetition(); } catch (e) { toast(e.message, 'echec'); }
     }, { titre: 'Quitter la Bande ?', oui: 'Quitter', annuler: () => afficherBande(x) });
     const f = el('button', 'btn large', 'Fermer'); f.onclick = fermerFenetre;
     ouvrirFenetre([el('h2', null, x.nom), z, ...boutons, q, f], 'ligue');
@@ -5204,11 +5238,11 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     for (const m of x.membres.filter((y) => y.id !== monCompteId())) {
       const l = el('div', 'reglage-ligne'); l.append(el('span', null, m.pseudo));
       const r = el('button', 'btn', 'Retirer');
-      r.onclick = async () => { try { await apiJoueur(`/bandes/${x.id}/membres/${m.id}`, 'DELETE'); ouvrirUneBande(x.id); } catch (e) { toast(e.message); } };
+      r.onclick = async () => { try { await apiJoueur(`/bandes/${x.id}/membres/${m.id}`, 'DELETE'); ouvrirUneBande(x.id); } catch (e) { toast(e.message, 'echec'); } };
       l.append(r); z.append(l);
     }
     const ok = el('button', 'btn principal large', 'Enregistrer');
-    ok.onclick = async () => { try { afficherBande(await apiJoueur('/bandes/' + x.id, 'PATCH', { nom: nom.value, mise: Number(mise.value), ouverte: ouverte.checked })); toast('Bande mise à jour.'); } catch (e) { toast(e.message); } };
+    ok.onclick = async () => { try { afficherBande(await apiJoueur('/bandes/' + x.id, 'PATCH', { nom: nom.value, mise: Number(mise.value), ouverte: ouverte.checked })); toast('Bande mise à jour.', 'succes'); } catch (e) { toast(e.message, 'echec'); } };
     const f = el('button', 'btn large', 'Retour'); f.onclick = () => afficherBande(x);
     ouvrirFenetre([el('h2', null, 'Réglages de la Bande'), z, ok, f]);
   }
@@ -5224,8 +5258,8 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     if (!compteLocal() || (etatBandes && !etatBandes.google)) { lienBandeVu = true; return fenetreGoogle('Un ami t\'invite dans sa Bande', texte); }
     if (!etatBandes) return; // état pas encore lu (réseau) : on réessaiera
     lienBandeVu = true;
-    try { const x = await apiJoueur('/bandes/rejoindre', 'POST', { code: l.code }); stock.effacer('kopo-bande-lien'); toast(`Bienvenue dans « ${x.nom} » !`); afficherBande(x); majCartesCompetition(); }
-    catch (e) { toast(e.message); if (/inconnu|complète|maximum/.test(e.message)) stock.effacer('kopo-bande-lien'); else lienBandeVu = false; } // sinon (réseau, Google…) on réessaiera
+    try { const x = await apiJoueur('/bandes/rejoindre', 'POST', { code: l.code }); stock.effacer('kopo-bande-lien'); toast(`Bienvenue dans « ${x.nom} » !`, 'succes'); afficherBande(x); majCartesCompetition(); }
+    catch (e) { toast(e.message, 'echec'); if (/inconnu|complète|maximum/.test(e.message)) stock.effacer('kopo-bande-lien'); else lienBandeVu = false; } // sinon (réseau, Google…) on réessaiera
   }
 
   $('btnMatchJour').onclick = () => ouvrirMatchJour();
@@ -5236,16 +5270,36 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   // ------------------------------------------------------------------ notifications et invitations (serveur)
   // Rivalité (« Kevin t'a rattrapé : 7 – 7 ! »), invitation d'un ami, nouvel ami : montrées sur l'accueil, une à la fois.
   const notifsVues = new Set();
+  // Notifications qui demandent une action (invitation, demande d'ami, rappel de la Bande) : une fenêtre, sur l'accueil seulement.
+  // Les autres (rivalité, cadeau, parrainage, résultat de la Bande, ami accepté) : une pastille, partout, même en partie.
+  function notifEnFenetre(a) {
+    const d = a.donnees || {};
+    return a.type === 'invitation' || (a.type === 'ami' && !d.accepte) || (a.type === 'bande' && !!d.rappel);
+  }
+  function pastilleNotification(a) {
+    const d = a.donnees || {};
+    if (a.type === 'cadeau') {
+      const n = Array.isArray(d.stickers) ? d.stickers.filter((id) => KopoStickers.ST[id]).length : 0;
+      return toast('Cadeau de l\'équipe Masano' + (d.message ? ' : ' + d.message : '') + (n ? ` (${n} sticker${n > 1 ? 's' : ''} à envoyer depuis le chat)` : ''), 'succes');
+    }
+    if (a.type === 'parrainage' || a.type === 'bande') apiJoueur('/moi').then((m) => soldeServeur(m.compte.solde)).catch(() => {});
+    if (a.type === 'parrainage') return toast(a.texte + (d.titre ? ' « ' + d.titre + ' »' : ''), 'succes');
+    if (a.type === 'ami') return toast(a.texte, 'succes');
+    toast(a.texte, 'info'); // rivalité, résultat de la Bande
+  }
   async function lireNotifications() {
-    if (!MODE_SERVEUR || !compteLocal() || $('ecranAccueil').hidden || !$('voile').hidden) return;
+    if (!MODE_SERVEUR || !compteLocal()) return;
+    const surAccueil = () => !$('ecranAccueil').hidden && $('voile').hidden;
+    if (!surAccueil() && !$('toast').hidden) return; // une pastille est déjà affichée : au prochain tour
     let n;
     try { n = await apiJoueur('/notifications'); } catch (e) { return; }
     if (typeof n.demandesAmi === 'number') majPastilleAmis(n.demandesAmi);
-    const nonLues = n.liste.filter((x) => !x.lue && !notifsVues.has(x.id)).reverse(); // de la plus ancienne à la plus récente
+    const nonLues = n.liste.filter((x) => !x.lue && !notifsVues.has(x.id) && (surAccueil() || !notifEnFenetre(x))).reverse(); // de la plus ancienne à la plus récente
     const a = nonLues.find((x) => x.type === 'invitation' && Date.now() - new Date(x.cree_le) < 10 * 60e3) || nonLues[0]; // une invitation passe devant
-    if (!a || $('ecranAccueil').hidden || !$('voile').hidden) return;
+    if (!a || (notifEnFenetre(a) && !surAccueil())) return;
     notifsVues.add(a.id);
     apiJoueur('/notifications/lues', 'POST', { ids: [a.id] }).catch(() => {});
+    if (!notifEnFenetre(a)) { pastilleNotification(a); setTimeout(lireNotifications, 4500); return; }
     const d = a.donnees || {};
     const z = el('div', 'notif-carte');
     const boutons = [];
@@ -5256,64 +5310,27 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       const go = el('button', 'btn principal large', 'Rejoindre');
       go.onclick = () => { const p = lirePseudo(); if (!p) return; fermerFenetre(); entrerServeur(p, { code: d.code }); };
       boutons.push(go, fermer('Pas maintenant'));
-    } else if (a.type === 'rivalite') {
-      z.append(icone('i-revanche'), el('h2', null, 'Rivalité'));
-      const ff = el('div', 'face-a-face');
-      const score = el('span', 'score'); score.append(el('b', null, String(d.toi)), ' – ', el('b', null, String(d.lui)));
-      ff.append(el('span', null, 'Toi'), score, el('span', null, d.pseudo || '?'));
-      z.append(ff, el('p', null, a.texte), el('small', 'muted', 'Retrouve-le en ligne pour reprendre l\'avantage !'));
-      const couper = el('button', 'btn', 'Ne plus recevoir les rivalités');
-      couper.onclick = async () => { try { await apiJoueur('/moi', 'PATCH', { notifs: { rivalite: false } }); toast('Notifications de rivalité coupées.'); } catch (e) { toast(e.message); } fermerFenetre(); };
-      boutons.push(fermer('À moi de jouer !'), couper);
-    } else if (a.type === 'cadeau') {
-      // Stickers offerts par l'équipe : le message dit pourquoi, puis ce qui est reçu.
-      z.append(icone('i-cadeau'), el('h2', null, 'Cadeau de l\'équipe Masano'));
-      if (d.message) z.append(el('p', null, d.message));
-      const ids = Array.isArray(d.stickers) ? d.stickers.filter((id) => KopoStickers.ST[id]) : [];
-      if (ids.length) {
-        const g = el('div', 'st-grille');
-        for (const id of ids.slice(0, 10)) { const c = el('div', 'st-case anim'); c.innerHTML = KopoStickers.svg(id, nomSticker(id)); c.append(el('span', 'reste', '×' + d.utilisations)); g.append(c); }
-        z.append(g);
-      }
-      z.append(el('small', 'muted', `${d.utilisations || ''} utilisation${d.utilisations > 1 ? 's' : ''} de chaque sticker, à envoyer depuis le chat en partie${configServeur && configServeur.stickers && configServeur.stickers.actif ? '' : ' dès que les stickers seront ouverts'}.`));
-      boutons.push(fermer('Merci !'));
-    } else if (a.type === 'parrainage') {
-      z.append(icone('i-cadeau'), el('h2', null, 'Parrainage'), el('p', null, a.texte));
-      if (d.titre) z.append(el('b', 'titre-parrain', '« ' + d.titre + ' »'));
-      apiJoueur('/moi').then((m) => soldeServeur(m.compte.solde)).catch(() => {});
-      const voir = el('button', 'btn principal large', 'Inviter d\'autres amis');
-      voir.onclick = () => ouvrirParrainage();
-      boutons.push(voir, fermer());
     } else if (a.type === 'ami' && d.demande) {
       // Demande d'ami : accepter ou refuser (« Plus tard » la laisse dans Paramètres → Mes amis).
       z.append(icone('i-creer'), el('h2', null, a.texte), el('p', null, d.pseudo + '#' + d.numero), el('small', 'muted', 'Vous pourrez vous inviter à vos tables et vous comparer dans la ligue.'));
       const suite = () => { fermerFenetre(); setTimeout(lireNotifications, 400); };
       const oui = el('button', 'btn principal large', 'Accepter');
-      oui.onclick = async () => { try { await repondreDemande(d.de, true); toast(d.pseudo + ' est dans tes amis.'); } catch (e) { toast(e.message); } suite(); };
+      oui.onclick = async () => { try { await repondreDemande(d.de, true); toast(d.pseudo + ' est dans tes amis.', 'succes'); } catch (e) { toast(e.message, 'echec'); } suite(); };
       const non = el('button', 'btn large', 'Refuser');
-      non.onclick = async () => { try { await repondreDemande(d.de, false); toast('Demande refusée.'); } catch (e) { toast(e.message); } suite(); };
+      non.onclick = async () => { try { await repondreDemande(d.de, false); toast('Demande refusée.', 'succes'); } catch (e) { toast(e.message, 'echec'); } suite(); };
       boutons.push(oui, non, fermer('Plus tard'));
     } else if (a.type === 'bande') {
       z.append(icone('i-bande'), el('h2', null, 'La Bande'), el('p', null, a.texte));
-      if (d.rappel) {
-        const go = el('button', 'btn principal large', 'Jouer mon Match du jour');
-        go.onclick = () => { fermerFenetre(); ouvrirMatchJour(); };
-        const couper = el('button', 'btn', 'Ne plus recevoir ces rappels');
-        couper.onclick = async () => { try { await apiJoueur('/moi', 'PATCH', { notifs: { bande: false } }); toast('Rappels coupés.'); } catch (e) { toast(e.message); } fermerFenetre(); };
-        boutons.push(go, fermer('Plus tard'), couper);
-      } else {
-        apiJoueur('/moi').then((m) => soldeServeur(m.compte.solde)).catch(() => {});
-        if (d.bande) { const voir = el('button', 'btn principal large', 'Voir la Bande'); voir.onclick = () => { fermerFenetre(); ouvrirBande({ id: d.bande }); }; boutons.push(voir); }
-        boutons.push(fermer());
-      }
-    } else if (a.type === 'ami' && d.accepte) {
-      z.append(icone('i-creer'), el('h2', null, a.texte), el('small', 'muted', 'Invite-le à ta table depuis le salon d\'une partie.'));
-      boutons.push(fermer());
+      const go = el('button', 'btn principal large', 'Jouer mon Match du jour');
+      go.onclick = () => { fermerFenetre(); ouvrirMatchJour(); };
+      const couper = el('button', 'btn', 'Ne plus recevoir ces rappels');
+      couper.onclick = async () => { try { await apiJoueur('/moi', 'PATCH', { notifs: { bande: false } }); toast('Rappels coupés.', 'succes'); } catch (e) { toast(e.message, 'echec'); } fermerFenetre(); };
+      boutons.push(go, fermer('Plus tard'), couper);
     } else if (a.type === 'ami') {
       // Ancienne notification (« t'a ajouté en ami », d'avant les demandes).
       z.append(icone('i-creer'), el('h2', null, a.texte));
       const aj = el('button', 'btn principal large', 'L\'ajouter aussi');
-      aj.onclick = async () => { try { toastAjoutAmi(await apiJoueur('/amis', 'POST', { cible: d.pseudo + '#' + d.numero }), d.pseudo); } catch (e) { toast(e.message); } fermerFenetre(); setTimeout(lireNotifications, 400); };
+      aj.onclick = async () => { try { toastAjoutAmi(await apiJoueur('/amis', 'POST', { cible: d.pseudo + '#' + d.numero }), d.pseudo); } catch (e) { toast(e.message, 'echec'); } fermerFenetre(); setTimeout(lireNotifications, 400); };
       boutons.push(aj, fermer('Plus tard'));
     } else return;
     ouvrirFenetre([z, ...boutons]);
@@ -5336,7 +5353,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
         const li = el('li'), t = el('span', null, a.pseudo + ' ');
         if (a.en_ligne) t.append(el('span', 'en-ligne', '● en ligne'));
         const b = el('button', 'btn', 'Inviter');
-        b.onclick = async () => { try { await apiJoueur('/amis/' + encodeURIComponent(a.id) + '/inviter', 'POST', { code: v.code }); b.textContent = 'Invité'; b.disabled = true; } catch (e) { toast(e.message); } };
+        b.onclick = async () => { try { await apiJoueur('/amis/' + encodeURIComponent(a.id) + '/inviter', 'POST', { code: v.code }); b.textContent = 'Invité'; b.disabled = true; } catch (e) { toast(e.message, 'echec'); } };
         li.append(t, b); liste.append(li);
       }
     } catch (e) { liste.append(el('li', null, e.message)); }
@@ -5398,7 +5415,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   }
   async function ouvrirParcours() {
     let P;
-    try { await chargerCatalogue(); P = await apiJoueur('/parcours'); } catch (e) { toast(e.message); return; }
+    try { await chargerCatalogue(); P = await apiJoueur('/parcours'); } catch (e) { toast(e.message, 'echec'); return; }
     const z = el('div', 'parcours');
     const tete = el('div', 'parcours-tete');
     const barre = el('div', 'barre-xp'), sp = el('span'); barre.append(sp);
@@ -5413,11 +5430,11 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       bouton.disabled = true;
       try {
         const r = await apiJoueur('/parcours/recuperer', 'POST', { palier: n, voie });
-        if (r.objet) { const q = lireProfil(); if (!R.OBJETS[r.objet.id]) R.OBJETS[r.objet.id] = { type: r.objet.type, nom: r.objet.nom, d: 'Parcours de saison' }; R.donnerObjet(q, r.objet.id); ecrireProfil(q); appliquerCollection(q); synchroEquiper(r.objet.id); toast(`Nouveau : ${r.objet.nom} (équipé)`); }
-        else toast(`+${r.pieces} pièces`);
+        if (r.objet) { const q = lireProfil(); if (!R.OBJETS[r.objet.id]) R.OBJETS[r.objet.id] = { type: r.objet.type, nom: r.objet.nom, d: 'Parcours de saison' }; R.donnerObjet(q, r.objet.id); ecrireProfil(q); appliquerCollection(q); synchroEquiper(r.objet.id); toast(`Nouveau : ${r.objet.nom} (équipé)`, 'succes'); }
+        else toast(`+${r.pieces} pièces`, 'succes');
         soldeServeur(r.solde);
         ouvrirParcours();
-      } catch (e) { toast(e.message); bouton.disabled = false; }
+      } catch (e) { toast(e.message, 'echec'); bouton.disabled = false; }
     };
     const caseRec = (r, n, voie, atteint) => {
       const c = el('div', 'case' + (voie === 'plus' ? ' plus' : '') + (r && r.recupere ? ' fait' : ''));
@@ -5447,15 +5464,16 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   // ------------------------------------------------------------------ boutique (serveur)
   // Apparences à prix affiché, rangées par catégorie (strategie-pieces §4.3) : pas de hasard, pas de fausse urgence.
   async function ouvrirBoutique() {
-    if (!MODE_SERVEUR) return toast('La boutique arrive avec le jeu en ligne.');
+    if (!MODE_SERVEUR) return toast('La boutique arrive avec le jeu en ligne.', 'alerte');
     let B;
-    try { if (!compteLocal()) { const ps = lirePseudo(); if (!ps) return; await compteServeur(ps); } B = await apiJoueur('/boutique'); } catch (e) { toast(e.message); return; }
+    try { if (!compteLocal()) { const ps = lirePseudo(); if (!ps) return; await compteServeur(ps); } B = await apiJoueur('/boutique'); } catch (e) { toast(e.message, 'echec'); return; }
     soldeServeur(B.solde);
     for (const o of B.objets) objetDuServeur(o);
     const possedes = new Set(B.possedes.concat(['av-laiton', 'dos-laiton']));
     const z = el('div', 'boutique');
     const solde = el('div', 'boutique-solde'); solde.append(pieceEl(), formatPieces(B.solde));
-    z.append(solde, el('small', 'muted', 'Des apparences seulement : rien n\'aide à gagner. Les pièces se gagnent en jouant.'));
+    const plus = el('button', 'btn petit acheter-pieces', '+ Acheter des pièces'); plus.onclick = () => ouvrirAchatPieces(ouvrirBoutique);
+    z.append(solde, plus, el('small', 'muted', 'Des apparences seulement : rien n\'aide à gagner. Les pièces se gagnent en jouant.'));
     const enVente = B.objets.filter((o) => o.prix != null && !o.ville).sort((a, b) => a.prix - b.prix || a.nom.localeCompare(b.nom, 'fr'));
     for (const cat of R.parCategorie(enVente)) {
       z.append(el('h3', null, cat.nom));
@@ -5515,8 +5533,9 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     corps.append(el('h2', null, o.nom), apercuObjet(o.id));
     if (o.prix > solde) {
       corps.append(el('p', null, `Il te manque ${formatPieces(o.prix - solde)} pièces pour ${nomType} ${o.nom}. Missions, bonus du jour et parties en ligne en rapportent.`));
-      const ok = el('button', 'btn principal large', 'Retour'); ok.onclick = ouvrirBoutique;
-      return ouvrirFenetre([corps, ok], 'boutique');
+      const ok = el('button', 'btn principal large', 'Acheter des pièces'); ok.onclick = () => ouvrirAchatPieces(ouvrirBoutique);
+      const ret = el('button', 'btn large', 'Retour'); ret.onclick = ouvrirBoutique;
+      return ouvrirFenetre([corps, ok, ret], 'boutique');
     }
     corps.append(el('p', null, `Acheter ${nomType} ${o.nom} pour ${formatPieces(o.prix)} pièces ? Il te restera ${formatPieces(solde - o.prix)} pièces.`));
     const oui = el('button', 'btn principal large', 'Acheter'), non = el('button', 'btn large', 'Retour');
@@ -5528,9 +5547,9 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
         soldeServeur(r.solde);
         const q = lireProfil(); R.donnerObjet(q, o.id); R.equiper(q, o.id); ecrireProfil(q); appliquerCollection(q);
         await apiJoueur('/collection/equiper', 'POST', { objet: o.id }).catch(() => {});
-        vibrer(40); toast(`${o.nom} est à toi (équipé)`);
+        vibrer(40); toast(`${o.nom} est à toi (équipé)`, 'succes');
         ouvrirBoutique();
-      } catch (e) { toast(e.message); oui.disabled = false; }
+      } catch (e) { toast(e.message, 'echec'); oui.disabled = false; }
     };
     ouvrirFenetre([corps, oui, non], 'boutique');
   }
@@ -5555,15 +5574,48 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
           const r = await apiJoueur('/stickers/acheter', 'POST', { ...quoi, offre: i });
           soldeServeur(r.solde);
           if (stickersEtat) stickersEtat.soldes = r.soldes;
-          vibrer(40); toast(`Merci ! ${r.texte} (${formatPieces(r.pieces)} pièces)`);
+          vibrer(40); toast(`Merci ! ${r.texte} (${formatPieces(r.pieces)} pièces)`, 'succes');
           ouvrirBoutique();
-        } catch (e) { toast(e.message); boutons.forEach((x, k) => (x.disabled = offres[k].pieces > solde)); }
+        } catch (e) { toast(e.message, 'echec'); boutons.forEach((x, k) => (x.disabled = offres[k].pieces > solde)); }
       };
       return b;
     });
     const non = el('button', 'btn large', 'Retour'); non.onclick = ouvrirBoutique;
     ouvrirFenetre([corps, ...boutons, el('small', 'muted', 'Paiement en francs congolais (mobile money) : bientôt.'), non], 'boutique');
   }
+
+  // Acheter des pièces (18/11) : des bouquets du moins cher (500 FC) au plus cher (40 000 FC), prix fixés par le serveur,
+  // au même taux que les stickers (200 pièces ≈ 500 FC), avec un bonus qui grandit avec le bouquet.
+  // Le paiement mobile money n'est pas encore branché : les bouquets s'affichent avec « Bientôt ».
+  async function ouvrirAchatPieces(retour) {
+    if (!MODE_SERVEUR) return toast('L\'achat de pièces arrive avec le jeu en ligne.', 'alerte');
+    let B;
+    try { if (!compteLocal()) { const ps = lirePseudo(); if (!ps) return; await compteServeur(ps); } B = await apiJoueur('/bouquets'); } catch (e) { toast(e.message, 'echec'); return; }
+    soldeServeur(B.solde);
+    const z = el('div', 'boutique');
+    const solde = el('div', 'boutique-solde'); solde.append(pieceEl(), formatPieces(B.solde));
+    z.append(solde, el('small', 'muted', 'Plus le bouquet est gros, plus il y a de pièces offertes. Des pièces pour les tables à mise, les apparences et les stickers ; elles ne se revendent pas.'));
+    const l = el('div', 'bouquets'), meilleur = B.bouquets.reduce((m, b) => (b.bonusPct > m.bonusPct ? b : m), B.bouquets[0]);
+    B.bouquets.forEach((b, i) => {
+      const r = el('button', 'bouquet' + (b === meilleur && b.bonus ? ' top' : ''));
+      const tas = el('div', 'tas'), n = Math.min(6, i + 1);
+      for (let k = 0; k < n; k++) { const p = pieceEl(); p.style.left = (k < 3 ? k * 14 : (k - 3) * 14 + 7) + 'px'; p.style.top = (k < 3 ? 14 : 0) + 'px'; tas.append(p); } // un tas qui grandit avec le bouquet
+      const mil = el('div');
+      const q = el('div', 'qte'); q.append(formatPieces(b.pieces));
+      mil.append(el('div', 'nom', b.nom), q);
+      if (b.bonus) mil.append(el('span', 'bonus', `+${formatPieces(b.bonus)} offertes`));
+      const px = el('div', 'px', formatPieces(b.francs) + ' FC');
+      r.append(tas, mil, px);
+      if (b === meilleur && b.bonus) r.append(el('span', 'ruban', `Le plus avantageux · +${b.bonusPct} %`));
+      r.setAttribute('aria-label', `${b.nom} : ${b.pieces} pièces pour ${b.francs} francs congolais`);
+      r.onclick = () => (B.paiement ? toast('Paiement mobile money : bientôt.', 'alerte') : toast(`Bouquet « ${b.nom} » : le paiement mobile money arrive bientôt.`, 'alerte'));
+      l.append(r);
+    });
+    z.append(l, el('small', 'muted', B.paiement ? 'Paiement en francs congolais par mobile money.' : 'Paiement en francs congolais (mobile money : M-Pesa, Orange Money, Airtel Money) : bientôt.'));
+    const ret = el('button', 'btn principal large', retour ? 'Retour' : 'Fermer'); ret.onclick = retour || fermerFenetre;
+    ouvrirFenetre([el('h2', null, 'Acheter des pièces'), z, ret], 'boutique');
+  }
+  window.ouvrirAchatPieces = ouvrirAchatPieces;
 
   // Chat en partie : messages choisis dans le tableau de bord (/api/config), sinon la liste de départ.
   const messagesChat = () => (configServeur && Array.isArray(configServeur.messages) && configServeur.messages.length ? configServeur.messages : REACTIONS);
@@ -5640,9 +5692,9 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       b.innerHTML = KopoStickers.svg(x.id, x.nom + (ouvert ? ` (${reste} restant${reste > 1 ? 's' : ''})` : ' (verrouillé)'));
       if (reste > 0) b.append(el('span', 'reste', '×' + reste));
       b.onclick = () => {
-        if (!E.actif) return toast('Les stickers arrivent bientôt.');
-        if (!reste) return toast(E.vente ? `« ${x.nom} » est verrouillé : achète-le dans la boutique.` : `« ${x.nom} » est verrouillé : il arrive bientôt en boutique.`);
-        if (!enLigne) return toast('Les stickers s\'envoient pendant une partie en ligne.');
+        if (!E.actif) return toast('Les stickers arrivent bientôt.', 'alerte');
+        if (!reste) return toast(E.vente ? `« ${x.nom} » est verrouillé : achète-le dans la boutique.` : `« ${x.nom} » est verrouillé : il arrive bientôt en boutique.`, 'alerte');
+        if (!enLigne) return toast('Les stickers s\'envoient pendant une partie en ligne.', 'alerte');
         fermerFenetre(); if (vueActuelle) afficher(vueActuelle);
         client.reseau.envoyer({ type: 'sticker', sticker: x.id });
       };
@@ -5656,7 +5708,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     if (!stickersEtat || !d.sticker) return;
     stickersEtat.soldes = stickersEtat.soldes || {};
     if (d.restants > 0) stickersEtat.soldes[d.sticker] = d.restants; else delete stickersEtat.soldes[d.sticker];
-    if (d.restants === 0) toast(`Plus d'utilisations pour « ${nomSticker(d.sticker)} » : il se reverrouille.`);
+    if (d.restants === 0) toast(`Plus d'utilisations pour « ${nomSticker(d.sticker)} » : il se reverrouille.`, 'alerte');
   });
 
   // Règle de foule (choisie le 11/11) : 6 stickers au plus à l'écran, les suivants attendent qu'une place se libère ;
@@ -5772,15 +5824,15 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       contenu.push(el('p', null, 'Amis, blocage et signalement arrivent avec les comptes en ligne.'));
     } else {
       const ami = el('button', 'btn principal large', 'Ajouter en ami');
-      ami.onclick = async () => { try { toastAjoutAmi(await apiJoueur('/amis', 'POST', { cible: id }), nomJoueur); retour(); } catch (e) { toast(e.message); } };
+      ami.onclick = async () => { try { toastAjoutAmi(await apiJoueur('/amis', 'POST', { cible: id }), nomJoueur); retour(); } catch (e) { toast(e.message, 'echec'); } };
       const estBloque = bloques.has(id);
       const bloquer = el('button', 'btn large', estBloque ? 'Débloquer' : 'Bloquer');
       bloquer.onclick = async () => {
         try {
-          if (estBloque) { await apiJoueur('/bloques/' + encodeURIComponent(id), 'DELETE'); bloques.delete(id); toast('Joueur débloqué.'); }
-          else { await apiJoueur('/bloques', 'POST', { cible: id }); bloques.add(id); toast('Joueur bloqué : tu ne verras plus ses réactions.'); }
+          if (estBloque) { await apiJoueur('/bloques/' + encodeURIComponent(id), 'DELETE'); bloques.delete(id); toast('Joueur débloqué.', 'succes'); }
+          else { await apiJoueur('/bloques', 'POST', { cible: id }); bloques.add(id); toast('Joueur bloqué : tu ne verras plus ses réactions.', 'succes'); }
           memoriserBloques(); retour();
-        } catch (e) { toast(e.message); }
+        } catch (e) { toast(e.message, 'echec'); }
       };
       const signaler = el('button', 'btn large', 'Signaler');
       signaler.onclick = () => {
@@ -5790,8 +5842,8 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
         const details = el('input', 'texte'); details.maxLength = 300; details.placeholder = 'Détails (facultatif)';
         const envoyerS = el('button', 'btn principal large', 'Envoyer le signalement');
         envoyerS.onclick = async () => {
-          if (!motif) return toast('Choisis un motif.');
-          try { await apiJoueur('/signaler', 'POST', { cible: id, motif, details: details.value, partie: vueActuelle && vueActuelle.code }); toast('Merci, ton signalement a été envoyé.'); retour(); } catch (e) { toast(e.message); }
+          if (!motif) return toast('Choisis un motif.', 'alerte');
+          try { await apiJoueur('/signaler', 'POST', { cible: id, motif, details: details.value, partie: vueActuelle && vueActuelle.code }); toast('Merci, ton signalement a été envoyé.', 'succes'); retour(); } catch (e) { toast(e.message, 'echec'); }
         };
         const annuler = el('button', 'btn large', 'Annuler'); annuler.onclick = retour;
         choix.append(...boutons, details);
@@ -5807,7 +5859,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   // Demande d'ami : « Demande envoyée », ou ami tout de suite s'il m'avait déjà demandé.
   function toastAjoutAmi(r, nom) {
     nom = (r && r.ami && r.ami.pseudo) || nom || 'Ce joueur';
-    toast(r && r.etat === 'ami' ? nom + ' est dans tes amis.' : 'Demande envoyée à ' + nom + '. Il doit l\'accepter.');
+    toast(r && r.etat === 'ami' ? nom + ' est dans tes amis.' : 'Demande envoyée à ' + nom + '. Il doit l\'accepter.', 'succes');
   }
   // Pastille rouge sur Paramètres (et « Mes amis »), compteur sur le bouton Amis de l'accueil, tant qu'une demande d'ami attend une réponse.
   let demandesAmi = 0;
@@ -5870,7 +5922,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     amiAInviter = null;
     if (Date.now() - a.quand > 3 * 60e3) return; // trop ancien : il a sans doute changé d'avis
     apiJoueur('/amis/' + encodeURIComponent(a.id) + '/inviter', 'POST', { code: v.code })
-      .then(() => toast('Invitation envoyée à ' + a.pseudo + '.'), (e) => toast(e.message));
+      .then(() => toast('Invitation envoyée à ' + a.pseudo + '.', 'succes'), (e) => toast(e.message, 'echec'));
   }
   async function ouvrirAmis(retour, garderOnglet) {
     if (typeof retour !== 'function') retour = fermerFenetre;
@@ -5887,12 +5939,12 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     const ident = c.compte.pseudo + '#' + c.compte.numero;
     const moi = el('div', 'amis-moi'); const t = el('span', null, 'Ton identifiant'); t.append(el('br'), el('b', null, ident));
     const copier = el('button', 'btn', 'Copier');
-    copier.onclick = async () => { try { await navigator.clipboard.writeText(ident); toast('Identifiant copié.'); } catch (e) { toast(ident); } };
+    copier.onclick = async () => { try { await navigator.clipboard.writeText(ident); toast('Identifiant copié.', 'succes'); } catch (e) { toast(ident); } };
     moi.append(t, copier);
     const champ = el('input', 'texte'); champ.placeholder = 'Pseudo#1234'; champ.setAttribute('aria-label', 'Pseudo et numéro de ton ami');
     const valider = el('button', 'btn principal', 'Ajouter');
     const ajout = el('div', 'amis-ajout'); ajout.append(champ, valider); ajout.hidden = true;
-    valider.onclick = async () => { const v = champ.value.trim(); if (!v) return champ.focus(); try { toastAjoutAmi(await apiJoueur('/amis', 'POST', { cible: v })); champ.value = ''; ajout.hidden = true; dessiner(); } catch (e) { toast(e.message); } };
+    valider.onclick = async () => { const v = champ.value.trim(); if (!v) return champ.focus(); try { toastAjoutAmi(await apiJoueur('/amis', 'POST', { cible: v })); champ.value = ''; ajout.hidden = true; dessiner(); } catch (e) { toast(e.message, 'echec'); } };
     champ.onkeydown = (e) => { if (e.key === 'Enter') valider.click(); };
     const ajouter = el('button', 'btn principal', 'Ajouter un ami');
     ajouter.onclick = () => { ajout.hidden = !ajout.hidden; if (!ajout.hidden) champ.focus(); };
@@ -5932,7 +5984,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
           const plus = el('button', 'plus', '⋯'); plus.setAttribute('aria-label', 'Plus');
           plus.onclick = () => {
             const ret = el('button', 'btn large', 'Retirer de mes amis');
-            ret.onclick = () => demanderConfirmation(`${a.pseudo} ne sera plus dans tes amis.`, async () => { try { await apiJoueur('/amis/' + encodeURIComponent(a.id), 'DELETE'); } catch (e) { toast(e.message); } rouvrir(); }, { titre: 'Retirer ' + a.pseudo + ' ?', oui: 'Retirer', annuler: rouvrir });
+            ret.onclick = () => demanderConfirmation(`${a.pseudo} ne sera plus dans tes amis.`, async () => { try { await apiJoueur('/amis/' + encodeURIComponent(a.id), 'DELETE'); } catch (e) { toast(e.message, 'echec'); } rouvrir(); }, { titre: 'Retirer ' + a.pseudo + ' ?', oui: 'Retirer', annuler: rouvrir });
             const ann = el('button', 'btn principal large', 'Retour'); ann.onclick = rouvrir;
             ouvrirFenetre([el('h2', null, a.pseudo), el('p', null, a.pseudo + '#' + a.numero), ret, ann]);
           };
@@ -5965,7 +6017,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
                   for (const x of recents) for (const y of x.joueurs) if (y.id === j.id) { if (r.etat === 'ami') y.ami = true; else y.envoyee = true; }
                   if (r.etat === 'ami' && j.recue) majPastilleAmis(Math.max(0, demandesAmi - 1));
                   montrer();
-                } catch (e) { aj.disabled = false; toast(e.message); }
+                } catch (e) { aj.disabled = false; toast(e.message, 'echec'); }
               };
               li.append(aj);
             }
@@ -5978,15 +6030,15 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
           const li = el('li'), qui = el('span', 'qui'), nomD = el('b', null, d.pseudo + ' ');
           nomD.append(el('small', null, '#' + d.numero)); qui.append(nomD, el('span', null, 'veut être ton ami'));
           const oui = el('button', 'btn principal', 'Accepter'), non = el('button', 'plus', '✕'); non.setAttribute('aria-label', 'Refuser');
-          oui.onclick = async () => { try { await repondreDemande(d.id, true); toast(d.pseudo + ' est dans tes amis.'); } catch (e) { toast(e.message); } dessiner(); };
-          non.onclick = async () => { try { await repondreDemande(d.id, false); } catch (e) { toast(e.message); } dessiner(); };
+          oui.onclick = async () => { try { await repondreDemande(d.id, true); toast(d.pseudo + ' est dans tes amis.', 'succes'); } catch (e) { toast(e.message, 'echec'); } dessiner(); };
+          non.onclick = async () => { try { await repondreDemande(d.id, false); } catch (e) { toast(e.message, 'echec'); } dessiner(); };
           li.append(avatarAmi(d), qui, oui, non); liste.append(li);
         }
         for (const d of dm.envoyees) {
           const li = el('li', 'absent'), qui = el('span', 'qui'), nomD = el('b', null, d.pseudo + ' ');
           nomD.append(el('small', null, '#' + d.numero)); qui.append(nomD, el('span', null, 'Demande envoyée'));
           const x = el('button', 'plus', '✕'); x.setAttribute('aria-label', 'Annuler la demande');
-          x.onclick = async () => { try { await apiJoueur('/amis/demandes/' + encodeURIComponent(d.id), 'DELETE'); } catch (e) { toast(e.message); } dessiner(); };
+          x.onclick = async () => { try { await apiJoueur('/amis/demandes/' + encodeURIComponent(d.id), 'DELETE'); } catch (e) { toast(e.message, 'echec'); } dessiner(); };
           li.append(avatarAmi(d), qui, x); liste.append(li);
         }
       }
@@ -6035,7 +6087,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       const lien = lienParrain(P.code);
       const champ = el('input', 'texte'); champ.readOnly = true; champ.value = lien; champ.setAttribute('aria-label', 'Ton lien d\'invitation');
       const copier = el('button', 'btn', 'Copier');
-      copier.onclick = async () => { try { await navigator.clipboard.writeText(lien); toast('Lien copié.'); } catch (e) { champ.select(); toast('Sélectionne le lien et copie-le.'); } };
+      copier.onclick = async () => { try { await navigator.clipboard.writeText(lien); toast('Lien copié.', 'succes'); } catch (e) { champ.select(); toast('Sélectionne le lien et copie-le.', 'alerte'); } };
       const ligne = el('div', 'lien'); ligne.append(champ, copier);
       const wa = el('button', 'btn large btn-whatsapp', 'Inviter sur WhatsApp');
       wa.prepend(icone('i-partager'));
@@ -6073,7 +6125,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     } else if (P.peutEtreParraine && !P.filleuls.length) {
       const champ = el('input', 'texte'); champ.placeholder = 'Code de ton ami'; champ.maxLength = 6; champ.setAttribute('aria-label', 'Code de parrainage');
       const ok = el('button', 'btn', 'Valider');
-      ok.onclick = async () => { try { const r = await apiJoueur('/parrainage', 'POST', { code: champ.value.trim() }); toast(`${r.parrain} t'a invité : joue tes premières parties pour gagner ton cadeau !`); ouvrirParrainage(retour); } catch (e) { toast(e.message); } };
+      ok.onclick = async () => { try { const r = await apiJoueur('/parrainage', 'POST', { code: champ.value.trim() }); toast(`${r.parrain} t'a invité : joue tes premières parties pour gagner ton cadeau !`, 'succes'); ouvrirParrainage(retour); } catch (e) { toast(e.message, 'echec'); } };
       const ligne = el('div', 'lien'); ligne.append(champ, ok);
       zone.append(el('h3', null, 'Un ami t\'a invité ?'), ligne);
     }
@@ -6081,7 +6133,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   }
   window.ouvrirParrainage = ouvrirParrainage;
   // Données reprises de l'ancienne adresse du site (réunies avec le profil créé ici).
-  try { if (sessionStorage.getItem('kopo-donnees-reprises')) { sessionStorage.removeItem('kopo-donnees-reprises'); setTimeout(() => toast('Tes statistiques de l\'ancienne adresse ont été récupérées.'), 1200); } } catch (e) {}
+  try { if (sessionStorage.getItem('kopo-donnees-reprises')) { sessionStorage.removeItem('kopo-donnees-reprises'); setTimeout(() => toast('Tes statistiques de l\'ancienne adresse ont été récupérées.', 'succes'), 1200); } } catch (e) {}
   setTimeout(restaurerProfil, 1500);
   if (/^[A-Z0-9]{6}$/.test(parrainLien) && MODE_SERVEUR) setTimeout(() => toast('Un ami t\'invite : connecte-toi avec Google dans Paramètres et joue tes premières parties pour gagner des pièces !'), 2500);
 
@@ -6161,11 +6213,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       stock.ecrire('kopo-remise-a-flot', jourLocal());
       if (r && r.ok) {
         soldeServeur(r.solde);
-        const corps = el('div', 'bonus-jour');
-        corps.append(el('h2', null, 'Remise à flot'), el('p', null, `Tu étais presque à sec : ton solde remonte à ${formatPieces(r.solde)} pièces. C'est possible une fois par jour.`));
-        const ok = el('button', 'btn principal large', 'Merci !');
-        ok.onclick = fermerFenetre;
-        if ($('voile').hidden) ouvrirFenetre([corps, ok]); else toast(`Remise à flot : ${formatPieces(r.solde)} pièces.`);
+        toast(`Remise à flot : ton solde remonte à ${formatPieces(r.solde)} pièces (une fois par jour).`, 'succes');
       }
     } catch (e) {} finally { remiseEnCours = false; }
   }
@@ -6188,7 +6236,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   (async function finirConnexionGoogle() {
     let jeton = null, erreur = null;
     try { jeton = sessionStorage.getItem('kopo-google-retour'); erreur = sessionStorage.getItem('kopo-google-erreur'); sessionStorage.removeItem('kopo-google-retour'); sessionStorage.removeItem('kopo-google-erreur'); } catch (e) {}
-    if (erreur) return toast('Connexion Google annulée.');
+    if (erreur) return toast('Connexion Google annulée.', 'alerte');
     if (!jeton || typeof SERVEUR === 'undefined' || !SERVEUR) return;
     try {
       const invite = compteLocal();
@@ -6199,13 +6247,13 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       stock.ecrire('kopo-compte-serveur', { serveur: SERVEUR, jeton: j.jeton, compte: j.compte });
       stock.ecrire('kopo-entree', 'google'); $('bienvenue').hidden = true;
       if (j.compte && j.compte.pseudo) { stock.ecrire('kopo-pseudo', j.compte.pseudo); if ($('pseudo')) { $('pseudo').value = j.compte.pseudo; majAvatar(); } figerPseudo(); }
-      toast('Connecté avec Google : ' + j.compte.pseudo + '#' + j.compte.numero);
+      toast('Connecté avec Google : ' + j.compte.pseudo + '#' + j.compte.numero, 'succes');
       majBloques(); setTimeout(restaurerProfil, 3000);
       if (j.parrainage) {
         stock.effacer('kopo-parrain');
-        setTimeout(() => toast(j.parrainage.ok ? `${j.parrainage.parrain} t'a invité : joue tes premières parties pour gagner ton cadeau !` : j.parrainage.erreur), 3800);
+        setTimeout(() => toast(j.parrainage.ok ? `${j.parrainage.parrain} t'a invité : joue tes premières parties pour gagner ton cadeau !` : j.parrainage.erreur, j.parrainage.ok ? 'succes' : 'echec'), 3800);
       }
-    } catch (e) { toast(e.message); }
+    } catch (e) { toast(e.message, 'echec'); }
   })();
 
   // ------------------------------------------------------------------ tutoriel
@@ -6325,7 +6373,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   $('pseudoEntree').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('btnEntreeInvite').click(); });
   $('btnEntreeInvite').onclick = () => {
     const p = nettoyerPseudo($('pseudoEntree').value);
-    if (!p) { toast('Choisis ton pseudo pour jouer.'); $('pseudoEntree').focus(); return; }
+    if (!p) { toast('Choisis ton pseudo pour jouer.', 'alerte'); $('pseudoEntree').focus(); return; }
     stock.ecrire('kopo-pseudo', p); stock.ecrire('kopo-entree', 'invite');
     $('bienvenue').hidden = true;
     afficherAccueil();
@@ -6549,7 +6597,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     crediterEnLigne('mission', r.pieces, r.texte.slice(0, 60) + ':' + r.finieLe);
     majSolde(); pop($('btnBourse'), 1.2); vibrer(30);
     if (r.niveauApres.niveau > r.niveauAvant.niveau) tampon('NIVEAU ' + r.niveauApres.niveau);
-    toast(`+${r.pieces} pièces · +${r.xp} XP`);
+    toast(`+${r.pieces} pièces · +${r.xp} XP`, 'succes');
     ouvrirMissions();
   }
   function ouvrirMissions() {
@@ -6682,7 +6730,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     const deja = nettoyerPseudo(stock.lire('kopo-pseudo') || '');
     if (deja) { if ($('pseudo').value !== deja) { $('pseudo').value = deja; majAvatar(); } figerPseudo(); return deja; }
     const p = nettoyerPseudo($('pseudo').value); $('pseudo').value = p;
-    if (p.length < 3) { $('voileRejoindre').hidden = $('voileRobots').hidden = true; toast(p ? 'Le pseudo fait au moins 3 caractères, en un seul mot.' : "Choisis d'abord ton pseudo, en haut."); $('pseudo').focus(); return null; }
+    if (p.length < 3) { $('voileRejoindre').hidden = $('voileRobots').hidden = true; toast(p ? 'Le pseudo fait au moins 3 caractères, en un seul mot.' : "Choisis d'abord ton pseudo, en haut.", 'alerte'); $('pseudo').focus(); return null; }
     stock.ecrire('kopo-pseudo', p); figerPseudo();
     return p;
   }
@@ -6734,7 +6782,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   $('btnRejoindre').onclick = () => {
     const p = lirePseudo(); if (!p) return;
     const code = $('codeRejoindre').value.trim().toUpperCase();
-    if (!/^[A-Z]{4}$/.test(code)) { toast('Le code fait 4 lettres.'); return; }
+    if (!/^[A-Z]{4}$/.test(code)) { toast('Le code fait 4 lettres.', 'alerte'); return; }
     if (MODE_SERVEUR) entrerServeur(p, { code }); else demarrerClient(code, p);
   };
   $('codeRejoindre').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('btnRejoindre').click(); });
@@ -6773,7 +6821,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       const p = lireProfil();
       if (r && r.profil && R.fusionnerProfils(p, r.profil, 'max')) {
         ecrireProfil(p); appliquerCollection(p);
-        toast('Ton niveau et tes statistiques ont été récupérés.');
+        toast('Ton niveau et tes statistiques ont été récupérés.', 'succes');
       }
     } catch (e) {}
     sauvegarderProfil();
@@ -6870,7 +6918,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     if (!MODE_SERVEUR) corps.append(el('div', 'note-essai', 'Pièces d\'essai, remises à zéro au lancement officiel.'));
     const ok = el('button', 'btn principal large', b ? 'Récupérer' : 'OK');
     ok.onclick = () => { fermerFenetre(); majSolde(); if (b) { pop($('btnBourse'), 1.2); suiteAccueil(); } };
-    if (!b && MODE_SERVEUR) { const bq = el('button', 'btn large', 'Boutique'); bq.onclick = ouvrirBoutique; ouvrirFenetre([corps, ok, bq]); }
+    if (!b && MODE_SERVEUR) { const ach = el('button', 'btn large', 'Acheter des pièces'); ach.onclick = () => ouvrirAchatPieces(() => fenetrePieces(null)); const bq = el('button', 'btn large', 'Boutique'); bq.onclick = ouvrirBoutique; ouvrirFenetre([corps, ok, ach, bq]); }
     else ouvrirFenetre([corps, ok]);
   }
   function bonusDuJour() {
@@ -6948,7 +6996,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   });
   addEventListener('appinstalled', () => {
     stock.ecrire('kopo-installe', true); inviteInstallation = null; majBoutonInstaller();
-    toast('Masano est installé ! Ouvre-le depuis ton écran d\'accueil' + (CADEAU_INSTALLATION ? ' pour recevoir ton cadeau.' : '.'));
+    toast('Masano est installé ! Ouvre-le depuis ton écran d\'accueil' + (CADEAU_INSTALLATION ? ' pour recevoir ton cadeau.' : '.'), 'succes');
   });
   majBoutonInstaller();
   async function installer() {
@@ -6982,7 +7030,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     const copier = el('button', 'btn large', 'Copier le lien du jeu');
     copier.onclick = () => {
       const lien = NOUVELLE_ADRESSE || (location.origin + location.pathname);
-      (navigator.clipboard ? navigator.clipboard.writeText(lien) : Promise.reject()).then(() => toast('Lien copié : colle-le dans ' + nav + '.'), () => toast(lien));
+      (navigator.clipboard ? navigator.clipboard.writeText(lien) : Promise.reject()).then(() => toast('Lien copié : colle-le dans ' + nav + '.', 'succes'), () => toast(lien));
     };
     const fait = el('button', 'btn principal large', 'C\'est fait');
     fait.onclick = () => { stock.ecrire('kopo-installe', true); majBoutonInstaller(); fermerFenetre(); };
@@ -7105,7 +7153,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       oui.onclick = async () => {
         oui.disabled = true;
         try { await activerPush(); b.replaceChildren(icone('i-cloche'), el('p', null, 'C\'est fait ! Tu peux tout régler dans Paramètres > Notifications.')); setTimeout(() => b.remove(), 4000); }
-        catch (err) { toast(err.message); oui.disabled = false; if (Notification.permission === 'denied') b.remove(); }
+        catch (err) { toast(err.message, 'echec'); oui.disabled = false; if (Notification.permission === 'denied') b.remove(); }
       };
       boutons.append(oui, tard);
     }
@@ -7122,7 +7170,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     const interrupteur = (texte, aide, actuel, changer) => {
       const b = el('button', 'bascule'); b.setAttribute('role', 'switch'); b.setAttribute('aria-label', texte);
       let v = actuel; const maj = () => b.setAttribute('aria-checked', String(!!v));
-      b.onclick = async () => { b.disabled = true; try { v = await changer(!v); } catch (e) { toast(e.message); } b.disabled = false; maj(); };
+      b.onclick = async () => { b.disabled = true; try { v = await changer(!v); } catch (e) { toast(e.message, 'echec'); } b.disabled = false; maj(); };
       maj(); return ligne(texte, aide, b);
     };
     if (IOS_A_INSTALLER) {
@@ -7147,7 +7195,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     let u; try { u = new URL(url, location.href); } catch (e) { return; }
     const code = u.hash.slice(1).toUpperCase(), o = u.searchParams.get('ouvrir');
     if (/^[A-Z]{4}$/.test(code)) {
-      if ($('ecranAccueil').hidden) return toast('Invitation à la table ' + code + ' : termine ta partie d\'abord.');
+      if ($('ecranAccueil').hidden) return toast('Invitation à la table ' + code + ' : termine ta partie d\'abord.', 'alerte');
       fermerFenetre(); $('codeRejoindre').value = code; $('voileRejoindre').hidden = false;
     } else if (o === 'amis' && $('ecranAccueil').hidden === false) { majPastilleAmis(); ouvrirAmis(); }
     else if (o === 'match' && $('ecranAccueil').hidden === false) ouvrirMatchJour();
@@ -7370,7 +7418,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     const cible = e.target.closest('#modes .mode');
     if (!cible || cible.classList.contains('mode-bientot')) return;
     e.preventDefault(); e.stopImmediatePropagation();
-    toast(`${jeuChoisi() === 'inter8' ? 'Inter (8)' : 'Kopo'} est en maintenance. On revient très vite !`);
+    toast(`${jeuChoisi() === 'inter8' ? 'Inter (8)' : 'Kopo'} est en maintenance. On revient très vite !`, 'alerte');
   };
   $('modes').addEventListener('click', jeuEnMaintenance, true);
   const interBientot = (e) => {
@@ -7378,7 +7426,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     const cible = e.target.closest('#modes .mode');
     if (!cible || ['btnModeRejoindre', 'btnModeRobots', 'btnCreer', 'btnInconnus', 'btnCahier'].includes(cible.id)) return; // ouverts pour Inter (8)
     e.preventDefault(); e.stopImmediatePropagation();
-    toast("Ce mode arrive très bientôt pour Inter (8). En attendant : entre amis, en ligne ou contre les robots !");
+    toast("Ce mode arrive très bientôt pour Inter (8). En attendant : entre amis, en ligne ou contre les robots !", 'alerte');
   };
   $('modes').addEventListener('click', interBientot, true);
   majChoixJeu();
@@ -7393,7 +7441,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     let url = lienJeu(jeu);
     if (MODE_SERVEUR && compteLocal()) { try { const P = await apiJoueur('/parrainage'); if (P.code) url = lienJeu(jeu) + '?parrain=' + P.code; } catch (e) {} }
     try { if (navigator.share) { await navigator.share({ title: 'Masano · ' + jeuPartage(jeu).nom, text: texteInviterJeu(jeu), url }); return; } } catch (e) { return; }
-    try { await navigator.clipboard.writeText(url); toast('Lien du jeu copié.'); } catch (e) { toast(url); }
+    try { await navigator.clipboard.writeText(url); toast('Lien du jeu copié.', 'succes'); } catch (e) { toast(url); }
   }
   // Groupes de la communauté (réglés dans l'admin, onglet Pilotage) : couleur et initiale du réseau.
   const RESEAUX = { whatsapp: ['WhatsApp', '#1f7a4d', 'W'], telegram: ['Telegram', '#1f86c4', 'T'], facebook: ['Facebook', '#1b5fd1', 'f'], instagram: ['Instagram', '#b8336a', 'I'], tiktok: ['TikTok', '#202024', '♪'], youtube: ['YouTube', '#c4302b', '▶'], x: ['X', '#202024', 'X'], discord: ['Discord', '#5865f2', 'D'], autre: ['Lien', '#5a4a2a', '↗'] };
@@ -7442,8 +7490,8 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   $('btnQr').onclick = $('qr').onclick = basculerQr;
   $('qr').onkeydown = (e) => { if (e.key === 'Enter' || (e.key === 'Escape' && $('ecranSalon').classList.contains('qr-ouvert'))) basculerQr(); };
   $('btnCopier').onclick = async () => {
-    try { await navigator.clipboard.writeText($('lienSalon').value); toast('Lien copié.'); }
-    catch (e) { $('lienSalon').hidden = false; $('lienSalon').select(); toast('Sélectionne le lien et copie-le.'); }
+    try { await navigator.clipboard.writeText($('lienSalon').value); toast('Lien copié.', 'succes'); }
+    catch (e) { $('lienSalon').hidden = false; $('lienSalon').select(); toast('Sélectionne le lien et copie-le.', 'alerte'); }
   };
 
   // ------------------------------------------------------------------ actualiser
@@ -7532,7 +7580,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     const fermer = (toastReveil) => {
       if (fini) return; fini = true;
       splash.classList.remove('attente'); splash.classList.add('fini'); setTimeout(() => splash.remove(), 500);
-      if (toastReveil) toast('Le serveur se réveille encore : les parties en ligne seront prêtes dans un instant.');
+      if (toastReveil) toast('Le serveur se réveille encore : les parties en ligne seront prêtes dans un instant.', 'alerte');
     };
     const serveurPret = MODE_SERVEUR && navigator.onLine
       ? fetch(SERVEUR + '/sante', { cache: 'no-store' }).then(() => true, () => true) // une erreur ne bloque pas l'accueil
@@ -7555,7 +7603,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       fermer(!pret);
     })();
   })();
-  if (typeof mqtt === 'undefined' && !LOCAL && !MODE_SERVEUR) montrerBandeau("La bibliothèque réseau n'a pas pu se charger.");
+  if (typeof mqtt === 'undefined' && !LOCAL && !MODE_SERVEUR) montrerBandeau("La bibliothèque réseau n'a pas pu se charger.", 'echec');
   lobby.demarrer();
   const codeLien = location.hash.slice(1).toUpperCase();
   if (session && (!/^[A-Z]{4}$/.test(codeLien) || codeLien === session.code)) {

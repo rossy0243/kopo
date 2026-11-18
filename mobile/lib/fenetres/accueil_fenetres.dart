@@ -72,7 +72,7 @@ void ouvrirRejoindre() {
   final code = TextEditingController();
   void valider() {
     final c = code.text.trim().toUpperCase();
-    if (!RegExp(r'^[A-Z]{4}$').hasMatch(c)) { app.toast('Le code fait 4 lettres.'); return; }
+    if (!RegExp(r'^[A-Z]{4}$').hasMatch(c)) { app.toast('Le code fait 4 lettres.', Niv.alerte); return; }
     app.rejoindreCode(c);
   }
   app.ouvrirFenetre((context) => Fenetre(titre: 'Rejoindre', enfants: [
@@ -438,7 +438,7 @@ void fenetrePieces(Map? b) {
       ),
       const Ecart(12),
       Btn.principal(b != null ? 'Récupérer' : 'OK', large: true, onTap: () { app.fermerFenetre(); if (b != null) app.suiteAccueil(); }),
-      if (b == null) ...[const Ecart(8), Btn('Boutique', large: true, onTap: ouvrirBoutique)],
+      if (b == null) ...[const Ecart(8), Btn('Acheter des pièces', large: true, onTap: () => ouvrirAchatPieces(retour: () => fenetrePieces(null))), const Ecart(8), Btn('Boutique', large: true, onTap: ouvrirBoutique)],
     ]);
   }, 'pieces');
 }
@@ -469,18 +469,6 @@ Future<void> cadeauFondateur() async {
         ]));
     await fin.future;
   } catch (_) {}
-}
-
-void fenetreRemiseAFlot(int solde) {
-  app.ouvrirFenetre((context) => Fenetre(enfants: [
-        Text('Remise à flot', textAlign: TextAlign.center, style: K.titre(36)),
-        const Ecart(8),
-        const Center(child: Piece(taille: 56)),
-        const Ecart(8),
-        Text("Tu étais presque à sec : ton solde remonte à ${App.formatPieces(solde)} pièces. C'est possible une fois par jour.", textAlign: TextAlign.center, style: K.texte(15)),
-        const Ecart(12),
-        Btn.principal('Merci !', large: true, onTap: app.fermerFenetre),
-      ]));
 }
 
 /// « Jouer en ligne » sans Google : on explique, et on propose les robots.

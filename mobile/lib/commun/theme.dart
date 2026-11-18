@@ -15,6 +15,7 @@ class K {
   static const cardInk = Color(0xFF1B2533);
   static const red = Color(0xFFC7362F);
   static const good = Color(0xFF3FBF7F);
+  static const warn = Color(0xFFF0A63A);
   static const bad = Color(0xFFEF6B5F);
   static const line = Color(0x1FFFFFFF);
   static const encre = Color(0xFF1D1606);

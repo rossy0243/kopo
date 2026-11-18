@@ -100,8 +100,8 @@ Widget _zoneStickers(VoidCallback rafraichir) {
         Builder(builder: (_) {
           final reste = app.resteSticker(id), ouvert = actif && reste > 0;
           return CaseSticker(id, verrou: !ouvert, reste: reste, onTap: () {
-            if (!actif) { app.toast('Les stickers arrivent bientôt.'); return; }
-            if (reste <= 0) { app.toast(app.stickers?['vente'] == true ? '« ${app.nomSticker(id)} » est verrouillé : achète-le dans la boutique.' : '« ${app.nomSticker(id)} » est verrouillé : il arrive bientôt en boutique.'); return; }
+            if (!actif) { app.toast('Les stickers arrivent bientôt.', Niv.alerte); return; }
+            if (reste <= 0) { app.toast(app.stickers?['vente'] == true ? '« ${app.nomSticker(id)} » est verrouillé : achète-le dans la boutique.' : '« ${app.nomSticker(id)} » est verrouillé : il arrive bientôt en boutique.', Niv.alerte); return; }
             app.fermerFenetre();
             app.envoyerSticker(id);
           });

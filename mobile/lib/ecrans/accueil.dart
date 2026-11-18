@@ -81,8 +81,8 @@ class Accueil extends StatelessWidget {
   List<CarteMode> _modes(BuildContext context, bool inter) {
     final enMaint = app.etatJeu(app.jeu) == 'maintenance';
     VoidCallback garde(VoidCallback f, {bool ouvertInter = false}) => () {
-          if (enMaint) { app.toast('${inter ? 'Inter (8)' : 'Kopo'} est en maintenance. On revient très vite !'); return; }
-          if (inter && !ouvertInter) { app.toast('Ce mode arrive très bientôt pour Inter (8). En attendant : entre amis, en ligne ou contre les robots !'); return; }
+          if (enMaint) { app.toast('${inter ? 'Inter (8)' : 'Kopo'} est en maintenance. On revient très vite !', Niv.alerte); return; }
+          if (inter && !ouvertInter) { app.toast('Ce mode arrive très bientôt pour Inter (8). En attendant : entre amis, en ligne ou contre les robots !', Niv.alerte); return; }
           f();
         };
     final ej = app.etatJour;
