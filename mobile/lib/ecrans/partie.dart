@@ -163,7 +163,9 @@ class _Table extends StatelessWidget {
       for (var k = 0; k < autres.length; k++) {
         final a = math.pi * (1 - (k + .5) / autres.length);
         final x = .5 + .41 * math.cos(a), y = .5 - .37 * math.sin(a);
-        enfants.add(Positioned(left: w * x - 55, top: h * y - 42, width: 110, child: _Siege(v, m, autres[k])));
+        // Sur un écran étroit, le siège (110 de large) reste entier dans l'écran au lieu de sortir par un bord.
+        final gauche = (w * x - 55).clamp(0.0, math.max(0.0, w - 110)).toDouble();
+        enfants.add(Positioned(left: gauche, top: h * y - 42, width: 110, child: _Siege(v, m, autres[k])));
       }
       enfants.add(Positioned(left: w * .5 - 60, bottom: 0, width: 120, child: _Siege(v, m, v['moi'].toString())));
       return Stack(clipBehavior: Clip.none, children: enfants);

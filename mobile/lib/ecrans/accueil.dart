@@ -21,48 +21,58 @@ class Accueil extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final taille = MediaQuery.of(context).size;
     final paysage = MediaQuery.of(context).orientation == Orientation.landscape;
+    // Écran bas en paysage (téléphone couché, Galaxy Fold fermé couché) : tout serre un peu pour tenir.
+    final bas = paysage && taille.height < 430;
     final inter = app.jeu == 'inter8';
     final modes = _modes(context, inter);
     return SafeArea(
       child: Container(
         decoration: const BoxDecoration(gradient: RadialGradient(center: Alignment(0, .1), radius: .8, colors: [Color(0x1FE2B04A), Color(0x00E2B04A)])),
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+        padding: EdgeInsets.fromLTRB(taille.width < 360 ? 8 : 12, bas ? 6 : 10, taille.width < 360 ? 8 : 12, bas ? 4 : 8),
         child: Column(children: [
           const _Haut(),
-          const SizedBox(height: 10),
+          SizedBox(height: bas ? 6 : 10),
           Row(children: [
             if (app.jeuxVisibles.length > 1) const Expanded(child: _ChoixJeu()) else const Spacer(),
             const SizedBox(width: 8),
             const _BoutonSon(),
           ]),
-          const SizedBox(height: 10),
+          SizedBox(height: bas ? 4 : 10),
           Expanded(
             child: paysage
-                ? Center(
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
-                      child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-                        for (final m in modes) Padding(padding: const EdgeInsets.symmetric(horizontal: 7), child: SizedBox(height: math.min(m.creer ? 188 : 168, MediaQuery.of(context).size.height * (m.creer ? .5 : .44)), child: AspectRatio(aspectRatio: 5 / 7, child: m))),
-                      ]),
-                    ),
-                  )
+                // La hauteur des cartes suit la place qui reste : la barre du bas reste toujours visible.
+                ? LayoutBuilder(builder: (context, c) {
+                    final dispo = c.maxHeight - (bas ? 8 : 20);
+                    double haut(bool creer) => math.max(80, math.min(creer ? 188 : 168, dispo * (creer ? 1 : .9)));
+                    return Center(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        padding: EdgeInsets.symmetric(horizontal: 4, vertical: bas ? 4 : 10),
+                        child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+                          for (final m in modes) Padding(padding: EdgeInsets.symmetric(horizontal: bas ? 5 : 7), child: SizedBox(height: haut(m.creer), child: AspectRatio(aspectRatio: bas ? 1 : 5 / 7, child: m))),
+                        ]),
+                      ),
+                    );
+                  })
                 : Center(
                     child: SingleChildScrollView(
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 360),
                         child: LayoutBuilder(builder: (context, c) {
                           final w = (c.maxWidth - 10) / 2;
+                          // Cartes étroites (Galaxy Fold fermé) : un peu plus hautes pour que leur texte tienne.
+                          final h = w < 150 ? w * 1.12 : w * 3.6 / 4;
                           return Wrap(spacing: 10, runSpacing: 10, children: [
-                            for (final m in modes) SizedBox(width: m.creer ? c.maxWidth : w, height: m.creer ? 112 : w * 3.6 / 4, child: m),
+                            for (final m in modes) SizedBox(width: m.creer ? c.maxWidth : w, height: m.creer ? 112 : h, child: m),
                           ]);
                         }),
                       ),
                     ),
                   ),
           ),
-          const _BarreBas(),
+          _BarreBas(bas: bas),
         ]),
       ),
     );
@@ -142,7 +152,8 @@ class CarteMode extends StatelessWidget {
               Center(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  // Si la carte est petite (écran étroit ou bas), tout son contenu rétrécit au lieu d'être coupé.
+                  child: LayoutBuilder(builder: (context, c) => FittedBox(fit: BoxFit.scaleDown, child: SizedBox(width: math.max(c.maxWidth, 96), child: Column(mainAxisSize: MainAxisSize.min, children: [
                     Stack(clipBehavior: Clip.none, children: [
                       Ico(icone, taille: creer ? 40 : 38, couleur: creer ? K.encre : null),
                       if (point) Positioned(top: -2, right: -6, child: Container(width: 9, height: 9, decoration: BoxDecoration(color: K.red, shape: BoxShape.circle, border: Border.all(color: K.table, width: 2)))),
@@ -153,7 +164,7 @@ class CarteMode extends StatelessWidget {
                     Text(sous, textAlign: TextAlign.center, maxLines: 3, overflow: TextOverflow.ellipsis, style: K.texte(11, couleur: creer ? const Color(0xFF4A3A12) : K.muted).copyWith(height: 1.2)),
                     if (creer && amis > 0) _pointEnLigne('$amis ami${amis > 1 ? 's' : ''} en ligne', const Color(0xFF4A3A12)),
                     if (enLigne != null) _pointEnLigne('$enLigne joueur${enLigne! > 1 ? 's' : ''} en ligne', K.muted),
-                  ]),
+                  ])))),
                 ),
               ),
             ]),
@@ -177,22 +188,27 @@ class _Haut extends StatelessWidget {
   const _Haut();
   @override
   Widget build(BuildContext context) {
-    final etroit = MediaQuery.of(context).size.width < 420;
+    final largeur = MediaQuery.of(context).size.width;
+    final etroit = largeur < 420;
+    // Écran étroit (Galaxy Fold fermé, petit téléphone) : le logo seul, pour que les pièces et le pseudo restent visibles.
+    final tresEtroit = largeur < 400;
     final p = app.lireProfil();
     final n = R.niveauDe(p['xp'] as num? ?? 0);
     final pseudo = app.pseudo;
     return Row(children: [
       Row(children: [
         ClipRRect(borderRadius: BorderRadius.circular(8), child: SvgPicture.asset('assets/img/masano-logo.svg', width: etroit ? 30 : 36, height: etroit ? 30 : 36)),
-        const SizedBox(width: 7),
-        Text('MASANO', style: K.titre(etroit ? 28 : 36).copyWith(letterSpacing: 3)),
+        if (!tresEtroit) ...[
+          const SizedBox(width: 7),
+          Text('MASANO', style: K.titre(etroit ? 28 : 36).copyWith(letterSpacing: 3)),
+        ],
       ]),
-      const Spacer(),
+      const Spacer(), // le profil (flex 4) garde la place pour le pseudo sur un écran étroit
       // Bourse
       GestureDetector(
         onTap: () => fenetrePieces(null),
         child: Container(
-          padding: const EdgeInsets.fromLTRB(4, 4, 12, 4),
+          padding: EdgeInsets.fromLTRB(4, 4, tresEtroit ? 8 : 12, 4),
           decoration: BoxDecoration(color: const Color(0x4D000000), borderRadius: BorderRadius.circular(99), border: Border.all(color: const Color(0x73E2B04A))),
           child: Row(children: [
             const Piece(),
@@ -227,14 +243,15 @@ class _Haut extends StatelessWidget {
       const SizedBox(width: 6),
       // Profil
       Flexible(
+        flex: 4,
         child: GestureDetector(
           onTap: ouvrirProfil,
           child: Container(
-            padding: const EdgeInsets.fromLTRB(4, 4, 12, 4),
+            padding: EdgeInsets.fromLTRB(4, 4, tresEtroit ? 8 : 12, 4),
             decoration: BoxDecoration(color: const Color(0x4D000000), borderRadius: BorderRadius.circular(99), border: Border.all(color: K.line)),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Avatar(pseudo.isEmpty ? '?' : pseudo, avatar: app.avatarEquipe, cadre: app.cadreEquipe, taille: 36, niveau: (p['xp'] ?? 0) == 0 ? null : n.niveau),
-              const SizedBox(width: 8),
+              Avatar(pseudo.isEmpty ? '?' : pseudo, avatar: app.avatarEquipe, cadre: app.cadreEquipe, taille: tresEtroit ? 32 : 36, niveau: (p['xp'] ?? 0) == 0 ? null : n.niveau),
+              SizedBox(width: tresEtroit ? 5 : 8),
               Flexible(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
                   if (!etroit) Text('Ton pseudo', style: K.texte(11, couleur: K.muted)),
@@ -297,7 +314,7 @@ class _ChoixJeu extends StatelessWidget {
                 child: Text(lettre, style: TextStyle(fontFamily: K.display, fontSize: 16, color: actif ? const Color(0xFFF3D48A) : K.muted)),
               ),
               const SizedBox(width: 8),
-              Flexible(child: Text(nom, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: K.display, fontSize: 20, letterSpacing: 1.5, color: actif ? K.encre : K.muted))),
+              Flexible(child: FittedBox(fit: BoxFit.scaleDown, child: Text(nom, maxLines: 1, style: TextStyle(fontFamily: K.display, fontSize: 20, letterSpacing: 1.5, color: actif ? K.encre : K.muted)))), // « INTER (8) » rétrécit plutôt que d'être coupé
               if (e == 'test' || e == 'maintenance') ...[
                 const SizedBox(width: 6),
                 Container(
@@ -325,25 +342,31 @@ class _ChoixJeu extends StatelessWidget {
 }
 
 class _BarreBas extends StatelessWidget {
-  const _BarreBas();
+  final bool bas;
+  const _BarreBas({this.bas = false});
   @override
   Widget build(BuildContext context) {
-    Widget onglet(String ico, String t, VoidCallback f, {bool point = false, int demandes = 0}) => InkWell(
+    // Écran étroit : les onglets se partagent la largeur et leur texte rétrécit au lieu de sortir de l'écran.
+    final etroit = MediaQuery.of(context).size.width < 400;
+    Widget onglet(String ico, String t, VoidCallback f, {bool point = false, int demandes = 0}) {
+      final o = InkWell(
           borderRadius: BorderRadius.circular(12),
           onTap: f,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
+            padding: EdgeInsets.symmetric(horizontal: etroit ? 2 : 12, vertical: bas ? 2 : 4),
+            child: Flex(direction: bas ? Axis.horizontal : Axis.vertical, mainAxisSize: MainAxisSize.min, children: [
               Stack(clipBehavior: Clip.none, children: [
-                Ico(ico, taille: 24),
+                Ico(ico, taille: bas ? 20 : 24),
                 if (point) Positioned(top: -2, right: -5, child: Container(width: 9, height: 9, decoration: BoxDecoration(color: K.red, shape: BoxShape.circle, border: Border.all(color: K.table, width: 2)))),
                 if (demandes > 0) Positioned(top: -6, right: -8, child: Container(padding: const EdgeInsets.symmetric(horizontal: 5), height: 16, decoration: BoxDecoration(color: K.bad, borderRadius: BorderRadius.circular(8)), child: Text('$demandes', style: K.texte(10, couleur: Colors.white, poids: FontWeight.w700)))),
               ]),
-              const SizedBox(height: 2),
-              Text(t, style: K.texte(12, couleur: K.muted, poids: FontWeight.w600)),
+              SizedBox(height: 2, width: bas ? 5 : 0),
+              Flexible(child: FittedBox(fit: BoxFit.scaleDown, child: Text(t, maxLines: 1, style: K.texte(12, couleur: K.muted, poids: FontWeight.w600)))),
             ]),
           ),
         );
+      return etroit ? Expanded(child: o) : o;
+    }
     final inter = app.jeu == 'inter8';
     return Row(mainAxisAlignment: MainAxisAlignment.center, children: [
       onglet('missions', 'Missions', ouvrirMissions, point: app.pointMissions),
