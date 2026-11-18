@@ -888,6 +888,19 @@ body.en-jeu #filChat { display: flex; }
 .boutique .st-offre { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 8px 10px; border: 1px dashed var(--line); border-radius: 10px; color: var(--muted); font-size: 13px; }
 .boutique .st-offre b { color: var(--ink); }
 .boutique .st-tete-pack .btn { padding: 5px 10px; font-size: 13px; }
+.bouquets { display: grid; gap: 8px; }
+.bouquet { display: grid; grid-template-columns: 58px 1fr auto; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.04); color: var(--ink); font: inherit; text-align: left; cursor: pointer; position: relative; }
+.bouquet:hover, .bouquet:focus-visible { border-color: var(--brass); }
+.bouquet.top { border-color: var(--brass); background: rgba(226,176,74,.1); }
+.bouquet .tas { position: relative; height: 40px; }
+.bouquet .tas .piece { position: absolute; width: 26px; height: 26px; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,.35); }
+.bouquet .qte { display: flex; align-items: center; gap: 6px; font-family: var(--display); font-size: 26px; letter-spacing: 1px; color: var(--brass); line-height: 1; }
+.bouquet .nom { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 1.2px; }
+.bouquet .bonus { display: inline-block; margin-top: 3px; font-size: 12px; font-weight: 700; color: #1d1606; background: #6fbf8f; border-radius: 6px; padding: 1px 6px; }
+.bouquet .px { text-align: right; font-weight: 700; font-size: 16px; white-space: nowrap; }
+.bouquet .px small { display: block; font-weight: 400; font-size: 12px; color: var(--muted); }
+.bouquet .ruban { position: absolute; top: -9px; right: 12px; background: var(--brass); color: #1d1606; font-size: 11px; font-weight: 700; border-radius: 6px; padding: 2px 7px; }
+.boutique .acheter-pieces { margin: 2px auto 4px; display: flex; }
 .boutique .st-tete-pack { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 10px 0 4px; }
 .boutique button.st-case { color: inherit; font: inherit; }
 .fenetre[data-type="boutique"] .st-prix { display: inline-flex; align-items: center; gap: 4px; vertical-align: middle; }
@@ -5341,7 +5354,8 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     const possedes = new Set(B.possedes.concat(['av-laiton', 'dos-laiton']));
     const z = el('div', 'boutique');
     const solde = el('div', 'boutique-solde'); solde.append(pieceEl(), formatPieces(B.solde));
-    z.append(solde, el('small', 'muted', 'Des apparences seulement : rien n\'aide à gagner. Les pièces se gagnent en jouant.'));
+    const plus = el('button', 'btn petit acheter-pieces', '+ Acheter des pièces'); plus.onclick = () => ouvrirAchatPieces(ouvrirBoutique);
+    z.append(solde, plus, el('small', 'muted', 'Des apparences seulement : rien n\'aide à gagner. Les pièces se gagnent en jouant.'));
     const enVente = B.objets.filter((o) => o.prix != null && !o.ville).sort((a, b) => a.prix - b.prix || a.nom.localeCompare(b.nom, 'fr'));
     for (const cat of R.parCategorie(enVente)) {
       z.append(el('h3', null, cat.nom));
@@ -5401,8 +5415,9 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     corps.append(el('h2', null, o.nom), apercuObjet(o.id));
     if (o.prix > solde) {
       corps.append(el('p', null, `Il te manque ${formatPieces(o.prix - solde)} pièces pour ${nomType} ${o.nom}. Missions, bonus du jour et parties en ligne en rapportent.`));
-      const ok = el('button', 'btn principal large', 'Retour'); ok.onclick = ouvrirBoutique;
-      return ouvrirFenetre([corps, ok], 'boutique');
+      const ok = el('button', 'btn principal large', 'Acheter des pièces'); ok.onclick = () => ouvrirAchatPieces(ouvrirBoutique);
+      const ret = el('button', 'btn large', 'Retour'); ret.onclick = ouvrirBoutique;
+      return ouvrirFenetre([corps, ok, ret], 'boutique');
     }
     corps.append(el('p', null, `Acheter ${nomType} ${o.nom} pour ${formatPieces(o.prix)} pièces ? Il te restera ${formatPieces(solde - o.prix)} pièces.`));
     const oui = el('button', 'btn principal large', 'Acheter'), non = el('button', 'btn large', 'Retour');
@@ -5450,6 +5465,39 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     const non = el('button', 'btn large', 'Retour'); non.onclick = ouvrirBoutique;
     ouvrirFenetre([corps, ...boutons, el('small', 'muted', 'Paiement en francs congolais (mobile money) : bientôt.'), non], 'boutique');
   }
+
+  // Acheter des pièces (18/11) : des bouquets du moins cher (500 FC) au plus cher (40 000 FC, 20 $), prix fixés par le serveur,
+  // au même taux que les stickers (200 pièces ≈ 500 FC), avec un bonus qui grandit avec le bouquet.
+  // Le paiement mobile money n'est pas encore branché : les bouquets s'affichent avec « Bientôt ».
+  async function ouvrirAchatPieces(retour) {
+    if (!MODE_SERVEUR) return toast('L\'achat de pièces arrive avec le jeu en ligne.');
+    let B;
+    try { if (!compteLocal()) { const ps = lirePseudo(); if (!ps) return; await compteServeur(ps); } B = await apiJoueur('/bouquets'); } catch (e) { toast(e.message); return; }
+    soldeServeur(B.solde);
+    const z = el('div', 'boutique');
+    const solde = el('div', 'boutique-solde'); solde.append(pieceEl(), formatPieces(B.solde));
+    z.append(solde, el('small', 'muted', 'Plus le bouquet est gros, plus il y a de pièces offertes. Des pièces pour les tables à mise, les apparences et les stickers ; elles ne se revendent pas.'));
+    const l = el('div', 'bouquets'), meilleur = B.bouquets.reduce((m, b) => (b.bonusPct > m.bonusPct ? b : m), B.bouquets[0]);
+    B.bouquets.forEach((b, i) => {
+      const r = el('button', 'bouquet' + (b === meilleur && b.bonus ? ' top' : ''));
+      const tas = el('div', 'tas'), n = Math.min(6, i + 1);
+      for (let k = 0; k < n; k++) { const p = pieceEl(); p.style.left = (k < 3 ? k * 14 : (k - 3) * 14 + 7) + 'px'; p.style.top = (k < 3 ? 14 : 0) + 'px'; tas.append(p); } // un tas qui grandit avec le bouquet
+      const mil = el('div');
+      const q = el('div', 'qte'); q.append(formatPieces(b.pieces));
+      mil.append(el('div', 'nom', b.nom), q);
+      if (b.bonus) mil.append(el('span', 'bonus', `+${formatPieces(b.bonus)} offertes`));
+      const px = el('div', 'px', formatPieces(b.francs) + ' FC'); px.append(el('small', null, 'soit ' + String(b.dollars).replace('.', ',') + ' $'));
+      r.append(tas, mil, px);
+      if (b === meilleur && b.bonus) r.append(el('span', 'ruban', `Le plus avantageux · +${b.bonusPct} %`));
+      r.setAttribute('aria-label', `${b.nom} : ${b.pieces} pièces pour ${b.francs} francs congolais`);
+      r.onclick = () => (B.paiement ? toast('Paiement mobile money : bientôt.') : toast(`Bouquet « ${b.nom} » : le paiement mobile money arrive bientôt.`));
+      l.append(r);
+    });
+    z.append(l, el('small', 'muted', B.paiement ? 'Paiement en francs congolais par mobile money.' : 'Paiement en francs congolais (mobile money : M-Pesa, Orange Money, Airtel Money) : bientôt.'));
+    const ret = el('button', 'btn principal large', retour ? 'Retour' : 'Fermer'); ret.onclick = retour || fermerFenetre;
+    ouvrirFenetre([el('h2', null, 'Acheter des pièces'), z, ret], 'boutique');
+  }
+  window.ouvrirAchatPieces = ouvrirAchatPieces;
 
   // Chat en partie : messages choisis dans le tableau de bord (/api/config), sinon la liste de départ.
   const messagesChat = () => (configServeur && Array.isArray(configServeur.messages) && configServeur.messages.length ? configServeur.messages : REACTIONS);
@@ -6756,7 +6804,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     if (!MODE_SERVEUR) corps.append(el('div', 'note-essai', 'Pièces d\'essai, remises à zéro au lancement officiel.'));
     const ok = el('button', 'btn principal large', b ? 'Récupérer' : 'OK');
     ok.onclick = () => { fermerFenetre(); majSolde(); if (b) { pop($('btnBourse'), 1.2); suiteAccueil(); } };
-    if (!b && MODE_SERVEUR) { const bq = el('button', 'btn large', 'Boutique'); bq.onclick = ouvrirBoutique; ouvrirFenetre([corps, ok, bq]); }
+    if (!b && MODE_SERVEUR) { const ach = el('button', 'btn large', 'Acheter des pièces'); ach.onclick = () => ouvrirAchatPieces(() => fenetrePieces(null)); const bq = el('button', 'btn large', 'Boutique'); bq.onclick = ouvrirBoutique; ouvrirFenetre([corps, ok, ach, bq]); }
     else ouvrirFenetre([corps, ok]);
   }
   function bonusDuJour() {

@@ -20,6 +20,7 @@ const { creerMatchJour } = require('./match-jour');
 const { creerBande } = require('./bande');
 const { creerPush } = require('./push');
 const { creerStickers } = require('./stickers');
+const { creerBouquets } = require('./bouquets');
 const { permis } = require('./limites');
 
 async function demarrer({ port = Number(process.env.PORT || 2567), env = process.env } = {}) {
@@ -42,6 +43,7 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
   const matchJour = creerMatchJour(base, reglages, env);
   const bande = creerBande(base, reglages, comptes, matchJour, social);
   const stickers = creerStickers(base, reglages, comptes);
+  const bouquets = creerBouquets(base, reglages, comptes);
   // Chaque minute : semaines de Bande finies (pot partagé), mises automatiques du lundi, rappel du soir.
   const minuteurBande = setInterval(() => bande.tic().catch((e) => console.error('Bande :', e.message)), 60e3);
   minuteurBande.unref();
@@ -67,7 +69,7 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
   // version = commit déployé (Render le donne dans RENDER_GIT_COMMIT) : pour vérifier qu'une mise à jour est en ligne.
   app.get('/sante', (req, res) => res.json({ ok: true, salles: salles.size, version: (env.RENDER_GIT_COMMIT || '').slice(0, 7) || null }));
   // API des joueurs : /api (site) et /api/v1 (applis mobiles, version figée de l'API). Les deux servent les mêmes routes.
-  const routes = routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours, parrainage, matchJour, bande, push, stickers, env });
+  const routes = routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours, parrainage, matchJour, bande, push, stickers, bouquets, env });
 
   // Compteur en ligne et salles ouvertes (lu par l'accueil).
   routes.get('/en-ligne', async (req, res) => {
@@ -108,7 +110,7 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
   app.get('/api/openapi.yaml', (req, res) => { res.type('application/yaml'); res.sendFile(path.join(__dirname, '..', '..', 'docs', 'api', 'openapi.yaml')); });
   app.use('/api/v1', routes);
   app.use('/api', routes);
-  app.use('/admin/api', routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainage, bande, push, stickers, salles, demarrage: Date.now() }));
+  app.use('/admin/api', routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainage, bande, push, stickers, bouquets, salles, demarrage: Date.now() }));
   app.get('/admin', (req, res) => { res.set('Cache-Control', 'no-store'); res.set('X-Frame-Options', 'DENY'); res.sendFile(path.join(__dirname, '..', 'public', 'admin.html')); });
 
   const serveurHttp = http.createServer(app);

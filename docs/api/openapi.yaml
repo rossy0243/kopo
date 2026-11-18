@@ -602,6 +602,23 @@ paths:
                   utilisations: { type: integer }
                   stickers: { type: array, items: { type: string } }
                   soldes: { type: object, additionalProperties: { type: integer } }
+  /bouquets:
+    get:
+      tags: [Pièces, Boutique et parcours]
+      summary: Bouquets de pièces (argent réel), du moins cher au plus cher
+      description: "Prix fixés par le serveur, au taux des stickers (200 pièces ≈ 500 FC, 1 $ ≈ 2 000 FC), avec un bonus qui grandit avec le bouquet ; le plus cher fait 40 000 FC (20 $). `paiement` est faux tant que le mobile money n'est pas branché : les prix sont affichés, rien ne se paie (l'admin peut livrer un bouquet payé à la main)."
+      responses:
+        '200':
+          description: Bouquets
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  solde: { type: integer }
+                  paiement: { type: boolean }
+                  taux: { type: object, properties: { piecesPour500FC: { type: integer }, fcParDollar: { type: integer } } }
+                  bouquets: { type: array, items: { $ref: '#/components/schemas/Bouquet' } }
   /boutique:
     get:
       tags: [Boutique et parcours]
@@ -1122,6 +1139,16 @@ components:
         ami: { type: boolean }
         match: { type: boolean }
         annonce: { type: boolean }
+    Bouquet:
+      type: object
+      properties:
+        id: { type: integer, description: Position dans la liste (0 = le moins cher) }
+        nom: { type: string }
+        francs: { type: integer }
+        dollars: { type: number }
+        pieces: { type: integer, description: Pièces reçues, bonus compris }
+        bonus: { type: integer, description: Pièces en plus du taux }
+        bonusPct: { type: integer }
     OffreSticker:
       type: object
       properties:

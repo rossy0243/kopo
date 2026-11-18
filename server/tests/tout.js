@@ -1779,6 +1779,34 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.strictEqual((await api('/api/v1/push', { jeton: b.jeton })).json.natifs.length, 0);
   });
   // --- Stickers animés : utilisations vendues (plus tard) ou offertes par l'admin, envoi vérifié et décompté
+  await test('bouquets de pièces : du moins cher au plus cher, 40 000 FC au plus, taux des stickers, livrés par l\'admin', async () => {
+    const a = await invite('Acheteur' + Date.now() % 1000);
+    const B = (await api('/api/v1/bouquets', { jeton: a.jeton })).json;
+    assert.strictEqual(B.paiement, false);
+    assert.deepStrictEqual(B.bouquets.map((b) => [b.francs, b.pieces]), [[500, 200], [2000, 850], [5000, 2250], [10000, 4800], [20000, 10000], [40000, 21000]]);
+    assert.strictEqual(B.bouquets.at(-1).dollars, 20);
+    for (let i = 1; i < B.bouquets.length; i++) {
+      assert.ok(B.bouquets[i].francs > B.bouquets[i - 1].francs && B.bouquets[i].bonusPct > B.bouquets[i - 1].bonusPct, 'bonus croissant');
+    }
+    for (const b of B.bouquets) assert.ok(b.pieces >= b.francs / 2.5, 'jamais moins que le taux des stickers');
+    assert.strictEqual((await api('/api/v1/bouquets')).statut, 401);
+    // Réglage : refusé au-dessus de 40 000 FC, sous le taux, ou dans le désordre.
+    for (const bouquets of [[{ francs: 50000, pieces: 30000 }], [{ francs: 2000, pieces: 500 }], [{ francs: 2000, pieces: 850 }, { francs: 500, pieces: 200 }], [{ francs: 2000, pieces: 1000 }, { francs: 5000, pieces: 2100 }]]) {
+      assert.strictEqual((await api('/admin/api/reglages/bouquets', { methode: 'PUT', jeton: adminJeton, corps: { valeur: { bouquets } } })).statut, 400, JSON.stringify(bouquets));
+    }
+    // Livraison à la main : pièces au registre, notification, journal.
+    const avant = (await api('/api/pieces', { jeton: a.jeton })).json.solde;
+    assert.strictEqual((await api('/admin/api/bouquets/livrer', { methode: 'POST', jeton: a.jeton, corps: {} })).statut, 401);
+    const nom = a.compte.pseudo + '#' + a.compte.numero;
+    assert.strictEqual((await api('/admin/api/bouquets/livrer', { methode: 'POST', jeton: adminJeton, corps: { joueur: nom, bouquet: 1, message: '' } })).statut, 400);
+    assert.strictEqual((await api('/admin/api/bouquets/livrer', { methode: 'POST', jeton: adminJeton, corps: { joueur: nom, bouquet: 9, message: 'MP-123' } })).statut, 400);
+    const r = await api('/admin/api/bouquets/livrer', { methode: 'POST', jeton: adminJeton, corps: { joueur: nom, bouquet: 1, message: 'MP-123456' } });
+    assert.strictEqual(r.statut, 200); assert.strictEqual(r.json.solde, avant + 850);
+    assert.ok((await api('/api/notifications', { jeton: a.jeton })).json.liste.some((n) => /Petit sac.*\+850/.test(n.texte)));
+    const adm = (await api('/admin/api/bouquets', { jeton: adminJeton })).json;
+    assert.strictEqual(adm.livraisons[0].pieces, 850); assert.match(adm.livraisons[0].ref, /MP-123456/);
+    assert.ok((await api('/admin/api/journal', { jeton: adminJeton })).json.some((l) => l.action === 'bouquet:livre'));
+  });
   await test('stickers : éteints au départ, cadeaux de l\'admin (joueur, tous, groupe) avec message, envoi décompté', async () => {
     assert.deepStrictEqual((await api('/api/config')).json.stickers, { actif: false, vente: false });
     const a = await invite('StickA'), b = await invite('StickB'), c = await invite('StickC');

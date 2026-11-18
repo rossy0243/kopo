@@ -22,7 +22,7 @@ function clientMobile(req) {
 // Adresse publique du site (liens légaux, liens d'invitation).
 const adresseSite = (env) => String(env.SITE_URL || 'https://kopo-d655.onrender.com/').replace(/\/?$/, '/');
 
-function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours, parrainage, matchJour, bande, push, stickers, env = process.env }) {
+function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours, parrainage, matchJour, bande, push, stickers, bouquets, env = process.env }) {
   const r = express.Router();
   r.use(express.json({ limit: '64kb' })); // la copie du profil (PUT /profil) peut faire quelques dizaines de ko
   // Limite par adresse IP (large : en 4G, beaucoup de joueurs partagent la même adresse).
@@ -160,6 +160,8 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours,
   // Stickers animés : catalogue, offres (pas encore en vente) et utilisations restantes du joueur.
   r.get('/stickers', joueur, enveloppe(async (req, res) => res.json(await stickers.pourJoueur(req.compte.id))));
   r.post('/stickers/acheter', joueur, enveloppe(async (req, res) => res.json(await stickers.acheter(req.compte, req.body || {}))));
+  // Bouquets de pièces (argent réel) : prix fixés ici, au taux des stickers ; le paiement mobile money n'est pas encore branché.
+  r.get('/bouquets', joueur, (req, res) => res.json({ solde: req.compte.solde, ...bouquets.pourJoueur() }));
   r.get('/boutique', joueur, enveloppe(async (req, res) => res.json({ solde: req.compte.solde, objets: parcours.catalogue(), ...(await parcours.collection(req.compte)) })));
   r.post('/boutique/acheter', joueur, enveloppe(async (req, res) => res.json(await parcours.acheter(req.compte, req.body.objet))));
 
