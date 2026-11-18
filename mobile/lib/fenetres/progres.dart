@@ -498,7 +498,7 @@ void _acheterStickers(Map s, int solde, {String? sticker, String? pack, required
 }
 
 // ---------------------------------------------------------------- acheter des pièces
-// Bouquets du moins cher (500 FC) au plus cher (40 000 FC, 20 \$), prix fixés par le serveur au taux des stickers
+// Bouquets du moins cher (500 FC) au plus cher (40 000 FC), prix fixés par le serveur au taux des stickers
 // (200 pièces ≈ 500 FC), avec un bonus qui grandit avec le bouquet. Le paiement mobile money n'est pas encore branché.
 Future<void> ouvrirAchatPieces({VoidCallback? retour}) async {
   Map B;
@@ -509,8 +509,6 @@ Future<void> ouvrirAchatPieces({VoidCallback? retour}) async {
   app.soldeServeur(B['solde']);
   app.ouvrirFenetre((context) => fenetreAchatPieces(B, retour: retour), 'boutique');
 }
-
-String _dollars(num d) => (d == d.roundToDouble() ? d.toInt().toString() : d.toString().replaceAll('.', ','));
 
 /// La fenêtre elle-même (séparée pour les captures d'écran).
 Widget fenetreAchatPieces(Map B, {VoidCallback? retour}) {
@@ -543,10 +541,7 @@ Widget fenetreAchatPieces(Map B, {VoidCallback? retour}) {
               child: Text('+${App.formatPieces(b['bonus'] as num)} offertes', style: K.texte(12, couleur: K.encre, poids: FontWeight.w700)),
             ),
         ])),
-        Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          Text('${App.formatPieces(b['francs'] as num)} FC', style: K.texte(16, poids: FontWeight.w700)),
-          Text('soit ${_dollars(b['dollars'] as num)} \$', style: K.texte(12, couleur: K.muted)),
-        ]),
+        Text('${App.formatPieces(b['francs'] as num)} FC', style: K.texte(16, poids: FontWeight.w700)),
       ]),
     );
     return Padding(

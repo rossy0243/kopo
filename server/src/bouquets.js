@@ -1,37 +1,35 @@
 // Bouquets de pièces (18/11) : l'endroit où l'on achète des pièces avec de l'argent réel (francs congolais, mobile money).
 // Même logique que les stickers (stickers.js) : le serveur fixe les prix, jamais le téléphone ; les francs et les pièces
-// suivent le taux de la stratégie (strategie-pieces §5.3 : 200 pièces ≈ 500 FC, soit 2,5 FC la pièce ; 1 $ ≈ 2 000 FC).
-// Plus le bouquet est gros, plus il donne de pièces en bonus. Le plus cher : 40 000 FC (20 $).
+// suivent le taux de la stratégie (strategie-pieces §5.3 : 200 pièces ≈ 500 FC, soit 2,5 FC la pièce).
+// Plus le bouquet est gros, plus il donne de pièces en bonus. Le plus cher : 40 000 FC.
 // Le paiement mobile money n'est pas encore branché : les bouquets s'affichent (« Bientôt »), et l'admin peut livrer
 // un bouquet à un joueur depuis le tableau de bord (paiement reçu à la main), avec un message au joueur.
 // Lignes rouges (strategie-pieces §5.4) : jamais de retrait ni d'échange de pièces, pas de tirage au sort.
 'use strict';
 
 const FC_PAR_PIECE = 2.5; // le même taux que les stickers (stickers.js)
-const FC_PAR_DOLLAR = 2000;
-const FRANCS_MAX = 40000; // 20 $
+const FRANCS_MAX = 40000;
 const BOUQUETS_MAX = 8;
 
 // Du moins cher au plus cher. `pieces` compte le bonus ; la base est francs / 2,5.
 const NOMS = ['Poignée', 'Petit sac', 'Sac', 'Coffret', 'Malle', 'Trésor', 'Grand trésor', 'Fortune'];
 const BOUQUETS_DEFAUT = [
-  { francs: 500, pieces: 200 }, //     0,25 $ : base 200, pas de bonus
-  { francs: 2000, pieces: 850 }, //       1 $ : base 800, +50 (6 %)
-  { francs: 5000, pieces: 2250 }, //    2,5 $ : base 2 000, +250 (12 %)
-  { francs: 10000, pieces: 4800 }, //     5 $ : base 4 000, +800 (20 %)
-  { francs: 20000, pieces: 10000 }, //   10 $ : base 8 000, +2 000 (25 %)
-  { francs: 40000, pieces: 21000 }, //   20 $ : base 16 000, +5 000 (31 %)
+  { francs: 500, pieces: 200 }, // base 200, pas de bonus
+  { francs: 2000, pieces: 850 }, // base 800, +50 (6 %)
+  { francs: 5000, pieces: 2250 }, // base 2 000, +250 (12 %)
+  { francs: 10000, pieces: 4800 }, // base 4 000, +800 (20 %)
+  { francs: 20000, pieces: 10000 }, // base 8 000, +2 000 (25 %)
+  { francs: 40000, pieces: 21000 }, // base 16 000, +5 000 (31 %)
 ];
 
 const erreur = (m, statut = 400) => Object.assign(new Error(m), { statut });
 const base = (francs) => Math.round(francs / FC_PAR_PIECE);
-const dollars = (francs) => Math.round((francs / FC_PAR_DOLLAR) * 100) / 100;
 
-// Ce que voit le joueur : nom, pièces (bonus compris), bonus en pièces et en %, prix en francs et en dollars.
+// Ce que voit le joueur : nom, pièces (bonus compris), bonus en pièces et en %, prix en francs congolais.
 function detailler(liste) {
   return liste.map((b, i) => {
     const bonus = b.pieces - base(b.francs);
-    return { id: i, nom: NOMS[i], francs: b.francs, dollars: dollars(b.francs), pieces: b.pieces, bonus, bonusPct: Math.round((100 * bonus) / base(b.francs)) };
+    return { id: i, nom: NOMS[i], francs: b.francs, pieces: b.pieces, bonus, bonusPct: Math.round((100 * bonus) / base(b.francs)) };
   });
 }
 
@@ -62,7 +60,7 @@ function creerBouquets(base_, reglages, comptes) {
   return {
     liste,
     // Pour le joueur. `paiement` : faux tant que le mobile money n'est pas branché (les prix sont affichés, rien ne se paie).
-    pourJoueur: () => ({ paiement: false, taux: { piecesPour500FC: 200, fcParDollar: FC_PAR_DOLLAR }, bouquets: liste() }),
+    pourJoueur: () => ({ paiement: false, taux: { piecesPour500FC: 200 }, bouquets: liste() }),
 
     // Tableau de bord : un bouquet livré à un joueur (paiement reçu à la main). Pièces au registre (motif « achat_pieces »)
     // et une notification au joueur, dans la même transaction.

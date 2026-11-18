@@ -1784,7 +1784,7 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     const B = (await api('/api/v1/bouquets', { jeton: a.jeton })).json;
     assert.strictEqual(B.paiement, false);
     assert.deepStrictEqual(B.bouquets.map((b) => [b.francs, b.pieces]), [[500, 200], [2000, 850], [5000, 2250], [10000, 4800], [20000, 10000], [40000, 21000]]);
-    assert.strictEqual(B.bouquets.at(-1).dollars, 20);
+    assert.strictEqual(B.bouquets.at(-1).francs, 40000); assert.ok(!('dollars' in B.bouquets[0]));
     for (let i = 1; i < B.bouquets.length; i++) {
       assert.ok(B.bouquets[i].francs > B.bouquets[i - 1].francs && B.bouquets[i].bonusPct > B.bouquets[i - 1].bonusPct, 'bonus croissant');
     }

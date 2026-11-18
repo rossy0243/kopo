@@ -96,8 +96,8 @@ const DIV = { bois: 'Bois', bronze: 'Bronze', argent: 'Argent', or: 'Or', diaman
 async function bouquetsAdmin() {
   const B = await api('/bouquets');
   $('#bouquets').innerHTML = `<div class="carte"><table><tr><th>Bouquet</th><th class="n">Prix</th><th class="n">Pièces</th><th class="n">dont bonus</th></tr>
-      ${B.bouquets.map((b) => `<tr><td>${esc(b.nom)}</td><td class="n">${nb(b.francs)} FC <span class="muted">(${String(b.dollars).replace('.', ',')} $)</span></td><td class="n">${nb(b.pieces)}</td><td class="n">${b.bonus ? `+${nb(b.bonus)} <span class="muted">(${b.bonusPct} %)</span>` : '<span class="muted">—</span>'}</td></tr>`).join('')}</table>
-      <p class="muted" style="margin:8px 0 0">Même taux que les stickers : 200 pièces ≈ 500 FC (1 $ ≈ 2 000 FC). Plus le bouquet est gros, plus le bonus monte. Les joueurs voient ces bouquets dans « Acheter des pièces » ; le paiement mobile money n'est pas encore branché (« Bientôt »).</p></div>
+      ${B.bouquets.map((b) => `<tr><td>${esc(b.nom)}</td><td class="n">${nb(b.francs)} FC</td><td class="n">${nb(b.pieces)}</td><td class="n">${b.bonus ? `+${nb(b.bonus)} <span class="muted">(${b.bonusPct} %)</span>` : '<span class="muted">—</span>'}</td></tr>`).join('')}</table>
+      <p class="muted" style="margin:8px 0 0">Même taux que les stickers : 200 pièces ≈ 500 FC. Plus le bouquet est gros, plus le bonus monte. Les joueurs voient ces bouquets dans « Acheter des pièces » ; le paiement mobile money n'est pas encore branché (« Bientôt »).</p></div>
     <div class="carte"><b>Livrer un bouquet</b> <span class="muted">(paiement mobile money reçu à la main)</span>
       <div class="ligne"><input id="bqJoueur" placeholder="Pseudo#1234" style="width:180px"><select id="bqQuoi">${B.bouquets.map((b) => `<option value="${b.id}">${esc(b.nom)} · ${nb(b.francs)} FC → ${nb(b.pieces)} pièces</option>`).join('')}</select>
         <input id="bqRef" placeholder="Référence (ex. n° de transaction)" style="flex:1;min-width:200px"><button class="btn principal" id="bqLivrer">Livrer</button></div>
