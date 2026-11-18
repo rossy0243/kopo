@@ -37,9 +37,21 @@ function jetonLiveKit({ cle, secret, identite, nom, salon, parler, duree = DUREE
   return tete + '.' + crypto.createHmac('sha256', secret).update(tete).digest('base64url');
 }
 
+// « https://x.livekit.cloud/ », « x.livekit.cloud » ou « wss://x.livekit.cloud » donnent tous wss://x.livekit.cloud.
+function adresseLiveKit(v) {
+  if (!v) return '';
+  let u = v.replace(/\/+$/, '');
+  if (/^https:\/\//i.test(u)) u = 'wss://' + u.slice(8);
+  else if (/^http:\/\//i.test(u)) u = 'ws://' + u.slice(7);
+  else if (!/^wss?:\/\//i.test(u)) u = 'wss://' + u;
+  return u;
+}
+
 function creerAbonnement(base_, env = process.env) {
-  const livekit = env.LIVEKIT_URL && env.LIVEKIT_API_KEY && env.LIVEKIT_API_SECRET
-    ? { url: env.LIVEKIT_URL, cle: env.LIVEKIT_API_KEY, secret: env.LIVEKIT_API_SECRET } : null;
+  // Valeurs copiées-collées dans Render : on enlève espaces et guillemets, et l'adresse devient wss:// si besoin.
+  const net = (v) => String(v || '').trim().replace(/^["']|["']$/g, '').trim();
+  const url = adresseLiveKit(net(env.LIVEKIT_URL)), cle = net(env.LIVEKIT_API_KEY), secretLk = net(env.LIVEKIT_API_SECRET);
+  const livekit = url && cle && secretLk ? { url, cle, secret: secretLk } : null;
   const offre = () => ({ paiement: false, micro: !!livekit, formules: FORMULES.map((f) => ({ ...f })), avantages: AVANTAGES.slice() });
 
   const api = {
@@ -83,6 +95,22 @@ function creerAbonnement(base_, env = process.env) {
       return { ...offre(), actifs, francs30j: mois.f, activations30j: mois.n, activations };
     },
 
+    // Tableau de bord : LiveKit accepte-t-il nos réglages ? Un jeton d'essai est présenté à /rtc/validate du serveur vocal.
+    async verifierLiveKit(fetcher = globalThis.fetch) {
+      if (!livekit) return { ok: false, raison: 'LIVEKIT_URL, LIVEKIT_API_KEY ou LIVEKIT_API_SECRET absent sur Render.' };
+      const jeton = jetonLiveKit({ cle: livekit.cle, secret: livekit.secret, identite: 'verif-admin', nom: 'Vérification', salon: 'verification', parler: false, duree: 60 });
+      const base = livekit.url.replace(/^ws/i, 'http');
+      try {
+        const r = await fetcher(`${base}/rtc/validate?access_token=${encodeURIComponent(jeton)}`, { signal: AbortSignal.timeout(8000) });
+        const texte = String(await r.text()).trim().slice(0, 200);
+        if (r.ok) return { ok: true, url: livekit.url };
+        if (r.status === 401 || r.status === 403) return { ok: false, url: livekit.url, raison: `LiveKit refuse la clé : vérifie LIVEKIT_API_KEY et LIVEKIT_API_SECRET (la clé et son secret doivent aller ensemble). Réponse : ${texte}` };
+        return { ok: false, url: livekit.url, raison: `LiveKit répond ${r.status} : vérifie LIVEKIT_URL. ${texte}` };
+      } catch (e) {
+        return { ok: false, url: livekit.url, raison: `Serveur vocal injoignable à ${livekit.url} : vérifie LIVEKIT_URL (ex. wss://ton-projet.livekit.cloud). ${String(e.message || e).slice(0, 120)}` };
+      }
+    },
+
     // Salle : jeton du salon vocal de la table pour un abonné assis (vérifié par la salle). `parler` faux = sanction « micro ».
     jetonVocal({ compte, salon, parler }) {
       if (!livekit) throw erreur('Le micro arrive bientôt.', 503);
@@ -92,4 +120,4 @@ function creerAbonnement(base_, env = process.env) {
   return api;
 }
 
-module.exports = { creerAbonnement, jetonLiveKit, estAbonne, FORMULES, AVANTAGES };
+module.exports = { creerAbonnement, jetonLiveKit, adresseLiveKit, estAbonne, FORMULES, AVANTAGES };

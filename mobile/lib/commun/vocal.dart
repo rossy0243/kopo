@@ -54,9 +54,10 @@ class Vocal {
       });
     try {
       await salle.connect(d['url'].toString(), d['jeton'].toString());
-    } catch (_) {
+    } catch (e) {
       if (_salle == salle) _salle = null;
-      toast('Micro : connexion au salon vocal impossible.', 'echec');
+      final r = e.toString();
+      toast('Micro : connexion au salon vocal impossible. (${r.length > 90 ? r.substring(0, 90) : r})', 'echec');
       return;
     }
     if (_salle != salle) { await salle.disconnect(); return; }
