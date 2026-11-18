@@ -40,6 +40,8 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
   if (!push.actif()) console.log('Notifications push éteintes (VAPID_PUBLIC et VAPID_PRIVE absents).');
   const social = creerSocial(base, push);
   const parcours = creerParcours(base, reglages, comptes, ligue);
+  // Cadres retirés : les cadres achetés en boutique sont remboursés (une seule fois par cadre).
+  await parcours.rembourserCadres().then((r) => r.pieces && console.log(`Cadres remboursés : ${r.remboursements} achats, ${r.pieces} pièces.`)).catch((e) => console.error('Remboursement des cadres :', e.message));
   const parrainage = creerParrainage(base, reglages, comptes, social, env);
   const matchJour = creerMatchJour(base, reglages, env);
   const bande = creerBande(base, reglages, comptes, matchJour, social);

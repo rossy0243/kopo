@@ -58,6 +58,8 @@
   // Thème des pays (depuis le 02/11, avant : villes). Rien n'aide à gagner : ce sont des apparences.
   // Les identifiants gardent leur ancien nom de ville (déjà dans les collections) ; seul le nom affiché change.
   // ville: true = objet de l'ancien thème, plus proposé, mais toujours valable pour qui l'a déjà.
+  // retire: true = cadres, retirés du jeu le 18/11 : plus donnés, plus montrés ni équipables.
+  // Gardés ici (et dans les profils) pour pouvoir les réutiliser autrement plus tard.
   const OBJETS = {
     'av-laiton': { type: 'avatar', nom: 'Laiton', d: 'De base' },
     'av-nuit': { type: 'avatar', nom: 'Nuit', d: 'Niveau 2' },
@@ -65,18 +67,17 @@
     'av-fleuve': { type: 'avatar', nom: 'Fleuve', d: 'Niveau 5' },
     'dos-laiton': { type: 'dos', nom: 'Laiton', d: 'De base' },
     'dos-kinshasa': { type: 'dos', nom: 'RD Congo', d: 'Bienvenue, jour 7' },
-    'cadre-kinshasa': { type: 'cadre', nom: 'RD Congo', d: 'Défi de la semaine' },
-    'cadre-abidjan': { type: 'cadre', nom: "Côte d'Ivoire", d: 'Défi de la semaine' },
-    'cadre-dakar': { type: 'cadre', nom: 'Sénégal', d: 'Défi de la semaine' },
-    'cadre-douala': { type: 'cadre', nom: 'Cameroun', d: 'Défi de la semaine' },
-    'cadre-brazzaville': { type: 'cadre', nom: 'Congo', d: 'Défi de la semaine' },
-    'cadre-lubumbashi': { type: 'cadre', nom: 'Lubumbashi', d: 'Ancien défi', ville: true },
+    'cadre-kinshasa': { type: 'cadre', nom: 'RD Congo', d: 'Défi de la semaine', retire: true },
+    'cadre-abidjan': { type: 'cadre', nom: "Côte d'Ivoire", d: 'Défi de la semaine', retire: true },
+    'cadre-dakar': { type: 'cadre', nom: 'Sénégal', d: 'Défi de la semaine', retire: true },
+    'cadre-douala': { type: 'cadre', nom: 'Cameroun', d: 'Défi de la semaine', retire: true },
+    'cadre-brazzaville': { type: 'cadre', nom: 'Congo', d: 'Défi de la semaine', retire: true },
+    'cadre-lubumbashi': { type: 'cadre', nom: 'Lubumbashi', d: 'Ancien défi', ville: true, retire: true },
   };
   // Ordre d'affichage des catégories (boutique et collection).
   const CATEGORIES = [
     { type: 'avatar', nom: 'Avatars', un: 'Avatar' },
     { type: 'dos', nom: 'Dos de cartes', un: 'Dos de cartes' },
-    { type: 'cadre', nom: 'Cadres', un: 'Cadre' },
   ];
   // Range une liste d'objets ({ id, type, … }) par catégorie, dans l'ordre de CATEGORIES ; les catégories vides sont omises.
   function parCategorie(liste) {
@@ -95,15 +96,14 @@
   // Donne un objet ; on l'équipe tout de suite pour que le joueur le voie.
   function donnerObjet(p, id) {
     const c = collection(p), o = OBJETS[id];
-    if (!o || c.possedes.includes(id)) return false;
+    if (!o || o.retire || c.possedes.includes(id)) return false;
     c.possedes.push(id);
     c.equipes[o.type] = id;
     return true;
   }
   function equiper(p, id) {
     const c = collection(p), o = OBJETS[id];
-    if (!o) return false;
-    if (o.type === 'cadre' && c.equipes.cadre === id) { c.equipes.cadre = null; return true; } // retirer le cadre
+    if (!o || o.retire) return false;
     if (!c.possedes.includes(id)) return false;
     c.equipes[o.type] = id;
     return true;
@@ -202,17 +202,16 @@
     { id: 'katapss3', texte: 'Fais 3 Katapss cette semaine', cible: 3, compte: (e) => e.katapss },
     { id: 'finales6', texte: 'Atteins 6 finales cette semaine', cible: 6, compte: (e) => (e.finale ? 1 : 0) },
   ];
-  const CADRES = ['cadre-kinshasa', 'cadre-abidjan', 'cadre-dakar', 'cadre-douala', 'cadre-brazzaville']; // pays seulement
   const DEFI_PIECES = 300, DEFI_XP = 30;
   function defiSemaine(p, jour) {
     const sem = semaineDe(jour);
     if (!p.defi || p.defi.semaine !== sem) {
       const n = parseInt(sem.slice(-2), 10) + parseInt(sem.slice(0, 4), 10) * 53;
-      p.defi = { semaine: sem, id: DEFIS[n % DEFIS.length].id, cadre: CADRES[n % CADRES.length], avance: 0, finie: false };
+      p.defi = { semaine: sem, id: DEFIS[n % DEFIS.length].id, avance: 0, finie: false }; // plus de cadre (retirés le 18/11)
     }
     const d = DEFIS.find((x) => x.id === p.defi.id) || DEFIS[0];
     const fin = decaler(jour, 6 - ((dateDe(jour).getDay() + 6) % 7));
-    return { texte: d.texte, cible: d.cible, avance: Math.min(p.defi.avance, d.cible), finie: p.defi.finie, pieces: DEFI_PIECES, xp: DEFI_XP, cadre: p.defi.cadre, nomCadre: OBJETS[p.defi.cadre].nom, joursRestants: ecart(jour, fin) + 1 };
+    return { texte: d.texte, cible: d.cible, avance: Math.min(p.defi.avance, d.cible), finie: p.defi.finie, pieces: DEFI_PIECES, xp: DEFI_XP, joursRestants: ecart(jour, fin) + 1 };
   }
 
   // ------------------------------------------------------------------ parcours de bienvenue (7 jours)
@@ -355,8 +354,8 @@
       if (n) {
         const avant = p.defi.avance;
         p.defi.avance = Math.min(d.cible, avant + n);
-        if (p.defi.avance >= d.cible) { p.defi.finie = true; piecesGagnees += DEFI_PIECES; xpMissions += DEFI_XP; donnerObjet(p, p.defi.cadre); }
-        defi = { texte: d.texte, avant, apres: p.defi.avance, cible: d.cible, finie: p.defi.finie, pieces: DEFI_PIECES, cadre: p.defi.finie ? OBJETS[p.defi.cadre].nom : null };
+        if (p.defi.avance >= d.cible) { p.defi.finie = true; piecesGagnees += DEFI_PIECES; xpMissions += DEFI_XP; }
+        defi = { texte: d.texte, avant, apres: p.defi.avance, cible: d.cible, finie: p.defi.finie, pieces: DEFI_PIECES };
       }
     }
     if (piecesGagnees) crediter(p, piecesGagnees);

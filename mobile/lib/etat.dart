@@ -217,7 +217,6 @@ class App extends ChangeNotifier {
     maj();
   }
   String get avatarEquipe => ((R.collection(lireProfil())['equipes'] as Map?)?['avatar'] as String?) ?? 'av-laiton';
-  String? get cadreEquipe => (R.collection(lireProfil())['equipes'] as Map?)?['cadre'] as String?;
   bool get pointMissions {
     final p = lireProfil(), j = jourLocal();
     return !(p['missions'] is Map && p['missions']['vuLe'] == j) || R.aEncaisser(p, j) > 0;

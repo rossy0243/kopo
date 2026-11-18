@@ -673,7 +673,7 @@ paths:
   /collection/equiper:
     post:
       tags: [Boutique et parcours]
-      summary: Équiper un objet possédé (avatar, dos de cartes, cadre)
+      summary: Équiper un objet possédé (avatar, dos de cartes ; les cadres sont retirés : 400)
       requestBody:
         required: true
         content: { application/json: { schema: { type: object, required: [objet], properties: { objet: { type: [string, 'null'] } } } } }

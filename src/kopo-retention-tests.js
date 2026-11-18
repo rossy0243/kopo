@@ -215,15 +215,15 @@ test('Même défi toute la semaine, un autre la semaine suivante', () => {
   assert.strictEqual(R.defiSemaine(p, '2026-11-01').texte, a);
   assert.notStrictEqual(R.defiSemaine(p, '2026-11-02').texte, a);
 });
-test('Défi fini : 300 pièces, XP et le cadre de la ville de la semaine', () => {
+test('Défi fini : 300 pièces et XP, plus de cadre (retirés)', () => {
   const p = profil();
   const d = R.defiSemaine(p, '2026-10-31');
   const e = partie({ place: 1, victoire: true, finale: true, manches: 30, katapss: 3 });
   let r;
   for (let i = 0; i < d.cible && !(r && r.defi && r.defi.finie); i++) r = R.enregistrerPartie(p, e, '2026-10-31');
   assert.ok(r.defi.finie);
-  assert.ok(p.collection.possedes.includes(d.cadre));
-  assert.strictEqual(p.collection.equipes.cadre, d.cadre);
+  assert.ok(!('cadre' in d) && !('cadre' in r.defi));
+  assert.ok(!p.collection.possedes.some((id) => R.OBJETS[id].type === 'cadre'));
   assert.ok(R.defiSemaine(p, '2026-10-31').joursRestants === 2);
 });
 
@@ -280,31 +280,25 @@ test('Deux jours ratés : la série repart à 1', () => {
 });
 
 console.log('\nCollection');
-test('Équiper seulement un objet possédé ; retirer un cadre', () => {
+test('Équiper seulement un objet possédé ; les cadres ne se donnent ni ne s\'équipent plus', () => {
   const p = profil();
   assert.strictEqual(R.equiper(p, 'av-kinshasa'), false);
-  R.donnerObjet(p, 'cadre-dakar');
-  assert.strictEqual(p.collection.equipes.cadre, 'cadre-dakar');
-  assert.ok(R.equiper(p, 'cadre-dakar'));
-  assert.strictEqual(p.collection.equipes.cadre, null);
+  assert.strictEqual(R.donnerObjet(p, 'cadre-dakar'), false);
+  p.collection.possedes.push('cadre-dakar'); // ancien cadre gardé dans le profil
+  assert.strictEqual(R.equiper(p, 'cadre-dakar'), false);
   assert.ok(R.equiper(p, 'av-laiton'));
 });
-test('Rangement par catégorie : avatars, dos de cartes, cadres (vides omises)', () => {
+test('Rangement par catégorie : avatars, dos de cartes (vides omises, plus de cadres)', () => {
   const l = Object.entries(R.OBJETS).map(([id, o]) => Object.assign({ id }, o));
-  assert.deepStrictEqual(R.parCategorie(l).map((c) => c.nom), ['Avatars', 'Dos de cartes', 'Cadres']);
-  assert.deepStrictEqual(R.parCategorie(l.filter((o) => o.type !== 'dos')).map((c) => c.type), ['avatar', 'cadre']);
-  assert.strictEqual(R.parCategorie(l).reduce((n, c) => n + c.objets.length, 0), l.length);
+  assert.deepStrictEqual(R.parCategorie(l).map((c) => c.nom), ['Avatars', 'Dos de cartes']);
+  assert.deepStrictEqual(R.parCategorie(l.filter((o) => o.type !== 'dos')).map((c) => c.type), ['avatar']);
+  assert.strictEqual(R.parCategorie(l).reduce((n, c) => n + c.objets.length, 0), l.filter((o) => o.type !== 'cadre').length);
 });
-test('Thème des pays : le défi ne donne plus de cadre de ville, mais un ancien cadre de ville reste équipable', () => {
+test('Thème des pays : un ancien objet de ville reste équipable ; les cadres restent connus mais retirés', () => {
   const p = profil();
-  for (let i = 0; i < 60; i++) {
-    const q = profil();
-    const d = R.defiSemaine(q, R.decaler('2026-11-02', 7 * i));
-    assert.ok(!R.OBJETS[d.cadre].ville, d.cadre);
-  }
-  p.collection = { possedes: ['cadre-lubumbashi'] };
-  assert.ok(R.equiper(p, 'cadre-lubumbashi'));
-  assert.strictEqual(p.collection.equipes.cadre, 'cadre-lubumbashi');
+  p.collection = { possedes: ['av-laiton', 'dos-laiton', 'cadre-lubumbashi'] };
+  assert.ok(!R.equiper(p, 'cadre-lubumbashi'));
+  assert.ok(R.OBJETS['cadre-lubumbashi'].retire);
   assert.strictEqual(R.OBJETS['av-kinshasa'].nom, 'RD Congo');
 });
 
@@ -328,7 +322,8 @@ console.log('\nRéunir deux profils (changement d\'adresse, sauvegarde du serveu
 const ancienProfil = () => {
   const p = profil();
   for (let i = 0; i < 30; i++) R.enregistrerPartie(p, partie({ place: i % 3 ? 2 : 1, nbJoueurs: i < 10 ? 2 : 3, victoire: !(i % 3), finale: true, adversaires: i < 10 ? [{ id: 'yvn', nom: 'Yvn', devant: false }] : [] }), '2026-10-0' + (1 + (i % 9)));
-  R.donnerObjet(p, 'cadre-dakar');
+  R.donnerObjet(p, 'av-nuit');
+  R.equiper(p, 'av-nuit');
   return p;
 };
 const neufProfil = () => {
@@ -345,8 +340,8 @@ test('déménagement : les deux profils sont additionnés, rien n\'est perdu', (
   assert.strictEqual(n.xp, xp);
   assert.deepStrictEqual([n.rivaux.yvn.gagnes, n.rivaux.yvn.perdus], [10, 4]);
   assert.strictEqual(n.premierePartie, a.premierePartie);
-  assert.ok(n.collection.possedes.includes('cadre-dakar'));
-  assert.strictEqual(n.collection.equipes.cadre, 'cadre-dakar');
+  assert.ok(n.collection.possedes.includes('av-nuit'));
+  assert.strictEqual(n.collection.equipes.avatar, 'av-nuit');
 });
 test('déménagement : une deuxième visite de l\'ancienne adresse ne compte pas deux fois', () => {
   const a = ancienProfil(), n = neufProfil();
