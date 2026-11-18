@@ -340,7 +340,9 @@ details.rappel summary { cursor: pointer; font-weight: 600; }
   body.en-jeu .depart-qui { font-size: 17px; }
   body.en-jeu .zone-main { position: static; border: 0; background: none; padding: 0; margin: 0; }
   body.en-jeu .zone-main h3 { display: none; }
-  body.en-jeu .main { position: absolute; left: 50%; transform: translateX(-50%); bottom: max(6px, env(safe-area-inset-bottom)); width: min(calc(100% - 340px), 640px); justify-content: center; flex-wrap: nowrap; margin: 0; padding-top: 0; min-height: 0; z-index: 2; }
+  /* La main reste entre ton siège (à gauche) et la colonne des boutons (à droite) : --main-g et --main-d
+     sont mesurés par ajusterMain (encoches et bords arrondis compris), pour qu'aucune carte ne passe sous un bouton. */
+  body.en-jeu .main { position: absolute; left: var(--main-g, calc(max(10px, env(safe-area-inset-left)) + 126px)); right: var(--main-d, calc(max(10px, env(safe-area-inset-right)) + 158px)); margin: 0 auto; max-width: 640px; bottom: max(6px, env(safe-area-inset-bottom)); justify-content: center; flex-wrap: nowrap; margin: 0; padding-top: 0; min-height: 0; z-index: 2; }
   body.en-jeu .main .carte { transform: translateY(var(--dy, 0px)) rotate(var(--r, 0deg)); transform-origin: 50% 130%; box-shadow: 0 6px 14px rgba(0,0,0,.45); }
   body.en-jeu .main .carte.choisie { transform: translateY(calc(var(--dy, 0px) - 22px)) rotate(var(--r, 0deg)); }
   body.en-jeu .main.placee { position: absolute; }
@@ -352,6 +354,10 @@ details.rappel summary { cursor: pointer; font-weight: 600; }
   body.en-jeu .actions small.muted { display: none; }
   body.en-jeu #zoneKatapss { position: absolute; right: max(14px, env(safe-area-inset-right)); top: 50%; transform: translateY(-50%); z-index: 2; }
   body.en-jeu .btn.katapss { width: 112px; height: 112px; border-radius: 50%; padding: 0; font-size: 24px; letter-spacing: 1px; line-height: 1; border: 4px solid #ff8f86; box-shadow: 0 8px 0 #7d1d18, 0 12px 24px rgba(0,0,0,.5); }
+  /* Pas la place au-dessus des boutons (écran bas, plusieurs « Contester ») : placerKatapss réduit les ronds, sur 1 ou 2 colonnes. */
+  body.en-jeu #zoneKatapss.serre { display: grid; grid-template-columns: repeat(var(--kc, 1), auto); gap: 8px; justify-items: center; }
+  body.en-jeu #zoneKatapss.serre .btn.katapss { width: var(--kt); height: var(--kt); font-size: calc(var(--kt) * .21); border-width: 3px; box-shadow: 0 5px 0 #7d1d18, 0 8px 16px rgba(0,0,0,.5); }
+  body.en-jeu #zoneKatapss.serre .btn.katapss.inter { font-size: calc(var(--kt) * .16); letter-spacing: 0; }
 }
 @media (orientation: landscape) and (max-height: 430px) {
   body.en-jeu .main .carte { width: 58px; height: 84px; }
@@ -3254,7 +3260,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       b.onclick = () => { b.disabled = true; envoyer({ type: 'action', action: { type: 'ramasser' } }); };
       act.append(b);
     }
-
+    placerKatapss();
   }
 
   // ------------------------------------------------------------------ Inter (8) : la table
@@ -3534,6 +3540,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       b.onclick = () => { b.disabled = true; choixInter = []; envoyer({ type: 'action', action: { type: 'passer' } }); };
       act.append(b);
     }
+    placerKatapss();
   }
 
   // ------------------------------------------------------------------ Inter (8) : animations et sons
@@ -3640,6 +3647,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     main.classList.remove('rangees');
     if (!n || main.offsetParent === null) { main.style.height = ''; return; }
     const paysage = matchMedia('(orientation: landscape)').matches;
+    if (paysage) reserverBords(main);
     const W = main.clientWidth, w = cartes[0].offsetWidth, h = cartes[0].offsetHeight;
     const cs = getComputedStyle(main), padG = parseFloat(cs.paddingLeft) || 0, padH = parseFloat(cs.paddingTop) || 0;
     const L = W - padG - (parseFloat(cs.paddingRight) || 0);
@@ -3662,7 +3670,54 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       c.style.top = padH + r * pasV + 'px';
     });
   }
-  window.addEventListener('resize', () => poserMain($('main'), null));
+  window.addEventListener('resize', () => { poserMain($('main'), null); placerKatapss(); });
+
+  // En paysage, la main se place entre ton siège (en bas à gauche) et la colonne des boutons (en bas à droite),
+  // mesurés à l'écran : avec une encoche ou des bords arrondis (zone sûre), les boutons s'écartent du bord
+  // et la main se resserre d'autant, pour qu'aucune carte ne passe dessous. La colonne des boutons garde
+  // sa largeur même vide : la main ne bouge pas quand les boutons apparaissent.
+  function reserverBords(main) {
+    const boite = main.offsetParent, moi = document.querySelector('#ecranPartie .siege.vous'), act = $('actions');
+    if (!boite) return;
+    const b = boite.getBoundingClientRect(), ECART = 16; // l'éventail (cartes du bord tournées) déborde un peu
+    let g = 0, d = 0;
+    if (moi && moi.offsetParent) g = moi.getBoundingClientRect().right - b.left + ECART;
+    for (const e of [act, $('zoneKatapss')]) {
+      const r = e.getBoundingClientRect();
+      if (r.width && e.offsetParent) d = Math.max(d, b.right - r.left + ECART);
+    }
+    main.style.setProperty('--main-g', Math.round(Math.max(g, 10)) + 'px');
+    main.style.setProperty('--main-d', Math.round(Math.max(d, 10)) + 'px');
+  }
+
+  // En paysage, KATAPSS (ou J'annonce et les Contester) est au milieu à droite, au-dessus de la colonne des boutons.
+  // Sur un écran bas, ou avec plusieurs boutons, ils descendraient sur « Jouer », « Ramasser »… : on les pose
+  // alors juste au-dessus des boutons, en ronds plus petits, sur 1 ou 2 colonnes.
+  function placerKatapss() {
+    const zk = $('zoneKatapss'), act = $('actions');
+    zk.classList.remove('serre'); zk.style.top = zk.style.bottom = zk.style.transform = '';
+    zk.style.removeProperty('--kt'); zk.style.removeProperty('--kc');
+    const n = zk.children.length;
+    if (!n || !zk.offsetParent || !document.body.classList.contains('en-jeu') || !matchMedia('(orientation: landscape)').matches) return;
+    const boite = zk.offsetParent.getBoundingClientRect(), r = zk.getBoundingClientRect(), a = act.getBoundingClientRect();
+    const tete = document.querySelector('body.en-jeu header'), ECART = 8;
+    const haut = (tete ? tete.getBoundingClientRect().bottom : boite.top) + ECART;
+    const bas = (a.height ? a.top : boite.bottom - 10) - ECART;
+    if (r.top >= haut && r.bottom <= bas) return; // tient déjà au milieu
+    const taille = zk.children[0].offsetWidth, place = Math.max(0, bas - haut), large = Math.max(a.width, taille);
+    let kt = 0, kc = 1;
+    for (const c of [1, 2]) {
+      const rangs = Math.ceil(n / c);
+      const t = Math.floor(Math.min(taille, (place - (rangs - 1) * ECART) / rangs, (large - (c - 1) * ECART) / c));
+      if (t > kt + 4) { kt = t; kc = c; }
+    }
+    zk.classList.add('serre');
+    zk.style.setProperty('--kt', Math.max(56, kt) + 'px');
+    zk.style.setProperty('--kc', kc);
+    zk.style.top = 'auto'; zk.style.transform = 'none';
+    zk.style.bottom = Math.round(boite.bottom - bas) + 'px';
+  }
+  if (window.ResizeObserver) new ResizeObserver(() => placerKatapss()).observe($('actions'));
 
   // Centre d'une carte de ta main à sa place finale (sans ses animations).
   function centrePlace(e) {

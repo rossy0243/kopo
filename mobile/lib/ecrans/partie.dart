@@ -59,7 +59,8 @@ class Partie extends StatelessWidget {
           ]),
         ),
         if (paysage)
-          Expanded(child: Row(children: [Expanded(flex: 3, child: Column(children: [table])), SizedBox(width: math.min(420, MediaQuery.of(context).size.width * .42), child: SingleChildScrollView(child: bas))]))
+          // Paysage : la colonne de droite garde ses boutons en bas, toujours visibles ; la main se range au-dessus (_Bas).
+          Expanded(child: Row(children: [Expanded(flex: 3, child: Column(children: [table])), SizedBox(width: math.min(420, MediaQuery.of(context).size.width * .42), child: bas)]))
         else ...[table, ConstrainedBox(constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * .56), child: SingleChildScrollView(reverse: true, child: bas))],
       ]),
     );
@@ -433,10 +434,10 @@ class _Bas extends StatelessWidget {
     }
     final aide = v['robots'] == 'gentils' ? (inter ? aideGuideeInter(v) : aideGuidee(v)) : null;
     final barre = (v['chrono'] != null && monTour) || pause != null;
+    final paysage = MediaQuery.of(context).orientation == Orientation.landscape;
+    final (main, boutons) = jeJoue ? (inter ? _mainInter(context, actions, monTour, paysage) : _mainKopo(context, actions, monTour, paysage)) : (const <Widget>[], const <Widget>[]);
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(10, 4, 10, 8),
-      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+    final haut = <Widget>[
         if (consigne.isNotEmpty) Text.rich(TextSpan(style: K.texte(15), children: consigne), textAlign: TextAlign.center),
         if (aide != null)
           Container(
@@ -454,13 +455,38 @@ class _Bas extends StatelessWidget {
           ),
         if (v['entreRobots'] == true)
           Padding(padding: const EdgeInsets.only(top: 6), child: Btn(restants.contains(v['moi']) ? 'Passer à la fin de la manche' : 'Passer à la fin', large: true, onTap: () => app.envoyer({'type': 'passerFin'}))),
-        if (jeJoue) ...(inter ? _mainInter(context, actions, monTour) : _mainKopo(context, actions, monTour)),
-      ]),
+        ...main,
+    ];
+    const marges = EdgeInsets.fromLTRB(10, 4, 10, 8);
+    if (!paysage) return Padding(padding: marges, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [...haut, ...boutons]));
+    // Paysage : les boutons (KATAPSS, J'annonce, Contester, Jouer, Piocher…) ont leur place réservée en bas de la colonne.
+    // La main et la consigne prennent le reste, au-dessus : une grande main passe sur plusieurs rangées (_Main),
+    // et si l'écran est trop bas, c'est cette partie qui défile, jamais sous les boutons. Sur un tout petit écran,
+    // les boutons gardent au plus un peu plus de la moitié de la hauteur (et défilent à leur tour) : une rangée de cartes reste visible.
+    return Padding(
+      padding: marges,
+      child: LayoutBuilder(
+        builder: (context, c) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, place) => _PlaceMain(
+                hauteur: place.maxHeight - (consigne.isNotEmpty ? 28 : 6),
+                child: SingleChildScrollView(reverse: true, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: haut)),
+              ),
+            ),
+          ),
+          if (boutons.isNotEmpty)
+            ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: math.max(c.maxHeight * .55, c.maxHeight - 140)),
+              child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: boutons)),
+            ),
+        ]),
+      ),
     );
   }
 
   // ---- Kopo
-  List<Widget> _mainKopo(BuildContext context, List<Map> actions, bool monTour) {
+  (List<Widget>, List<Widget>) _mainKopo(BuildContext context, List<Map> actions, bool monTour, bool paysage) {
     final main = (m['main'] as List).cast<String>();
     final jouables = {for (final a in actions) if (a['type'] == 'jouer') a['carte'] as String};
     if (app.carteChoisie != null && !jouables.contains(app.carteChoisie)) app.carteChoisie = null;
@@ -474,14 +500,16 @@ class _Bas extends StatelessWidget {
     final toutPoser = actions.any((a) => a['type'] == 'toutPoser');
     final n = main.length;
     final s = n > 1 ? 's' : '';
-    return [
-      if (actions.any((a) => a['type'] == 'katapss')) Padding(padding: const EdgeInsets.only(top: 8), child: _GrosBouton('KATAPSS !', () => app.action({'type': 'katapss'}))),
+    final katapss = actions.any((a) => a['type'] == 'katapss') ? Padding(padding: const EdgeInsets.only(top: 8), child: _GrosBouton('KATAPSS !', () => app.action({'type': 'katapss'}), petit: paysage)) : null;
+    return ([
+      if (katapss != null && !paysage) katapss,
       const SizedBox(height: 6),
-      Text('Ta main ($n carte$s)${jouables.isNotEmpty ? ' · touche une carte' : ''}', textAlign: TextAlign.center, style: K.texte(13, couleur: K.muted)),
-      const SizedBox(height: 4),
+      // En paysage, comme sur le site : pas de titre, la place va aux cartes.
+      if (!paysage) ...[Text('Ta main ($n carte$s)${jouables.isNotEmpty ? ' · touche une carte' : ''}', textAlign: TextAlign.center, style: K.texte(13, couleur: K.muted)), const SizedBox(height: 4)],
       _Main(
         cartes: KopoCartes.trier(main, app.prefs['tri'] as String? ?? 'couleur'),
         inter: false,
+        rangsMax: paysage ? 3 : 1,
         etat: (c) => jouables.contains(c) ? (c == choisie ? _EtatCarte.choisie : _EtatCarte.jouable) : monTour ? _EtatCarte.grisee : _EtatCarte.normale,
         onTap: (c) {
           if (!jouables.contains(c)) return;
@@ -490,6 +518,8 @@ class _Bas extends StatelessWidget {
           app.maj();
         },
       ),
+    ], [
+      if (katapss != null && paysage) katapss,
       const SizedBox(height: 6),
       if (choisie != null) Btn.principal('Jouer le ${KopoCartes.afficher(choisie)}', large: true, onTap: () { app.carteChoisie = null; app.action({'type': 'jouer', 'carte': choisie}); }),
       if (toutPoser)
@@ -505,11 +535,11 @@ class _Bas extends StatelessWidget {
           padding: const EdgeInsets.only(top: 6),
           child: Btn('Ramasser le ${KopoCartes.afficher(forte)}${jouables.isNotEmpty || toutPoser ? ' (bluff)' : ''}', style: jouables.isEmpty && !toutPoser ? StyleBtn.principal : StyleBtn.normal, large: true, onTap: () => app.action({'type': 'ramasser'})),
         ),
-    ];
+    ]);
   }
 
   // ---- Inter (8)
-  List<Widget> _mainInter(BuildContext context, List<Map> actions, bool monTour) {
+  (List<Widget>, List<Widget>) _mainInter(BuildContext context, List<Map> actions, bool monTour, bool paysage) {
     final main = (m['main'] as List).cast<String>();
     final coups = actions.where((a) => a['type'] == 'jouer').toList();
     bool contient(Map a, String c) => (a['cartes'] as List).contains(c);
@@ -523,11 +553,11 @@ class _Bas extends StatelessWidget {
     void changer(List<String> l) { app.choixInter = l; app.maj(); }
 
     final zone = <Widget>[
-      if (actions.any((a) => a['type'] == 'annoncer')) _GrosBouton("J'ANNONCE !", () => app.action({'type': 'annoncer'})),
+      if (actions.any((a) => a['type'] == 'annoncer')) _GrosBouton("J'ANNONCE !", () => app.action({'type': 'annoncer'}), petit: paysage),
       for (final a in actions.where((a) => a['type'] == 'contester'))
-        _GrosBouton('CONTESTER ${app.nomDe(v, a['cible']).toUpperCase()}', () => app.action({'type': 'contester', 'cible': a['cible']}), rouge: true),
+        _GrosBouton('CONTESTER ${app.nomDe(v, a['cible']).toUpperCase()}', () => app.action({'type': 'contester', 'cible': a['cible']}), rouge: true, petit: paysage),
       for (final id in ((m['enGrace'] as List?) ?? []).where((id) => id != v['moi']))
-        _GrosBouton('CONTESTER ${app.nomDe(v, id).toUpperCase()} (dans 3 s)', null, rouge: true),
+        _GrosBouton('CONTESTER ${app.nomDe(v, id).toUpperCase()} (dans 3 s)', null, rouge: true, petit: paysage),
     ];
     final boutons = <Widget>[];
     if (encore.isNotEmpty) {
@@ -552,14 +582,15 @@ class _Bas extends StatelessWidget {
     }
     if (actions.any((a) => a['type'] == 'passer')) boutons.add(Btn('Passer', style: coups.isEmpty ? StyleBtn.principal : StyleBtn.normal, large: true, onTap: () { app.choixInter = []; app.action({'type': 'passer'}); }));
 
-    return [
-      if (zone.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 8), child: Wrap(alignment: WrapAlignment.center, spacing: 8, runSpacing: 8, children: zone)),
+    final zoneW = zone.isEmpty ? null : Padding(padding: const EdgeInsets.only(top: 8), child: Wrap(alignment: WrapAlignment.center, spacing: 8, runSpacing: paysage ? 6 : 8, children: zone));
+    return ([
+      if (zoneW != null && !paysage) zoneW,
       const SizedBox(height: 6),
-      Text('Ta main ($n carte${n > 1 ? 's' : ''})${coups.isNotEmpty && choix.isEmpty ? ' · touche une carte' : ''}', textAlign: TextAlign.center, style: K.texte(13, couleur: K.muted)),
-      const SizedBox(height: 4),
+      if (!paysage) ...[Text('Ta main ($n carte${n > 1 ? 's' : ''})${coups.isNotEmpty && choix.isEmpty ? ' · touche une carte' : ''}', textAlign: TextAlign.center, style: K.texte(13, couleur: K.muted)), const SizedBox(height: 4)],
       _Main(
         cartes: InterCartes.trier(main),
         inter: true,
+        rangsMax: paysage ? 3 : 1,
         etat: (c) => choix.contains(c)
             ? _EtatCarte.choisie
             : (ajoutable(choix, c) || (choix.isNotEmpty && ajoutable(const [], c))) ? _EtatCarte.jouable : monTour ? _EtatCarte.grisee : _EtatCarte.normale,
@@ -575,9 +606,11 @@ class _Bas extends StatelessWidget {
           }
         },
       ),
+    ], [
+      if (zoneW != null && paysage) zoneW,
       const SizedBox(height: 6),
       for (final b in boutons) Padding(padding: const EdgeInsets.only(top: 5), child: b),
-    ];
+    ]);
   }
 }
 
@@ -585,7 +618,9 @@ class _GrosBouton extends StatelessWidget {
   final String texte;
   final VoidCallback? onTap;
   final bool rouge;
-  const _GrosBouton(this.texte, this.onTap, {this.rouge = false});
+  /// En paysage : plus compact, pour laisser de la place à la main au-dessus.
+  final bool petit;
+  const _GrosBouton(this.texte, this.onTap, {this.rouge = false, this.petit = false});
   @override
   Widget build(BuildContext context) => Opacity(
         opacity: onTap == null ? .5 : 1,
@@ -597,8 +632,8 @@ class _GrosBouton extends StatelessWidget {
             borderRadius: BorderRadius.circular(14),
             onTap: onTap == null ? null : () { app.vibrer(80); onTap!(); },
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
-              child: Text(texte, textAlign: TextAlign.center, style: TextStyle(fontFamily: K.display, fontSize: 30, letterSpacing: 2, height: 1, color: rouge ? Colors.white : K.encre)),
+              padding: EdgeInsets.symmetric(horizontal: petit ? 14 : 22, vertical: petit ? 6 : 10),
+              child: Text(texte, textAlign: TextAlign.center, style: TextStyle(fontFamily: K.display, fontSize: petit ? 21 : 30, letterSpacing: 2, height: 1, color: rouge ? Colors.white : K.encre)),
             ),
           ),
         ),
@@ -607,24 +642,44 @@ class _GrosBouton extends StatelessWidget {
 
 enum _EtatCarte { normale, jouable, choisie, grisee }
 
+/// Hauteur laissée à la main au-dessus des boutons (paysage) : les rangées se serrent pour y tenir.
+class _PlaceMain extends InheritedWidget {
+  final double hauteur;
+  const _PlaceMain({required this.hauteur, required super.child});
+  @override
+  bool updateShouldNotify(_PlaceMain old) => old.hauteur != hauteur;
+}
+
 /// La main : cartes côte à côte, qui se chevauchent quand la place manque. La carte choisie se lève.
+/// Comme sur le site : si le coin des cartes (« 10♥ ») ne reste plus lisible, la main passe sur plusieurs
+/// rangées (jusqu'à rangsMax, 3 en paysage), qui se chevauchent en laissant voir le haut de chaque carte.
 class _Main extends StatelessWidget {
   final List<String> cartes;
   final bool inter;
+  final int rangsMax;
   final _EtatCarte Function(String) etat;
   final ValueChanged<String> onTap;
-  const _Main({required this.cartes, required this.inter, required this.etat, required this.onTap});
+  const _Main({required this.cartes, required this.inter, this.rangsMax = 1, required this.etat, required this.onTap});
+
+  static const l = 58.0, h = l * 78 / 54, lisible = 30.0;
+
   @override
   Widget build(BuildContext context) => LayoutBuilder(builder: (context, c) {
         final n = cartes.length;
         if (n == 0) return const SizedBox(height: 20);
         final w = c.maxWidth;
-        const l = 58.0;
-        final pas = n == 1 ? 0.0 : math.min(l + 4, (w - l) / (n - 1));
-        final largeur = l + pas * (n - 1);
-        const h = l * 78 / 54;
+        double pasPour(int parRang) => parRang < 2 ? l + 4 : math.min(l + 4, (w - l) / (parRang - 1));
+        var rangs = 1;
+        while (rangs < rangsMax && pasPour((n / rangs).ceil()) < lisible) { rangs++; }
+        final parRang = (n / rangs).ceil();
+        rangs = (n / parRang).ceil();
+        final pas = pasPour(parRang);
+        final largeur = l + pas * (math.min(n, parRang) - 1);
+        // Rangées : 44 px entre elles, moins si la place manque (28 px au moins : le coin « 10♥ » reste visible).
+        final place = context.dependOnInheritedWidgetOfExactType<_PlaceMain>()?.hauteur;
+        final pasV = rangs < 2 ? 0.0 : place == null ? 44.0 : ((place - h - 16) / (rangs - 1)).clamp(28.0, 44.0);
         return SizedBox(
-          height: h + 16,
+          height: h + 16 + (rangs - 1) * pasV,
           child: Center(
             child: SizedBox(
               width: largeur,
@@ -637,8 +692,8 @@ class _Main extends StatelessWidget {
                     return AnimatedPositioned(
                       key: ValueKey(carte),
                       duration: Duration(milliseconds: app.sansAnim ? 0 : 160),
-                      left: pas * i,
-                      top: e == _EtatCarte.choisie ? 0 : e == _EtatCarte.jouable ? 8 : 14,
+                      left: pas * (i % parRang),
+                      top: (i ~/ parRang) * pasV + (e == _EtatCarte.choisie ? 0 : e == _EtatCarte.jouable ? 8 : 14),
                       child: GestureDetector(
                         onTap: () => onTap(carte),
                         child: Container(
