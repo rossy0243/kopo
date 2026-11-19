@@ -7958,7 +7958,7 @@ svg .vb { transform-box: view-box; }
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = 'ca87c7fa6903'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = '7c19cae71109'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: true };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // La musique des menus était coupée par défaut : on l'allume une fois pour tous (le joueur peut la recouper).
@@ -9943,7 +9943,7 @@ svg .vb { transform-box: view-box; }
         $('audios').append(a);
       });
       salle.on(LK.RoomEvent.TrackUnsubscribed, (piste) => piste.detach().forEach((a) => a.remove()));
-      salle.on(LK.RoomEvent.ActiveSpeakersChanged, (ps) => { this.parleurs = new Set(ps.map((p) => p.identity)); this.dessinerParleurs(); });
+      salle.on(LK.RoomEvent.ActiveSpeakersChanged, (ps) => this.nouveauxParleurs(ps.map((p) => p.identity)));
       salle.on(LK.RoomEvent.AudioPlaybackStatusChanged, () => this.dessiner());
       salle.on(LK.RoomEvent.Disconnected, () => { if (this.salle === salle) { this.salle = null; this.actif = false; this.muet = true; this.parleurs.clear(); this.signaler(); this.dessiner(); this.dessinerParleurs(); } });
       try { await salle.connect(d.url, d.jeton); } catch (e) { if (this.salle === salle) this.salle = null; console.warn('Micro :', e); const r = String((e && e.message) || '').slice(0, 90); return toast('Micro : connexion au salon vocal impossible.' + (r ? ' (' + r + ')' : ''), 'echec'); }
@@ -9984,6 +9984,16 @@ svg .vb { transform-box: view-box; }
     // Icône du micro d'un joueur : barré quand il a coupé son micro, haut-parleur barré quand je ne l'entends pas.
     icone(j) { return !j.voix ? null : j.id !== (this.vue && this.vue.moi) && this.entendPas(j.id) ? 'son-coupe' : j.muet ? 'micro-coupe' : 'micro'; },
     signaler() { envoyer({ type: 'micro', voix: this.actif, muet: this.muet }); },
+    // LiveKit redit « qui parle » plusieurs fois par seconde quand toute la table parle (le volume de chacun change),
+    // même quand ce sont les mêmes personnes. Redessiner à chaque fois (sièges, bandeau, mise en page) ralentissait
+    // le jeu : on ne redessine que si la liste change vraiment, et au plus une fois par image.
+    nouveauxParleurs(ids) {
+      if (ids.length === this.parleurs.size && ids.every((id) => this.parleurs.has(id))) return;
+      this.parleurs = new Set(ids);
+      if (this.dessinPrevu) return;
+      this.dessinPrevu = true;
+      requestAnimationFrame(() => { this.dessinPrevu = false; this.dessinerParleurs(); });
+    },
     maj(v) {
       this.vue = v; this.dessiner(); this.dessinerParleurs();
       if (this.annoncer && v) { this.annoncer = false; const me = v.joueurs.find((j) => j.id === v.moi); if (me && !me.plus) setTimeout(annoncerMicro, 1200); }

@@ -39,6 +39,23 @@ void main() {
     app.vocal.parleurs = {};
   });
 
+  test('qui parle : rien ne se redessine tant que ce sont les mêmes personnes', () {
+    var appels = 0, ecran = 0;
+    void compter() => appels++;
+    void compterEcran() => ecran++;
+    app.vocal.quiParle.addListener(compter);
+    app.addListener(compterEcran);
+    app.vocal.parleurs = {'b', 'c'};
+    app.vocal.parleurs = {'c', 'b'}; // LiveKit redit la même liste (le volume a changé) : rien
+    expect(appels, 1);
+    app.vocal.parleurs = {'b'};
+    expect(appels, 2);
+    expect(ecran, 0); // l'écran entier n'est jamais redessiné pour « qui parle »
+    app.vocal.quiParle.removeListener(compter);
+    app.removeListener(compterEcran);
+    app.vocal.parleurs = {};
+  });
+
   testWidgets('siège étroit : l\'initiale du pseudo', (t) async {
     final style = K.texte(13, poids: FontWeight.w700);
     await t.pumpWidget(cadre(Row(children: [Flexible(child: NomOuInitiale('Mamie_Kinshasa', style: style))]), 24));
