@@ -247,6 +247,20 @@ class Bienvenue extends StatefulWidget {
 
 class _BienvenueState extends State<Bienvenue> {
   final _pseudo = TextEditingController();
+  // Le bouton Google n'apparaît qu'avec la réponse du serveur (/config). Si elle manque (réseau lent,
+  // serveur qui redémarre), on réessaie quelques fois au lieu de ne montrer que « Jouer en invité ».
+  bool _chargeConfig = false;
+  @override
+  void initState() { super.initState(); _attendreConfig(); }
+  Future<void> _attendreConfig() async {
+    if (app.config != null) return;
+    _chargeConfig = true;
+    for (var essai = 1; essai <= 6 && mounted && app.config == null; essai++) {
+      await app.relireConfig();
+      if (app.config == null && mounted) await Future.delayed(Duration(seconds: math.min(3 * essai, 10)));
+    }
+    if (mounted) setState(() => _chargeConfig = false);
+  }
   @override
   void dispose() { _pseudo.dispose(); super.dispose(); }
 
@@ -280,6 +294,9 @@ class _BienvenueState extends State<Bienvenue> {
           const Muet('Tes pièces et ton compte te suivent sur tous tes téléphones.', taille: 12, align: TextAlign.center),
           const Ecart(10),
           Row(children: [const Expanded(child: Divider(color: K.line)), Padding(padding: const EdgeInsets.symmetric(horizontal: 10), child: Text('OU', style: K.texte(12, couleur: K.muted).copyWith(letterSpacing: 2))), const Expanded(child: Divider(color: K.line))]),
+          const Ecart(10),
+        ] else if (_chargeConfig) ...[
+          const Muet('Chargement de la connexion Google…', taille: 12, align: TextAlign.center),
           const Ecart(10),
         ],
         Container(

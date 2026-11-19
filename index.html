@@ -7954,7 +7954,7 @@ svg .vb { transform-box: view-box; }
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = 'cab2271cbb60'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = 'b8bf0417fd51'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: true };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // La musique des menus était coupée par défaut : on l'allume une fois pour tous (le joueur peut la recouper).
@@ -12506,13 +12506,24 @@ svg .vb { transform-box: view-box; }
     if (stock.lire('kopo-entree') || retourGoogle) return false;
     if (stock.lire('kopo-pseudo')) { stock.ecrire('kopo-entree', 'invite'); return false; }
     $('bienvenue').hidden = false;
-    lireConfig().then((cfg) => {
+    // Le bouton Google n'apparaît qu'avec la réponse du serveur (/api/config). Si elle manque (réseau lent,
+    // serveur qui redémarre), on réessaie quelques fois au lieu de ne montrer que « Jouer en invité ».
+    const aide = $('aideGoogle'), texteAide = aide.textContent;
+    let essai = 0;
+    const essayer = () => lireConfig().then((cfg) => {
+      if (!cfg && ++essai <= 6 && !$('bienvenue').hidden) {
+        aide.hidden = false; aide.textContent = 'Chargement de la connexion Google…';
+        setTimeout(essayer, Math.min(3000 * essai, 10000));
+        return;
+      }
+      aide.textContent = texteAide;
       if (cfg && cfg.nouveaute === NOUVEAUTE && !lireNouveaute()) ecrireNouveaute({ saute: true }); // nouveau joueur : pas de fenêtre « Nouveau »
       const ok = !!(cfg && cfg.google);
-      $('btnEntreeGoogle').hidden = $('aideGoogle').hidden = $('ouGoogle').hidden = !ok;
+      $('btnEntreeGoogle').hidden = aide.hidden = $('ouGoogle').hidden = !ok;
       if (ok) $('btnEntreeGoogle').onclick = () => connexionGoogle(cfg.google);
       if (ok) $('aideInvite').textContent = 'En invité, tu joues contre les robots. Pour jouer en ligne ou entre amis, connecte-toi avec Google (ici ou plus tard).';
     });
+    essayer();
     return true;
   }
   $('pseudoEntree').addEventListener('input', () => { const v = nettoyerPseudo($('pseudoEntree').value, true); if (v !== $('pseudoEntree').value) $('pseudoEntree').value = v; });
