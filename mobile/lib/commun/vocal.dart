@@ -3,6 +3,8 @@
 // abonné assis (message « vocal »). Un non-abonné qui touche le micro voit l'invitation à s'abonner, avec les prix.
 import 'package:livekit_client/livekit_client.dart' as lk;
 
+import 'stock.dart';
+
 class Vocal {
   /// Envoie un message à la salle (`vocal`, `micro`), rafraîchit l'écran, affiche une notification.
   final void Function(Map<String, dynamic> msg) envoyer;
@@ -12,14 +14,29 @@ class Vocal {
   void Function(Map offre)? inviterAbonnement;
   /// Annonce « Nouveau : le micro en partie » (la même fenêtre, avec « Plus tard »).
   void Function()? annoncer;
+  /// Joueur bloqué : on ne l'entend pas non plus.
+  bool Function(String id)? bloque;
+  /// « Couper le micro des autres » : le même réglage que dans les Paramètres (gardé sur le téléphone).
+  void Function(bool coupe)? garderSonCoupe;
   Vocal({required this.envoyer, required this.maj, required this.toast});
 
   lk.Room? _salle;
   lk.EventsListener<lk.RoomEvent>? _ecoute;
   bool actif = false, muet = true, parler = false, sonCoupe = false, demande = false;
-  /// Identifiants (= comptes) de ceux qui parlent ; joueurs rendus muets pour moi seul.
+  /// Identifiants (= comptes) de ceux qui parlent ; joueurs rendus muets pour moi seul
+  /// (gardés sur le téléphone, d'une partie à l'autre, comme sur le site).
   Set<String> parleurs = {};
-  final Set<String> coupes = {};
+  final Set<String> coupes = {...((Stock.lire('kopo-micros-coupes') as List?) ?? const []).map((e) => e.toString())};
+
+  /// Couper le son, c'est seulement pour moi : les autres joueurs s'entendent toujours.
+  bool entendPas(String id) => sonCoupe || coupes.contains(id) || (bloque?.call(id) ?? false);
+
+  /// Icône du micro d'un joueur : barré quand il a coupé son micro, haut-parleur barré quand je ne l'entends pas.
+  String? icone(Map j, Object? moi) {
+    if (j['voix'] != true) return null;
+    if (j['id'] != moi && entendPas(j['id'].toString())) return 'son-coupe';
+    return j['muet'] == true ? 'micro-coupe' : 'micro';
+  }
 
   void activer() {
     if (demande) return;
@@ -56,7 +73,7 @@ class Vocal {
     _ecoute = ecoute;
     ecoute
       ..on<lk.ActiveSpeakersChangedEvent>((e) { parleurs = e.speakers.map((p) => p.identity).toSet(); maj(); })
-      ..on<lk.TrackSubscribedEvent>((e) { if (sonCoupe || coupes.contains(e.participant.identity)) e.publication.disable(); })
+      ..on<lk.TrackSubscribedEvent>((e) { if (entendPas(e.participant.identity)) e.publication.disable(); })
       ..on<lk.RoomDisconnectedEvent>((_) {
         if (_salle != salle) return;
         _salle = null; actif = false; muet = true; parleurs = {};
@@ -91,18 +108,34 @@ class Vocal {
     maj();
   }
 
-  void _appliquerSon() {
+  void appliquerSon() {
     for (final p in _salle?.remoteParticipants.values ?? const <lk.RemoteParticipant>[]) {
       for (final pub in p.audioTrackPublications) {
-        if (sonCoupe || coupes.contains(p.identity)) { pub.disable(); } else { pub.enable(); }
+        if (entendPas(p.identity)) { pub.disable(); } else { pub.enable(); }
       }
     }
   }
 
-  void basculerSon() { sonCoupe = !sonCoupe; _appliquerSon(); maj(); }
+  /// Tout le monde d'un coup, pour moi seul.
+  void basculerSon([bool? coupe]) {
+    sonCoupe = coupe ?? !sonCoupe;
+    garderSonCoupe?.call(sonCoupe);
+    appliquerSon();
+    maj();
+    toast(sonCoupe ? "Tu n'entends plus les autres joueurs. Eux s'entendent toujours." : 'Tu entends de nouveau les autres joueurs.', 'info');
+  }
 
-  /// Rendre muet un abonné pour moi seul (les autres l'entendent toujours).
-  void basculerJoueur(String id) { if (!coupes.remove(id)) coupes.add(id); _appliquerSon(); maj(); }
+  /// Un joueur précis, pour moi seul (les autres l'entendent toujours).
+  void basculerJoueur(String id, [String nom = '']) {
+    final coupe = !coupes.remove(id);
+    if (coupe) coupes.add(id);
+    final liste = coupes.toList();
+    Stock.ecrire('kopo-micros-coupes', liste.length > 200 ? liste.sublist(liste.length - 200) : liste);
+    appliquerSon();
+    maj();
+    final n = nom.isEmpty ? 'ce joueur' : nom;
+    toast(coupe ? "Tu n'entends plus $n. Les autres l'entendent toujours." : 'Tu entends de nouveau $n.', 'info');
+  }
 
   void signaler() => envoyer({'type': 'micro', 'voix': actif, 'muet': muet});
 
@@ -116,7 +149,7 @@ class Vocal {
   }
 
   /// En quittant la table.
-  Future<void> arreter() async { demande = false; coupes.clear(); await couper(); maj(); }
+  Future<void> arreter() async { demande = false; await couper(); maj(); }
 }
 
 /// Initiale d'un pseudo, quand il ne tient pas à l'écran.

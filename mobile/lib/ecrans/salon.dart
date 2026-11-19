@@ -180,7 +180,19 @@ class _LigneJoueur extends StatelessWidget {
         if (robot) const Padding(padding: EdgeInsets.only(right: 6), child: Ico('robots', taille: 20)),
         Flexible(child: Text(avecNiveau ? nom.replaceFirst(RegExp(r'^Robot '), '') : nom, overflow: TextOverflow.ellipsis, style: K.texte(15, poids: FontWeight.w600))),
         if (j['plus'] == true) const Padding(padding: EdgeInsets.only(left: 5), child: CouronnePlus(taille: 15)),
-        if (j['voix'] == true) Padding(padding: const EdgeInsets.only(left: 5), child: Ico(j['muet'] == true ? 'micro-coupe' : 'micro', taille: 16, couleur: parle ? K.good : null)),
+        if (j['voix'] == true && j['id'] != v['moi'])
+          // Toucher le micro d'un joueur : je ne l'entends plus (lui et les autres continuent de parler).
+          Semantics(
+            button: true,
+            label: app.vocal.entendPas(j['id'].toString()) ? 'Réentendre $nom' : 'Ne plus entendre $nom',
+            excludeSemantics: true,
+            child: InkWell(
+              onTap: () => app.vocal.sonCoupe ? app.vocal.basculerSon(false) : app.vocal.basculerJoueur(j['id'].toString(), nom),
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(padding: const EdgeInsets.fromLTRB(7, 4, 4, 4), child: Ico(app.vocal.icone(j, v['moi'])!, taille: 18, couleur: app.vocal.entendPas(j['id'].toString()) ? K.bad : parle ? K.good : null)),
+            ),
+          )
+        else if (j['voix'] == true) Padding(padding: const EdgeInsets.only(left: 5), child: Ico(j['muet'] == true ? 'micro-coupe' : 'micro', taille: 16, couleur: parle ? K.good : null)),
         const SizedBox(width: 6),
         Expanded(
           child: Wrap(spacing: 4, runSpacing: 4, children: [

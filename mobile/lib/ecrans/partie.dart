@@ -233,7 +233,7 @@ class _Siege extends StatelessWidget {
           ),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             if (robot) Padding(padding: const EdgeInsets.only(right: 4), child: Ico('robots', taille: 15, couleur: courant ? K.encre : null))
-            else if (j['voix'] == true) Padding(padding: const EdgeInsets.only(right: 3), child: Ico(j['muet'] == true ? 'micro-coupe' : 'micro', taille: 14, couleur: courant ? K.encre : parle ? K.good : null)),
+            else if (j['voix'] == true) Padding(padding: const EdgeInsets.only(right: 3), child: Ico(app.vocal.icone(j, v['moi'])!, taille: 14, couleur: courant ? K.encre : parle ? K.good : null)),
             // Pas la place pour le pseudo : son initiale.
             Flexible(child: NomOuInitiale(moi ? 'Toi' : (j['nom'] ?? '?').toString(), style: K.texte(13, couleur: courant ? K.encre : K.ink, poids: FontWeight.w700))),
             if (j['plus'] == true) Padding(padding: const EdgeInsets.only(left: 3), child: CouronnePlus(taille: 13, couleur: courant ? K.encre : K.brass)),

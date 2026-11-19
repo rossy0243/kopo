@@ -68,7 +68,18 @@ void ficheJoueur(String id, String nom) {
   app.ouvrirFenetre((context) {
     final avecCompte = app.enLigne && id.startsWith('c_');
     final bloque = app.bloques.contains(id);
+    // Son micro : je peux ne plus l'entendre, pour moi seul (abonné ou pas, le bouton est là dès qu'il parle).
+    final jv = ((app.vue?['joueurs'] as List?) ?? const []).cast<Map>().where((j) => j['id'] == id).firstOrNull;
+    final coupe = app.vocal.coupes.contains(id);
     return Fenetre(titre: nom.isEmpty ? 'Joueur' : nom, enfants: [
+      if (jv?['voix'] == true || coupe) ...[
+        coupe
+            ? Btn('Réentendre son micro', large: true, onTap: () { app.vocal.basculerJoueur(id, nom); retour(); })
+            : Btn.principal('Couper son micro (pour toi)', large: true, onTap: () { app.vocal.basculerJoueur(id, nom); retour(); }),
+        const Ecart(4),
+        Muet(coupe ? "Tu ne l'entends plus. Les autres joueurs l'entendent toujours." : "Seulement pour toi : les autres joueurs l'entendent toujours.", taille: 12),
+        const Ecart(10),
+      ],
       if (!avecCompte) Text('Amis, blocage et signalement arrivent avec les comptes en ligne.', style: K.texte(15))
       else ...[
         Btn.principal('Ajouter en ami', large: true, onTap: () async { try { toastAjoutAmi(await Api.post('/amis', {'cible': id}), nom); retour(); } catch (e) { app.toast(messageErreur(e), Niv.echec); } }),
@@ -78,6 +89,7 @@ void ficheJoueur(String id, String nom) {
             if (bloque) { await Api.delete('/bloques/${Uri.encodeComponent(id)}'); app.bloques.remove(id); app.toast('Joueur débloqué.', Niv.succes); }
             else { await Api.post('/bloques', {'cible': id}); app.bloques.add(id); app.toast('Joueur bloqué : tu ne verras plus ses réactions.', Niv.succes); }
             Stock.ecrire('kopo-bloques', app.bloques.toList());
+            app.vocal.appliquerSon();
             retour();
           } catch (e) { app.toast(messageErreur(e), Niv.echec); }
         }),
