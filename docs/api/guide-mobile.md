@@ -106,7 +106,7 @@ final r = await Supabase.instance.client.auth.signInWithIdToken(
 |---|---|
 | `FCM_COMPTE_SERVICE` | Push des applis (JSON du compte de service Firebase, ou ce JSON en base64) |
 | `SUPABASE_ANON_KEY` | Clé publique Supabase donnée aux applis pour la connexion Google |
-| `SITE_URL` | Adresse du site (liens CGU et confidentialité), `https://kopo-d655.onrender.com/` par défaut |
+| `SITE_URL` | Adresse du site (liens CGU et confidentialité), `https://masano.online/` par défaut |
 | `SUPPORT_URL` | Facultatif : page ou adresse de contact (`mailto:…`) affichée dans l'appli |
 
 ## 8. Tester en local

@@ -48,7 +48,7 @@ function creerPush(base, reglages, env = process.env) {
   const cle = env.VAPID_PUBLIC || '', prive = env.VAPID_PRIVE || '';
   let actif = !!(cle && prive);
   if (actif) {
-    try { webpush.setVapidDetails(env.VAPID_CONTACT || 'https://kopo-d655.onrender.com/', cle, prive); }
+    try { webpush.setVapidDetails(env.VAPID_CONTACT || 'mailto:contact@masano.online', cle, prive); }
     catch (e) { console.error('Push : clés VAPID refusées :', e.message); actif = false; }
   }
   let envoyeur = (abonnement, charge, options) => webpush.sendNotification(abonnement, charge, options);

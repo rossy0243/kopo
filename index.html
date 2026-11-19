@@ -7896,11 +7896,13 @@ svg .vb { transform-box: view-box; }
   };
 
   // ------------------------------------------------------------------ changement d'adresse
-  // Passage de GitHub Pages à Render : les données du téléphone (compte invité, profil, réglages) sont liées
-  // à l'adresse du site. Quand NOUVELLE_ADRESSE est remplie, l'ancienne adresse envoie ses données kopo-*
-  // à la nouvelle dans le # (rien ne passe par un serveur), et la nouvelle les reprend si elle est encore vide.
-  const NOUVELLE_ADRESSE = 'https://kopo-d655.onrender.com/'; // avec le / final
-  const ANCIENNE_ADRESSE = 'https://rossy0243.github.io/kopo/'; // ses données kopo-* y sont restées sur le téléphone
+  // GitHub Pages, puis Render (kopo-d655.onrender.com), puis masano.online : les données du téléphone (compte invité,
+  // profil, réglages) sont liées à l'adresse du site. Quand NOUVELLE_ADRESSE est remplie, chaque ancienne adresse
+  // envoie ses données kopo-* à la nouvelle dans le # (rien ne passe par un serveur), et la nouvelle les reprend.
+  const NOUVELLE_ADRESSE = 'https://masano.online/'; // avec le / final
+  const ANCIENNES_ADRESSES = ['https://kopo-d655.onrender.com/', 'https://rossy0243.github.io/kopo/']; // la plus récente d'abord
+  const ANCIENNE_ADRESSE = ANCIENNES_ADRESSES[0]; // bouton « Les récupérer » du profil : là où sont restées les données
+  const SUR_ANCIENNE_ADRESSE = ANCIENNES_ADRESSES.some((a) => location.href.startsWith(a));
   // Données arrivées de l'ancienne adresse. Nouvelle adresse encore vide : on recopie tout.
   // Sinon (le joueur a d'abord ouvert la nouvelle adresse, par exemple par le lien d'un ami, et un profil neuf
   // y a été créé) : on réunit les deux profils au lieu de jeter l'ancien, et on reprend l'ancien compte
@@ -7938,7 +7940,7 @@ svg .vb { transform-box: view-box; }
       history.replaceState(null, '', location.pathname + location.search + suite);
       return;
     }
-    if (!NOUVELLE_ADRESSE || LOCAL || !location.hostname.endsWith('.github.io')) return; // seule l'ancienne adresse redirige (pas l'appli ni un test local)
+    if (!NOUVELLE_ADRESSE || LOCAL || !SUR_ANCIENNE_ADRESSE) return; // seules les anciennes adresses redirigent (pas l'appli ni un test local)
     let cible; try { cible = new URL(NOUVELLE_ADRESSE); } catch (e) { return; }
     if (cible.origin === location.origin) return;
     if (h.startsWith('#access_token') || h.startsWith('#error')) return; // retour de Google : on le traite ici
@@ -7952,7 +7954,7 @@ svg .vb { transform-box: view-box; }
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = '3c2a06d10663'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = '2e073a954be5'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: true };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // La musique des menus était coupée par défaut : on l'allume une fois pour tous (le joueur peut la recouper).
@@ -13157,7 +13159,7 @@ svg .vb { transform-box: view-box; }
   // Lancé depuis l'icône : mesuré au chargement, avant tout passage en plein écran demandé par le jeu.
   const LANCE_ICONE = navigator.standalone === true
     || (!document.fullscreenElement && matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches);
-  const ANCIENNE_PAGE = !!NOUVELLE_ADRESSE && location.href.startsWith(ANCIENNE_ADRESSE); // ses données partent vers la nouvelle adresse
+  const ANCIENNE_PAGE = !!NOUVELLE_ADRESSE && SUR_ANCIENNE_ADRESSE; // ses données partent vers la nouvelle adresse
   const CADEAU_INSTALLATION = 200; // pièces, une fois, à la première ouverture depuis l'icône (plafond serveur : 200)
   let inviteInstallation = null; // l'événement beforeinstallprompt gardé pour le bouton
   if (LANCE_ICONE) stock.ecrire('kopo-installe', true);
