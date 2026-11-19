@@ -1,0 +1,51 @@
+# Construit l'APK Android de l'appli (mobile/) et le met en téléchargement sur la page du run (« Artifacts »).
+# Lancement : à la main (onglet Actions > APK Android > Run workflow) ou à chaque envoi sur une branche claude/*.
+# Sans les secrets de publication, l'APK est signé avec une clé de test : il s'installe, mais ne remplace pas
+# une version du Play Store.
+name: APK Android
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['claude/**']
+    paths: ['mobile/**', '.github/workflows/apk.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.9  # Flutter 3.50 exige l'AGP 9.1.1, le projet est en 9.1.0
+          cache: true
+      - run: flutter --version
+      - run: flutter pub get
+      - run: flutter build apk --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: masano-apk
+          path: mobile/build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 30
+      # Lien direct, téléchargeable sur le téléphone sans compte GitHub : version « apk-test » (remplacée à chaque construction).
+      - name: Publier dans la version apk-test
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp build/app/outputs/flutter-apk/app-release.apk masano.apk
+          gh release delete apk-test --yes --cleanup-tag || true
+          gh release create apk-test masano.apk --prerelease --target "$GITHUB_SHA" \
+            --title "APK de test Masano" \
+            --notes "APK Android de test (signé avec la clé de test). Construit depuis $GITHUB_SHA."
