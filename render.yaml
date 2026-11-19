@@ -68,3 +68,34 @@ services:
       - path: /*
         name: X-Content-Type-Options
         value: nosniff
+
+  # Page de téléchargement de l'appli Android (app.masano.online) : dossier telecharger/ seul.
+  # Le bouton pointe sur /masano.apk, redirigé vers le fichier de la release GitHub : pour publier
+  # un nouvel APK, il suffit de changer la destination ci-dessous (les liens partagés restent bons).
+  - type: web
+    name: masano-app
+    runtime: static
+    buildCommand: echo "page statique"
+    staticPublishPath: telecharger
+    autoDeploy: true
+    buildFilter:
+      paths:
+        - telecharger/**
+        - render.yaml
+    routes:
+      - type: redirect
+        source: /masano.apk
+        destination: https://github.com/rossy0243/kopo/releases/download/apk-test/masano.apk
+      - type: redirect
+        source: /apk
+        destination: https://github.com/rossy0243/kopo/releases/download/apk-test/masano.apk
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: no-cache
+      - path: /img/*
+        name: Cache-Control
+        value: public, max-age=604800
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff

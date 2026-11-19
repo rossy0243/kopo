@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Télécharger Masano pour Android · Kopo et Inter (8)</title>
+<meta name="description" content="L'appli Masano pour Android : joue au Kopo et à Inter (8) entre amis, en ligne ou contre les robots. Gratuit, version bêta.">
+<meta name="theme-color" content="#10233a">
+<link rel="icon" href="img/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+<link rel="canonical" href="https://app.masano.online/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Masano">
+<meta property="og:locale" content="fr_FR">
+<meta property="og:title" content="Télécharge Masano sur Android">
+<meta property="og:description" content="Kopo et Inter (8) dans ta poche : entre amis, en ligne ou contre les robots. Gratuit, version bêta.">
+<meta property="og:url" content="https://app.masano.online/">
+<meta property="og:image" content="https://masano.online/icons/og-masano.png">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@400;500;600;700&display=swap">
+<style>
+:root { --fond: #10233a; --fond-2: #183252; --fond-3: #1f3d63; --laiton: #e2b04a; --laiton-2: #f3cf7a; --encre: #f4ecd8; --muted: #9fb2c8; --ligne: rgba(226,176,74,.28); }
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: radial-gradient(1200px 600px at 50% -10%, #1f3d63 0%, var(--fond) 60%) no-repeat, var(--fond); color: var(--encre); font: 16px/1.55 "Outfit", "Segoe UI", system-ui, sans-serif; }
+a { color: var(--laiton); }
+.page { max-width: 1040px; margin: 0 auto; padding: 0 16px; }
+.titre { font: 400 1em/1 "Bebas Neue", Impact, sans-serif; letter-spacing: .06em; color: var(--laiton); }
+
+header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 0; }
+.marque { display: inline-flex; align-items: center; gap: 10px; font: 400 32px/1 "Bebas Neue", Impact, sans-serif; letter-spacing: 3px; color: var(--laiton); text-decoration: none; }
+.marque img { width: 38px; height: 38px; border-radius: 22%; }
+.beta { font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--fond); background: var(--laiton); border-radius: 999px; padding: 3px 10px; }
+
+.hero { display: grid; grid-template-columns: 1.05fr 1fr; gap: 36px; align-items: center; padding: 28px 0 40px; }
+.hero h1 { font: 400 clamp(42px, 7vw, 68px)/.95 "Bebas Neue", Impact, sans-serif; letter-spacing: .03em; margin: 0 0 14px; color: var(--encre); }
+.hero h1 span { color: var(--laiton); }
+.hero p.lead { font-size: 18px; color: var(--encre); margin: 0 0 24px; max-width: 34em; }
+.bouton { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 56px; padding: 0 26px; border-radius: 14px; font: 600 18px/1 "Outfit", sans-serif; text-decoration: none; cursor: pointer; border: 0; }
+.bouton.principal { background: linear-gradient(180deg, var(--laiton-2), var(--laiton)); color: #1a1408; box-shadow: 0 8px 24px rgba(226,176,74,.25); }
+.bouton.principal:hover { filter: brightness(1.05); }
+.bouton.secondaire { background: transparent; color: var(--laiton); border: 1.5px solid var(--laiton); }
+.bouton svg { width: 22px; height: 22px; flex: none; }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.taille { font-size: 14px; color: var(--muted); margin-top: 10px; }
+.note-ios { display: none; margin-top: 16px; padding: 12px 14px; border-radius: 12px; background: rgba(255,255,255,.05); border: 1px solid var(--ligne); font-size: 15px; }
+.ios .note-ios { display: block; }
+
+.ecran { border-radius: 18px; overflow: hidden; border: 1px solid var(--ligne); box-shadow: 0 24px 60px rgba(0,0,0,.45); background: #0c1b2e; }
+.ecran img { display: block; width: 100%; height: auto; }
+
+section { padding: 36px 0; }
+section > h2 { font: 400 36px/1 "Bebas Neue", Impact, sans-serif; letter-spacing: .04em; color: var(--laiton); margin: 0 0 18px; }
+
+.jeux { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.jeu { background: linear-gradient(180deg, var(--fond-2), rgba(24,50,82,.6)); border: 1px solid var(--ligne); border-radius: 18px; padding: 22px; }
+.jeu h3 { font: 400 30px/1 "Bebas Neue", Impact, sans-serif; letter-spacing: .05em; color: var(--laiton); margin: 0 0 8px; display: flex; align-items: center; gap: 10px; }
+.jeu h3 .pastille { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; border: 1.5px solid var(--laiton); font-size: 20px; }
+.jeu p { margin: 0 0 10px; }
+.jeu ul { margin: 0; padding-left: 18px; color: var(--muted); }
+
+.galerie { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+.galerie figure { margin: 0; }
+.galerie figcaption { font-size: 14px; color: var(--muted); margin-top: 8px; text-align: center; }
+
+.etapes { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; counter-reset: e; }
+.etapes li { counter-increment: e; display: grid; grid-template-columns: 40px 1fr; gap: 14px; align-items: start; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.07); border-radius: 14px; padding: 14px 16px; }
+.etapes li::before { content: counter(e); display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--laiton); color: #1a1408; font-weight: 700; }
+.etapes strong { color: var(--encre); }
+.etapes span { color: var(--muted); }
+.aide { margin-top: 14px; font-size: 15px; color: var(--muted); }
+details { margin-top: 10px; background: rgba(255,255,255,.03); border-radius: 12px; padding: 10px 14px; }
+details summary { cursor: pointer; color: var(--encre); font-weight: 500; }
+details p { color: var(--muted); margin: 8px 0 2px; }
+
+.liens { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.lien { display: flex; flex-direction: column; gap: 6px; background: var(--fond-2); border: 1px solid var(--ligne); border-radius: 16px; padding: 18px; text-decoration: none; color: var(--encre); }
+.lien:hover { border-color: var(--laiton); }
+.lien b { color: var(--laiton); font-size: 18px; }
+.lien small { color: var(--muted); font-size: 14px; }
+
+.bientot { text-align: center; padding: 28px 18px; border-radius: 18px; border: 1px dashed var(--ligne); }
+.bientot p { margin: 6px 0 0; color: var(--muted); }
+
+footer { padding: 30px 0 44px; color: var(--muted); font-size: 14px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; border-top: 1px solid rgba(255,255,255,.07); margin-top: 20px; }
+footer a { color: var(--muted); }
+
+@media (max-width: 820px) {
+  .hero { grid-template-columns: 1fr; gap: 26px; padding-top: 10px; }
+  .jeux, .liens { grid-template-columns: 1fr; }
+  .galerie { grid-template-columns: 1fr; }
+  .actions .bouton { width: 100%; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <a class="marque" href="https://masano.online/"><img src="img/masano-logo.svg" alt="" width="38" height="38">Masano</a>
+    <span class="beta">Bêta</span>
+  </header>
+
+  <div class="hero">
+    <div>
+      <h1>Kopo et Inter (8)<br><span>dans ta poche</span></h1>
+      <p class="lead">L'appli Masano pour Android : joue entre amis autour de la même table, en ligne avec d'autres joueurs, ou contre les robots pour t'entraîner. Gratuit.</p>
+      <div class="actions">
+        <a class="bouton principal" id="telecharger" href="/masano.apk" download>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+          Télécharger l'APK
+        </a>
+        <a class="bouton secondaire" href="#installer">Comment installer ?</a>
+      </div>
+      <div class="taille">Pour téléphones Android · environ 98 Mo · version bêta</div>
+      <div class="note-ios">Sur iPhone, l'appli arrive bientôt sur l'App Store. En attendant, tu peux jouer tout de suite sur <a href="https://masano.online/">masano.online</a>, sans rien installer.</div>
+    </div>
+    <div class="ecran"><img src="img/2-accueil.webp" width="1200" height="554" alt="L'accueil de Masano : créer une partie, jouer en ligne, rejoindre, contre les robots, cahier"></div>
+  </div>
+
+  <section>
+    <h2>Deux jeux, une seule appli</h2>
+    <div class="jeux">
+      <div class="jeu">
+        <h3><span class="pastille">K</span>Kopo</h3>
+        <p>Le jeu de cartes à élimination : une manche, un éliminé, le dernier debout gagne. Annonce <b>KATAPSS</b> pour te qualifier d'un coup.</p>
+        <ul><li>De 2 à 9 joueurs</li><li>Entre amis, en ligne ou contre les robots</li></ul>
+      </div>
+      <div class="jeu">
+        <h3><span class="pastille">8</span>Inter (8)</h3>
+        <p>Vide ta main le premier ! Le 8 demande la couleur, le 2, le 10 et le Joker font piocher.</p>
+        <ul><li>De 2 à 8 joueurs</li><li>Partie simple ou en mode délire</li></ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Aperçu</h2>
+    <div class="galerie">
+      <figure class="ecran-fig"><div class="ecran"><img src="img/1-table.webp" width="1200" height="554" alt="Une partie d'Inter (8) contre les robots" loading="lazy"></div><figcaption>À la table</figcaption></figure>
+      <figure class="ecran-fig"><div class="ecran"><img src="img/3-salon.webp" width="1200" height="554" alt="Le salon d'une partie entre amis" loading="lazy"></div><figcaption>Le salon entre amis</figcaption></figure>
+    </div>
+  </section>
+
+  <section id="installer">
+    <h2>Installer l'appli en 4 étapes</h2>
+    <ol class="etapes">
+      <li><div><strong>Touche « Télécharger l'APK ».</strong><br><span>Le fichier masano.apk arrive dans tes téléchargements. Si Chrome dit « ce type de fichier peut être dangereux », touche « Télécharger quand même ».</span></div></li>
+      <li><div><strong>Ouvre le fichier.</strong><br><span>Depuis la notification de fin de téléchargement, ou dans l'appli « Fichiers » → Téléchargements → masano.apk.</span></div></li>
+      <li><div><strong>Autorise l'installation.</strong><br><span>Android demande d'autoriser cette source : touche « Paramètres », active « Autoriser depuis cette source » (ou « Sources inconnues »), puis reviens en arrière.</span></div></li>
+      <li><div><strong>Touche « Installer », puis « Ouvrir ».</strong><br><span>Masano est maintenant sur ton écran d'accueil. Bonne partie !</span></div></li>
+    </ol>
+    <details>
+      <summary>Play Protect affiche un avertissement</summary>
+      <p>L'appli est en bêta et n'est pas encore sur le Play Store, donc Google ne la connaît pas encore. Touche « Plus d'infos » puis « Installer quand même ».</p>
+    </details>
+    <details>
+      <summary>« Appli non installée » ou « Conflit avec un package existant »</summary>
+      <p>Désinstalle l'ancienne version de Masano, puis ouvre de nouveau masano.apk. Vérifie aussi qu'il te reste au moins 250 Mo d'espace libre.</p>
+    </details>
+    <details>
+      <summary>Je n'ai pas Android</summary>
+      <p>Sur iPhone, l'appli arrive bientôt sur l'App Store. Sur iPhone comme sur ordinateur, tu peux déjà jouer sur <a href="https://masano.online/">masano.online</a>.</p>
+    </details>
+    <p class="aide">Toujours bloqué ? Écris-nous sur le groupe WhatsApp ou à <a href="mailto:contact@masano.online">contact@masano.online</a>.</p>
+  </section>
+
+  <section>
+    <h2>Rejoins la communauté</h2>
+    <div class="liens">
+      <a class="lien" href="https://chat.whatsapp.com/CvxXbpKzXZi2cWxrgdQwn9" target="_blank" rel="noopener"><b>Groupe WhatsApp</b><small>Trouve des joueurs, donne ton avis sur la bêta, signale un souci.</small></a>
+      <a class="lien" href="https://masano.online/"><b>Jouer sur le web</b><small>masano.online, sans installation, sur téléphone ou ordinateur.</small></a>
+      <a class="lien" href="mailto:contact@masano.online"><b>Nous écrire</b><small>contact@masano.online</small></a>
+    </div>
+  </section>
+
+  <section>
+    <div class="bientot">
+      <span class="titre" style="font-size:30px">Bientôt sur l'App Store</span>
+      <p>Masano est en bêta : merci de tester avec nous. La version iPhone arrive bientôt.</p>
+    </div>
+  </section>
+
+  <footer>
+    <span>© Masano · Kopo et Inter (8)</span>
+    <span><a href="https://masano.online/legal/conditions.html">Conditions</a> · <a href="https://masano.online/legal/confidentialite.html">Confidentialité</a></span>
+  </footer>
+</div>
+<script>
+// iPhone / iPad : l'APK ne s'installe pas, on met en avant le jeu web.
+if (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
+  document.body.classList.add('ios');
+}
+</script>
+</body>
+</html>
