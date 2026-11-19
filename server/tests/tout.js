@@ -1826,6 +1826,46 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.strictEqual(adm.livraisons[0].pieces, 850); assert.match(adm.livraisons[0].ref, /MP-123456/);
     assert.ok((await api('/admin/api/journal', { jeton: adminJeton })).json.some((l) => l.action === 'bouquet:livre'));
   });
+  await test('abonnement Kopo+ : une activation de test s\'annule (jours retirés, micro coupé, francs hors du total)', async () => {
+    const a = await invite('AboAnnul'), b = await invite('AboAnnulB');
+    const nom = a.compte.pseudo + '#' + a.compte.numero;
+    const avant = (await api('/admin/api/abonnements', { jeton: adminJeton })).json;
+    await api('/admin/api/abonnements/activer', { methode: 'POST', jeton: adminJeton, corps: { joueur: nom, formule: 'mois', message: 'ESSAI-1' } });
+    const r2 = await api('/admin/api/abonnements/activer', { methode: 'POST', jeton: adminJeton, corps: { joueur: nom, formule: 'an', message: 'ESSAI-2' } });
+    const fin2 = new Date(r2.json.jusqu).getTime();
+    const liste = (await api('/admin/api/abonnements', { jeton: adminJeton })).json;
+    assert.strictEqual(liste.francs30j, avant.francs30j + 27500);
+    const [an, mois] = liste.activations.filter((l) => l.compte === a.compte.id);
+
+    const client = new Client(URL_.replace('http', 'ws'));
+    const sa = await client.create('kopo', { jeton: a.jeton, code: 'ABOZ', rapide: true });
+    const sb = await client.joinById(sa.roomId, { jeton: b.jeton });
+    const recu = [], vues = { b: null };
+    sa.onMessage('vocal', (m) => recu.push(m)); sa.onMessage('*', () => {});
+    sb.onMessage('vue', (v) => { vues.b = v; }); sb.onMessage('*', () => {});
+
+    // L'année annulée : il garde le mois.
+    assert.strictEqual((await api(`/admin/api/abonnements/${an.id}/annuler`, { methode: 'POST', jeton: a.jeton })).statut, 401);
+    const x = await api(`/admin/api/abonnements/${an.id}/annuler`, { methode: 'POST', jeton: adminJeton });
+    assert.strictEqual(x.statut, 200);
+    assert.ok(Math.abs(new Date(x.json.jusqu).getTime() - (fin2 - 365 * 864e5)) < 60e3);
+    assert.strictEqual((await api(`/admin/api/abonnements/${an.id}/annuler`, { methode: 'POST', jeton: adminJeton })).statut, 404, 'une seule fois');
+    // Le mois annulé : plus de Kopo+, couronne et micro retirés tout de suite.
+    const y = await api(`/admin/api/abonnements/${mois.id}/annuler`, { methode: 'POST', jeton: adminJeton });
+    assert.strictEqual(y.json.jusqu, null);
+    await attendre(300);
+    assert.deepStrictEqual(recu.at(-1), { fin: 'abonnement' });
+    assert.ok(!vues.b.joueurs.find((j) => j.id === a.compte.id).plus);
+    sa.send('vocal'); await attendre(300);
+    assert.strictEqual(recu.at(-1).refuse, 'abonnement');
+    await sa.leave(); await sb.leave();
+
+    const apres = (await api('/admin/api/abonnements', { jeton: adminJeton })).json;
+    assert.strictEqual(apres.francs30j, avant.francs30j);
+    assert.ok(apres.activations.find((l) => l.id === mois.id).annule_le);
+    assert.strictEqual((await api('/api/moi', { jeton: a.jeton })).json.compte.kopoPlus, false);
+    assert.ok((await api('/admin/api/journal', { jeton: adminJeton })).json.some((l) => l.action === 'abonnement:annule'));
+  });
   await test('LiveKit : adresse corrigée, valeurs nettoyées, vérification depuis le tableau de bord', async () => {
     const { creerAbonnement, adresseLiveKit } = require('../src/abonnement');
     assert.strictEqual(adresseLiveKit('https://kopo-x.livekit.cloud/'), 'wss://kopo-x.livekit.cloud');

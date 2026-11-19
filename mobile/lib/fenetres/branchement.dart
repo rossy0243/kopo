@@ -25,6 +25,7 @@ void brancherFenetres() {
   app.finPartieUi = afficherFinPartie;
   app.resultatMatchJourUi = resultatMatchJour;
   app.vocal.inviterAbonnement = (offre) => ouvrirAbonnement(offre);
+  app.vocal.annoncer = () => ouvrirAbonnement(null, true);
   app.onConnecte = () { Push.synchroniser(); };
 
   // Notification reçue appli ouverte (Android) : un toast, le joueur est déjà dans le jeu.

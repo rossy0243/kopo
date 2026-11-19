@@ -305,6 +305,13 @@ class SalleKopo extends Room {
     if (!c) return;
     c.kopo_plus_jusqu = jusqu;
     for (const [i, cl] of this.clientsParId) cl.send('vue', this.vuePour(i));
+    // Plus abonné : sorti du salon vocal tout de suite, pas à la fin de son jeton.
+    const { abonnement } = SalleKopo.services;
+    if (abonnement && !abonnement.estAbonne(c)) {
+      abonnement.retirerDuVocal({ salon: 'table-' + this.roomId, identite: id }).catch(() => {});
+      const cl = this.clientsParId.get(id);
+      if (cl) cl.send('vocal', { fin: 'abonnement' });
+    }
   }
 
   // Micro : jeton du salon vocal de cette table (LiveKit), pour un abonné Kopo+ assis ici. Un non-abonné reçoit les prix.

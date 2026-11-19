@@ -254,6 +254,12 @@ function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainag
   // --- Abonnement Kopo+ (micro) : formules, abonnés, et un abonnement activé à la main (paiement mobile money reçu).
   r.get('/abonnements', enveloppe(async (req, res) => res.json(n2(await abonnement.resumeAdmin()))));
   r.get('/abonnements/livekit', enveloppe(async (req, res) => res.json(await abonnement.verifierLiveKit())));
+  r.post('/abonnements/:id/annuler', enveloppe(async (req, res) => {
+    const x = await abonnement.annuler(req.params.id);
+    await journal('abonnement:annule', x.compte, { activation: Number(req.params.id), formule: x.formule, francs: x.francs, jusqu: x.jusqu });
+    for (const s of salles) if (s.majAbonne) s.majAbonne(x.compte, x.jusqu);
+    res.json(x);
+  }));
   r.post('/abonnements/activer', enveloppe(async (req, res) => {
     const x = await abonnement.activer(req.body || {});
     await journal('abonnement:active', x.joueur.id, { formule: x.formule.id, francs: x.formule.francs, jusqu: x.jusqu, message: req.body.message });
