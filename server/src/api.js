@@ -20,7 +20,7 @@ function clientMobile(req) {
 }
 
 // Adresse publique du site (liens légaux, liens d'invitation).
-const adresseSite = (env) => String(env.SITE_URL || 'https://kopo-d655.onrender.com/').replace(/\/?$/, '/');
+const adresseSite = (env) => String(env.SITE_URL || 'https://masano.online/').replace(/\/?$/, '/');
 
 function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours, parrainage, matchJour, bande, push, stickers, bouquets, abonnement, env = process.env }) {
   const r = express.Router();
