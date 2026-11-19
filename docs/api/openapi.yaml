@@ -638,6 +638,20 @@ paths:
                   micro: { type: boolean }
                   formules: { type: array, items: { type: object, properties: { id: { enum: [mois, an] }, nom: { type: string }, francs: { type: integer }, jours: { type: integer }, note: { type: [string, 'null'] } } } }
                   avantages: { type: array, items: { type: string } }
+                  essai: { type: object, description: "Essai de bienvenue : 7 jours, une fois par compte Google. raison (si pas possible) : deja, google (compte invité), abonne.", properties: { jours: { type: integer }, possible: { type: boolean }, raison: { type: [string, 'null'], enum: [deja, google, abonne, null] }, enCours: { type: boolean } } }
+  /abonnement/essai:
+    post:
+      tags: [Pièces, Boutique et parcours]
+      summary: Lancer l'essai Kopo+ de 7 jours (une fois, compte Google)
+      description: "Donne 7 jours de Kopo+ (micro, couronne) tout de suite, une seule fois par compte. 403 pour un compte invité (sans Google), 409 si l'essai est déjà pris ou si le joueur est déjà abonné. Une notification part, et la veille de la fin une autre rappelle les prix."
+      responses:
+        '200':
+          description: Essai lancé
+          content:
+            application/json:
+              schema: { type: object, properties: { ok: { type: boolean }, jusqu: { type: string, format: date-time }, jours: { type: integer } } }
+        '403': { description: Compte invité, connecte-toi avec Google }
+        '409': { description: Essai déjà pris, ou déjà abonné }
   /boutique:
     get:
       tags: [Boutique et parcours]

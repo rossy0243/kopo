@@ -49,6 +49,10 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
   const bouquets = creerBouquets(base, reglages, comptes);
   const abonnement = creerAbonnement(base, env);
   if (!abonnement.microPret()) console.log('Micro éteint (LIVEKIT_URL, LIVEKIT_API_KEY et LIVEKIT_API_SECRET absents).');
+  abonnement.majSalles = (id, jusqu) => { for (const s of salles) if (s.majAbonne) s.majAbonne(id, jusqu); };
+  // La veille de la fin d'un abonnement (ou de l'essai) : une notification avec les prix.
+  const minuteurRappels = setInterval(() => abonnement.rappels(social.notifier).catch((e) => console.error('Kopo+ :', e.message)), 10 * 60e3);
+  minuteurRappels.unref();
   // Chaque minute : semaines de Bande finies (pot partagé), mises automatiques du lundi, rappel du soir.
   const minuteurBande = setInterval(() => bande.tic().catch((e) => console.error('Bande :', e.message)), 60e3);
   minuteurBande.unref();
@@ -138,8 +142,8 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
   console.log(`Kopo : serveur prêt sur le port ${adresse.port} (base : ${base.genre}).`);
 
   return {
-    port: adresse.port, base, comptes, reglages, auth, ligue, social, parcours, parrainage, matchJour, bande, push,
-    async arreter() { clearInterval(minuteurSaison); clearInterval(minuteurBande); clearInterval(minuteurPush); await jeu.gracefullyShutdown(false).catch(() => {}); serveurHttp.close(); await base.fermer(); },
+    port: adresse.port, base, comptes, reglages, auth, ligue, social, parcours, parrainage, matchJour, bande, push, abonnement, stickers,
+    async arreter() { clearInterval(minuteurSaison); clearInterval(minuteurBande); clearInterval(minuteurPush); clearInterval(minuteurRappels); await jeu.gracefullyShutdown(false).catch(() => {}); serveurHttp.close(); await base.fermer(); },
   };
 }
 
