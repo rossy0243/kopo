@@ -166,8 +166,11 @@ class _LigneJoueur extends StatelessWidget {
   final Map j;
   final bool gerer;
   const _LigneJoueur(this.v, this.j, this.gerer);
+  // Seule la ligne se redessine quand quelqu'un se met à parler ou se tait (pas tout le salon).
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ValueListenableBuilder<Set<String>>(valueListenable: app.vocal.quiParle, builder: (context, _, _) => _ligne(context));
+
+  Widget _ligne(BuildContext context) {
     final robot = j['robot'] == true;
     final avecNiveau = robot && j['niveau'] != null && v['robots'] != 'gentils';
     final nom = (j['nom'] ?? '?').toString();

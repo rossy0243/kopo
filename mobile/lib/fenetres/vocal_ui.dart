@@ -72,8 +72,11 @@ class BoutonsMicro extends StatelessWidget {
 class BandeauParleurs extends StatelessWidget {
   final Map v;
   const BandeauParleurs(this.v, {super.key});
+  // Se redessine seul quand la liste de ceux qui parlent change (pas tout l'écran de la partie).
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ValueListenableBuilder<Set<String>>(valueListenable: app.vocal.quiParle, builder: (context, _, _) => _bandeau(context));
+
+  Widget _bandeau(BuildContext context) {
     final joueurs = (v['joueurs'] as List).cast<Map>();
     final ids = app.vocal.parleurs.where((id) => joueurs.any((j) => j['id'] == id)).toList();
     if (ids.isEmpty) return const SizedBox.shrink();

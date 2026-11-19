@@ -1,6 +1,7 @@
 // Micro des abonnés Kopo+ : seuls les abonnés parlent et s'entendent, comme sur le site (src/source.html, « vocal »).
 // La voix passe par un serveur LiveKit ; le serveur du jeu donne l'accès au salon vocal de la table seulement à un
 // abonné assis (message « vocal »). Un non-abonné qui touche le micro voit l'invitation à s'abonner, avec les prix.
+import 'package:flutter/foundation.dart';
 import 'package:livekit_client/livekit_client.dart' as lk;
 
 import 'stock.dart';
@@ -25,7 +26,13 @@ class Vocal {
   bool actif = false, muet = true, parler = false, sonCoupe = false, demande = false;
   /// Identifiants (= comptes) de ceux qui parlent ; joueurs rendus muets pour moi seul
   /// (gardés sur le téléphone, d'une partie à l'autre, comme sur le site).
-  Set<String> parleurs = {};
+  /// LiveKit redit « qui parle » plusieurs fois par seconde quand toute la table parle (le volume change), même
+  /// quand ce sont les mêmes personnes. Avant, chaque fois redessinait tout l'écran de la partie (main, table…) et
+  /// le jeu ralentissait : maintenant seuls les sièges et le bandeau « qui parle » écoutent, et seulement quand la
+  /// liste change vraiment.
+  final ValueNotifier<Set<String>> quiParle = ValueNotifier(const {});
+  Set<String> get parleurs => quiParle.value;
+  set parleurs(Set<String> s) { if (!setEquals(s, quiParle.value)) quiParle.value = s; }
   final Set<String> coupes = {...((Stock.lire('kopo-micros-coupes') as List?) ?? const []).map((e) => e.toString())};
 
   /// Couper le son, c'est seulement pour moi : les autres joueurs s'entendent toujours.
@@ -72,7 +79,7 @@ class Vocal {
     final ecoute = salle.createListener();
     _ecoute = ecoute;
     ecoute
-      ..on<lk.ActiveSpeakersChangedEvent>((e) { parleurs = e.speakers.map((p) => p.identity).toSet(); maj(); })
+      ..on<lk.ActiveSpeakersChangedEvent>((e) => parleurs = e.speakers.map((p) => p.identity).toSet())
       ..on<lk.TrackSubscribedEvent>((e) { if (entendPas(e.participant.identity)) e.publication.disable(); })
       ..on<lk.RoomDisconnectedEvent>((_) {
         if (_salle != salle) return;

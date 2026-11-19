@@ -184,8 +184,11 @@ class _Siege extends StatelessWidget {
   final String id;
   const _Siege(this.v, this.m, this.id);
 
+  // Seul le siège se redessine quand quelqu'un se met à parler ou se tait (pas tout l'écran).
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ValueListenableBuilder<Set<String>>(valueListenable: app.vocal.quiParle, builder: (context, _, _) => _siege(context));
+
+  Widget _siege(BuildContext context) {
     final j = (v['joueurs'] as List).cast<Map>().firstWhere((x) => x['id'] == id, orElse: () => {});
     final moi = id == v['moi'];
     final courant = id == m['joueurCourant'];
