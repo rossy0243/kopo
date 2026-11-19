@@ -114,7 +114,7 @@ async function bouquetsAdmin() {
 // Abonnement Kopo+ (micro en salle, couronne dorée) : prix, abonnés, et un abonnement activé à la main (paiement reçu).
 async function abonnementsAdmin() {
   const A = await api('/abonnements');
-  $('#abonnements').innerHTML = `<div class="carte"><div class="ligne"><span><b>${nb(A.actifs)}</b> abonné${A.actifs > 1 ? 's' : ''} en cours</span><span class="muted">·</span><span><b>${nb(A.francs30j)} FC</b> encaissés sur 30 jours (${nb(A.activations30j)} activation${A.activations30j > 1 ? 's' : ''})</span></div>
+  $('#abonnements').innerHTML = `<div class="carte"><div class="ligne"><span><b>${nb(A.actifs)}</b> abonné${A.actifs > 1 ? 's' : ''} en cours</span><span class="muted">·</span><span><b>${nb(A.francs30j)} FC</b> encaissés sur 30 jours (${nb(A.activations30j)} activation${A.activations30j > 1 ? 's' : ''})</span><span class="muted">·</span><span><b>${nb(A.essais30j)}</b> essai${A.essais30j > 1 ? 's' : ''} gratuit${A.essais30j > 1 ? 's' : ''} de ${A.essaiJours} jours sur 30 jours</span></div>
       <table><tr><th>Formule</th><th class="n">Prix</th><th class="n">Durée</th></tr>${A.formules.map((f) => `<tr><td>${esc(f.nom)}${f.note ? ` <span class="muted">(${esc(f.note)})</span>` : ''}</td><td class="n">${nb(f.francs)} FC</td><td class="n">${nb(f.jours)} jours</td></tr>`).join('')}</table>
       <p class="muted" style="margin:8px 0 0">Kopo+ donne le micro en salle (seuls les abonnés parlent et s'entendent), la couronne dorée et la voie Kopo+ du parcours. <span id="abLivekit">${A.micro ? 'Serveur vocal LiveKit : vérification…' : '<b>Micro éteint</b> : LIVEKIT_URL, LIVEKIT_API_KEY et LIVEKIT_API_SECRET absents sur Render.'}</span> Paiement mobile money pas encore branché.</p></div>
     <div class="carte"><b>Activer un abonnement</b> <span class="muted">(paiement mobile money reçu à la main)</span>
@@ -122,7 +122,7 @@ async function abonnementsAdmin() {
       <input id="abRef" placeholder="Référence du paiement" style="width:200px"><button class="btn" id="abActiver">Activer</button></div>
       <p class="muted" style="margin:6px 0 0">S'il reste des jours, la nouvelle période s'ajoute à la fin. Le joueur reçoit une notification ; la couronne apparaît tout de suite à sa table. Noté au Journal.</p></div>
     <div class="carte"><table><tr><th>Date</th><th>Joueur</th><th>Formule</th><th class="n">Prix</th><th>Jusqu'au</th><th>Référence</th><th></th></tr>
-      ${lignes('abActivations', A.activations, (l) => `<tr${l.annule_le ? ' class="muted"' : ''}><td>${date(l.cree_le)}</td><td><button class="lien" data-joueur="${esc(l.compte)}">${esc(l.pseudo)}#${esc(l.numero)}</button></td><td>${l.formule === 'an' ? '1 an' : '1 mois'}</td><td class="n">${l.annule_le ? `<s>${nb(l.francs)} FC</s>` : nb(l.francs) + ' FC'}</td><td>${date(l.jusqu)}</td><td>${esc(l.ref || '')}</td><td>${l.annule_le ? 'Annulée le ' + date(l.annule_le) : `<button class="btn" data-ab-annuler="${l.id}" data-ab-nom="${esc(l.pseudo)}#${esc(l.numero)}" data-ab-jours="${l.formule === 'an' ? 365 : 30}">Annuler</button>`}</td></tr>`, { par: 10, colonnes: 7, vide: '<tr><td class="muted" colspan="7">Aucun abonnement activé pour l\'instant.</td></tr>' })}</table></div>`;
+      ${lignes('abActivations', A.activations, (l) => `<tr${l.annule_le ? ' class="muted"' : ''}><td>${date(l.cree_le)}</td><td><button class="lien" data-joueur="${esc(l.compte)}">${esc(l.pseudo)}#${esc(l.numero)}</button></td><td>${l.formule === 'an' ? '1 an' : l.formule === 'essai' ? 'Essai gratuit' : '1 mois'}</td><td class="n">${l.annule_le ? `<s>${nb(l.francs)} FC</s>` : nb(l.francs) + ' FC'}</td><td>${date(l.jusqu)}</td><td>${esc(l.ref || '')}</td><td>${l.annule_le ? 'Annulée le ' + date(l.annule_le) : `<button class="btn" data-ab-annuler="${l.id}" data-ab-nom="${esc(l.pseudo)}#${esc(l.numero)}" data-ab-jours="${l.formule === 'an' ? 365 : l.formule === 'essai' ? A.essaiJours : 30}">Annuler</button>`}</td></tr>`, { par: 10, colonnes: 7, vide: '<tr><td class="muted" colspan="7">Aucun abonnement activé pour l\'instant.</td></tr>' })}</table></div>`;
   $('#abonnements').onclick = async (ev) => {
     const b = ev.target.closest('[data-ab-annuler]');
     if (!b) return;
@@ -423,6 +423,10 @@ const afficher = {
         <div class="ligne"><span>${R.vente ? '<b class="ok">Vente ouverte</b> : les joueurs peuvent acheter des utilisations en pièces' + (R.actif ? '.' : ', dès que les stickers seront allumés.') : '<b class="ko">Vente fermée</b> : les prix sont affichés, rien ne s\'achète.'}</span>
           <span style="flex:1"></span><button class="btn ${R.vente ? 'danger' : 'principal'}" id="stVente">${R.vente ? 'Fermer la vente' : 'Ouvrir la vente en pièces'}</button></div>
         <p class="muted" style="margin:0">Chaque envoi en partie décompte une utilisation ; à 0 le sticker se reverrouille. L'achat en argent réel attend le paiement mobile.</p></div>
+      <h3>Cadeau de bienvenue</h3>
+      <div class="carte"><p class="muted" style="margin:0 0 6px">Offert une seule fois à chaque joueur, nouveau ou déjà inscrit, la première fois qu'il ouvre ses stickers pendant qu'ils sont allumés. Une notification lui dit ce qu'il a reçu. ${nb(S.bienvenueJoueurs)} joueur${S.bienvenueJoueurs > 1 ? 's l\'ont' : ' l\'a'} reçu.</p>
+        <div class="ligne" style="flex-wrap:wrap">${S.stickers.map((x) => `<label style="display:flex;gap:6px;align-items:center;min-width:150px"><input type="checkbox" data-bienvenue="${x.id}"${R.bienvenue.stickers.includes(x.id) ? ' checked' : ''}>${esc(x.nom)}</label>`).join('')}</div>
+        <div class="ligne"><input id="stBvN" type="number" min="0" max="100" value="${R.bienvenue.utilisations}" style="width:80px"> <span class="muted">envois de chaque sticker coché (0 = pas de cadeau)</span><span style="flex:1"></span><button class="btn" id="stBienvenue">Enregistrer</button></div></div>
       <h3>Offrir des stickers</h3>
       <div class="carte">
         <div class="ligne"><b style="width:90px">À qui</b><select id="stCible"><option value="joueur">Un joueur</option><option value="tous">Tous les joueurs</option><option value="groupe">Un groupe de joueurs</option></select>
@@ -482,6 +486,10 @@ const afficher = {
     $('#stInter').onclick = async () => {
       if (!R.actif && !confirm('Allumer les stickers ? Les joueurs qui ont des utilisations pourront les envoyer en partie.')) return;
       try { await api('/reglages/stickers', { methode: 'PUT', corps: { valeur: { ...R, actif: !R.actif } } }); message(R.actif ? 'Stickers éteints.' : 'Stickers allumés.'); aller('stickers'); } catch (e) { message(e.message); }
+    };
+    $('#stBienvenue').onclick = async () => {
+      const ids = [...$('#contenu').querySelectorAll('[data-bienvenue]:checked')].map((b) => b.dataset.bienvenue);
+      try { await api('/reglages/stickers', { methode: 'PUT', corps: { valeur: { ...R, bienvenue: { stickers: ids, utilisations: Number($('#stBvN').value) || 0 } } } }); message('Cadeau de bienvenue enregistré.'); aller('stickers'); } catch (e) { message(e.message); }
     };
     $('#stVente').onclick = async () => {
       if (!R.vente && !confirm('Ouvrir la vente ? Les joueurs pourront acheter des utilisations de stickers avec leurs pièces.')) return;

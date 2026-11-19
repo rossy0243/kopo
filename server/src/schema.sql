@@ -459,3 +459,7 @@ CREATE TABLE IF NOT EXISTS abonnements (
 );
 CREATE INDEX IF NOT EXISTS abonnements_compte ON abonnements (compte_id, id DESC);
 ALTER TABLE abonnements ADD COLUMN IF NOT EXISTS annule_le timestamptz; -- activation annulée par l'admin (test, erreur) : jours retirés, francs hors du total
+-- Essai Kopo+ de bienvenue (19/11) : 7 jours offerts une seule fois par compte Google, lancé par le joueur.
+ALTER TABLE comptes ADD COLUMN IF NOT EXISTS kopo_plus_essai timestamptz;      -- début de l'essai (null = pas encore pris)
+ALTER TABLE comptes ADD COLUMN IF NOT EXISTS kopo_plus_rappel timestamptz;     -- fin d'abonnement déjà annoncée la veille
+ALTER TABLE comptes ADD COLUMN IF NOT EXISTS stickers_bienvenue timestamptz;   -- stickers de bienvenue reçus (une fois)

@@ -63,6 +63,13 @@ void main() {
     expect(find.text('${App.formatPieces(25000)} FC'), findsOneWidget);
     expect(find.text('2 MOIS OFFERTS'), findsOneWidget);
     expect(find.textContaining('\$'), findsNothing);
+    // Essai de bienvenue proposé (compte Google), ou connexion Google demandée (compte invité).
+    await t.pumpWidget(MaterialApp(theme: K.theme(), home: Scaffold(body: SingleChildScrollView(child: fenetreAbonnement({...offre, 'actif': false, 'essai': {'jours': 7, 'possible': true, 'raison': null}}, annonce: true)))));
+    expect(find.text('Nouveau : le micro en partie'), findsOneWidget);
+    expect(find.text('Essayer 7 jours gratuits'), findsOneWidget);
+    await t.pumpWidget(MaterialApp(theme: K.theme(), home: Scaffold(body: SingleChildScrollView(child: fenetreAbonnement({...offre, 'actif': false, 'essai': {'jours': 7, 'possible': false, 'raison': 'google'}})))));
+    expect(find.text('Essayer 7 jours gratuits'), findsNothing);
+    expect(find.text('Se connecter avec Google'), findsOneWidget);
   });
 
   testWidgets('micro : bouton « + » pour un non-abonné, rien sans autre humain', (t) async {

@@ -1866,6 +1866,52 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.strictEqual((await api('/api/moi', { jeton: a.jeton })).json.compte.kopoPlus, false);
     assert.ok((await api('/admin/api/journal', { jeton: adminJeton })).json.some((l) => l.action === 'abonnement:annule'));
   });
+  await test('bienvenue : essai Kopo+ de 7 jours (une fois, compte Google) et rappel la veille de la fin', async () => {
+    const inv = await invite('EssaiInvite');
+    const o = (await api('/api/v1/abonnement', { jeton: inv.jeton })).json;
+    assert.deepStrictEqual([o.essai.jours, o.essai.possible, o.essai.raison], [7, false, 'google']);
+    assert.strictEqual((await api('/api/v1/abonnement/essai', { methode: 'POST', jeton: inv.jeton })).statut, 403);
+    // Un joueur déjà inscrit avec Google y a droit aussi.
+    const g = (await api('/api/connexion', { methode: 'POST', corps: { jetonSupabase: await jetonGoogle('google-essai', 'Essai Kopo') } })).json;
+    assert.strictEqual((await api('/api/v1/abonnement', { jeton: g.jeton })).json.essai.possible, true);
+    const r = await api('/api/v1/abonnement/essai', { methode: 'POST', jeton: g.jeton });
+    assert.strictEqual(r.statut, 200);
+    assert.ok(Math.abs(new Date(r.json.jusqu).getTime() - (Date.now() + 7 * 864e5)) < 60e3);
+    const apres = (await api('/api/v1/abonnement', { jeton: g.jeton })).json;
+    assert.strictEqual(apres.actif, true); assert.strictEqual(apres.essai.raison, 'deja'); assert.strictEqual(apres.essai.enCours, true);
+    assert.strictEqual((await api('/api/v1/abonnement/essai', { methode: 'POST', jeton: g.jeton })).statut, 409, 'une seule fois');
+    const adm = (await api('/admin/api/abonnements', { jeton: adminJeton })).json;
+    const ligne = adm.activations.find((l) => l.compte === g.compte.id);
+    assert.strictEqual(ligne.formule, 'essai'); assert.strictEqual(ligne.francs, 0); assert.ok(adm.essais30j >= 1);
+    // La veille de la fin : une notification avec les prix, une seule fois.
+    await srv.base.query("UPDATE comptes SET kopo_plus_jusqu = now() + interval '20 hours' WHERE id = $1", [g.compte.id]);
+    const notes = [];
+    const notifier = async (id, type, texte) => { notes.push({ id, texte }); };
+    await srv.abonnement.rappels(notifier);
+    await srv.abonnement.rappels(notifier);
+    const mien = notes.filter((n) => n.id === g.compte.id);
+    assert.strictEqual(mien.length, 1); assert.match(mien[0].texte, /essai Kopo\+ se termine demain.*2 500 FC/);
+    // Après l'essai : plus abonné, et pas de deuxième essai.
+    await srv.base.query("UPDATE comptes SET kopo_plus_jusqu = now() - interval '1 hour' WHERE id = $1", [g.compte.id]);
+    assert.strictEqual((await api('/api/v1/abonnement/essai', { methode: 'POST', jeton: g.jeton })).statut, 409);
+  });
+  await test('bienvenue : stickers offerts une fois à chaque joueur, nouveaux comme anciens, quand les stickers sont allumés', async () => {
+    const resume = (await api('/admin/api/stickers', { jeton: adminJeton })).json;
+    assert.deepStrictEqual(resume.reglage.bienvenue, { stickers: ['katapss', 'rire', 'bravo'], utilisations: 10 });
+    const a = await invite('BvStick');
+    await api('/admin/api/reglages/stickers', { methode: 'PUT', jeton: adminJeton, corps: { valeur: { ...resume.reglage, actif: false } } });
+    assert.deepStrictEqual((await api('/api/v1/stickers', { jeton: a.jeton })).json.soldes, {}, 'éteints : rien encore');
+    assert.strictEqual((await api('/admin/api/reglages/stickers', { methode: 'PUT', jeton: adminJeton, corps: { valeur: { ...resume.reglage, bienvenue: { stickers: ['inconnu'], utilisations: 5 } } } })).statut, 400);
+    await api('/admin/api/reglages/stickers', { methode: 'PUT', jeton: adminJeton, corps: { valeur: { ...resume.reglage, actif: true, bienvenue: { stickers: ['katapss', 'bravo'], utilisations: 10 } } } });
+    const s1 = (await api('/api/v1/stickers', { jeton: a.jeton })).json.soldes;
+    assert.strictEqual(s1.katapss, 10); assert.strictEqual(s1.bravo, 10); assert.ok(!s1.rire);
+    const s2 = (await api('/api/v1/stickers', { jeton: a.jeton })).json.soldes;
+    assert.strictEqual(s2.katapss, 10, 'une seule fois');
+    const n = (await api('/api/notifications', { jeton: a.jeton })).json;
+    assert.ok(n.liste.some((x) => /Cadeau de bienvenue : 10 envois/.test(x.texte)));
+    assert.ok((await api('/admin/api/stickers', { jeton: adminJeton })).json.bienvenueJoueurs >= 1);
+    await api('/admin/api/reglages/stickers', { methode: 'PUT', jeton: adminJeton, corps: { valeur: { ...resume.reglage } } });
+  });
   await test('LiveKit : adresse corrigée, valeurs nettoyées, vérification depuis le tableau de bord', async () => {
     const { creerAbonnement, adresseLiveKit } = require('../src/abonnement');
     assert.strictEqual(adresseLiveKit('https://kopo-x.livekit.cloud/'), 'wss://kopo-x.livekit.cloud');

@@ -164,6 +164,8 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours,
   r.get('/bouquets', joueur, (req, res) => res.json({ solde: req.compte.solde, ...bouquets.pourJoueur() }));
   // Abonnement Kopo+ (micro en salle, couronne dorée) : prix en francs congolais, l'abonnement du joueur, micro prêt ou non.
   r.get('/abonnement', joueur, (req, res) => res.json(abonnement.pourJoueur(req.compte)));
+  // Essai de bienvenue : 7 jours de Kopo+, une seule fois, compte Google.
+  r.post('/abonnement/essai', joueur, enveloppe(async (req, res) => res.json(await abonnement.essayer(req.compte))));
   r.get('/boutique', joueur, enveloppe(async (req, res) => res.json({ solde: req.compte.solde, objets: parcours.catalogue(), ...(await parcours.collection(req.compte)) })));
   r.post('/boutique/acheter', joueur, enveloppe(async (req, res) => res.json(await parcours.acheter(req.compte, req.body.objet))));
 

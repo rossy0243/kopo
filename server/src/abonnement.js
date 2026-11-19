@@ -19,6 +19,7 @@ const AVANTAGES = [
   'Couronne dorée à côté de ton pseudo',
   'Voie Kopo+ du parcours de saison (apparences en plus)',
 ];
+const ESSAI_JOURS = 7; // essai de bienvenue (19/11) : une fois par compte Google, lancé par le joueur
 const DUREE_JETON = 6 * 3600; // un jeton vocal tient 6 heures (une longue soirée de jeu)
 
 const erreur = (m, statut = 400) => Object.assign(new Error(m), { statut });
@@ -54,11 +55,55 @@ function creerAbonnement(base_, env = process.env) {
   const livekit = url && cle && secretLk ? { url, cle, secret: secretLk } : null;
   const offre = () => ({ paiement: false, micro: !!livekit, formules: FORMULES.map((f) => ({ ...f })), avantages: AVANTAGES.slice() });
 
+  const etatEssai = (c) => {
+    const raison = !c ? 'google' : c.kopo_plus_essai ? 'deja' : !c.auth_id ? 'google' : estAbonne(c) ? 'abonne' : null;
+    return { jours: ESSAI_JOURS, possible: !raison, raison, enCours: !!(c && c.kopo_plus_essai && estAbonne(c) && new Date(c.kopo_plus_jusqu) - new Date(c.kopo_plus_essai) <= (ESSAI_JOURS + 1) * 864e5) };
+  };
+
   const api = {
-    FORMULES, estAbonne,
+    FORMULES, ESSAI_JOURS, estAbonne,
+    // Salles ouvertes, pour que la couronne apparaisse tout de suite (branché par index.js).
+    majSalles: () => {},
+
+    // Le joueur lance son essai : 7 jours de Kopo+ (micro, couronne), une seule fois, avec un compte Google
+    // (sinon on recréerait des comptes invités pour enchaîner les essais). Noté avec les activations, à 0 FC.
+    async essayer(compte) {
+      const e = etatEssai(compte);
+      if (!e.possible) {
+        throw erreur(e.raison === 'deja' ? 'Tu as déjà profité de ton essai Kopo+.' : e.raison === 'abonne' ? 'Tu es déjà abonné à Kopo+.' : 'Connecte-toi avec Google pour profiter de l\'essai gratuit.', e.raison === 'google' ? 403 : 409);
+      }
+      const jusqu = await base_.transaction(async (q) => {
+        const r = await q.query(`UPDATE comptes SET kopo_plus_jusqu = now() + make_interval(days => $2), kopo_plus_essai = now()
+          WHERE id = $1 AND kopo_plus_essai IS NULL AND auth_id IS NOT NULL AND (kopo_plus_jusqu IS NULL OR kopo_plus_jusqu <= now()) RETURNING kopo_plus_jusqu`, [compte.id, ESSAI_JOURS]);
+        if (!r.rows.length) throw erreur('Tu as déjà profité de ton essai Kopo+.', 409);
+        const fin = r.rows[0].kopo_plus_jusqu;
+        await q.query("INSERT INTO abonnements (compte_id, formule, francs, jours, ref, jusqu) VALUES ($1, 'essai', 0, $2, 'Essai de bienvenue', $3)", [compte.id, ESSAI_JOURS, fin]);
+        const date = new Date(fin).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', timeZone: 'Africa/Kinshasa' });
+        await q.query("INSERT INTO notifications (compte_id, type, texte, donnees) VALUES ($1, 'cadeau', $2, $3)",
+          [compte.id, `Ton essai Kopo+ commence : micro et couronne dorée jusqu'au ${date}. Parle avec les autres abonnés de ta table !`, JSON.stringify({ abonnement: 'essai', jusqu: fin })]);
+        return fin;
+      });
+      api.majSalles(compte.id, jusqu);
+      return { ok: true, jusqu, jours: ESSAI_JOURS };
+    },
+
+    // Toutes les 10 minutes : la veille de la fin d'un abonnement (essai compris), une notification avec les prix.
+    async rappels(notifier) {
+      const l = (await base_.query(`UPDATE comptes SET kopo_plus_rappel = kopo_plus_jusqu
+        WHERE kopo_plus_jusqu > now() AND kopo_plus_jusqu <= now() + interval '24 hours' AND kopo_plus_rappel IS DISTINCT FROM kopo_plus_jusqu AND statut = 'actif'
+        RETURNING id, kopo_plus_jusqu, kopo_plus_essai`)).rows;
+      for (const c of l) {
+        const essai = c.kopo_plus_essai && new Date(c.kopo_plus_jusqu) - new Date(c.kopo_plus_essai) <= (ESSAI_JOURS + 1) * 864e5;
+        const texte = (essai ? 'Ton essai Kopo+ se termine demain.' : 'Ton abonnement Kopo+ se termine demain.')
+          + ` Pour garder le micro et la couronne : 2 500 FC le mois, ou 25 000 FC l'année (2 mois offerts).`;
+        await notifier(c.id, 'cadeau', texte, { abonnement: 'rappel', jusqu: c.kopo_plus_jusqu }).catch(() => {});
+      }
+      return l.length;
+    },
     microPret: () => !!livekit,
     // Pour le joueur : son abonnement et les prix (en francs congolais).
-    pourJoueur: (c) => ({ actif: estAbonne(c), jusqu: estAbonne(c) ? c.kopo_plus_jusqu : null, ...offre() }),
+    // essai : 7 jours offerts une fois. raison du refus : 'deja' (déjà pris), 'google' (compte invité), 'abonne'.
+    pourJoueur: (c) => ({ actif: estAbonne(c), jusqu: estAbonne(c) ? c.kopo_plus_jusqu : null, essai: etatEssai(c), ...offre() }),
     offre,
 
     // Tableau de bord : abonnement activé à la main (paiement mobile money reçu), avec la référence du paiement.
@@ -118,10 +163,11 @@ function creerAbonnement(base_, env = process.env) {
     // Tableau de bord : formules, abonnés en cours, francs encaissés sur 30 jours, dernières activations.
     async resumeAdmin() {
       const actifs = (await base_.query("SELECT count(*)::int AS n FROM comptes WHERE kopo_plus_jusqu > now() AND statut = 'actif'")).rows[0].n;
-      const mois = (await base_.query("SELECT COALESCE(sum(francs), 0)::int AS f, count(*)::int AS n FROM abonnements WHERE cree_le > now() - interval '30 days' AND annule_le IS NULL")).rows[0];
+      const mois = (await base_.query("SELECT COALESCE(sum(francs), 0)::int AS f, count(*)::int AS n FROM abonnements WHERE cree_le > now() - interval '30 days' AND annule_le IS NULL AND formule <> 'essai'")).rows[0];
       const activations = (await base_.query(`SELECT a.id::int AS id, a.formule, a.francs, a.ref, a.jusqu, a.cree_le, a.annule_le, c.id AS compte, c.pseudo, c.numero
         FROM abonnements a JOIN comptes c ON c.id = a.compte_id ORDER BY a.id DESC LIMIT 30`)).rows;
-      return { ...offre(), actifs, francs30j: mois.f, activations30j: mois.n, activations };
+      const essais30j = (await base_.query("SELECT count(*)::int AS n FROM abonnements WHERE formule = 'essai' AND cree_le > now() - interval '30 days'")).rows[0].n;
+      return { ...offre(), essaiJours: ESSAI_JOURS, actifs, francs30j: mois.f, activations30j: mois.n, essais30j, activations };
     },
 
     // Tableau de bord : LiveKit accepte-t-il nos réglages ? Un jeton d'essai est présenté à /rtc/validate du serveur vocal.
@@ -149,4 +195,4 @@ function creerAbonnement(base_, env = process.env) {
   return api;
 }
 
-module.exports = { creerAbonnement, jetonLiveKit, adresseLiveKit, estAbonne, FORMULES, AVANTAGES };
+module.exports = { ESSAI_JOURS, creerAbonnement, jetonLiveKit, adresseLiveKit, estAbonne, FORMULES, AVANTAGES };
