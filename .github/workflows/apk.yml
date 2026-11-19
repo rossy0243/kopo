@@ -1,5 +1,6 @@
 # Construit l'APK Android de l'appli (mobile/) et le met en téléchargement sur la page du run (« Artifacts »).
-# Lancement : à la main (onglet Actions > APK Android > Run workflow) ou à chaque envoi sur une branche claude/*.
+# Lancement : à chaque fusion sur main qui touche l'appli (mobile/), ou à la main (onglet Actions > APK Android > Run workflow).
+# Une PR qui touche l'appli construit aussi l'APK (vérification), sans le publier. Seul main publie : l'APK de app.masano.online est donc toujours celui de main, jamais celui d'une branche en cours.
 # Sans les secrets de publication, l'APK est signé avec une clé de test : il s'installe, mais ne remplace pas
 # une version du Play Store.
 name: APK Android
@@ -7,7 +8,9 @@ name: APK Android
 on:
   workflow_dispatch:
   push:
-    branches: ['claude/**']
+    branches: [main]
+    paths: ['mobile/**', '.github/workflows/apk.yml']
+  pull_request:
     paths: ['mobile/**', '.github/workflows/apk.yml']
 
 permissions:
@@ -41,6 +44,7 @@ jobs:
           retention-days: 30
       # Lien direct, téléchargeable sur le téléphone sans compte GitHub : version « apk-test » (remplacée à chaque construction).
       - name: Publier dans la version apk-test
+        if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
