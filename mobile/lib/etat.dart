@@ -126,7 +126,9 @@ class App extends ChangeNotifier {
   void maj() { Sons.surMenu(ecran != 'partie'); notifyListeners(); }
 
   /// Micro des abonnés Kopo+ (LiveKit), voir commun/vocal.dart.
-  late final Vocal vocal = Vocal(envoyer: envoyer, maj: maj, toast: (t, n) => toast(t, Niv.values.firstWhere((x) => x.name == n, orElse: () => Niv.info)));
+  late final Vocal vocal = Vocal(envoyer: envoyer, maj: maj, toast: (t, n) => toast(t, Niv.values.firstWhere((x) => x.name == n, orElse: () => Niv.info)))
+    ..bloque = ((id) => bloques.contains(id))
+    ..garderSonCoupe = (coupe) { prefs['sonAutresCoupe'] = coupe; enregistrerPrefs(); };
   /// Tests et captures d'écran : le micro s'affiche sans salle sur le serveur.
   bool microEssai = false;
   /// Le micro a un sens à cette table : partie sur le serveur, avec au moins un autre humain.
@@ -209,6 +211,8 @@ class App extends ChangeNotifier {
   void appliquerPrefs() {
     Couleurs4.actif = prefs['quatreCouleurs'] == true;
     Sons.regler(effets: prefs['effetsSonores'] == true, musique: prefs['musique'] == true);
+    // « Couper le micro des autres » (Paramètres ou en-tête de la partie) : tout de suite, pour moi seul.
+    if (vocal.sonCoupe != (prefs['sonAutresCoupe'] == true)) { vocal.sonCoupe = prefs['sonAutresCoupe'] == true; vocal.appliquerSon(); }
   }
 
   // ---------------------------------------------------------------- profil (XP, missions…) sur le téléphone
@@ -385,6 +389,7 @@ class App extends ChangeNotifier {
   Future<void> demarrer() async {
     chargerPrefs();
     bloques = {...((Stock.lire('kopo-bloques') as List?) ?? []).map((e) => e.toString())};
+    vocal.coupes..clear()..addAll(((Stock.lire('kopo-micros-coupes') as List?) ?? const []).map((e) => e.toString()));
     suivi = null;
     Api.surMiseAJour = (store) { miseAJourStore = store ?? ''; maj(); };
     _splash(74, 'Préparation de la table…');

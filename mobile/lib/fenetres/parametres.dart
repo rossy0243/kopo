@@ -98,6 +98,8 @@ class _ParametresState extends State<_Parametres> {
       Bascule('Effets sonores', pr['effetsSonores'] == true, (_) => _bascule('effetsSonores', () => Sons.jouer('essai')), aide: 'Cartes, tour, Katapss, chat'),
       Bascule("Musique d'ambiance", pr['musique'] == true, (_) => _bascule('musique'), aide: 'Plus basse pendant les parties'),
       Bascule('Vibrations', pr['vibrations'] == true, (_) => _bascule('vibrations', () => app.vibrer(60)), aide: "Quand c'est à toi de jouer"),
+      // Le micro des autres : coupé pour moi seul (eux s'entendent toujours). Aussi dans l'en-tête de la partie.
+      if (app.enLigne) Bascule('Couper le micro des autres', pr['sonAutresCoupe'] == true, (_) => _bascule('sonAutresCoupe'), aide: "Tu n'entends plus personne ; les autres s'entendent toujours"),
       const Titre3('Jeu'),
       choix('Ranger ma main', null, const [('couleur', 'Par couleur'), ('valeur', 'Par valeur')], pr['tri'] == 'valeur' ? 'valeur' : 'couleur', (v) { pr['tri'] = v; app.enregistrerPrefs(); setState(() {}); }),
       Bascule('Confirmer avant « Tout poser »', pr['confirmerToutPoser'] == true, (_) => _bascule('confirmerToutPoser'), aide: 'Évite de sortir par erreur'),

@@ -433,6 +433,8 @@ body.salon .app { display: flex; flex-direction: column; min-height: 100vh; min-
 #listeJoueurs li > span:first-child { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 #listeJoueurs .pastille { font-size: 10px; padding: 1px 6px; }
 #listeJoueurs li .btn.retirer { padding: 2px 8px; font-size: 14px; line-height: 1.4; }
+#listeJoueurs li .btn.micro-joueur { padding: 2px 6px; font-size: 14px; line-height: 1.4; flex: none; }
+#listeJoueurs li .btn.micro-joueur.coupe { border-color: var(--bad); color: var(--bad); }
 /* Niveau de chaque robot : l'hôte touche la pastille pour passer Facile → Normal → Fort */
 .niveau-robot { flex: none; border: 1px solid var(--line); border-radius: 99px; background: rgba(255,255,255,.07); color: var(--ink); font-size: 11px; font-weight: 700; padding: 2px 8px; line-height: 1.4; }
 span.niveau-robot { border-color: transparent; }
@@ -7956,7 +7958,7 @@ svg .vb { transform-box: view-box; }
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = 'a7843daa3e72'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = 'ca87c7fa6903'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: true };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // La musique des menus était coupée par défaut : on l'allume une fois pour tous (le joueur peut la recouper).
@@ -9087,7 +9089,14 @@ svg .vb { transform-box: view-box; }
       if (j.id === v.moi) li.append(el('span', 'pastille neutre', 'toi'));
       if (!j.connecte && !j.robot) li.append(el('span', 'pastille ko', 'déconnecté'));
       else if (j.pret && !j.robot && j.id !== v.hote && !v.publique) li.append(el('span', 'pastille ok', 'prêt'));
-      if (j.voix) li.append(avecIco(el('span'), j.muet ? 'micro-coupe' : 'micro'));
+      if (j.voix && j.id !== v.moi) {
+        // Toucher le micro d'un joueur : je ne l'entends plus (lui et les autres continuent de parler).
+        const coupe = vocal.entendPas(j.id), b = avecIco(el('button', 'btn micro-joueur' + (coupe ? ' coupe' : '')), vocal.icone(j));
+        b.setAttribute('aria-label', coupe ? 'Réentendre ' + j.nom : 'Ne plus entendre ' + j.nom);
+        b.title = b.getAttribute('aria-label');
+        b.onclick = () => (vocal.sonCoupe ? vocal.basculerSon(false) : vocal.basculerJoueur(j.id, j.nom));
+        li.append(b);
+      } else if (j.voix) li.append(avecIco(el('span'), vocal.icone(j)));
       if (avecNiveau) li.append(pastilleNiveauRobot(j, jeSuisHote && !v.publique));
       if (jeSuisHote && j.id !== v.moi && !v.publique) {
         const b = el('button', 'btn retirer', '✕');
@@ -9181,7 +9190,7 @@ svg .vb { transform-box: view-box; }
       if (m.nbCartes[id]) eventail.append(el('b', 'nb', String(m.nbCartes[id])));
       d.append(eventail);
       const ligne = el('div', 'ligne');
-      const nomJ = id === v.moi ? 'Toi' : joueur.nom || '?', icoJ = joueur.robot ? 'robots' : joueur.voix ? (joueur.muet ? 'micro-coupe' : 'micro') : null;
+      const nomJ = id === v.moi ? 'Toi' : joueur.nom || '?', icoJ = joueur.robot ? 'robots' : vocal.icone(joueur);
       ligne.append(icoJ ? avecIco(el('span', 'nom'), icoJ, nomJ) : el('span', 'nom', nomJ));
       if (joueur.plus) ligne.firstChild.after(badgePlus());
       if (m.nbCartes[id]) { const n = el('span', 'compte', String(m.nbCartes[id])); n.setAttribute('aria-label', m.nbCartes[id] + ' carte' + (m.nbCartes[id] > 1 ? 's' : '')); ligne.append(n); }
@@ -9900,7 +9909,8 @@ svg .vb { transform-box: view-box; }
   const initiale = (nom) => (Array.from(String(nom || '?').trim())[0] || '?').toUpperCase();
   const vocal = {
     actif: false, muet: true, parler: false, sonCoupe: !!prefs.sonAutresCoupe, salle: null, vue: null, demande: false,
-    parleurs: new Set(), coupes: new Set(), // identifiants (= comptes) qui parlent ; joueurs rendus muets pour moi seul
+    // Identifiants (= comptes) qui parlent ; joueurs rendus muets pour moi seul (gardés sur cet appareil, d'une partie à l'autre).
+    parleurs: new Set(), coupes: new Set(stock.lire('kopo-micros-coupes') || []),
     dispo() { return MODE_SERVEUR && !LOCAL && !!client && !!client.serveur && !!this.vue && this.vue.joueurs.some((j) => j.id !== this.vue.moi && !j.robot); },
     activer() {
       if (!this.dispo() || this.demande) return;
@@ -9929,7 +9939,7 @@ svg .vb { transform-box: view-box; }
       this.salle = salle;
       salle.on(LK.RoomEvent.TrackSubscribed, (piste, pub, p) => {
         if (piste.kind !== 'audio') return;
-        const a = piste.attach(); a.dataset.peer = p.identity; a.muted = this.sonCoupe || this.coupes.has(p.identity);
+        const a = piste.attach(); a.dataset.peer = p.identity; a.muted = this.entendPas(p.identity);
         $('audios').append(a);
       });
       salle.on(LK.RoomEvent.TrackUnsubscribed, (piste) => piste.detach().forEach((a) => a.remove()));
@@ -9953,10 +9963,26 @@ svg .vb { transform-box: view-box; }
       catch (e) { toast('Micro non autorisé sur ce téléphone.', 'alerte'); }
       this.signaler(); this.dessiner();
     },
-    appliquerSon() { $('audios').querySelectorAll('audio').forEach((a) => (a.muted = this.sonCoupe || this.coupes.has(a.dataset.peer))); },
-    basculerSon() { this.sonCoupe = !this.sonCoupe; this.appliquerSon(); this.dessiner(); },
-    // Rendre muet un abonné pour moi seul (les autres l'entendent toujours).
-    basculerJoueur(id) { if (this.coupes.has(id)) this.coupes.delete(id); else this.coupes.add(id); this.appliquerSon(); },
+    // Couper le son, c'est seulement pour moi : les autres joueurs s'entendent toujours. Un joueur bloqué est coupé aussi.
+    entendPas(id) { return this.sonCoupe || this.coupes.has(id) || bloques.has(id); },
+    appliquerSon() { $('audios').querySelectorAll('audio').forEach((a) => (a.muted = this.entendPas(a.dataset.peer))); },
+    // Tout le monde d'un coup : le même réglage que « Couper le micro des autres » dans les Paramètres (gardé).
+    basculerSon(coupe = !this.sonCoupe) {
+      this.sonCoupe = coupe; prefs.sonAutresCoupe = coupe; enregistrerPrefs();
+      this.appliquerSon(); this.dessiner(); this.redessinerTable();
+      toast(coupe ? 'Tu n\'entends plus les autres joueurs. Eux s\'entendent toujours.' : 'Tu entends de nouveau les autres joueurs.', 'info');
+    },
+    redessinerTable() { if (vueActuelle && $('voile').hidden) afficher(vueActuelle); }, // pas sous une fenêtre ouverte (le salon la fermerait)
+    // Un joueur précis, pour moi seul.
+    basculerJoueur(id, nom) {
+      const coupe = !this.coupes.has(id);
+      if (coupe) this.coupes.add(id); else this.coupes.delete(id);
+      stock.ecrire('kopo-micros-coupes', [...this.coupes].slice(-200));
+      this.appliquerSon(); this.dessiner(); this.redessinerTable();
+      toast(coupe ? `Tu n'entends plus ${nom || 'ce joueur'}. Les autres l'entendent toujours.` : `Tu entends de nouveau ${nom || 'ce joueur'}.`, 'info');
+    },
+    // Icône du micro d'un joueur : barré quand il a coupé son micro, haut-parleur barré quand je ne l'entends pas.
+    icone(j) { return !j.voix ? null : j.id !== (this.vue && this.vue.moi) && this.entendPas(j.id) ? 'son-coupe' : j.muet ? 'micro-coupe' : 'micro'; },
     signaler() { envoyer({ type: 'micro', voix: this.actif, muet: this.muet }); },
     maj(v) {
       this.vue = v; this.dessiner(); this.dessinerParleurs();
@@ -9968,7 +9994,7 @@ svg .vb { transform-box: view-box; }
       this.actif = false; this.muet = true; this.parleurs.clear();
       $('audios').replaceChildren();
     },
-    arreter() { this.couper(); this.vue = null; this.demande = false; this.coupes.clear(); this.dessiner(); this.dessinerParleurs(); },
+    arreter() { this.couper(); this.vue = null; this.demande = false; this.dessiner(); this.dessinerParleurs(); },
     dessiner() {
       const box = $('vocal');
       box.hidden = !this.vue;
@@ -9993,7 +10019,7 @@ svg .vb { transform-box: view-box; }
       const enVocal = n ? ` (${n} autre${n > 1 ? 's' : ''} abonné${n > 1 ? 's' : ''} en vocal)` : ' (aucun autre abonné en vocal)';
       const m = etiquette(avecIco(el('button', 'btn ' + (this.muet ? 'coupe' : 'ouvert')), this.muet ? 'micro-coupe' : 'micro'), (!this.parler ? 'Micro coupé par la modération' : this.muet ? 'Micro coupé, toucher pour parler' : 'Micro ouvert, toucher pour couper') + enVocal);
       m.onclick = () => this.basculerMicro();
-      const so = etiquette(avecIco(el('button', 'btn son-autres' + (this.sonCoupe ? ' coupe' : '')), this.sonCoupe ? 'son-coupe' : 'son'), this.sonCoupe ? 'Son des autres coupé, toucher pour le remettre' : 'Couper le son des autres');
+      const so = etiquette(avecIco(el('button', 'btn son-autres' + (this.sonCoupe ? ' coupe' : '')), this.sonCoupe ? 'son-coupe' : 'son'), this.sonCoupe ? 'Micro des autres coupé pour toi, toucher pour les réentendre' : 'Couper le micro de tous les autres (pour toi seul)');
       so.onclick = () => this.basculerSon();
       box.append(m, so);
     },
@@ -10694,7 +10720,7 @@ svg .vb { transform-box: view-box; }
     bascule('effetsSonores', 'Effets sonores', 'Cartes, tour, Katapss, chat', () => Sons.jouer('essai'));
     bascule('musique', 'Musique d\'ambiance', 'Plus basse pendant les parties', null);
     bascule('vibrations', 'Vibrations', 'Quand c\'est à toi de jouer', () => vibrer(60));
-    if (MICRO_ACTIF && MODE_SERVEUR) bascule('sonAutresCoupe', 'Couper le micro des autres', 'Au début de chaque partie', null);
+    if (MICRO_ACTIF && MODE_SERVEUR) bascule('sonAutresCoupe', 'Couper le micro des autres', 'Tu n\'entends plus personne ; les autres s\'entendent toujours', () => vocal.basculerSon(!!prefs.sonAutresCoupe));
     titre('Jeu');
     choix('tri', 'Ranger ma main', null, [['couleur', 'Par couleur'], ['valeur', 'Par valeur']]);
     bascule('confirmerToutPoser', 'Confirmer avant « Tout poser »', 'Évite de sortir par erreur', null);
@@ -12008,6 +12034,14 @@ svg .vb { transform-box: view-box; }
   function ficheJoueur(id, nomJoueur) {
     const contenu = [el('h2', null, nomJoueur || 'Joueur')];
     const retour = () => { fermerFenetre(); if (vueActuelle) afficher(vueActuelle); };
+    // Son micro : je peux ne plus l'entendre, pour moi seul (abonné ou pas, le bouton est là dès qu'il parle).
+    const jv = vueActuelle && (vueActuelle.joueurs || []).find((j) => j.id === id);
+    if (MICRO_ACTIF && ((jv && jv.voix) || vocal.coupes.has(id))) {
+      const coupe = vocal.coupes.has(id);
+      const b = avecIco(el('button', 'btn large' + (coupe ? '' : ' principal')), coupe ? 'son' : 'son-coupe', coupe ? 'Réentendre son micro' : 'Couper son micro (pour toi)');
+      b.onclick = () => { vocal.basculerJoueur(id, nomJoueur); retour(); };
+      contenu.push(b, el('small', 'muted', coupe ? 'Tu ne l\'entends plus. Les autres joueurs l\'entendent toujours.' : 'Seulement pour toi : les autres joueurs l\'entendent toujours.'));
+    }
     if (!compteLocal() || !/^c_/.test(id)) {
       contenu.push(el('p', null, 'Amis, blocage et signalement arrivent avec les comptes en ligne.'));
     } else {
@@ -12019,7 +12053,7 @@ svg .vb { transform-box: view-box; }
         try {
           if (estBloque) { await apiJoueur('/bloques/' + encodeURIComponent(id), 'DELETE'); bloques.delete(id); toast('Joueur débloqué.', 'succes'); }
           else { await apiJoueur('/bloques', 'POST', { cible: id }); bloques.add(id); toast('Joueur bloqué : tu ne verras plus ses réactions.', 'succes'); }
-          memoriserBloques(); retour();
+          memoriserBloques(); vocal.appliquerSon(); retour();
         } catch (e) { toast(e.message, 'echec'); }
       };
       const signaler = el('button', 'btn large', 'Signaler');
