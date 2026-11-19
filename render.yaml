@@ -34,7 +34,7 @@ services:
       - key: VAPID_PRIVE           # notifications push : clé privée (secrète), créée avec la clé publique
         sync: false
       - key: VAPID_CONTACT         # adresse de contact pour les services de push (mailto:… ou https://…)
-        value: https://masano.online/
+        value: mailto:contact@masano.online
       - key: FCM_COMPTE_SERVICE    # push des applis Android/iOS : JSON du compte de service Firebase (ou ce JSON en base64)
         sync: false
       - key: LIVEKIT_URL           # micro des abonnés Kopo+ : wss://<projet>.livekit.cloud (LiveKit Cloud → Settings)
@@ -45,8 +45,8 @@ services:
         sync: false
       - key: SUPABASE_ANON_KEY     # clé publique « anon » de Supabase, donnée aux applis pour la connexion Google
         sync: false
-      - key: SUPPORT_URL           # facultatif : page ou adresse de contact affichée dans l'appli
-        sync: false
+      - key: SUPPORT_URL           # page ou adresse de contact affichée dans l'appli
+        value: mailto:contact@masano.online
       - key: ORIGINES              # pages autorisées à appeler le serveur
         value: https://rossy0243.github.io,https://kopo-d655.onrender.com,https://masano.online,https://www.masano.online,capacitor://localhost,https://localhost
 
