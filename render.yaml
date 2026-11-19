@@ -34,7 +34,7 @@ services:
       - key: VAPID_PRIVE           # notifications push : clé privée (secrète), créée avec la clé publique
         sync: false
       - key: VAPID_CONTACT         # adresse de contact pour les services de push (mailto:… ou https://…)
-        value: https://kopo-d655.onrender.com/
+        value: https://masano.online/
       - key: FCM_COMPTE_SERVICE    # push des applis Android/iOS : JSON du compte de service Firebase (ou ce JSON en base64)
         sync: false
       - key: LIVEKIT_URL           # micro des abonnés Kopo+ : wss://<projet>.livekit.cloud (LiveKit Cloud → Settings)
@@ -48,7 +48,7 @@ services:
       - key: SUPPORT_URL           # facultatif : page ou adresse de contact affichée dans l'appli
         sync: false
       - key: ORIGINES              # pages autorisées à appeler le serveur
-        value: https://rossy0243.github.io,https://kopo-d655.onrender.com,capacitor://localhost,https://localhost
+        value: https://rossy0243.github.io,https://kopo-d655.onrender.com,https://masano.online,https://www.masano.online,capacitor://localhost,https://localhost
 
   # Page du jeu (remplace GitHub Pages, pour pouvoir passer le dépôt en privé).
   # Seuls la page, le manifeste, le service worker, les icônes, les pages légales et les pages de partage kopo/ et inter8/ sont publiés (pas le code du serveur).
@@ -60,7 +60,7 @@ services:
     autoDeploy: true
     envVars:
       - key: SITE_URL              # adresse publique du site (aperçus des liens partagés)
-        value: https://kopo-d655.onrender.com/
+        value: https://masano.online/
     headers:
       - path: /*
         name: Cache-Control
