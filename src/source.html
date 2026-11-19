@@ -219,6 +219,8 @@ header .vocal .btn { padding: 5px 9px; font-size: 15px; line-height: 1.2; }
 .abonnement .ab-actif { color: var(--good); font-weight: 600; }
 .ab-avantages { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 14px; }
 .ab-avantages .ico { color: var(--brass); }
+.ab-essai { margin: 6px 0 2px; }
+.ab-essai-note { display: block; text-align: center; margin-bottom: 2px; }
 .ab-formules { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .ab-formule { position: relative; display: grid; gap: 2px; justify-items: center; padding: 14px 8px 10px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.04); color: var(--ink); font: inherit; cursor: pointer; }
 .ab-formule.top { border-color: var(--brass); background: rgba(226,176,74,.1); }
@@ -4004,12 +4006,30 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     const z = el('div', 'abonnement');
     const tete = el('div', 'ab-tete'); tete.append(ico('couronne', 'plus-ico grand'), el('b', null, 'Kopo+'));
     z.append(tete);
-    if (A.actif && A.jusqu) z.append(el('p', 'ab-actif', `Tu es abonné jusqu'au ${new Date(A.jusqu).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}.`));
+    if (A.actif && A.jusqu) z.append(el('p', 'ab-actif', `${A.essai && A.essai.enCours ? 'Ton essai gratuit court' : 'Tu es abonné'} jusqu'au ${new Date(A.jusqu).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}.`));
     else if (annonce) z.append(el('p', 'muted', 'Tu peux maintenant parler avec les autres joueurs de ta table pendant la partie. Le micro est réservé aux abonnés Kopo+ : seuls les abonnés parlent et s\'entendent.'));
     else z.append(el('p', 'muted', 'Le micro en partie est réservé aux abonnés : à la table, seuls les abonnés parlent et s\'entendent.'));
     const ul = el('ul', 'ab-avantages');
     (A.avantages || []).forEach((a, i) => { const li = el('li'); li.append(ico(['micro', 'couronne', 'cadeau'][i] || 'cadeau'), ' ' + a); ul.append(li); });
     z.append(ul);
+    // Essai de bienvenue : 7 jours offerts une fois (compte Google). Le micro s'ouvre tout de suite si on est à une table.
+    const E = !A.actif && A.essai;
+    if (E && E.possible) {
+      const b = el('button', 'btn principal large ab-essai', `Essayer ${E.jours} jours gratuits`);
+      b.onclick = async () => {
+        b.disabled = true;
+        try {
+          const r = await apiJoueur('/abonnement/essai', 'POST');
+          fermerFenetre();
+          toast(`Essai Kopo+ lancé : micro et couronne jusqu'au ${new Date(r.jusqu).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}.`, 'succes');
+          if (vocal.dispo()) setTimeout(() => vocal.activer(), 600);
+        } catch (e) { b.disabled = false; toast(e.message, 'echec'); }
+      };
+      z.append(b, el('small', 'muted ab-essai-note', `Sans engagement : après ${E.jours} jours, le micro s'arrête tout seul. Ou abonne-toi :`));
+    } else if (E && E.raison === 'google') {
+      z.append(el('p', 'muted', `Essai gratuit de ${E.jours} jours avec un compte Google.`));
+      lireConfig().then((cfg) => { if (cfg && cfg.google) { const g = el('button', 'btn large', 'Se connecter avec Google'); g.onclick = () => connexionGoogle(cfg.google); z.insertBefore(g, l); } }).catch(() => {});
+    }
     const l = el('div', 'ab-formules');
     for (const f of A.formules) {
       const b = el('button', 'ab-formule' + (f.id === 'an' ? ' top' : ''));
@@ -4020,7 +4040,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       l.append(b);
     }
     z.append(l, el('small', 'muted', A.paiement ? 'Paiement en francs congolais par mobile money.' : 'Paiement en francs congolais (mobile money : M-Pesa, Orange Money, Airtel Money) : bientôt. Kopo+ ne donne jamais d\'avantage pour gagner.'));
-    const ret = el('button', 'btn principal large', annonce ? 'Plus tard' : 'Fermer'); ret.onclick = fermerFenetre;
+    const ret = el('button', (E && E.possible) ? 'btn large' : 'btn principal large', annonce ? 'Plus tard' : 'Fermer'); ret.onclick = fermerFenetre;
     ouvrirFenetre([el('h2', null, A.actif ? 'Ton abonnement' : annonce ? 'Nouveau : le micro en partie' : 'Le micro en partie'), z, ret], 'boutique');
     if (annonce) $('fenetre').dataset.annonce = 'micro'; // reste ouverte quand un joueur arrive au salon
   }

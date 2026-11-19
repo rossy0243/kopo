@@ -8,6 +8,7 @@ import '../commun/theme.dart';
 import '../commun/vocal.dart';
 import '../etat.dart';
 import '../reseau/api.dart';
+import 'communes.dart';
 
 /// Couronne dorée des abonnés Kopo+ (pleine, pour la distinguer des icônes au trait).
 class CouronnePlus extends StatelessWidget {
@@ -144,10 +145,27 @@ Future<void> ouvrirAbonnement([Map? offre, bool annonce = false]) async {
   app.ouvrirFenetre((context) => fenetreAbonnement(A, annonce: annonce), annonce ? 'annonce-micro' : 'boutique');
 }
 
-String _date(String iso) {
+bool _essaiEnvoi = false;
+/// Essai de bienvenue : 7 jours de Kopo+, une fois par compte Google. Le micro s'ouvre tout de suite si on est à une table.
+Future<void> lancerEssai() async {
+  if (_essaiEnvoi) return;
+  _essaiEnvoi = true;
+  try {
+    final r = await Api.post('/abonnement/essai') as Map;
+    app.fermerFenetre();
+    app.toast("Essai Kopo+ lancé : micro et couronne jusqu'au ${_date(r['jusqu'].toString(), annee: false)}.", Niv.succes);
+    if (app.microDispo) Future.delayed(const Duration(milliseconds: 600), app.vocal.activer);
+  } catch (e) {
+    app.toast(e is ErreurApi ? e.message : 'Essai impossible pour l\'instant.', Niv.echec);
+  } finally {
+    _essaiEnvoi = false;
+  }
+}
+
+String _date(String iso, {bool annee = true}) {
   const mois = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
   final d = DateTime.tryParse(iso)?.toLocal();
-  return d == null ? '' : '${d.day} ${mois[d.month - 1]} ${d.year}';
+  return d == null ? '' : '${d.day} ${mois[d.month - 1]}${annee ? ' ${d.year}' : ''}';
 }
 
 /// La fenêtre elle-même (séparée pour les captures d'écran).
@@ -155,6 +173,8 @@ Widget fenetreAbonnement(Map A, {bool annonce = false}) {
   final actif = A['actif'] == true;
   final formules = ((A['formules'] as List?) ?? const []).cast<Map>();
   final avantages = ((A['avantages'] as List?) ?? const []).map((e) => e.toString()).toList();
+  final essai = !actif && A['essai'] is Map ? A['essai'] as Map : null;
+  final jours = essai?['jours'] ?? 7;
   Widget formule(Map f) {
     final top = f['id'] == 'an';
     return Expanded(child: Padding(
@@ -190,7 +210,7 @@ Widget fenetreAbonnement(Map A, {bool annonce = false}) {
     Row(mainAxisAlignment: MainAxisAlignment.center, children: [const CouronnePlus(taille: 28), const SizedBox(width: 8), Text('KOPO+', style: K.titre(28))]),
     const Ecart(6),
     if (actif && A['jusqu'] != null)
-      Text("Tu es abonné jusqu'au ${_date(A['jusqu'].toString())}.", textAlign: TextAlign.center, style: K.texte(14, couleur: K.good, poids: FontWeight.w600))
+      Text("${A['essai'] is Map && A['essai']['enCours'] == true ? 'Ton essai gratuit court' : 'Tu es abonné'} jusqu'au ${_date(A['jusqu'].toString())}.", textAlign: TextAlign.center, style: K.texte(14, couleur: K.good, poids: FontWeight.w600))
     else if (annonce)
       const Muet("Tu peux maintenant parler avec les autres joueurs de ta table pendant la partie. Le micro est réservé aux abonnés Kopo+ : seuls les abonnés parlent et s'entendent.", taille: 13)
     else
@@ -198,10 +218,24 @@ Widget fenetreAbonnement(Map A, {bool annonce = false}) {
     const Ecart(8),
     for (final (i, a) in avantages.indexed)
       Padding(padding: const EdgeInsets.symmetric(vertical: 3), child: Row(children: [Ico(i < icones.length ? icones[i] : 'cadeau', taille: 18), const SizedBox(width: 8), Expanded(child: Text(a, style: K.texte(14)))])),
+    if (essai != null && essai['possible'] == true) ...[
+      const Ecart(6),
+      Btn.principal('Essayer $jours jours gratuits', large: true, onTap: lancerEssai),
+      const Ecart(4),
+      Muet("Sans engagement : après $jours jours, le micro s'arrête tout seul. Ou abonne-toi :", taille: 12),
+    ] else if (essai != null && essai['raison'] == 'google') ...[
+      const Ecart(6),
+      Muet('Essai gratuit de $jours jours avec un compte Google.', taille: 13),
+      const Ecart(4),
+      Btn('Se connecter avec Google', large: true, onTap: () { app.fermerFenetre(); connecterGoogle(); }),
+    ],
     Row(children: [for (final f in formules) formule(f)]),
     const Ecart(10),
     Muet(A['paiement'] == true ? 'Paiement en francs congolais par mobile money.' : "Paiement en francs congolais (mobile money : M-Pesa, Orange Money, Airtel Money) : bientôt. Kopo+ ne donne jamais d'avantage pour gagner.", taille: 12),
     const Ecart(10),
-    Btn.principal(annonce ? 'Plus tard' : 'Fermer', large: true, onTap: app.fermerFenetre),
+    if (essai != null && essai['possible'] == true)
+      Btn(annonce ? 'Plus tard' : 'Fermer', large: true, onTap: app.fermerFenetre)
+    else
+      Btn.principal(annonce ? 'Plus tard' : 'Fermer', large: true, onTap: app.fermerFenetre),
   ]);
 }

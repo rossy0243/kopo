@@ -115,7 +115,7 @@ function creerComptes(base, reglages) {
     },
 
     async lire(id, q = base) {
-      const r = await q.query('SELECT id, auth_id, pseudo, numero, avatar, solde, statut, suspendu_jusqu, micro_coupe, pays, serie_bonus, dernier_bonus, notifs, equipes, kopo_plus_jusqu, cree_le, vu_le FROM comptes WHERE id = $1', [id]);
+      const r = await q.query('SELECT id, auth_id, pseudo, numero, avatar, solde, statut, suspendu_jusqu, micro_coupe, pays, serie_bonus, dernier_bonus, notifs, equipes, kopo_plus_jusqu, kopo_plus_essai, cree_le, vu_le FROM comptes WHERE id = $1', [id]);
       return r.rows[0] || null;
     },
     async parAuth(authId) {

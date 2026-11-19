@@ -73,11 +73,23 @@ const OFFRES_DEFAUT = {
 // Premiers prix (14/11), où les francs revenaient moins cher que les pièces : remplacés par les nouveaux.
 const ANCIENNES_OFFRES = JSON.stringify([{ utilisations: 20, pieces: 300, francs: 500 }, { utilisations: 50, pieces: 600, francs: 1000 }]);
 const REMISE_PACK = 33;
+// Stickers de bienvenue (19/11) : offerts une fois à chaque joueur, nouveaux comme anciens, dès que les stickers sont allumés.
+// utilisations 0 = pas de cadeau de bienvenue.
+const BIENVENUE_DEFAUT = { stickers: ['katapss', 'rire', 'bravo'], utilisations: 10 };
+function verifierBienvenue(b) {
+  if (!b) return { ...BIENVENUE_DEFAUT, stickers: BIENVENUE_DEFAUT.stickers.slice() };
+  const ids = [...new Set((Array.isArray(b.stickers) ? b.stickers : []).map(String))];
+  if (ids.some((id) => !STICKERS[id])) throw erreur('Sticker de bienvenue inconnu.');
+  if (ids.length > 6) throw erreur('6 stickers de bienvenue au plus.');
+  const n = Math.trunc(Number(b.utilisations));
+  if (!(n >= 0 && n <= 100)) throw erreur('Utilisations de bienvenue entre 0 et 100.');
+  return { stickers: ids, utilisations: ids.length ? n : 0 };
+}
 function verifierReglage(v) {
   v = v || {};
   const remise = v.remisePack == null ? REMISE_PACK : Math.trunc(Number(v.remisePack));
   if (!(remise >= 0 && remise <= 60)) throw erreur('Remise des packs entre 0 et 60 %.');
-  const out = { actif: v.actif === true, vente: v.vente === true, remisePack: remise, offres: {} };
+  const out = { actif: v.actif === true, vente: v.vente === true, remisePack: remise, offres: {}, bienvenue: verifierBienvenue(v.bienvenue) };
   const l = Array.isArray(v.offres && v.offres.sticker) ? v.offres.sticker : OFFRES_DEFAUT.sticker;
   if (!l.length || l.length > 4) throw erreur('Entre 1 et 4 offres.');
   out.offres.sticker = l.map((o) => {
@@ -136,7 +148,27 @@ async function conditionCible(base, cible) {
 }
 
 function creerStickers(base, reglages, comptes) {
-  const reglage = () => { const r = reglages.get('stickers') || {}; return { actif: false, vente: false, remisePack: REMISE_PACK, ...r, offres: { sticker: lireOffres(r.offres && r.offres.sticker) } }; };
+  const reglage = () => { const r = reglages.get('stickers') || {}; return { actif: false, vente: false, remisePack: REMISE_PACK, ...r, bienvenue: r.bienvenue || BIENVENUE_DEFAUT, offres: { sticker: lireOffres(r.offres && r.offres.sticker) } }; };
+
+  // Cadeau de bienvenue, une fois par compte (comptes.stickers_bienvenue) : donné la première fois que le joueur ouvre
+  // ses stickers alors qu'ils sont allumés. Les joueurs déjà inscrits le reçoivent aussi. Rend true s'il vient d'être donné.
+  async function donnerBienvenue(compteId) {
+    const b = reglage().bienvenue;
+    if (!b.utilisations || !b.stickers.length) return false;
+    return base.transaction(async (q) => {
+      const r = await q.query("UPDATE comptes SET stickers_bienvenue = now() WHERE id = $1 AND stickers_bienvenue IS NULL AND statut = 'actif' RETURNING id", [compteId]);
+      if (!r.rows.length) return false;
+      for (const id of b.stickers) {
+        await q.query(`INSERT INTO stickers_soldes (compte_id, sticker, restants) VALUES ($1, $2, $3)
+          ON CONFLICT (compte_id, sticker) DO UPDATE SET restants = stickers_soldes.restants + EXCLUDED.restants, maj_le = now()`, [compteId, id, b.utilisations]);
+        await q.query("INSERT INTO stickers_mouvements (compte_id, sticker, nombre, motif, ref) VALUES ($1, $2, $3, 'bienvenue', 'bienvenue')", [compteId, id, b.utilisations]);
+      }
+      const noms = b.stickers.map((id) => `« ${STICKERS[id].nom} »`).join(', ');
+      await q.query("INSERT INTO notifications (compte_id, type, texte, donnees) VALUES ($1, 'cadeau', $2, $3)",
+        [compteId, `🎁 Cadeau de bienvenue : ${b.utilisations} envois de chacun de ces stickers, ${noms}. Envoie-les pendant une partie !`, JSON.stringify({ stickers: b.stickers, utilisations: b.utilisations, bienvenue: true })]);
+      return true;
+    });
+  }
   const lireOffres = (l) => (!Array.isArray(l) || !l.length || JSON.stringify(l) === ANCIENNES_OFFRES ? OFFRES_DEFAUT.sticker : l.map((o) => ({ ...o, francs: enFrancs(o.pieces) })));
   const offres = (r) => ({ sticker: r.offres.sticker, packs: Object.fromEntries(Object.keys(PACKS).map((p) => [p, offresPack(r, p)])) });
   const catalogue = () => Object.entries(STICKERS).map(([id, s]) => ({ id, nom: s.nom, pack: s.pack }));
@@ -162,8 +194,10 @@ function creerStickers(base, reglages, comptes) {
     actif: () => reglage().actif === true,
 
     // Pour le joueur : catalogue, offres (achetables en pièces quand `vente`) et ses utilisations restantes.
+    donnerBienvenue,
     async pourJoueur(compteId) {
       const r = reglage();
+      if (compteId && r.actif === true) await donnerBienvenue(compteId).catch((e) => console.error('Stickers de bienvenue :', e.message));
       return { actif: r.actif === true, vente: r.actif === true && r.vente === true, stickers: catalogue(), packs: packs(), offres: offres(r), soldes: compteId ? await soldes(compteId) : {} };
     },
 
@@ -231,9 +265,10 @@ function creerStickers(base, reglages, comptes) {
     async resumeAdmin() {
       const cadeaux = (await base.query('SELECT id::int AS id, cible, stickers, utilisations, message, joueurs, cree_le FROM stickers_cadeaux ORDER BY id DESC LIMIT 30')).rows;
       const parSticker = (await base.query('SELECT sticker, sum(restants)::int AS restants, sum(utilises)::int AS utilises, count(*) FILTER (WHERE restants > 0)::int AS joueurs FROM stickers_soldes GROUP BY sticker')).rows;
-      return { reglage: reglage(), offres: offres(reglage()), stickers: catalogue(), packs: packs(), criteres: Object.entries(CRITERES).map(([id, d]) => ({ id, texte: d.texte, n: d.n || null, pays: !!d.pays })), cadeaux, parSticker };
+      const bienvenueJoueurs = (await base.query("SELECT count(*)::int AS n FROM comptes WHERE stickers_bienvenue IS NOT NULL")).rows[0].n;
+      return { bienvenueJoueurs, reglage: reglage(), offres: offres(reglage()), stickers: catalogue(), packs: packs(), criteres: Object.entries(CRITERES).map(([id, d]) => ({ id, texte: d.texte, n: d.n || null, pays: !!d.pays })), cadeaux, parSticker };
     },
   };
 }
 
-module.exports = { creerStickers, verifierReglage, offresPack, STICKERS, PACKS, CRITERES, OFFRES_DEFAUT, REMISE_PACK, ATTENTE_MS };
+module.exports = { BIENVENUE_DEFAUT, creerStickers, verifierReglage, offresPack, STICKERS, PACKS, CRITERES, OFFRES_DEFAUT, REMISE_PACK, ATTENTE_MS };
