@@ -171,6 +171,17 @@ class App extends ChangeNotifier {
   void fermerFenetre() { if (fenetre == null) return; fenetre = null; fenetreType = ''; maj(); }
   bool get chatOuvert => fenetre != null && fenetreType == 'chat';
 
+  /// Annonce du micro aux non-abonnés : en créant ou en rejoignant une table en ligne, 10 fois au plus sur ce téléphone.
+  static const annoncesMicro = 10;
+  bool _annoncerMicro = false;
+  void annoncerMicro() {
+    if (vue == null || fenetre != null) return; // pas par-dessus une autre fenêtre (elle ne compte pas)
+    final n = (Stock.lire('kopo-annonce-micro') as num?)?.toInt() ?? 0;
+    if (n >= annoncesMicro) return;
+    Stock.ecrire('kopo-annonce-micro', n + 1);
+    vocal.annoncer?.call();
+  }
+
   void bulle(String? joueur, String texte, {String? icone, String cls = '', int delai = 0, int duree = 1700}) {
     if (sansAnim || joueur == null) return;
     _ajouterEffet(Effet('bulle', joueur: joueur, texte: texte, icone: icone, cls: cls, delai: delai, duree: duree));
@@ -655,6 +666,7 @@ class App extends ChangeNotifier {
       }
       reveil.cancel();
       if (_client != jeton) { room.abandonner(); return; }
+      _annoncerMicro = facon['reconnexion'] == null && facon['matchJour'] == null && facon['robots'] == null;
       _brancher(room, nom, facon);
     } catch (e) {
       reveil.cancel();
@@ -695,6 +707,11 @@ class App extends ChangeNotifier {
           final v = (d as Map).cast<String, dynamic>();
           memoriser(v['code'].toString());
           afficher(v);
+          if (_annoncerMicro) {
+            _annoncerMicro = false;
+            final me = (v['joueurs'] as List?)?.cast<Map>().where((j) => j['id'] == v['moi']).firstOrNull;
+            if (me != null && me['plus'] != true) Timer(const Duration(milliseconds: 1200), annoncerMicro);
+          }
         case 'erreur':
           toast(d.toString(), Niv.echec);
         case 'solde':
@@ -797,7 +814,7 @@ class App extends ChangeNotifier {
     if (v['etat'] != 'finPartie') arreterSuiteAuto();
     if (v['etat'] == 'salon') {
       if (robotsAComposer) { _composerRobots(v); }
-      if (!chatOuvert) fenetre = null;
+      if (!chatOuvert && fenetreType != 'annonce-micro') fenetre = null; // l'annonce du micro reste quand un joueur arrive
       ecran = 'salon';
       if (amiAInviter != null) _inviterAmiAuSalon(v);
       maj();
