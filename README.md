@@ -64,5 +64,12 @@ Pour tester à plusieurs onglets sur un seul appareil, sans réseau : ouvrir `in
 4. Fait : `NOUVELLE_ADRESSE` = `https://kopo-d655.onrender.com/` (seule l’adresse `*.github.io` redirige). Pour refaire : remplir `NOUVELLE_ADRESSE` dans `src/source.html`, `node build.js`, fusionner. Les joueurs qui ouvrent l'ancienne adresse partent sur la nouvelle avec leurs données du téléphone (compte invité, profil, réglages), envoyées dans le `#` de l'adresse.
 5. Laisser l'ancienne adresse quelques semaines, puis passer le dépôt en privé (GitHub Pages s'arrête).
 
+## Domaine masano.online
+Depuis novembre 2026 le jeu est sur `https://masano.online/` (domaine personnalisé du site `kopo` sur Render ; `www` redirige vers la racine).
+- DNS chez le registrar : `@` en A vers `216.24.57.1` (ou ALIAS vers `kopo-d655.onrender.com`), `www` en CNAME vers `kopo-d655.onrender.com`. Render crée le certificat HTTPS tout seul.
+- `NOUVELLE_ADRESSE` = `https://masano.online/` ; `ANCIENNES_ADRESSES` (onrender et github.io) redirigent vers elle avec les données du téléphone, comme ci-dessus. L'ancienne adresse onrender reste donc utilisable (elle renvoie au bon endroit).
+- Render : `SITE_URL` = `https://masano.online/` sur le site **et** le serveur, `ORIGINES` du serveur contient `https://masano.online` et `https://www.masano.online`.
+- Supabase : `https://masano.online/**` dans les *Redirect URLs*, *Site URL* = `https://masano.online/`.
+
 ## Licence
 Tous droits réservés. Voir [LICENSE](LICENSE) : le dépôt est public pour la mise en ligne, mais sa réutilisation n'est pas autorisée.

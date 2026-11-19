@@ -12,7 +12,7 @@ import '../commun/theme.dart';
 import '../etat.dart';
 import '../reseau/google.dart';
 
-const lienSite = 'https://kopo-d655.onrender.com/';
+const lienSite = 'https://masano.online/';
 String get lienJeu => (app.config?['liens'] is Map ? app.config!['liens']['site'] as String? : null) ?? lienSite;
 String get lienMasano => lienJeu.replaceAll(RegExp(r'#.*$'), '');
 

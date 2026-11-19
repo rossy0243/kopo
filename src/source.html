@@ -1877,11 +1877,13 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   };
 
   // ------------------------------------------------------------------ changement d'adresse
-  // Passage de GitHub Pages à Render : les données du téléphone (compte invité, profil, réglages) sont liées
-  // à l'adresse du site. Quand NOUVELLE_ADRESSE est remplie, l'ancienne adresse envoie ses données kopo-*
-  // à la nouvelle dans le # (rien ne passe par un serveur), et la nouvelle les reprend si elle est encore vide.
-  const NOUVELLE_ADRESSE = 'https://kopo-d655.onrender.com/'; // avec le / final
-  const ANCIENNE_ADRESSE = 'https://rossy0243.github.io/kopo/'; // ses données kopo-* y sont restées sur le téléphone
+  // GitHub Pages, puis Render (kopo-d655.onrender.com), puis masano.online : les données du téléphone (compte invité,
+  // profil, réglages) sont liées à l'adresse du site. Quand NOUVELLE_ADRESSE est remplie, chaque ancienne adresse
+  // envoie ses données kopo-* à la nouvelle dans le # (rien ne passe par un serveur), et la nouvelle les reprend.
+  const NOUVELLE_ADRESSE = 'https://masano.online/'; // avec le / final
+  const ANCIENNES_ADRESSES = ['https://kopo-d655.onrender.com/', 'https://rossy0243.github.io/kopo/']; // la plus récente d'abord
+  const ANCIENNE_ADRESSE = ANCIENNES_ADRESSES[0]; // bouton « Les récupérer » du profil : là où sont restées les données
+  const SUR_ANCIENNE_ADRESSE = ANCIENNES_ADRESSES.some((a) => location.href.startsWith(a));
   // Données arrivées de l'ancienne adresse. Nouvelle adresse encore vide : on recopie tout.
   // Sinon (le joueur a d'abord ouvert la nouvelle adresse, par exemple par le lien d'un ami, et un profil neuf
   // y a été créé) : on réunit les deux profils au lieu de jeter l'ancien, et on reprend l'ancien compte
@@ -1919,7 +1921,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       history.replaceState(null, '', location.pathname + location.search + suite);
       return;
     }
-    if (!NOUVELLE_ADRESSE || LOCAL || !location.hostname.endsWith('.github.io')) return; // seule l'ancienne adresse redirige (pas l'appli ni un test local)
+    if (!NOUVELLE_ADRESSE || LOCAL || !SUR_ANCIENNE_ADRESSE) return; // seules les anciennes adresses redirigent (pas l'appli ni un test local)
     let cible; try { cible = new URL(NOUVELLE_ADRESSE); } catch (e) { return; }
     if (cible.origin === location.origin) return;
     if (h.startsWith('#access_token') || h.startsWith('#error')) return; // retour de Google : on le traite ici
@@ -2315,6 +2317,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       else if (facon.mise) room = await cli.joinOrCreate(facon.jeu === 'inter8' ? 'inter8-mise' : 'kopo-mise', { jeton: c.jeton, publique: true, taille: facon.taille, mise: facon.mise });
       else room = await cli.joinOrCreate(facon.jeu === 'inter8' ? 'inter8' : 'kopo', { jeton: c.jeton, publique: true, taille: facon.taille });
       clearTimeout(reveil);
+      if (!facon.reconnexion && !facon.matchJour) vocal.annoncer = true; // « Nouveau : le micro » à la première vue de la table
       brancherSalleServeur(cli, room, nom, facon);
     } catch (e) {
       clearTimeout(reveil);
@@ -2665,7 +2668,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     if (!ancienne || ancienne.etat !== v.etat || ancienne.numeroManche !== v.numeroManche) { carteChoisie = null; choixInter = []; cartesRecues.clear(); }
     if (v.jeu !== 'inter8') suivrePartie(v); // Inter (8) : l'XP et les missions viendront à l'étape de la progression
     if (v.etat !== 'finPartie') arreterSuiteAuto();
-    if (v.etat === 'salon') { if (!chatOuvert()) fermerFenetre(); return afficherSalon(v); } // le chat reste ouvert quand quelqu'un arrive ou se dit prêt
+    if (v.etat === 'salon') { if (!chatOuvert() && !annonceMicroOuverte()) fermerFenetre(); return afficherSalon(v); } // le chat reste ouvert quand quelqu'un arrive ou se dit prêt
     if (v.etat === 'manche' && client && !v.joueurs.some((j) => j.id === v.moi)) { quitter(); toast('La revanche est partie sans toi.', 'alerte'); return; }
     if (v.jeu === 'inter8') {
       const avant = positionsAvant();
@@ -3887,6 +3890,10 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     // Réponse du serveur : le jeton du salon vocal, ou la raison du refus (pas abonné, micro pas encore réglé…).
     async recevoir(d) {
       this.demande = false; this.dessiner();
+      if (d && d.fin) {
+        const etait = !!this.salle; this.couper(); this.signaler(); this.dessiner(); this.dessinerParleurs();
+        return etait ? toast('Ton abonnement Kopo+ est terminé : micro coupé.', 'info') : undefined;
+      }
       if (!d || d.refuse) {
         if (d && d.refuse === 'abonnement') return ouvrirAbonnement(d);
         if (d && d.refuse === 'bientot') return toast('Le micro des abonnés arrive bientôt.', 'info');
@@ -3930,7 +3937,10 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     // Rendre muet un abonné pour moi seul (les autres l'entendent toujours).
     basculerJoueur(id) { if (this.coupes.has(id)) this.coupes.delete(id); else this.coupes.add(id); this.appliquerSon(); },
     signaler() { envoyer({ type: 'micro', voix: this.actif, muet: this.muet }); },
-    maj(v) { this.vue = v; this.dessiner(); this.dessinerParleurs(); },
+    maj(v) {
+      this.vue = v; this.dessiner(); this.dessinerParleurs();
+      if (this.annoncer && v) { this.annoncer = false; const me = v.joueurs.find((j) => j.id === v.moi); if (me && !me.plus) setTimeout(annoncerMicro, 1200); }
+    },
     couper() {
       const s = this.salle; this.salle = null;
       if (s) try { s.disconnect(); } catch (e) {}
@@ -3985,6 +3995,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
 
   // Invitation à s'abonner (Kopo+) : ce que ça donne, les deux prix en francs congolais, et comment payer.
   async function ouvrirAbonnement(offre) {
+    const annonce = !!(offre && offre.annonce);
     let A = offre && offre.formules ? offre : null;
     if (!A || !('actif' in A)) {
       try { if (MODE_SERVEUR && compteLocal()) A = await apiJoueur('/abonnement'); } catch (e) {}
@@ -3994,6 +4005,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     const tete = el('div', 'ab-tete'); tete.append(ico('couronne', 'plus-ico grand'), el('b', null, 'Kopo+'));
     z.append(tete);
     if (A.actif && A.jusqu) z.append(el('p', 'ab-actif', `Tu es abonné jusqu'au ${new Date(A.jusqu).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}.`));
+    else if (annonce) z.append(el('p', 'muted', 'Tu peux maintenant parler avec les autres joueurs de ta table pendant la partie. Le micro est réservé aux abonnés Kopo+ : seuls les abonnés parlent et s\'entendent.'));
     else z.append(el('p', 'muted', 'Le micro en partie est réservé aux abonnés : à la table, seuls les abonnés parlent et s\'entendent.'));
     const ul = el('ul', 'ab-avantages');
     (A.avantages || []).forEach((a, i) => { const li = el('li'); li.append(ico(['micro', 'couronne', 'cadeau'][i] || 'cadeau'), ' ' + a); ul.append(li); });
@@ -4008,10 +4020,21 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       l.append(b);
     }
     z.append(l, el('small', 'muted', A.paiement ? 'Paiement en francs congolais par mobile money.' : 'Paiement en francs congolais (mobile money : M-Pesa, Orange Money, Airtel Money) : bientôt. Kopo+ ne donne jamais d\'avantage pour gagner.'));
-    const ret = el('button', 'btn principal large', 'Fermer'); ret.onclick = fermerFenetre;
-    ouvrirFenetre([el('h2', null, A.actif ? 'Ton abonnement' : 'Le micro en partie'), z, ret], 'boutique');
+    const ret = el('button', 'btn principal large', annonce ? 'Plus tard' : 'Fermer'); ret.onclick = fermerFenetre;
+    ouvrirFenetre([el('h2', null, A.actif ? 'Ton abonnement' : annonce ? 'Nouveau : le micro en partie' : 'Le micro en partie'), z, ret], 'boutique');
+    if (annonce) $('fenetre').dataset.annonce = 'micro'; // reste ouverte quand un joueur arrive au salon
   }
   window.ouvrirAbonnement = ouvrirAbonnement;
+  // Annonce du micro aux non-abonnés : en créant ou en rejoignant une table en ligne, 10 fois au plus sur cet appareil.
+  const ANNONCES_MICRO = 10;
+  function annoncerMicro() {
+    if (!MICRO_ACTIF || !vocal.vue || !$('voile').hidden) return; // pas par-dessus une autre fenêtre (elle ne compte pas)
+    let n = 0;
+    try { n = Number(localStorage.getItem('kopo-annonce-micro')) || 0; } catch (e) {}
+    if (n >= ANNONCES_MICRO) return;
+    try { localStorage.setItem('kopo-annonce-micro', String(n + 1)); } catch (e) {}
+    ouvrirAbonnement({ annonce: true });
+  }
   // Couronne dorée des abonnés Kopo+ (à côté du pseudo).
   function badgePlus() { const s = el('span', 'badge-plus'); s.append(ico('couronne', 'plus-ico')); s.title = 'Abonné Kopo+'; s.setAttribute('aria-label', 'Abonné Kopo+'); return s; }
 
@@ -4021,7 +4044,8 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     envoyer({ type: 'action', action: { type: 'jouer', carte: c } });
   }
 
-  function ouvrirFenetre(contenu, type) { $('fenetre').replaceChildren(...contenu); $('fenetre').dataset.type = type || ''; $('voile').hidden = false; }
+  function ouvrirFenetre(contenu, type) { $('fenetre').replaceChildren(...contenu); $('fenetre').dataset.type = type || ''; delete $('fenetre').dataset.annonce; $('voile').hidden = false; }
+  const annonceMicroOuverte = () => $('fenetre').dataset.annonce === 'micro' && !$('voile').hidden;
   function fermerFenetre() { $('voile').hidden = true; }
   const chatOuvert = () => $('fenetre').dataset.type === 'chat' && !$('voile').hidden;
 
@@ -6485,13 +6509,24 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     if (stock.lire('kopo-entree') || retourGoogle) return false;
     if (stock.lire('kopo-pseudo')) { stock.ecrire('kopo-entree', 'invite'); return false; }
     $('bienvenue').hidden = false;
-    lireConfig().then((cfg) => {
+    // Le bouton Google n'apparaît qu'avec la réponse du serveur (/api/config). Si elle manque (réseau lent,
+    // serveur qui redémarre), on réessaie quelques fois au lieu de ne montrer que « Jouer en invité ».
+    const aide = $('aideGoogle'), texteAide = aide.textContent;
+    let essai = 0;
+    const essayer = () => lireConfig().then((cfg) => {
+      if (!cfg && ++essai <= 6 && !$('bienvenue').hidden) {
+        aide.hidden = false; aide.textContent = 'Chargement de la connexion Google…';
+        setTimeout(essayer, Math.min(3000 * essai, 10000));
+        return;
+      }
+      aide.textContent = texteAide;
       if (cfg && cfg.nouveaute === NOUVEAUTE && !lireNouveaute()) ecrireNouveaute({ saute: true }); // nouveau joueur : pas de fenêtre « Nouveau »
       const ok = !!(cfg && cfg.google);
-      $('btnEntreeGoogle').hidden = $('aideGoogle').hidden = $('ouGoogle').hidden = !ok;
+      $('btnEntreeGoogle').hidden = aide.hidden = $('ouGoogle').hidden = !ok;
       if (ok) $('btnEntreeGoogle').onclick = () => connexionGoogle(cfg.google);
       if (ok) $('aideInvite').textContent = 'En invité, tu joues contre les robots. Pour jouer en ligne ou entre amis, connecte-toi avec Google (ici ou plus tard).';
     });
+    essayer();
     return true;
   }
   $('pseudoEntree').addEventListener('input', () => { const v = nettoyerPseudo($('pseudoEntree').value, true); if (v !== $('pseudoEntree').value) $('pseudoEntree').value = v; });
@@ -7116,7 +7151,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   // Lancé depuis l'icône : mesuré au chargement, avant tout passage en plein écran demandé par le jeu.
   const LANCE_ICONE = navigator.standalone === true
     || (!document.fullscreenElement && matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches);
-  const ANCIENNE_PAGE = !!NOUVELLE_ADRESSE && location.href.startsWith(ANCIENNE_ADRESSE); // ses données partent vers la nouvelle adresse
+  const ANCIENNE_PAGE = !!NOUVELLE_ADRESSE && SUR_ANCIENNE_ADRESSE; // ses données partent vers la nouvelle adresse
   const CADEAU_INSTALLATION = 200; // pièces, une fois, à la première ouverture depuis l'icône (plafond serveur : 200)
   let inviteInstallation = null; // l'événement beforeinstallprompt gardé pour le bouton
   if (LANCE_ICONE) stock.ecrire('kopo-installe', true);
