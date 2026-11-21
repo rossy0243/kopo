@@ -343,6 +343,26 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     const p = (await srv.base.query('SELECT count(*)::int AS n FROM participations')).rows[0].n;
     assert.ok(p >= 3);
   });
+  await test('événement : gains des tables gratuites et bonus du jour multipliés, annoncé dans /config, puis retour à la normale', async () => {
+    const maintenant = Date.now();
+    await assert.rejects(srv.reglages.ecrire('evenement', { actif: 1, nom: 'X', debut: '2026-11-28T18:00', fin: '2026-11-28T10:00', pieces: 2, bonus: 2 }), /après le début/);
+    await assert.rejects(srv.reglages.ecrire('evenement', { actif: 1, nom: 'X', debut: '2026-11-28T10:00', fin: '2026-11-28T18:00', pieces: 9, bonus: 2 }), /entre 1 et 5/);
+    await srv.reglages.ecrire('evenement', { actif: 1, nom: 'Week-end doré', debut: new Date(maintenant - 36e5).toISOString(), fin: new Date(maintenant + 36e5).toISOString(), pieces: 2, bonus: 3 });
+    try {
+      const cfg = (await api('/api/config')).json;
+      assert.match(cfg.annonce, /Week-end doré : pièces x2 sur les tables gratuites et bonus du jour x3, jusqu'à/);
+      assert.deepStrictEqual([cfg.evenement.pieces, cfg.evenement.bonus], [2, 3]);
+      const x = await invite('Evenement');
+      assert.strictEqual((await api('/api/bonus-du-jour', { methode: 'POST', jeton: x.jeton })).json.montant, 150, 'bonus 50 x 3');
+      const js = [await invite('EvA'), await invite('EvB'), await invite('EvC')];
+      const fin = await jouerPartie(js);
+      const v = (await srv.base.query("SELECT montant FROM registre_pieces WHERE compte_id = $1 AND motif = 'victoire' ORDER BY id DESC LIMIT 1", [fin.vainqueur])).rows[0];
+      assert.strictEqual(v.montant, 80, 'victoire 40 x 2');
+    } finally {
+      await srv.reglages.ecrire('evenement', DEFAUTS.evenement);
+    }
+    assert.strictEqual((await api('/api/config')).json.evenement, null);
+  });
   await test('partie avec un robot : aucune pièce gagnée', async () => {
     const js = [await invite('Solo'), await invite('Duo')];
     await jouerPartie(js, { robots: 1 });

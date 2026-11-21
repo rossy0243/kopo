@@ -214,7 +214,8 @@ function creerComptes(base, reglages) {
         let serie = 1, joker = false;
         if (dernier === hier) serie = c.serie_bonus + 1;
         else if (dernier === avantHier && c.serie_bonus && c.joker_semaine !== semaine) { serie = c.serie_bonus + 1; joker = true; }
-        const montant = Math.min(b.depart + b.pas * (serie - 1), b.plafond);
+        const ev = require('./reglages').evenementEnCours(reglages.get('evenement')); // événement en cours : bonus multiplié
+        const montant = Math.round(Math.min(b.depart + b.pas * (serie - 1), b.plafond) * (ev ? ev.bonus : 1));
         await q.query('UPDATE comptes SET serie_bonus = $2, dernier_bonus = $3, joker_semaine = CASE WHEN $4 THEN $5 ELSE joker_semaine END WHERE id = $1', [id, serie, auj, joker, semaine]);
         const solde = await mouvement(q, id, montant, 'bonus_jour');
         return { montant, gain: montant, serie, joker, prochain: Math.min(b.depart + b.pas * serie, b.plafond), solde, jokerLibre: joker ? false : c.joker_semaine !== semaine };

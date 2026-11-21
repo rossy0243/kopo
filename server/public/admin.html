@@ -499,6 +499,7 @@ const afficher = {
 
   async pilotage() {
     const r = await api('/reglages');
+    const heureKin = (iso) => (iso ? new Date(Date.parse(iso) + 36e5).toISOString().slice(0, 16) : ''); // ISO UTC → champ datetime-local à l'heure de Kinshasa
     const champs = (cle, libelles) => Object.entries(libelles).map(([k, t]) => `<label class="ligne"><span style="min-width:230px">${t}</span><input type="number" data-cle="${cle}" data-champ="${k}" value="${+r[cle][k]}" style="width:110px"></label>`).join('');
     $('#contenu').innerHTML = `<h2>Pilotage</h2>
       <p class="muted">Ces réglages s'appliquent tout de suite, sans mise à jour du jeu. Chaque changement est noté dans le Journal.</p>
@@ -526,6 +527,10 @@ const afficher = {
         <h3>Remise à flot</h3>${champs('remiseAFlot', { seuil: 'Si le solde passe sous', niveau: 'Remonter à' })}<button class="btn principal" data-enregistrer="remiseAFlot">Enregistrer</button></div>
       <div class="carte"><h3 style="margin-top:0">Robots dans les salles en ligne</h3><p class="muted">Tables gratuites seulement (jamais les tables à mise) : si la salle n'est pas pleine après l'attente, des robots prennent les places libres et la partie démarre. Ils restent affichés comme robots ; la partie ne rapporte ni pièces, ni Ligue, ni XP.</p>${champs('robotsPublics', { actif: 'Actif (1 = oui, 0 = non)', attente: 'Attente avant les robots (secondes, 10 à 600)' })}<button class="btn principal" data-enregistrer="robotsPublics">Enregistrer</button>
         <h3>Rappels push automatiques</h3><p class="muted">Envoyés une fois, heure de Kinshasa, aux joueurs qui ont gardé « Rappel du Match du jour » dans leurs paramètres (ils se coupent ensemble). 1 = oui, 0 = non.</p>${champs('rappels', { serie: 'Série du bonus du jour (17 h, série de 3 jours ou plus)', bande: 'Mise de la Bande (mercredi 18 h, pas encore inscrit)', saison: 'Fin de saison de la Ligue (24 h avant)' })}<button class="btn principal" data-enregistrer="rappels">Enregistrer</button></div>
+      <div class="carte"><h3 style="margin-top:0">Événement à durée limitée</h3><p class="muted">Entre le début et la fin (heure de Kinshasa), les gains des tables gratuites et le bonus du jour sont multipliés. Les joueurs le voient dans la fenêtre d'annonce (site et appli) quand aucune annonce n'est active. Les tables à mise ne changent pas.</p>
+        <div class="ligne"><label><input type="checkbox" id="evActif" ${r.evenement.actif ? 'checked' : ''}> actif</label><label>Nom <input id="evNom" maxlength="40" value="${esc(r.evenement.nom || '')}" placeholder="Week-end doré"></label></div>
+        <div class="ligne"><label>Début <input type="datetime-local" id="evDebut" value="${heureKin(r.evenement.debut)}"></label><label>Fin <input type="datetime-local" id="evFin" value="${heureKin(r.evenement.fin)}"></label></div>
+        <div class="ligne"><label>Pièces des tables gratuites x <input type="number" id="evPieces" min="1" max="5" step="0.5" value="${+r.evenement.pieces}" style="width:70px"></label><label>Bonus du jour x <input type="number" id="evBonus" min="1" max="5" step="0.5" value="${+r.evenement.bonus}" style="width:70px"></label><button class="btn principal" id="btnEvenement">Enregistrer</button></div></div>
       <div class="carte"><h3 style="margin-top:0">Tables à mise</h3>${champs('tables', { bronze: 'Bronze', argent: 'Argent', or: 'Or', diamant: 'Diamant' })}<button class="btn principal" data-enregistrer="tables">Enregistrer les mises</button>
         <h3>Partage du pot (en %, total 100)</h3>${champs('pot', { vainqueur: 'Vainqueur', deuxieme: '2e', troisieme: '3e', maison: 'Maison (pièces détruites)' })}<button class="btn principal" data-enregistrer="pot">Enregistrer le partage</button></div>
       <div class="carte"><h3 style="margin-top:0">Match du jour</h3>
@@ -596,6 +601,7 @@ const afficher = {
     };
     $('#btnMessages').onclick = () => ecrire('messagesRapides', $('#messagesRapides').value.split('\n'));
     $('#btnFondateur').onclick = () => ecrire('cadeauFondateur', { actif: $('#fondateurActif').checked });
+    $('#btnEvenement').onclick = () => ecrire('evenement', { actif: $('#evActif').checked, nom: $('#evNom').value, debut: $('#evDebut').value, fin: $('#evFin').value, pieces: Number($('#evPieces').value), bonus: Number($('#evBonus').value) });
     $('#btnMatchJour').onclick = () => ecrire('matchJour', { actif: $('#mjActif').checked, robots: $('#mjRobots').value, niveauRobots: Number($('#mjNiveau').value) });
     $('#btnNouveaute').onclick = () => ecrire('nouveaute', { bande: $('#nouveauteBande').checked });
     $('#btnVersion').onclick = () => ecrire('versionMin', $('#version').value.trim());

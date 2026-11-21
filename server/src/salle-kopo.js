@@ -9,7 +9,7 @@ const SK = require('../../src/kopo-salle.js');
 const SI = require('../../src/inter8-salle.js');
 const K = require('../../moteur/kopo-moteur.js');
 const { idAleatoire } = require('./comptes');
-const { etatJeuPour, NOMS_JEUX } = require('./reglages');
+const { etatJeuPour, NOMS_JEUX, evenementEnCours } = require('./reglages');
 const ATTENTE_STICKER = require('./stickers').ATTENTE_MS;
 const { permis, SALLES_MAX, actives: limitesActives } = require('./limites');
 
@@ -461,6 +461,8 @@ class SalleKopo extends Room {
     const ordre = [s.vainqueur, ...s.elimines.slice().reverse()];
     const place = (id) => ordre.indexOf(id) + 1 || null;
     const g = reglages.get('gains');
+    const ev = evenementEnCours(reglages.get('evenement')); // événement en cours (Pilotage) : gains multipliés
+    const fois = ev ? ev.pieces : 1;
     const partage = this.mise ? this.potParPlace(p, ordre) : null;
     await base.transaction(async (q) => {
       await q.query('INSERT INTO parties (id, code, publique, nb_joueurs, avec_robots, vainqueur, debut, fin, classee, jeu) VALUES ($1,$2,$3,$4,$5,$6,$7, now(), $8, $9)',
@@ -481,7 +483,7 @@ class SalleKopo extends Room {
           [pl === 1 ? g.victoire : 0, 'victoire'],
           [pl === 2 ? g.deuxieme : 0, 'deuxieme'],
         ];
-        for (const [montant, motif] of gains) if (montant > 0) await comptes.mouvement(q, id, montant, motif, p.id);
+        for (const [montant, motif] of gains) if (montant > 0) await comptes.mouvement(q, id, Math.round(montant * fois), motif, p.id);
       }
     });
     // Ligue : points selon la place, envoyés à chacun pour l'écran de fin.
