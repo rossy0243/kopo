@@ -448,6 +448,48 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.notStrictEqual(d.roomId, a.roomId, 'le 4e ouvre une nouvelle salle');
     for (const r of [a, b, c, d]) await r.leave();
   });
+  await test('salle publique gratuite : des robots complètent la table après l\'attente, partie non classée et sans pièces', async () => {
+    const client = new Client(URL_.replace('http', 'ws'));
+    const j = await invite('Seul' + Math.floor(Math.random() * 1000));
+    const solde = (await api('/api/moi', { jeton: j.jeton })).json.compte.solde;
+    let vue = null, classee = null;
+    const r = await client.joinOrCreate('kopo', { jeton: j.jeton, publique: true, taille: 4, rapide: true, attenteRobots: 200 });
+    r.onMessage('erreur', () => {}); r.onMessage('solde', () => {}); r.onMessage('classee', (m) => (classee = m.classee));
+    r.onMessage('vue', (v) => {
+      vue = v;
+      const a = v.manche && v.manche.actions[0];
+      if (v.etat === 'manche' && a) setTimeout(() => r.send('action', { action: a }), 5);
+    });
+    for (let t = 0; t < 40 && !(vue && vue.etat !== 'salon'); t++) await attendre(50);
+    assert.ok(vue && vue.etat !== 'salon', 'la salle démarre avec les robots');
+    assert.strictEqual(vue.joueurs.length, 4);
+    assert.strictEqual(vue.joueurs.filter((x) => x.robot).length, 3, 'robots affichés comme robots');
+    assert.strictEqual(classee, false, 'pas de Ligue avec des robots');
+    const enLigne = (await api('/api/en-ligne')).json;
+    assert.ok(!enLigne.sallesOuvertes.some((x) => x.id === r.roomId), 'plus proposée aux inconnus');
+    for (let t = 0; t < 400 && vue.etat !== 'finPartie'; t++) await attendre(50);
+    assert.strictEqual(vue.etat, 'finPartie');
+    await attendre(300);
+    assert.strictEqual((await api('/api/moi', { jeton: j.jeton })).json.compte.solde, solde, 'aucune pièce contre les robots');
+    await r.leave();
+  });
+  await test('tables à mise : jamais de robots, même après l\'attente', async () => {
+    const client = new Client(URL_.replace('http', 'ws'));
+    const j = await invite('Mise' + Math.floor(Math.random() * 1000));
+    let vue = null;
+    const r = await client.joinOrCreate('kopo-mise', { jeton: j.jeton, publique: true, taille: 3, mise: 'bronze', rapide: true, attenteRobots: 50 });
+    r.onMessage('erreur', () => {}); r.onMessage('solde', () => {}); r.onMessage('vue', (v) => (vue = v));
+    await attendre(600);
+    assert.strictEqual(vue.etat, 'salon');
+    assert.strictEqual(vue.joueurs.length, 1);
+    await r.leave();
+  });
+  await test('réglage robotsPublics : attente entre 10 et 600 secondes', async () => {
+    await assert.rejects(srv.reglages.ecrire('robotsPublics', { actif: 1, attente: 3 }), /Attente/);
+    await srv.reglages.ecrire('robotsPublics', { actif: 0, attente: 60 });
+    assert.deepStrictEqual(srv.reglages.get('robotsPublics'), { actif: 0, attente: 60 });
+    await srv.reglages.ecrire('robotsPublics', DEFAUTS.robotsPublics);
+  });
   await test('un ami rejoint une salle publique avec son code ; une salle privée n\'est jamais proposée aux inconnus', async () => {
     const client = new Client(URL_.replace('http', 'ws'));
     const [x, y, z] = [await invite('Ami' + Date.now() % 1000), await invite('Ami' + (Date.now() + 1) % 1000), await invite('Inc' + Date.now() % 1000)];

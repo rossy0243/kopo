@@ -83,6 +83,12 @@ class SalleKopo extends Room {
     // Les amis peuvent aussi rejoindre une salle publique avec son code.
     if (this.listing) this.listing.code = this.code;
     const rapide = options.rapide && process.env.KOPO_TESTS === '1';
+    // Salle publique gratuite (Kopo ou Inter (8)) : après une attente sans assez de joueurs, des robots complètent
+    // la table (réglage robotsPublics, onglet Pilotage). Jamais aux tables à mise. Les robots restent affichés
+    // comme robots ; avec eux la partie ne rapporte ni pièces, ni Ligue, ni XP de parcours (enregistrerPartie).
+    this.robotsPublics = this.publique && !this.mise && !this.jour && !this.entrainement;
+    this.attenteDepuis = null; // arrivée du premier joueur dans le salon
+    this.attenteTest = rapide && Number(options.attenteRobots) >= 0 ? Number(options.attenteRobots) : null; // tests seulement (ms)
     if (rapide) { this.salle.durees = { depart: 0, finTour: 0, mancheAuto: 1 }; if (this.jour || this.entrainement) this.salle.pauseRobot = 0; } // tests seulement
     this.clientsParId = new Map();
     this.comptes = new Map(); // id -> compte (au moment de l'entrée)
@@ -97,6 +103,7 @@ class SalleKopo extends Room {
     this.onMessage('*', (client, type, msg) => this.recevoir(client, type, msg));
     this.setSimulationInterval(() => {
       if (this.jour && this.jour.termine) return; // Match du jour fini pour le joueur : les robots s'arrêtent
+      if (this.robotsPublics && this.completerAvecRobots()) this.apresChangement();
       // Les robots jouent l'un après l'autre : en test, plusieurs coups par tour de boucle.
       for (let i = 0; i < (rapide && this.jour ? 50 : 1); i++) { if (!this.S.tic(this.salle)) break; this.apresChangement(); if (this.jour && this.jour.termine) break; }
     }, rapide && this.jour ? 20 : 200);
@@ -174,6 +181,30 @@ class SalleKopo extends Room {
     if (!r.ok) console.error('Entraînement : réglages refusés', o.reglages);
     for (let i = 0; i < o.robots; i++) this.S.recevoir(this.salle, id, { type: 'ajouterRobot' });
     if (o.lancer) this.S.recevoir(this.salle, id, { type: 'lancer' });
+  }
+
+  // Salle publique gratuite : si personne d'autre n'arrive pendant l'attente réglée, des robots prennent les places
+  // libres et la salle, pleine, démarre seule (tic). Renvoie true si des robots ont été ajoutés.
+  completerAvecRobots() {
+    const s = this.salle;
+    if (s.etat !== 'salon') { this.attenteDepuis = null; return false; }
+    if (!s.joueurs.some((j) => !j.robot)) { this.attenteDepuis = null; return false; }
+    if (this.attenteDepuis === null) this.attenteDepuis = Date.now();
+    const r = SalleKopo.services.reglages.get('robotsPublics') || {};
+    if (!r.actif && this.attenteTest === null) return false;
+    const attente = this.attenteTest !== null ? this.attenteTest : Math.max(10, Number(r.attente) || 45) * 1000;
+    if (Date.now() - this.attenteDepuis < attente || s.joueurs.length >= this.taille) return false;
+    while (s.joueurs.length < this.taille) {
+      let n = 1;
+      while (s.joueurs.some((j) => j.nom === 'Robot ' + n)) n++;
+      s.joueurs.push({ id: 'robot-' + n + '-' + Math.floor(Math.random() * 1e6), nom: 'Robot ' + n, connecte: true, robot: true, voix: false, muet: true });
+    }
+    s.robots = 'normaux';
+    s.niveauJoueur = 10; // force moyenne : ni trop facile, ni imbattable
+    if (this.attenteTest !== null) s.pauseRobot = 0; // tests seulement
+    this.classee = false;
+    if (!this.locked) this.lock(); // plus de place : les inconnus suivants ouvrent une autre salle
+    return true;
   }
 
   // Match du jour : 8 robots aux places fixes, puis la partie part tout de suite.

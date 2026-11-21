@@ -41,6 +41,9 @@ const DEFAUTS = {
   parrainage: { actif: true, parties: 5, piecesParrain: 300, piecesFilleul: 200, parMois: 30, total: 0, joursCompte: 7, joursPourJouer: 30 },
   // Match du jour (competition-amis.md) : 8 robots de niveau Fort (décision du 2/11), à pleine force, la même donne pour tous.
   matchJour: { actif: true, robots: 'forts', niveauRobots: 20 },
+  // Salles publiques gratuites (Kopo et Inter (8)) : des robots complètent la table après `attente` secondes
+  // sans assez de joueurs (actif : 1 = oui, 0 = non). Jamais aux tables à mise ; partie sans pièces, Ligue ni XP.
+  robotsPublics: { actif: 1, attente: 45 },
   // La Bande : maison = % des mises détruit ; inscrits de 2 à 20 ; 5 Matchs sur 7 au moins, sinon la mise est détruite ;
   // jour manqué avant l'inscription = pire note du jour - penaliteRetard ; inscription jusqu'au mercredi 23 h (heure de Kinshasa).
   // Pour miser : compte Google de joursCompte jours au moins, avec partiesMin parties jouées contre des humains.
@@ -253,6 +256,11 @@ function creerReglages(base) {
         if (!['faciles', 'normaux', 'forts'].includes(valeur.robots)) throw Object.assign(new Error('Niveau des robots : faciles, normaux ou forts.'), { statut: 400 });
         if (!(n >= 1 && n <= 100)) throw Object.assign(new Error('Niveau des robots entre 1 et 100.'), { statut: 400 });
         valeur = { actif: valeur.actif !== false && valeur.actif !== 0, robots: valeur.robots, niveauRobots: n };
+      }
+      if (cle === 'robotsPublics') {
+        const attente = entier(valeur.attente);
+        if (!(attente >= 10 && attente <= 600)) throw Object.assign(new Error('Attente entre 10 et 600 secondes.'), { statut: 400 });
+        valeur = { actif: valeur.actif !== false && valeur.actif !== 0 && valeur.actif !== '0' ? 1 : 0, attente };
       }
       if (cle === 'bande') valeur = verifierBande(valeur);
       if (cle === 'stickers') valeur = require('./stickers').verifierReglage(valeur);
