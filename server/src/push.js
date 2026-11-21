@@ -6,7 +6,8 @@
 //   annonce    : message envoyé depuis le tableau de bord admin.
 // Autres rappels du serveur, rangés sous « match » (Paramètres > Rappel du Match du jour : le joueur les coupe ensemble) :
 //   série du bonus du jour à 17 h (série de 3 jours ou plus, bonus pas encore pris), mise de la Bande le mercredi à 18 h
-//   (membre pas encore inscrit), fin de saison de la Ligue 24 h avant (joueurs classés de la saison). Un seul de chaque.
+//   (membre pas encore inscrit), fin de saison de la Ligue 24 h avant (joueurs classés de la saison), relance des absents
+//   à 18 h (avec des pièces offertes). Un seul de chaque.
 // Rien entre 22 h et 8 h (Kinshasa), sauf les invitations (l'ami qui invite est réveillé) et les annonces (choix de l'admin).
 // Deux canaux : Web Push (site, clés VAPID) et Firebase Cloud Messaging (applis Android et iOS, compte de service
 // Firebase dans FCM_COMPTE_SERVICE). Sans l'un ni l'autre, tout est éteint : le jeu marche comme avant.
@@ -302,6 +303,33 @@ function creerPush(base, reglages, env = process.env) {
       return api.rappelerChacun(l, 'saison-' + s.numero, () => ({ titre: 'Ligue', texte: `Plus que ${h} h dans la saison « ${s.nom} » : une dernière partie classée pour monter de division ?` }));
     },
 
+    // Relance des absents : venus pour la dernière fois il y a `jours` à 30 jours, pas relancés depuis 30 jours.
+    // Les pièces offertes arrivent tout de suite, avec une notification « cadeau » montrée à leur retour (site et appli).
+    async rappelAbsents() {
+      const r = reglages.get('relance') || {};
+      if (!(actif || fcmActif) || !r.actif || !api.comptes) return 0;
+      const jour = jourDe(horloge()), now = horloge().toISOString();
+      const l = (await base.query(`SELECT DISTINCT a.compte_id FROM ${ABONNES_RAPPELS}
+          AND c.vu_le < $1::timestamptz - make_interval(days => $2) AND c.vu_le > $1::timestamptz - interval '30 days'
+          AND NOT EXISTS (SELECT 1 FROM push_rappels_divers d WHERE d.compte_id = a.compte_id AND d.cle LIKE 'absent-%' AND d.cree_le > $1::timestamptz - interval '30 days')`, [now, r.jours])).rows;
+      const pieces = r.pieces > 0 ? r.pieces : 0;
+      let n = 0;
+      for (const x of l) {
+        const pris = await base.query('INSERT INTO push_rappels_divers (compte_id, cle, cree_le) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING RETURNING 1', [x.compte_id, 'absent-' + jour, now]);
+        if (!pris.rows.length) continue;
+        const texte = pieces ? `Tu nous manques ! ${pieces} pièces t'attendent pour ta prochaine partie.` : 'Tu nous manques ! Une partie rapide ce soir ?';
+        const envoyes = await envoyerAComptes([x.compte_id], { type: 'match', titre: 'Masano', texte, url: './', tag: 'absent-' + jour, action: 'accueil' }, { ttl: 6 * 3600 });
+        n += envoyes;
+        if (!envoyes || !pieces) continue;
+        await base.transaction(async (q) => {
+          await api.comptes.mouvement(q, x.compte_id, pieces, 'cadeau', 'relance-' + jour);
+          await q.query("INSERT INTO notifications (compte_id, type, texte, donnees) VALUES ($1, 'cadeau', $2, $3)",
+            [x.compte_id, `🎁 Content de te revoir : ${pieces} pièces offertes !`, JSON.stringify({ message: `content de te revoir, ${pieces} pièces offertes !`, relance: true })]);
+        }).catch((e) => console.error('Relance :', e.message));
+      }
+      return n;
+    },
+
     // Chaque minute : le rappel du Match du jour part une fois entre 19 h et 20 h (Kinshasa) ; série à 17 h,
     // Bande le mercredi à 18 h, fin de saison dès qu'il reste 24 h (jamais la nuit).
     async tic() {
@@ -309,6 +337,7 @@ function creerPush(base, reglages, env = process.env) {
       let n = 0;
       if (!nuit(maintenant)) n += await api.rappelSaison();
       if (h === 17 && !rappelsFaits.has('serie-' + jour)) { rappelsFaits.add('serie-' + jour); n += await api.rappelSerie(); }
+      if (h === 18 && !rappelsFaits.has('absent-' + jour)) { rappelsFaits.add('absent-' + jour); n += await api.rappelAbsents(); }
       if (h === 18 && jour === ajouterJours(lundiDe(jour), 2) && !rappelsFaits.has('bande-' + jour)) { rappelsFaits.add('bande-' + jour); n += await api.rappelBande(); }
       if (h !== 19 || rappelsFaits.has(jour)) return n;
       rappelsFaits.add(jour);

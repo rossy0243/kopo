@@ -49,6 +49,9 @@ const DEFAUTS = {
   rappels: { serie: 1, bande: 1, saison: 1 },
   // Événement à durée limitée (onglet Pilotage) : entre debut et fin (instants ISO), les gains des tables gratuites sont
   // multipliés par `pieces` et le bonus du jour par `bonus` (1 à 5). Annoncé tout seul aux joueurs (/api/config).
+  // Relance des joueurs absents (abonnés aux notifications) : après `jours` jours sans venir (et moins de 30), un push à 18 h
+  // et `pieces` pièces offertes (0 = rien). Au plus une relance par joueur tous les 30 jours.
+  relance: { actif: 1, jours: 3, pieces: 100 },
   evenement: { actif: 0, nom: '', debut: '', fin: '', pieces: 2, bonus: 2 },
   // La Bande : maison = % des mises détruit ; inscrits de 2 à 20 ; 5 Matchs sur 7 au moins, sinon la mise est détruite ;
   // jour manqué avant l'inscription = pire note du jour - penaliteRetard ; inscription jusqu'au mercredi 23 h (heure de Kinshasa).
@@ -289,6 +292,12 @@ function creerReglages(base) {
         if (!['faciles', 'normaux', 'forts'].includes(valeur.robots)) throw Object.assign(new Error('Niveau des robots : faciles, normaux ou forts.'), { statut: 400 });
         if (!(n >= 1 && n <= 100)) throw Object.assign(new Error('Niveau des robots entre 1 et 100.'), { statut: 400 });
         valeur = { actif: valeur.actif !== false && valeur.actif !== 0, robots: valeur.robots, niveauRobots: n };
+      }
+      if (cle === 'relance') {
+        const jours = entier(valeur.jours), pieces = entier(valeur.pieces);
+        if (!(jours >= 2 && jours <= 29)) throw Object.assign(new Error('Absence entre 2 et 29 jours.'), { statut: 400 });
+        if (!(pieces >= 0 && pieces <= 2000)) throw Object.assign(new Error('Cadeau entre 0 et 2 000 pièces.'), { statut: 400 });
+        valeur = { actif: valeur.actif === false || valeur.actif === 0 || valeur.actif === '0' ? 0 : 1, jours, pieces };
       }
       if (cle === 'evenement') valeur = verifierEvenement(valeur);
       if (cle === 'rappels') valeur = Object.fromEntries(Object.keys(DEFAUTS.rappels).map((k) => [k, valeur[k] === false || valeur[k] === 0 || valeur[k] === '0' ? 0 : 1]));

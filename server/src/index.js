@@ -38,6 +38,7 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
   minuteurSaison.unref();
   const push = creerPush(base, reglages, env);
   if (!push.actif()) console.log('Notifications push éteintes (VAPID_PUBLIC et VAPID_PRIVE absents).');
+  push.comptes = comptes; // relance des absents : pièces offertes
   const social = creerSocial(base, push);
   const parcours = creerParcours(base, reglages, comptes, ligue);
   // Cadres retirés : les cadres achetés en boutique sont remboursés (une seule fois par cadre).

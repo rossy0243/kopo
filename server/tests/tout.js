@@ -1764,6 +1764,28 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
       srv.push.regler({ maintenant: midi });
     }
   });
+  await test('push : relance des absents à 18 h, avec des pièces offertes, une fois par mois', async () => {
+    const a = await invite('PushAbsent'), b = await invite('PushPresent'), c = await invite('PushParti');
+    for (const [x, nom] of [[a, 'ab1'], [b, 'ab2'], [c, 'ab3']]) await api('/api/push/abonnement', { methode: 'POST', jeton: x.jeton, corps: { abonnement: abo(nom) } });
+    await srv.base.query("UPDATE comptes SET vu_le = '2026-11-18T10:00:00Z' WHERE id = $1", [a.compte.id]);
+    await srv.base.query("UPDATE comptes SET vu_le = '2026-11-22T10:00:00Z' WHERE id = $1", [b.compte.id]);
+    await srv.base.query("UPDATE comptes SET vu_le = '2026-09-01T10:00:00Z' WHERE id = $1", [c.compte.id]);
+    const avant = (await srv.comptes.lire(a.compte.id)).solde;
+    srv.push.regler({ maintenant: () => new Date('2026-11-23T17:05:00Z') }); // lundi 18 h 05 à Kinshasa
+    try {
+      await srv.push.tic();
+      const r = pour('ab1').filter((x) => /Tu nous manques/.test(x.texte));
+      assert.strictEqual(r.length, 1); assert.match(r[0].texte, /100 pièces/);
+      assert.strictEqual((await srv.comptes.lire(a.compte.id)).solde, avant + 100);
+      assert.ok((await api('/api/notifications', { jeton: a.jeton })).json.liste.some((n) => n.type === 'cadeau' && n.donnees.relance));
+      assert.strictEqual(pour('ab2').length, 0, 'venu il y a 1 jour');
+      assert.strictEqual(pour('ab3').length, 0, 'parti depuis plus de 30 jours');
+      srv.push.regler({ maintenant: () => new Date('2026-11-28T17:05:00Z') }); // 5 jours plus tard : pas de deuxième relance
+      await srv.base.query("UPDATE comptes SET vu_le = '2026-11-23T10:00:00Z' WHERE id = $1", [a.compte.id]);
+      await srv.push.rappelAbsents();
+      assert.strictEqual(pour('ab1').filter((x) => /Tu nous manques/.test(x.texte)).length, 1);
+    } finally { srv.push.regler({ maintenant: midi }); }
+  });
   await test('réglage rappels : chaque rappel se coupe depuis le tableau de bord', async () => {
     await srv.reglages.ecrire('rappels', { serie: 0, bande: '1', saison: true });
     assert.deepStrictEqual(srv.reglages.get('rappels'), { serie: 0, bande: 1, saison: 1 });
