@@ -20,15 +20,18 @@
   const MAX_JOUEURS = 8;
 
   // Mode Cahier (décision du 14/11) : quand le premier joueur sort, chacun compte les cartes qui
-  // lui restent en main avec ce barème (celui du créateur). Pour le changer, il suffit de changer
-  // les nombres ci-dessous ; les cartes absentes valent leur chiffre (2 = 2 points… 9 = 9 points).
+  // lui restent en main avec ce barème (celui du créateur). C'est le barème de départ : le serveur
+  // le remplace par celui de Pilotage (réglage « cahier »), figé au début de chaque partie.
+  // Les cartes absentes valent leur chiffre (2 = 2 points… 9 = 9 points).
   const BAREME_CAHIER = { X: 50, 8: 25, A: 1, 10: 10, R: 10, D: 10, V: 10 };
   const TOTAUX_CAHIER = [500, 1000]; // les deux totals d'élimination (créateur, 14/11)
-  const pointsCarte = (carte) => {
-    const v = valeur(carte);
-    return v in BAREME_CAHIER ? BAREME_CAHIER[v] : Number(v) || 0;
+  const pointsCarte = (carte, bareme) => {
+    const v = valeur(carte), b = bareme || BAREME_CAHIER;
+    return v in b ? b[v] : Number(v) || 0;
   };
-  const pointsMain = (main) => (main || []).reduce((t, c) => t + pointsCarte(c), 0);
+  const pointsMain = (main, bareme) => (main || []).reduce((t, c) => t + pointsCarte(c, bareme), 0);
+  // Barème complet (joker + 13 valeurs) à partir d'un barème partiel : ce qui manque garde la valeur de départ.
+  const baremeComplet = (b) => Object.fromEntries([JOKER, ...VALEURS].map((v) => [v, b && Number.isInteger(b[v]) && b[v] >= 0 ? b[v] : (v in BAREME_CAHIER ? BAREME_CAHIER[v] : Number(v))]));
 
   const brut = (carte) => carte.replace('*', '');
   const valeur = (carte) => (brut(carte)[0] === JOKER ? JOKER : brut(carte).slice(0, -1));
@@ -119,6 +122,7 @@
       elimine: null,
       phase: 'jeu', // 'jeu' | 'terminee' | 'nulle'
       cahier: !!o.cahier,
+      bareme: o.cahier && o.bareme ? Object.assign({}, o.bareme) : null, // barème du Cahier (null = celui de départ)
       graine: (o.graine >>> 0) || 1,
       journal: [],
       // Ce que toute la table a vu : cartes posées, et qui a pioché pendant une demande.
@@ -201,7 +205,7 @@
     if (m.cahier) {
       // Mode Cahier : la donne s'arrête au premier qui sort, les autres comptent leurs cartes.
       m.sorti = joueur;
-      m.points = Object.fromEntries(m.sieges.map((j) => [j, j === joueur ? 0 : pointsMain(m.mains[j])]));
+      m.points = Object.fromEntries(m.sieges.map((j) => [j, j === joueur ? 0 : pointsMain(m.mains[j], m.bareme)]));
       m.phase = 'terminee';
       m.joueurCourant = null;
       noter(m, `${joueur} pose sa dernière carte : fin de la donne, chacun compte ses points.`);
@@ -613,7 +617,7 @@
   }
 
   const Inter8 = {
-    COULEURS, NOMS_COULEURS, SYMBOLES, VALEURS, PENALITES, MAX_JOUEURS, BAREME_CAHIER, TOTAUX_CAHIER, pointsCarte, pointsMain,
+    COULEURS, NOMS_COULEURS, SYMBOLES, VALEURS, PENALITES, MAX_JOUEURS, BAREME_CAHIER, TOTAUX_CAHIER, pointsCarte, pointsMain, baremeComplet,
     valeur, couleur, afficher, nomValeur, finissable, nombrePaquets, nouveauPaquet, hasard, melanger, distribuer,
     nouvelleManche, appliquerDepart, actionsPossibles, refus, jouer, jouerPartie, vuePublique,
     strategieSimple, strategieHasard,

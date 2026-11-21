@@ -713,6 +713,15 @@ test('Cahier : sortir sur un 2 fait quand même piocher le suivant', () => {
   assert.strictEqual(m.points.B, I.pointsMain(m.mains.B));
   assert.strictEqual(m.mains.C.length, 1);
 });
+test('Cahier : barème réglé (Pilotage), complété par celui de départ', () => {
+  const b = I.baremeComplet({ X: 100, 8: 40, 7: 0 });
+  assert.strictEqual(Object.keys(b).length, 14);
+  assert.deepStrictEqual([b.X, b[8], b[7], b.A, b[9], b.R], [100, 40, 0, 1, 9, 10]);
+  assert.deepStrictEqual(I.baremeComplet(), I.baremeComplet(I.BAREME_CAHIER));
+  const m = I.nouvelleManche(['A', 'B'], { A: ['5C'], B: ['XR', '8P', '7T'] }, remplir('4C'), 'A', { mode: 'simple', graine: 7, cahier: true, bareme: b });
+  J(m, 'A', ['5C']);
+  assert.deepStrictEqual(m.points, { A: 0, B: 140 });
+});
 test('Cahier : sans l\'option, la manche continue jusqu\'au dernier', () => {
   const m = manche({ A: ['5C'], B: ['XR', '7P'], C: ['RP', '9T', 'AC'] }, remplir('4C'), 'A');
   J(m, 'A', ['5C']);

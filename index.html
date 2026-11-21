@@ -5258,15 +5258,18 @@ var qrcode = function() {
   const MAX_JOUEURS = 8;
 
   // Mode Cahier (décision du 14/11) : quand le premier joueur sort, chacun compte les cartes qui
-  // lui restent en main avec ce barème (celui du créateur). Pour le changer, il suffit de changer
-  // les nombres ci-dessous ; les cartes absentes valent leur chiffre (2 = 2 points… 9 = 9 points).
+  // lui restent en main avec ce barème (celui du créateur). C'est le barème de départ : le serveur
+  // le remplace par celui de Pilotage (réglage « cahier »), figé au début de chaque partie.
+  // Les cartes absentes valent leur chiffre (2 = 2 points… 9 = 9 points).
   const BAREME_CAHIER = { X: 50, 8: 25, A: 1, 10: 10, R: 10, D: 10, V: 10 };
   const TOTAUX_CAHIER = [500, 1000]; // les deux totals d'élimination (créateur, 14/11)
-  const pointsCarte = (carte) => {
-    const v = valeur(carte);
-    return v in BAREME_CAHIER ? BAREME_CAHIER[v] : Number(v) || 0;
+  const pointsCarte = (carte, bareme) => {
+    const v = valeur(carte), b = bareme || BAREME_CAHIER;
+    return v in b ? b[v] : Number(v) || 0;
   };
-  const pointsMain = (main) => (main || []).reduce((t, c) => t + pointsCarte(c), 0);
+  const pointsMain = (main, bareme) => (main || []).reduce((t, c) => t + pointsCarte(c, bareme), 0);
+  // Barème complet (joker + 13 valeurs) à partir d'un barème partiel : ce qui manque garde la valeur de départ.
+  const baremeComplet = (b) => Object.fromEntries([JOKER, ...VALEURS].map((v) => [v, b && Number.isInteger(b[v]) && b[v] >= 0 ? b[v] : (v in BAREME_CAHIER ? BAREME_CAHIER[v] : Number(v))]));
 
   const brut = (carte) => carte.replace('*', '');
   const valeur = (carte) => (brut(carte)[0] === JOKER ? JOKER : brut(carte).slice(0, -1));
@@ -5357,6 +5360,7 @@ var qrcode = function() {
       elimine: null,
       phase: 'jeu', // 'jeu' | 'terminee' | 'nulle'
       cahier: !!o.cahier,
+      bareme: o.cahier && o.bareme ? Object.assign({}, o.bareme) : null, // barème du Cahier (null = celui de départ)
       graine: (o.graine >>> 0) || 1,
       journal: [],
       // Ce que toute la table a vu : cartes posées, et qui a pioché pendant une demande.
@@ -5439,7 +5443,7 @@ var qrcode = function() {
     if (m.cahier) {
       // Mode Cahier : la donne s'arrête au premier qui sort, les autres comptent leurs cartes.
       m.sorti = joueur;
-      m.points = Object.fromEntries(m.sieges.map((j) => [j, j === joueur ? 0 : pointsMain(m.mains[j])]));
+      m.points = Object.fromEntries(m.sieges.map((j) => [j, j === joueur ? 0 : pointsMain(m.mains[j], m.bareme)]));
       m.phase = 'terminee';
       m.joueurCourant = null;
       noter(m, `${joueur} pose sa dernière carte : fin de la donne, chacun compte ses points.`);
@@ -5851,7 +5855,7 @@ var qrcode = function() {
   }
 
   const Inter8 = {
-    COULEURS, NOMS_COULEURS, SYMBOLES, VALEURS, PENALITES, MAX_JOUEURS, BAREME_CAHIER, TOTAUX_CAHIER, pointsCarte, pointsMain,
+    COULEURS, NOMS_COULEURS, SYMBOLES, VALEURS, PENALITES, MAX_JOUEURS, BAREME_CAHIER, TOTAUX_CAHIER, pointsCarte, pointsMain, baremeComplet,
     valeur, couleur, afficher, nomValeur, finissable, nombrePaquets, nouveauPaquet, hasard, melanger, distribuer,
     nouvelleManche, appliquerDepart, actionsPossibles, refus, jouer, jouerPartie, vuePublique,
     strategieSimple, strategieHasard,
@@ -6225,7 +6229,8 @@ var qrcode = function() {
     s.restants = I.melanger(s.joueurs.map((j) => j.id), s.rng);
     s.paquets = I.nombrePaquets(s.mode);
     if (s.publique) s.formule = 'normale';
-    s.cahier = s.formule === 'cahier' ? { total: s.totalCahier, scores: Object.fromEntries(s.restants.map((id) => [id, 0])), donnes: [] } : null;
+    // Barème des cartes (Pilotage : le serveur le pose dans s.baremeCahier) : figé pour toute la partie.
+    s.cahier = s.formule === 'cahier' ? { total: s.totalCahier, bareme: I.baremeComplet(s.baremeCahier), scores: Object.fromEntries(s.restants.map((id) => [id, 0])), donnes: [] } : null;
     demarrerManche(s);
   }
   function rendrePublique(s, taille) {
@@ -6338,7 +6343,7 @@ var qrcode = function() {
     // Avec une distribution animée, l'effet de la carte de départ (pénalité, tour sauté, J retour)
     // attend la fin du compte à rebours : le joueur sanctionné reçoit ses cartes après les autres.
     const differerDepart = s.durees.depart > 0;
-    s.manche = I.nouvelleManche(sieges, mains, pioche, premier, { mode: s.mode, jRetour: s.jRetour, graine: Math.floor(s.rng() * 4294967296), differerDepart, cahier: !!s.cahier });
+    s.manche = I.nouvelleManche(sieges, mains, pioche, premier, { mode: s.mode, jRetour: s.jRetour, graine: Math.floor(s.rng() * 4294967296), differerDepart, cahier: !!s.cahier, bareme: s.cahier && s.cahier.bareme });
     s.etat = 'manche';
     const depart = entreRobots(s) ? Math.min(s.durees.depart, RAPIDE.depart) : s.durees.depart;
     s.pause = depart > 0 ? { type: 'depart', jusqua: s.horloge() + depart, total: depart } : null;
@@ -6670,7 +6675,7 @@ var qrcode = function() {
       jRetour: !!s.jRetour,
       formule: s.formule || 'normale',
       totalCahier: s.totalCahier || TOTAL_CAHIER,
-      cahier: s.cahier ? { total: s.cahier.total, scores: Object.assign({}, s.cahier.scores), donnes: s.cahier.donnes.map((d) => ({ numero: d.numero, sorti: d.sorti, points: Object.assign({}, d.points), mains: d.mains /* cartes retournées en fin de donne : tout le monde les a vues */, elimines: d.elimines.slice() })) } : null,
+      cahier: s.cahier ? { total: s.cahier.total, bareme: Object.assign({}, s.cahier.bareme || I.baremeComplet()), scores: Object.assign({}, s.cahier.scores), donnes: s.cahier.donnes.map((d) => ({ numero: d.numero, sorti: d.sorti, points: Object.assign({}, d.points), mains: d.mains /* cartes retournées en fin de donne : tout le monde les a vues */, elimines: d.elimines.slice() })) } : null,
       joueurs: s.joueurs.map((j) => ({ id: j.id, nom: j.nom, connecte: j.connecte, peerId: j.peerId || null, voix: !!j.voix, muet: j.muet !== false, robot: !!j.robot, niveau: j.robot && !j.remplace ? niveauDuRobot(s, j.id) : null, pret: !!j.pret || !!j.robot, remplace: !!j.remplace, absent: estAbsent(s, j.id) })),
       delai: s.delai,
       publique: !!s.publique,
@@ -7958,7 +7963,7 @@ svg .vb { transform-box: view-box; }
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = '7c19cae71109'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = 'ed6c3fb3b3a9'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: true };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // La musique des menus était coupée par défaut : on l'allume une fois pour tous (le joueur peut la recouper).
@@ -8441,6 +8446,8 @@ svg .vb { transform-box: view-box; }
     if (sauvee) { try { jeuSalle = JSON.parse(sauvee).jeu === 'inter8' ? 'inter8' : 'kopo'; } catch (e) {} }
     const M = jeuSalle === 'inter8' ? SI : S;
     const salle = sauvee ? M.importer(sauvee) : M.creerSalle(code);
+    // Mode Cahier : barème des cartes réglé dans Pilotage (/api/config), lu au lancement de chaque partie.
+    if (jeuSalle === 'inter8' && configServeur && configServeur.cahier) salle.baremeCahier = configServeur.cahier;
     if (taille && !sauvee) M.rendrePublique(salle, taille);
     hote = { salle, vus: new Map(), reseau: null };
     session = { code, role: 'hote', nom };
@@ -10127,7 +10134,7 @@ svg .vb { transform-box: view-box; }
   // ------------------------------------------------------------------ Inter (8) : mode Cahier (14/11)
   // Fin de donne : les cartes de chacun se retournent, les points se comptent, la ligne s'écrit dans le
   // cahier et les éliminés sont barrés. Le tout tient en 2 à 3 s, dans l'attente avant la donne suivante.
-  const carteCahierEl = (c) => el('span', 'cahier-carte' + (estRougeInter(c) ? ' rouge' : '') + (I8.pointsCarte(c) >= 25 ? ' fort' : ''), I8.afficher(c));
+  const carteCahierEl = (c, bareme) => el('span', 'cahier-carte' + (estRougeInter(c) ? ' rouge' : '') + (I8.pointsCarte(c, bareme) >= 25 ? ' fort' : ''), I8.afficher(c));
   function defiler(e, a, b, delai, duree, avant = '') { // un nombre qui passe de a à b
     if (sansAnim || a === b) { e.textContent = avant + b; return; }
     e.textContent = avant + a;
@@ -10162,7 +10169,7 @@ svg .vb { transform-box: view-box; }
         ligne.append(el('span', 'qui', qui(id)), ajout, total);
         const cartes = el('div', 'cahier-cartes');
         (d.mains[id] || []).forEach((carte, i) => {
-          const e = carteCahierEl(carte); cartes.append(e);
+          const e = carteCahierEl(carte, c.bareme); cartes.append(e);
           if (!sansAnim) e.animate([{ transform: 'rotateY(90deg) translateY(-6px)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 260, delay: 150 + k * 70 + i * 80, fill: 'backwards', easing: 'ease-out' });
         });
         if (cartes.childNodes.length) ligne.append(cartes);

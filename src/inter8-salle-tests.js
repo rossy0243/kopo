@@ -494,6 +494,22 @@ test('Cahier : points écrits à chaque donne, éliminé au total, le dernier ga
     assert.deepStrictEqual(c.donnes.flatMap((d) => d.elimines), s.elimines);
   }
 });
+test('Cahier : le barème est figé au lancement de la partie', () => {
+  const s = salleAvec(3, 4);
+  s.baremeCahier = { X: 100 };
+  assert.ok(S.recevoir(s, 'p1', { type: 'reglages', formule: 'cahier', total: 500 }).ok);
+  assert.ok(S.recevoir(s, 'p1', { type: 'lancer' }).ok);
+  s.baremeCahier = { X: 1 }; // changé dans Pilotage pendant la partie : sans effet sur elle
+  assert.strictEqual(S.vue(s, 'p2').cahier.bareme.X, 100);
+  assert.strictEqual(s.manche.bareme.X, 100);
+  jouerPartieParLesVues(s, I.hasard(77));
+  const c = S.vue(s, 'p2').cahier;
+  for (const d of c.donnes) for (const [j, main] of Object.entries(d.mains)) assert.strictEqual(d.points[j], I.pointsMain(main, c.bareme));
+  assert.strictEqual(c.bareme.X, 100);
+  // Partie enregistrée avant le barème réglable : elle continue avec celui de départ.
+  const t = S.importer(S.exporter(Object.assign(salleAvec(3, 5), {})));
+  assert.strictEqual(t.baremeCahier, undefined);
+});
 test('Cahier : contre les robots, la partie va jusqu\'au bout', () => {
   const s = salleAvec(1, 9);
   assert.ok(S.recevoir(s, 'p1', { type: 'reglages', formule: 'cahier', total: 500 }).ok);
