@@ -343,6 +343,26 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     const p = (await srv.base.query('SELECT count(*)::int AS n FROM participations')).rows[0].n;
     assert.ok(p >= 3);
   });
+  await test('événement : gains des tables gratuites et bonus du jour multipliés, annoncé dans /config, puis retour à la normale', async () => {
+    const maintenant = Date.now();
+    await assert.rejects(srv.reglages.ecrire('evenement', { actif: 1, nom: 'X', debut: '2026-11-28T18:00', fin: '2026-11-28T10:00', pieces: 2, bonus: 2 }), /après le début/);
+    await assert.rejects(srv.reglages.ecrire('evenement', { actif: 1, nom: 'X', debut: '2026-11-28T10:00', fin: '2026-11-28T18:00', pieces: 9, bonus: 2 }), /entre 1 et 5/);
+    await srv.reglages.ecrire('evenement', { actif: 1, nom: 'Week-end doré', debut: new Date(maintenant - 36e5).toISOString(), fin: new Date(maintenant + 36e5).toISOString(), pieces: 2, bonus: 3 });
+    try {
+      const cfg = (await api('/api/config')).json;
+      assert.match(cfg.annonce, /Week-end doré : pièces x2 sur les tables gratuites et bonus du jour x3, jusqu'à/);
+      assert.deepStrictEqual([cfg.evenement.pieces, cfg.evenement.bonus], [2, 3]);
+      const x = await invite('Evenement');
+      assert.strictEqual((await api('/api/bonus-du-jour', { methode: 'POST', jeton: x.jeton })).json.montant, 150, 'bonus 50 x 3');
+      const js = [await invite('EvA'), await invite('EvB'), await invite('EvC')];
+      const fin = await jouerPartie(js);
+      const v = (await srv.base.query("SELECT montant FROM registre_pieces WHERE compte_id = $1 AND motif = 'victoire' ORDER BY id DESC LIMIT 1", [fin.vainqueur])).rows[0];
+      assert.strictEqual(v.montant, 80, 'victoire 40 x 2');
+    } finally {
+      await srv.reglages.ecrire('evenement', DEFAUTS.evenement);
+    }
+    assert.strictEqual((await api('/api/config')).json.evenement, null);
+  });
   await test('partie avec un robot : aucune pièce gagnée', async () => {
     const js = [await invite('Solo'), await invite('Duo')];
     await jouerPartie(js, { robots: 1 });
@@ -447,6 +467,50 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     const d = await entrer(js[3]);
     assert.notStrictEqual(d.roomId, a.roomId, 'le 4e ouvre une nouvelle salle');
     for (const r of [a, b, c, d]) await r.leave();
+  });
+  await test('salle publique gratuite : des robots complètent la table après l\'attente, partie non classée et sans pièces', async () => {
+    const client = new Client(URL_.replace('http', 'ws'));
+    const j = await invite('Seul' + Math.floor(Math.random() * 1000));
+    const solde = (await api('/api/moi', { jeton: j.jeton })).json.compte.solde;
+    let vue = null, classee = null;
+    const r = await client.joinOrCreate('kopo', { jeton: j.jeton, publique: true, taille: 4, rapide: true, attenteRobots: 200 });
+    r.onMessage('erreur', () => {}); r.onMessage('solde', () => {}); r.onMessage('classee', (m) => (classee = m.classee));
+    r.onMessage('vue', (v) => {
+      vue = v;
+      const a = v.manche && v.manche.actions[0];
+      if (v.etat === 'manche' && a) setTimeout(() => r.send('action', { action: a }), 5);
+    });
+    for (let t = 0; t < 40 && !(vue && vue.etat !== 'salon'); t++) await attendre(50);
+    assert.ok(vue && vue.etat !== 'salon', 'la salle démarre avec les robots');
+    assert.strictEqual(vue.joueurs.length, 4);
+    assert.strictEqual(vue.joueurs.filter((x) => x.robot).length, 3, 'robots affichés comme robots');
+    assert.ok(vue.joueurs.filter((x) => x.robot).every((x) => /^Robot [A-ZÀ-Ü]/.test(x.nom)), 'noms « Robot <prénom> »');
+    assert.strictEqual(new Set(vue.joueurs.map((x) => x.nom)).size, 4, 'noms différents');
+    assert.strictEqual(classee, false, 'pas de Ligue avec des robots');
+    const enLigne = (await api('/api/en-ligne')).json;
+    assert.ok(!enLigne.sallesOuvertes.some((x) => x.id === r.roomId), 'plus proposée aux inconnus');
+    for (let t = 0; t < 400 && vue.etat !== 'finPartie'; t++) await attendre(50);
+    assert.strictEqual(vue.etat, 'finPartie');
+    await attendre(300);
+    assert.strictEqual((await api('/api/moi', { jeton: j.jeton })).json.compte.solde, solde, 'aucune pièce contre les robots');
+    await r.leave();
+  });
+  await test('tables à mise : jamais de robots, même après l\'attente', async () => {
+    const client = new Client(URL_.replace('http', 'ws'));
+    const j = await invite('Mise' + Math.floor(Math.random() * 1000));
+    let vue = null;
+    const r = await client.joinOrCreate('kopo-mise', { jeton: j.jeton, publique: true, taille: 3, mise: 'bronze', rapide: true, attenteRobots: 50 });
+    r.onMessage('erreur', () => {}); r.onMessage('solde', () => {}); r.onMessage('vue', (v) => (vue = v));
+    await attendre(600);
+    assert.strictEqual(vue.etat, 'salon');
+    assert.strictEqual(vue.joueurs.length, 1);
+    await r.leave();
+  });
+  await test('réglage robotsPublics : attente entre 10 et 600 secondes', async () => {
+    await assert.rejects(srv.reglages.ecrire('robotsPublics', { actif: 1, attente: 3 }), /Attente/);
+    await srv.reglages.ecrire('robotsPublics', { actif: 0, attente: 60 });
+    assert.deepStrictEqual(srv.reglages.get('robotsPublics'), { actif: 0, attente: 60 });
+    await srv.reglages.ecrire('robotsPublics', DEFAUTS.robotsPublics);
   });
   await test('un ami rejoint une salle publique avec son code ; une salle privée n\'est jamais proposée aux inconnus', async () => {
     const client = new Client(URL_.replace('http', 'ws'));
@@ -1637,6 +1701,96 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
       await srv.push.rappelMatchJour(); // même après un redémarrage : un seul par jour
       assert.strictEqual(pour('h1').filter((x) => x.type === 'match').length, 1);
     } finally { srv.push.regler({ maintenant: midi }); }
+  });
+  await test('push : rappel de la série du bonus du jour à 17 h, une fois, si le bonus n\'est pas encore pris', async () => {
+    const a = await invite('PushSerie'), b = await invite('PushSeriePris'), c = await invite('PushSerieCourte');
+    for (const [x, nom] of [[a, 's1'], [b, 's2'], [c, 's3']]) await api('/api/push/abonnement', { methode: 'POST', jeton: x.jeton, corps: { abonnement: abo(nom) } });
+    await srv.base.query("UPDATE comptes SET serie_bonus = 5, dernier_bonus = '2026-11-19' WHERE id = $1", [a.compte.id]);
+    await srv.base.query("UPDATE comptes SET serie_bonus = 5, dernier_bonus = '2026-11-20' WHERE id = $1", [b.compte.id]);
+    await srv.base.query("UPDATE comptes SET serie_bonus = 2, dernier_bonus = '2026-11-19' WHERE id = $1", [c.compte.id]);
+    srv.push.regler({ maintenant: () => new Date('2026-11-20T16:05:00Z') }); // 17 h 05 à Kinshasa
+    try {
+      await srv.push.tic();
+      const r = pour('s1').filter((x) => x.tag === 'serie-2026-11-20');
+      assert.strictEqual(r.length, 1); assert.match(r[0].texte, /série de 5 jours/); assert.strictEqual(r[0].type, 'match');
+      assert.strictEqual(pour('s2').length, 0, 'bonus déjà pris aujourd\'hui');
+      assert.strictEqual(pour('s3').length, 0, 'série trop courte');
+      await srv.push.rappelSerie(); // après un redémarrage : toujours un seul
+      assert.strictEqual(pour('s1').length, 1);
+      await api('/api/push/prefs', { methode: 'PATCH', jeton: b.jeton, corps: { match: false } });
+      await srv.base.query("UPDATE comptes SET dernier_bonus = '2026-11-19' WHERE id = $1", [b.compte.id]);
+      await srv.push.rappelSerie();
+      assert.strictEqual(pour('s2').length, 0, 'rappels coupés avec le Match du jour');
+    } finally { srv.push.regler({ maintenant: midi }); }
+  });
+  await test('push : rappel de mise de la Bande le mercredi à 18 h, pour les membres pas encore inscrits', async () => {
+    const a = await invite('PushBandeA'), b = await invite('PushBandeB');
+    for (const [x, nom] of [[a, 'ba1'], [b, 'bb1']]) await api('/api/push/abonnement', { methode: 'POST', jeton: x.jeton, corps: { abonnement: abo(nom) } });
+    await srv.base.query("INSERT INTO bandes (id, nom, code, createur, mise) VALUES ('b_push', 'Les Lions', 'PUSHB1', $1, 500)", [a.compte.id]);
+    await srv.base.query("INSERT INTO bande_membres (bande_id, compte_id) VALUES ('b_push', $1), ('b_push', $2)", [a.compte.id, b.compte.id]);
+    await srv.base.query("INSERT INTO bande_semaines (bande_id, semaine, mise) VALUES ('b_push', '2026-11-16', 500)");
+    await srv.base.query("INSERT INTO bande_inscriptions (bande_id, semaine, compte_id, mise) VALUES ('b_push', '2026-11-16', $1, 500)", [a.compte.id]);
+    srv.push.regler({ maintenant: () => new Date('2026-11-17T17:05:00Z') }); // mardi 18 h 05 : rien
+    try {
+      await srv.push.tic();
+      assert.strictEqual(pour('bb1').length, 0);
+      srv.push.regler({ maintenant: () => new Date('2026-11-18T17:05:00Z') }); // mercredi 18 h 05
+      await srv.push.tic();
+      const r = pour('bb1');
+      assert.strictEqual(r.length, 1); assert.match(r[0].texte, /Les Lions/); assert.match(r[0].texte, /23 h/);
+      assert.strictEqual(pour('ba1').length, 0, 'déjà inscrit');
+      await srv.push.rappelBande();
+      assert.strictEqual(pour('bb1').length, 1, 'un seul par semaine');
+    } finally { srv.push.regler({ maintenant: midi }); }
+  });
+  await test('push : fin de saison de la Ligue, 24 h avant, une fois, pour les joueurs classés', async () => {
+    const a = await invite('PushLigue'), b = await invite('PushPasLigue');
+    for (const [x, nom] of [[a, 'l1'], [b, 'l2']]) await api('/api/push/abonnement', { methode: 'POST', jeton: x.jeton, corps: { abonnement: abo(nom) } });
+    const s = (await srv.base.query("SELECT numero, fin FROM saisons WHERE statut = 'en_cours'")).rows[0];
+    await srv.base.query('INSERT INTO ligue (saison, compte_id, points, parties) VALUES ($1, $2, 40, 3)', [s.numero, a.compte.id]);
+    await srv.base.query("UPDATE saisons SET fin = '2026-11-22T19:00:00Z' WHERE numero = $1", [s.numero]);
+    try {
+      srv.push.regler({ maintenant: () => new Date('2026-11-21T11:00:00Z') }); // 32 h avant : trop tôt
+      assert.strictEqual(await srv.push.rappelSaison(), 0);
+      srv.push.regler({ maintenant: () => new Date('2026-11-21T19:30:00Z') }); // samedi 20 h 30, 23 h 30 avant la fin
+      await srv.push.tic();
+      const r = pour('l1');
+      assert.strictEqual(r.length, 1); assert.match(r[0].texte, /Plus que 24 h|Plus que 23 h/);
+      assert.strictEqual(pour('l2').length, 0, 'pas classé cette saison');
+      await srv.push.tic();
+      assert.strictEqual(pour('l1').length, 1, 'une seule fois');
+    } finally {
+      await srv.base.query('UPDATE saisons SET fin = $2 WHERE numero = $1', [s.numero, s.fin]);
+      srv.push.regler({ maintenant: midi });
+    }
+  });
+  await test('push : relance des absents à 18 h, avec des pièces offertes, une fois par mois', async () => {
+    const a = await invite('PushAbsent'), b = await invite('PushPresent'), c = await invite('PushParti');
+    for (const [x, nom] of [[a, 'ab1'], [b, 'ab2'], [c, 'ab3']]) await api('/api/push/abonnement', { methode: 'POST', jeton: x.jeton, corps: { abonnement: abo(nom) } });
+    await srv.base.query("UPDATE comptes SET vu_le = '2026-11-18T10:00:00Z' WHERE id = $1", [a.compte.id]);
+    await srv.base.query("UPDATE comptes SET vu_le = '2026-11-22T10:00:00Z' WHERE id = $1", [b.compte.id]);
+    await srv.base.query("UPDATE comptes SET vu_le = '2026-09-01T10:00:00Z' WHERE id = $1", [c.compte.id]);
+    const avant = (await srv.comptes.lire(a.compte.id)).solde;
+    srv.push.regler({ maintenant: () => new Date('2026-11-23T17:05:00Z') }); // lundi 18 h 05 à Kinshasa
+    try {
+      await srv.push.tic();
+      const r = pour('ab1').filter((x) => /Tu nous manques/.test(x.texte));
+      assert.strictEqual(r.length, 1); assert.match(r[0].texte, /100 pièces/);
+      assert.strictEqual((await srv.comptes.lire(a.compte.id)).solde, avant + 100);
+      assert.ok((await api('/api/notifications', { jeton: a.jeton })).json.liste.some((n) => n.type === 'cadeau' && n.donnees.relance));
+      assert.strictEqual(pour('ab2').length, 0, 'venu il y a 1 jour');
+      assert.strictEqual(pour('ab3').length, 0, 'parti depuis plus de 30 jours');
+      srv.push.regler({ maintenant: () => new Date('2026-11-28T17:05:00Z') }); // 5 jours plus tard : pas de deuxième relance
+      await srv.base.query("UPDATE comptes SET vu_le = '2026-11-23T10:00:00Z' WHERE id = $1", [a.compte.id]);
+      await srv.push.rappelAbsents();
+      assert.strictEqual(pour('ab1').filter((x) => /Tu nous manques/.test(x.texte)).length, 1);
+    } finally { srv.push.regler({ maintenant: midi }); }
+  });
+  await test('réglage rappels : chaque rappel se coupe depuis le tableau de bord', async () => {
+    await srv.reglages.ecrire('rappels', { serie: 0, bande: '1', saison: true });
+    assert.deepStrictEqual(srv.reglages.get('rappels'), { serie: 0, bande: 1, saison: 1 });
+    assert.strictEqual(await srv.push.rappelSerie(), 0);
+    await srv.reglages.ecrire('rappels', DEFAUTS.rappels);
   });
   await test('push : annonce de l\'admin (compter, essai, envoi, limite de 10 min)', async () => {
     const x = await invite('PushAnnonce');

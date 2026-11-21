@@ -4,18 +4,25 @@
 //   ami        : demande d'ami reçue, demande acceptée ;
 //   match      : rappel du Match du jour à 19 h (Kinshasa), si pas encore joué, pour les habitués et les Bandes ;
 //   annonce    : message envoyé depuis le tableau de bord admin.
+// Autres rappels du serveur, rangés sous « match » (Paramètres > Rappel du Match du jour : le joueur les coupe ensemble) :
+//   série du bonus du jour à 17 h (série de 3 jours ou plus, bonus pas encore pris), mise de la Bande le mercredi à 18 h
+//   (membre pas encore inscrit), fin de saison de la Ligue 24 h avant (joueurs classés de la saison), relance des absents
+//   à 18 h (avec des pièces offertes). Un seul de chaque.
 // Rien entre 22 h et 8 h (Kinshasa), sauf les invitations (l'ami qui invite est réveillé) et les annonces (choix de l'admin).
 // Deux canaux : Web Push (site, clés VAPID) et Firebase Cloud Messaging (applis Android et iOS, compte de service
 // Firebase dans FCM_COMPTE_SERVICE). Sans l'un ni l'autre, tout est éteint : le jeu marche comme avant.
 'use strict';
 const webpush = require('web-push');
 const jose = require('jose');
-const { jourDe, lundiDe, numeroDu } = require('./match-jour');
+const { jourDe, lundiDe, numeroDu, ajouterJours } = require('./match-jour');
 
 const HEURE = 36e5;
 const TYPES_PUSH = ['invitation', 'ami', 'match', 'annonce'];
 const APPAREILS_MAX = 10; // par compte : au-delà, les plus anciens sont oubliés
 const PAQUET = 50; // envois en parallèle (annonces, rappels)
+// Joueurs abonnés (site ou appli) qui n'ont pas coupé les rappels (type « match »).
+const ABONNES_RAPPELS = `(SELECT compte_id FROM push_abonnements UNION SELECT compte_id FROM push_natifs) a JOIN comptes c ON c.id = a.compte_id
+  WHERE c.statut NOT IN ('supprime', 'banni') AND coalesce(c.push_prefs->>'match', 'true') <> 'false'`;
 const heureKinshasa = (d) => new Date(d.getTime() + HEURE).getUTCHours();
 const nuit = (d) => { const h = heureKinshasa(d); return h >= 22 || h < 8; };
 const erreur = (m, statut = 400) => Object.assign(new Error(m), { statut });
@@ -257,12 +264,84 @@ function creerPush(base, reglages, env = process.env) {
       }
       return n;
     },
-    // Chaque minute : le rappel part une fois entre 19 h et 20 h (Kinshasa).
+    // --- Autres rappels (série, Bande, saison). Chacun : une fois par joueur et par clé (push_rappels_divers).
+    async rappelerChacun(lignes, cle, message) {
+      let n = 0;
+      for (const x of lignes) {
+        const pris = await base.query('INSERT INTO push_rappels_divers (compte_id, cle) VALUES ($1,$2) ON CONFLICT DO NOTHING RETURNING 1', [x.compte_id, cle]);
+        if (!pris.rows.length) continue;
+        n += await envoyerAComptes([x.compte_id], { type: 'match', tag: cle, url: './', action: 'accueil', ...message(x) }, { ttl: 4 * 3600 });
+      }
+      return n;
+    },
+    // Série du bonus du jour (jour UTC, comme le bonus) : série de 3 jours ou plus, bonus pris hier mais pas encore aujourd'hui.
+    async rappelSerie() {
+      if (!(actif || fcmActif) || !(reglages.get('rappels') || {}).serie) return 0;
+      const now = horloge(), auj = now.toISOString().slice(0, 10), hier = new Date(now.getTime() - 24 * HEURE).toISOString().slice(0, 10);
+      const l = (await base.query(`SELECT DISTINCT a.compte_id, c.serie_bonus FROM ${ABONNES_RAPPELS} AND c.serie_bonus >= 3 AND c.dernier_bonus = $1::date`, [hier])).rows;
+      return api.rappelerChacun(l, 'serie-' + auj, (x) => ({ titre: 'Bonus du jour', texte: `Ne casse pas ta série de ${x.serie_bonus} jours : ton bonus du jour t'attend avant minuit !` }));
+    },
+    // Mise de la Bande : le mercredi, jour limite (23 h), pour les membres pas encore inscrits à la semaine.
+    async rappelBande() {
+      if (!(actif || fcmActif) || !(reglages.get('rappels') || {}).bande || !(reglages.get('bande') || {}).actif) return 0;
+      const lundi = lundiDe(jourDe(horloge()));
+      const l = (await base.query(`SELECT DISTINCT ON (a.compte_id) a.compte_id, b.nom FROM ${ABONNES_RAPPELS.replace(' WHERE ', ' JOIN bande_membres m ON m.compte_id = a.compte_id JOIN bandes b ON b.id = m.bande_id WHERE ')}
+          AND NOT EXISTS (SELECT 1 FROM bande_semaines s WHERE s.bande_id = b.id AND s.semaine = $1 AND s.statut <> 'ouverte')
+          AND NOT EXISTS (SELECT 1 FROM bande_inscriptions i WHERE i.bande_id = b.id AND i.semaine = $1 AND i.compte_id = a.compte_id)
+        ORDER BY a.compte_id, b.nom`, [lundi])).rows;
+      return api.rappelerChacun(l, 'bande-' + lundi, (x) => ({ titre: 'La Bande', texte: `Dernier jour pour miser dans « ${x.nom} » : inscris-toi avant 23 h pour jouer la semaine avec ta Bande !` }));
+    },
+    // Fin de saison de la Ligue : dans les 24 dernières heures (pas la dernière), pour les joueurs classés cette saison.
+    async rappelSaison() {
+      if (!(actif || fcmActif) || !(reglages.get('rappels') || {}).saison) return 0;
+      const s = (await base.query("SELECT numero, nom, fin FROM saisons WHERE statut = 'en_cours'")).rows[0];
+      if (!s) return 0;
+      const reste = new Date(s.fin).getTime() - horloge().getTime();
+      if (reste > 24 * HEURE || reste < HEURE) return 0;
+      const l = (await base.query(`SELECT DISTINCT a.compte_id FROM ${ABONNES_RAPPELS.replace(' WHERE ', ' JOIN ligue g ON g.compte_id = a.compte_id AND g.saison = $1 AND g.parties > 0 WHERE ')}`, [s.numero])).rows;
+      const h = Math.round(reste / HEURE);
+      return api.rappelerChacun(l, 'saison-' + s.numero, () => ({ titre: 'Ligue', texte: `Plus que ${h} h dans la saison « ${s.nom} » : une dernière partie classée pour monter de division ?` }));
+    },
+
+    // Relance des absents : venus pour la dernière fois il y a `jours` à 30 jours, pas relancés depuis 30 jours.
+    // Les pièces offertes arrivent tout de suite, avec une notification « cadeau » montrée à leur retour (site et appli).
+    async rappelAbsents() {
+      const r = reglages.get('relance') || {};
+      if (!(actif || fcmActif) || !r.actif || !api.comptes) return 0;
+      const jour = jourDe(horloge()), now = horloge().toISOString();
+      const l = (await base.query(`SELECT DISTINCT a.compte_id FROM ${ABONNES_RAPPELS}
+          AND c.vu_le < $1::timestamptz - make_interval(days => $2) AND c.vu_le > $1::timestamptz - interval '30 days'
+          AND NOT EXISTS (SELECT 1 FROM push_rappels_divers d WHERE d.compte_id = a.compte_id AND d.cle LIKE 'absent-%' AND d.cree_le > $1::timestamptz - interval '30 days')`, [now, r.jours])).rows;
+      const pieces = r.pieces > 0 ? r.pieces : 0;
+      let n = 0;
+      for (const x of l) {
+        const pris = await base.query('INSERT INTO push_rappels_divers (compte_id, cle, cree_le) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING RETURNING 1', [x.compte_id, 'absent-' + jour, now]);
+        if (!pris.rows.length) continue;
+        const texte = pieces ? `Tu nous manques ! ${pieces} pièces t'attendent pour ta prochaine partie.` : 'Tu nous manques ! Une partie rapide ce soir ?';
+        const envoyes = await envoyerAComptes([x.compte_id], { type: 'match', titre: 'Masano', texte, url: './', tag: 'absent-' + jour, action: 'accueil' }, { ttl: 6 * 3600 });
+        n += envoyes;
+        if (!envoyes || !pieces) continue;
+        await base.transaction(async (q) => {
+          await api.comptes.mouvement(q, x.compte_id, pieces, 'cadeau', 'relance-' + jour);
+          await q.query("INSERT INTO notifications (compte_id, type, texte, donnees) VALUES ($1, 'cadeau', $2, $3)",
+            [x.compte_id, `🎁 Content de te revoir : ${pieces} pièces offertes !`, JSON.stringify({ message: `content de te revoir, ${pieces} pièces offertes !`, relance: true })]);
+        }).catch((e) => console.error('Relance :', e.message));
+      }
+      return n;
+    },
+
+    // Chaque minute : le rappel du Match du jour part une fois entre 19 h et 20 h (Kinshasa) ; série à 17 h,
+    // Bande le mercredi à 18 h, fin de saison dès qu'il reste 24 h (jamais la nuit).
     async tic() {
-      const maintenant = horloge(), jour = jourDe(maintenant);
-      if (heureKinshasa(maintenant) !== 19 || rappelsFaits.has(jour)) return 0;
+      const maintenant = horloge(), jour = jourDe(maintenant), h = heureKinshasa(maintenant);
+      let n = 0;
+      if (!nuit(maintenant)) n += await api.rappelSaison();
+      if (h === 17 && !rappelsFaits.has('serie-' + jour)) { rappelsFaits.add('serie-' + jour); n += await api.rappelSerie(); }
+      if (h === 18 && !rappelsFaits.has('absent-' + jour)) { rappelsFaits.add('absent-' + jour); n += await api.rappelAbsents(); }
+      if (h === 18 && jour === ajouterJours(lundiDe(jour), 2) && !rappelsFaits.has('bande-' + jour)) { rappelsFaits.add('bande-' + jour); n += await api.rappelBande(); }
+      if (h !== 19 || rappelsFaits.has(jour)) return n;
       rappelsFaits.add(jour);
-      return api.rappelMatchJour();
+      return n + await api.rappelMatchJour();
     },
 
     // --- Annonces de l'admin

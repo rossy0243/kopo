@@ -9,7 +9,7 @@ const SK = require('../../src/kopo-salle.js');
 const SI = require('../../src/inter8-salle.js');
 const K = require('../../moteur/kopo-moteur.js');
 const { idAleatoire } = require('./comptes');
-const { etatJeuPour, NOMS_JEUX } = require('./reglages');
+const { etatJeuPour, NOMS_JEUX, evenementEnCours } = require('./reglages');
 const ATTENTE_STICKER = require('./stickers').ATTENTE_MS;
 const { permis, SALLES_MAX, actives: limitesActives } = require('./limites');
 
@@ -19,6 +19,9 @@ const LETTRES = 'ABCDEFGHJKMNPQRSTUVWXYZ';
 const DEBLOCAGE = 10;
 const NOMS_TABLES = { bronze: 'Bronze', argent: 'Argent', or: 'Or', diamant: 'Diamant' };
 const ERREUR_GOOGLE = 'Connecte-toi avec Google pour jouer en ligne ou entre amis. Sans compte, tu peux jouer contre les robots.';
+// Salles publiques complétées par des robots : leurs prénoms (toujours affichés « Robot <prénom> »).
+const PRENOMS_ROBOTS = ['Amani', 'Kofi', 'Aïcha', 'Malaika', 'Moussa', 'Nala', 'Zola', 'Fatou', 'Jabari', 'Imani', 'Thandi', 'Sekou',
+  'Mbuyi', 'Kalala', 'Ngalula', 'Ilunga', 'Makiese', 'Bintou', 'Kwame', 'Ayo', 'Nzinga', 'Tshala', 'Mwamba', 'Asha'];
 const nouveauCode = () => Array.from({ length: 4 }, () => LETTRES[Math.floor(Math.random() * LETTRES.length)]).join('');
 
 class SalleKopo extends Room {
@@ -83,6 +86,12 @@ class SalleKopo extends Room {
     // Les amis peuvent aussi rejoindre une salle publique avec son code.
     if (this.listing) this.listing.code = this.code;
     const rapide = options.rapide && process.env.KOPO_TESTS === '1';
+    // Salle publique gratuite (Kopo ou Inter (8)) : après une attente sans assez de joueurs, des robots complètent
+    // la table (réglage robotsPublics, onglet Pilotage). Jamais aux tables à mise. Les robots restent affichés
+    // comme robots ; avec eux la partie ne rapporte ni pièces, ni Ligue, ni XP de parcours (enregistrerPartie).
+    this.robotsPublics = this.publique && !this.mise && !this.jour && !this.entrainement;
+    this.attenteDepuis = null; // arrivée du premier joueur dans le salon
+    this.attenteTest = rapide && Number(options.attenteRobots) >= 0 ? Number(options.attenteRobots) : null; // tests seulement (ms)
     if (rapide) { this.salle.durees = { depart: 0, finTour: 0, mancheAuto: 1 }; if (this.jour || this.entrainement) this.salle.pauseRobot = 0; } // tests seulement
     this.clientsParId = new Map();
     this.comptes = new Map(); // id -> compte (au moment de l'entrée)
@@ -97,6 +106,7 @@ class SalleKopo extends Room {
     this.onMessage('*', (client, type, msg) => this.recevoir(client, type, msg));
     this.setSimulationInterval(() => {
       if (this.jour && this.jour.termine) return; // Match du jour fini pour le joueur : les robots s'arrêtent
+      if (this.robotsPublics && this.completerAvecRobots()) this.apresChangement();
       // Les robots jouent l'un après l'autre : en test, plusieurs coups par tour de boucle.
       for (let i = 0; i < (rapide && this.jour ? 50 : 1); i++) { if (!this.S.tic(this.salle)) break; this.apresChangement(); if (this.jour && this.jour.termine) break; }
     }, rapide && this.jour ? 20 : 200);
@@ -174,6 +184,32 @@ class SalleKopo extends Room {
     if (!r.ok) console.error('Entraînement : réglages refusés', o.reglages);
     for (let i = 0; i < o.robots; i++) this.S.recevoir(this.salle, id, { type: 'ajouterRobot' });
     if (o.lancer) this.S.recevoir(this.salle, id, { type: 'lancer' });
+  }
+
+  // Salle publique gratuite : si personne d'autre n'arrive pendant l'attente réglée, des robots prennent les places
+  // libres et la salle, pleine, démarre seule (tic). Renvoie true si des robots ont été ajoutés.
+  completerAvecRobots() {
+    const s = this.salle;
+    if (s.etat !== 'salon') { this.attenteDepuis = null; return false; }
+    if (!s.joueurs.some((j) => !j.robot)) { this.attenteDepuis = null; return false; }
+    if (this.attenteDepuis === null) this.attenteDepuis = Date.now();
+    const r = SalleKopo.services.reglages.get('robotsPublics') || {};
+    if (!r.actif && this.attenteTest === null) return false;
+    const attente = this.attenteTest !== null ? this.attenteTest : Math.max(10, Number(r.attente) || 45) * 1000;
+    if (Date.now() - this.attenteDepuis < attente || s.joueurs.length >= this.taille) return false;
+    // Prénoms africains tirés au hasard, toujours précédés de « Robot » (et l'icône robot sur le site et l'appli) :
+    // la table a de la vie, sans faire passer les robots pour des joueurs.
+    const libres = PRENOMS_ROBOTS.filter((p) => !s.joueurs.some((j) => j.nom === 'Robot ' + p));
+    while (s.joueurs.length < this.taille) {
+      const p = libres.length ? libres.splice(Math.floor(Math.random() * libres.length), 1)[0] : String(s.joueurs.length + 1);
+      s.joueurs.push({ id: 'robot-' + Math.floor(Math.random() * 1e9), nom: 'Robot ' + p, connecte: true, robot: true, voix: false, muet: true });
+    }
+    s.robots = 'normaux';
+    s.niveauJoueur = 10; // force moyenne : ni trop facile, ni imbattable
+    if (this.attenteTest !== null) s.pauseRobot = 0; // tests seulement
+    this.classee = false;
+    if (!this.locked) this.lock(); // plus de place : les inconnus suivants ouvrent une autre salle
+    return true;
   }
 
   // Match du jour : 8 robots aux places fixes, puis la partie part tout de suite.
@@ -425,6 +461,8 @@ class SalleKopo extends Room {
     const ordre = [s.vainqueur, ...s.elimines.slice().reverse()];
     const place = (id) => ordre.indexOf(id) + 1 || null;
     const g = reglages.get('gains');
+    const ev = evenementEnCours(reglages.get('evenement')); // événement en cours (Pilotage) : gains multipliés
+    const fois = ev ? ev.pieces : 1;
     const partage = this.mise ? this.potParPlace(p, ordre) : null;
     await base.transaction(async (q) => {
       await q.query('INSERT INTO parties (id, code, publique, nb_joueurs, avec_robots, vainqueur, debut, fin, classee, jeu) VALUES ($1,$2,$3,$4,$5,$6,$7, now(), $8, $9)',
@@ -445,7 +483,7 @@ class SalleKopo extends Room {
           [pl === 1 ? g.victoire : 0, 'victoire'],
           [pl === 2 ? g.deuxieme : 0, 'deuxieme'],
         ];
-        for (const [montant, motif] of gains) if (montant > 0) await comptes.mouvement(q, id, montant, motif, p.id);
+        for (const [montant, motif] of gains) if (montant > 0) await comptes.mouvement(q, id, Math.round(montant * fois), motif, p.id);
       }
     });
     // Ligue : points selon la place, envoyés à chacun pour l'écran de fin.
