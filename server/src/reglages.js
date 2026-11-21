@@ -52,6 +52,9 @@ const DEFAUTS = {
   // Relance des joueurs absents (abonnés aux notifications) : après `jours` jours sans venir (et moins de 30), un push à 18 h
   // et `pieces` pièces offertes (0 = rien). Au plus une relance par joueur tous les 30 jours.
   relance: { actif: 1, jours: 3, pieces: 100 },
+  // Inter (8), mode Cahier : points de chaque carte restée en main (X = joker). Lu par le serveur au début de
+  // chaque partie (figé jusqu'à la fin) : rien à changer dans l'appli. Valeurs de départ : barème du créateur (14/11).
+  cahier: { X: 50, A: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 25, 9: 9, 10: 10, V: 10, D: 10, R: 10 },
   evenement: { actif: 0, nom: '', debut: '', fin: '', pieces: 2, bonus: 2 },
   // La Bande : maison = % des mises détruit ; inscrits de 2 à 20 ; 5 Matchs sur 7 au moins, sinon la mise est détruite ;
   // jour manqué avant l'inscription = pire note du jour - penaliteRetard ; inscription jusqu'au mercredi 23 h (heure de Kinshasa).
@@ -165,6 +168,17 @@ function verifierBande(v) {
   }
   if (out.miseMin > out.miseMax) err('La mise minimum doit être sous la mise maximum.');
   if (out.inscritsMin > out.membresMax) err('Il faut plus de membres possibles que d\'inscrits minimum.');
+  return out;
+}
+
+// Barème du Cahier : un nombre entier de 0 à 500 points pour chaque carte.
+function verifierCahier(v) {
+  const out = {};
+  for (const k of Object.keys(DEFAUTS.cahier)) {
+    const n = entier(v[k]);
+    if (!(n >= 0 && n <= 500)) throw Object.assign(new Error(`Points invalides pour ${k === 'X' ? 'le joker' : 'la carte ' + k} (entier de 0 à 500).`), { statut: 400 });
+    out[k] = n;
+  }
   return out;
 }
 
@@ -307,6 +321,7 @@ function creerReglages(base) {
         valeur = { actif: valeur.actif !== false && valeur.actif !== 0 && valeur.actif !== '0' ? 1 : 0, attente };
       }
       if (cle === 'bande') valeur = verifierBande(valeur);
+      if (cle === 'cahier') valeur = verifierCahier(valeur);
       if (cle === 'stickers') valeur = require('./stickers').verifierReglage(valeur);
       if (cle === 'bouquets') valeur = require('./bouquets').verifierReglage(valeur);
       if (cle === 'durcissement') {
@@ -331,4 +346,4 @@ function creerReglages(base) {
   };
 }
 
-module.exports = { evenementEnCours, verifierEvenement, verifierMobile, PLATEFORMES, verifierCommunautes, communautesPubliques, RESEAUX, verifierJeux, etatJeuPour, NOMS_JEUX, creerReglages, DEFAUTS, VERSION_APPLI, versionPlusRecente, verifierMessages, verifierLigue, verifierBande, DIVISIONS, MESSAGE_MAX };
+module.exports = { verifierCahier, evenementEnCours, verifierEvenement, verifierMobile, PLATEFORMES, verifierCommunautes, communautesPubliques, RESEAUX, verifierJeux, etatJeuPour, NOMS_JEUX, creerReglages, DEFAUTS, VERSION_APPLI, versionPlusRecente, verifierMessages, verifierLigue, verifierBande, DIVISIONS, MESSAGE_MAX };

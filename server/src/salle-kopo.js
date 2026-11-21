@@ -55,6 +55,7 @@ class SalleKopo extends Room {
       this.salle.niveauJoueur = d.niveauRobots;
       this.salle.sansPause = true; // même temps pour tous : pas de pause
     } else this.salle = this.S.creerSalle(this.code);
+    this.baremeAJour();
     // Inter (8) : le style choisi à la création (« Quelle partie ? »), modifiable ensuite dans le salon.
     // Délire : 2 paquets, J retour en option (une ancienne appli qui ne l'envoie pas jouait avec).
     if (this.jeu === 'inter8' && SI.MODES.includes(options.mode)) {
@@ -176,9 +177,16 @@ class SalleKopo extends Room {
     this.apresChangement();
   }
 
+  // Inter (8), mode Cahier : barème des cartes de Pilotage. La salle ne le lit qu'au lancement d'une partie
+  // (puis il reste figé jusqu'à la fin) : le changer dans Pilotage ne touche jamais une partie en cours.
+  baremeAJour() {
+    if (this.jeu === 'inter8' && SalleKopo.services) this.salle.baremeCahier = SalleKopo.services.reglages.get('cahier') || null;
+  }
+
   // Entraînement : robots et réglages demandés à l'ouverture. Le joueur garde la main dans le salon
   // (ajouterRobot, niveauRobot, retirer, reglages), puis envoie « lancer ».
   preparerEntrainement(id) {
+    this.baremeAJour();
     const o = this.reglagesEntrainement;
     const r = this.S.recevoir(this.salle, id, Object.assign({ type: 'reglages' }, o.reglages));
     if (!r.ok) console.error('Entraînement : réglages refusés', o.reglages);
@@ -318,6 +326,7 @@ class SalleKopo extends Room {
     if (type === 'vocal') { this.donnerVocal(client, id).catch((e) => { console.error('Vocal :', e.message); client.send('vocal', { refuse: 'erreur' }); }); return; }
     // Micro réservé aux abonnés Kopo+ (et coupé par la sanction « micro ») : le serveur décide, jamais le téléphone.
     if (type === 'micro') { const c = this.comptes.get(id); if (!this.abonne(id) || (c && c.micro_coupe)) { msg.voix = !!msg.voix && this.abonne(id); msg.muet = true; } }
+    this.baremeAJour();
     const r = this.S.recevoir(this.salle, id, msg);
     if (!r.ok) { client.send('erreur', r.erreur); return; }
     if (r.evenement) { this.broadcast(r.evenement.type, r.evenement); return; } // émoji rapide : relayé à toute la table

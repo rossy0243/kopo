@@ -152,7 +152,8 @@
     s.restants = I.melanger(s.joueurs.map((j) => j.id), s.rng);
     s.paquets = I.nombrePaquets(s.mode);
     if (s.publique) s.formule = 'normale';
-    s.cahier = s.formule === 'cahier' ? { total: s.totalCahier, scores: Object.fromEntries(s.restants.map((id) => [id, 0])), donnes: [] } : null;
+    // Barème des cartes (Pilotage : le serveur le pose dans s.baremeCahier) : figé pour toute la partie.
+    s.cahier = s.formule === 'cahier' ? { total: s.totalCahier, bareme: I.baremeComplet(s.baremeCahier), scores: Object.fromEntries(s.restants.map((id) => [id, 0])), donnes: [] } : null;
     demarrerManche(s);
   }
   function rendrePublique(s, taille) {
@@ -265,7 +266,7 @@
     // Avec une distribution animée, l'effet de la carte de départ (pénalité, tour sauté, J retour)
     // attend la fin du compte à rebours : le joueur sanctionné reçoit ses cartes après les autres.
     const differerDepart = s.durees.depart > 0;
-    s.manche = I.nouvelleManche(sieges, mains, pioche, premier, { mode: s.mode, jRetour: s.jRetour, graine: Math.floor(s.rng() * 4294967296), differerDepart, cahier: !!s.cahier });
+    s.manche = I.nouvelleManche(sieges, mains, pioche, premier, { mode: s.mode, jRetour: s.jRetour, graine: Math.floor(s.rng() * 4294967296), differerDepart, cahier: !!s.cahier, bareme: s.cahier && s.cahier.bareme });
     s.etat = 'manche';
     const depart = entreRobots(s) ? Math.min(s.durees.depart, RAPIDE.depart) : s.durees.depart;
     s.pause = depart > 0 ? { type: 'depart', jusqua: s.horloge() + depart, total: depart } : null;
@@ -597,7 +598,7 @@
       jRetour: !!s.jRetour,
       formule: s.formule || 'normale',
       totalCahier: s.totalCahier || TOTAL_CAHIER,
-      cahier: s.cahier ? { total: s.cahier.total, scores: Object.assign({}, s.cahier.scores), donnes: s.cahier.donnes.map((d) => ({ numero: d.numero, sorti: d.sorti, points: Object.assign({}, d.points), mains: d.mains /* cartes retournées en fin de donne : tout le monde les a vues */, elimines: d.elimines.slice() })) } : null,
+      cahier: s.cahier ? { total: s.cahier.total, bareme: Object.assign({}, s.cahier.bareme || I.baremeComplet()), scores: Object.assign({}, s.cahier.scores), donnes: s.cahier.donnes.map((d) => ({ numero: d.numero, sorti: d.sorti, points: Object.assign({}, d.points), mains: d.mains /* cartes retournées en fin de donne : tout le monde les a vues */, elimines: d.elimines.slice() })) } : null,
       joueurs: s.joueurs.map((j) => ({ id: j.id, nom: j.nom, connecte: j.connecte, peerId: j.peerId || null, voix: !!j.voix, muet: j.muet !== false, robot: !!j.robot, niveau: j.robot && !j.remplace ? niveauDuRobot(s, j.id) : null, pret: !!j.pret || !!j.robot, remplace: !!j.remplace, absent: estAbsent(s, j.id) })),
       delai: s.delai,
       publique: !!s.publique,

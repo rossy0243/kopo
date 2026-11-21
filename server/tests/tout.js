@@ -506,6 +506,13 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.strictEqual(vue.joueurs.length, 1);
     await r.leave();
   });
+  await test('réglage cahier : barème du mode Cahier, entiers de 0 à 500', async () => {
+    await assert.rejects(srv.reglages.ecrire('cahier', { ...DEFAUTS.cahier, X: 501 }), /joker/);
+    await assert.rejects(srv.reglages.ecrire('cahier', { ...DEFAUTS.cahier, 8: 'abc' }), /carte 8/);
+    await srv.reglages.ecrire('cahier', { ...DEFAUTS.cahier, X: 80 });
+    assert.strictEqual(srv.reglages.get('cahier').X, 80);
+    await srv.reglages.ecrire('cahier', DEFAUTS.cahier);
+  });
   await test('réglage robotsPublics : attente entre 10 et 600 secondes', async () => {
     await assert.rejects(srv.reglages.ecrire('robotsPublics', { actif: 1, attente: 3 }), /Attente/);
     await srv.reglages.ecrire('robotsPublics', { actif: 0, attente: 60 });
