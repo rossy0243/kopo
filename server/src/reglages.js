@@ -44,6 +44,9 @@ const DEFAUTS = {
   // Salles publiques gratuites (Kopo et Inter (8)) : des robots complètent la table après `attente` secondes
   // sans assez de joueurs (actif : 1 = oui, 0 = non). Jamais aux tables à mise ; partie sans pièces, Ligue ni XP.
   robotsPublics: { actif: 1, attente: 45 },
+  // Rappels push du serveur (1 = oui, 0 = non), rangés avec le rappel du Match du jour (le joueur les coupe ensemble) :
+  // série du bonus du jour à 17 h, mise de la Bande le mercredi à 18 h, fin de saison de la Ligue 24 h avant (heure de Kinshasa).
+  rappels: { serie: 1, bande: 1, saison: 1 },
   // La Bande : maison = % des mises détruit ; inscrits de 2 à 20 ; 5 Matchs sur 7 au moins, sinon la mise est détruite ;
   // jour manqué avant l'inscription = pire note du jour - penaliteRetard ; inscription jusqu'au mercredi 23 h (heure de Kinshasa).
   // Pour miser : compte Google de joursCompte jours au moins, avec partiesMin parties jouées contre des humains.
@@ -257,6 +260,7 @@ function creerReglages(base) {
         if (!(n >= 1 && n <= 100)) throw Object.assign(new Error('Niveau des robots entre 1 et 100.'), { statut: 400 });
         valeur = { actif: valeur.actif !== false && valeur.actif !== 0, robots: valeur.robots, niveauRobots: n };
       }
+      if (cle === 'rappels') valeur = Object.fromEntries(Object.keys(DEFAUTS.rappels).map((k) => [k, valeur[k] === false || valeur[k] === 0 || valeur[k] === '0' ? 0 : 1]));
       if (cle === 'robotsPublics') {
         const attente = entier(valeur.attente);
         if (!(attente >= 10 && attente <= 600)) throw Object.assign(new Error('Attente entre 10 et 600 secondes.'), { statut: 400 });

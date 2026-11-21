@@ -1682,6 +1682,74 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
       assert.strictEqual(pour('h1').filter((x) => x.type === 'match').length, 1);
     } finally { srv.push.regler({ maintenant: midi }); }
   });
+  await test('push : rappel de la série du bonus du jour à 17 h, une fois, si le bonus n\'est pas encore pris', async () => {
+    const a = await invite('PushSerie'), b = await invite('PushSeriePris'), c = await invite('PushSerieCourte');
+    for (const [x, nom] of [[a, 's1'], [b, 's2'], [c, 's3']]) await api('/api/push/abonnement', { methode: 'POST', jeton: x.jeton, corps: { abonnement: abo(nom) } });
+    await srv.base.query("UPDATE comptes SET serie_bonus = 5, dernier_bonus = '2026-11-19' WHERE id = $1", [a.compte.id]);
+    await srv.base.query("UPDATE comptes SET serie_bonus = 5, dernier_bonus = '2026-11-20' WHERE id = $1", [b.compte.id]);
+    await srv.base.query("UPDATE comptes SET serie_bonus = 2, dernier_bonus = '2026-11-19' WHERE id = $1", [c.compte.id]);
+    srv.push.regler({ maintenant: () => new Date('2026-11-20T16:05:00Z') }); // 17 h 05 à Kinshasa
+    try {
+      await srv.push.tic();
+      const r = pour('s1').filter((x) => x.tag === 'serie-2026-11-20');
+      assert.strictEqual(r.length, 1); assert.match(r[0].texte, /série de 5 jours/); assert.strictEqual(r[0].type, 'match');
+      assert.strictEqual(pour('s2').length, 0, 'bonus déjà pris aujourd\'hui');
+      assert.strictEqual(pour('s3').length, 0, 'série trop courte');
+      await srv.push.rappelSerie(); // après un redémarrage : toujours un seul
+      assert.strictEqual(pour('s1').length, 1);
+      await api('/api/push/prefs', { methode: 'PATCH', jeton: b.jeton, corps: { match: false } });
+      await srv.base.query("UPDATE comptes SET dernier_bonus = '2026-11-19' WHERE id = $1", [b.compte.id]);
+      await srv.push.rappelSerie();
+      assert.strictEqual(pour('s2').length, 0, 'rappels coupés avec le Match du jour');
+    } finally { srv.push.regler({ maintenant: midi }); }
+  });
+  await test('push : rappel de mise de la Bande le mercredi à 18 h, pour les membres pas encore inscrits', async () => {
+    const a = await invite('PushBandeA'), b = await invite('PushBandeB');
+    for (const [x, nom] of [[a, 'ba1'], [b, 'bb1']]) await api('/api/push/abonnement', { methode: 'POST', jeton: x.jeton, corps: { abonnement: abo(nom) } });
+    await srv.base.query("INSERT INTO bandes (id, nom, code, createur, mise) VALUES ('b_push', 'Les Lions', 'PUSHB1', $1, 500)", [a.compte.id]);
+    await srv.base.query("INSERT INTO bande_membres (bande_id, compte_id) VALUES ('b_push', $1), ('b_push', $2)", [a.compte.id, b.compte.id]);
+    await srv.base.query("INSERT INTO bande_semaines (bande_id, semaine, mise) VALUES ('b_push', '2026-11-16', 500)");
+    await srv.base.query("INSERT INTO bande_inscriptions (bande_id, semaine, compte_id, mise) VALUES ('b_push', '2026-11-16', $1, 500)", [a.compte.id]);
+    srv.push.regler({ maintenant: () => new Date('2026-11-17T17:05:00Z') }); // mardi 18 h 05 : rien
+    try {
+      await srv.push.tic();
+      assert.strictEqual(pour('bb1').length, 0);
+      srv.push.regler({ maintenant: () => new Date('2026-11-18T17:05:00Z') }); // mercredi 18 h 05
+      await srv.push.tic();
+      const r = pour('bb1');
+      assert.strictEqual(r.length, 1); assert.match(r[0].texte, /Les Lions/); assert.match(r[0].texte, /23 h/);
+      assert.strictEqual(pour('ba1').length, 0, 'déjà inscrit');
+      await srv.push.rappelBande();
+      assert.strictEqual(pour('bb1').length, 1, 'un seul par semaine');
+    } finally { srv.push.regler({ maintenant: midi }); }
+  });
+  await test('push : fin de saison de la Ligue, 24 h avant, une fois, pour les joueurs classés', async () => {
+    const a = await invite('PushLigue'), b = await invite('PushPasLigue');
+    for (const [x, nom] of [[a, 'l1'], [b, 'l2']]) await api('/api/push/abonnement', { methode: 'POST', jeton: x.jeton, corps: { abonnement: abo(nom) } });
+    const s = (await srv.base.query("SELECT numero, fin FROM saisons WHERE statut = 'en_cours'")).rows[0];
+    await srv.base.query('INSERT INTO ligue (saison, compte_id, points, parties) VALUES ($1, $2, 40, 3)', [s.numero, a.compte.id]);
+    await srv.base.query("UPDATE saisons SET fin = '2026-11-22T19:00:00Z' WHERE numero = $1", [s.numero]);
+    try {
+      srv.push.regler({ maintenant: () => new Date('2026-11-21T11:00:00Z') }); // 32 h avant : trop tôt
+      assert.strictEqual(await srv.push.rappelSaison(), 0);
+      srv.push.regler({ maintenant: () => new Date('2026-11-21T19:30:00Z') }); // samedi 20 h 30, 23 h 30 avant la fin
+      await srv.push.tic();
+      const r = pour('l1');
+      assert.strictEqual(r.length, 1); assert.match(r[0].texte, /Plus que 24 h|Plus que 23 h/);
+      assert.strictEqual(pour('l2').length, 0, 'pas classé cette saison');
+      await srv.push.tic();
+      assert.strictEqual(pour('l1').length, 1, 'une seule fois');
+    } finally {
+      await srv.base.query('UPDATE saisons SET fin = $2 WHERE numero = $1', [s.numero, s.fin]);
+      srv.push.regler({ maintenant: midi });
+    }
+  });
+  await test('réglage rappels : chaque rappel se coupe depuis le tableau de bord', async () => {
+    await srv.reglages.ecrire('rappels', { serie: 0, bande: '1', saison: true });
+    assert.deepStrictEqual(srv.reglages.get('rappels'), { serie: 0, bande: 1, saison: 1 });
+    assert.strictEqual(await srv.push.rappelSerie(), 0);
+    await srv.reglages.ecrire('rappels', DEFAUTS.rappels);
+  });
   await test('push : annonce de l\'admin (compter, essai, envoi, limite de 10 min)', async () => {
     const x = await invite('PushAnnonce');
     await api('/api/push/abonnement', { methode: 'POST', jeton: x.jeton, corps: { abonnement: abo('x1') } });

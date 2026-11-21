@@ -402,6 +402,14 @@ CREATE TABLE IF NOT EXISTS push_rappels (
   jour      date NOT NULL,
   PRIMARY KEY (compte_id, jour)
 );
+-- Autres rappels push (série du bonus du jour, mise de la Bande, fin de saison de la Ligue) : un seul par clé
+-- (« serie-2026-11-21 », « bande-2026-11-16 », « saison-3 ») et par joueur, même si le serveur redémarre.
+CREATE TABLE IF NOT EXISTS push_rappels_divers (
+  compte_id text NOT NULL REFERENCES comptes(id),
+  cle       text NOT NULL,
+  cree_le   timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (compte_id, cle)
+);
 -- Annonces envoyées depuis le tableau de bord.
 CREATE TABLE IF NOT EXISTS push_annonces (
   id        bigserial PRIMARY KEY,
