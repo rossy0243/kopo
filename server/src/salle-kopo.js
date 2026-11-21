@@ -19,6 +19,9 @@ const LETTRES = 'ABCDEFGHJKMNPQRSTUVWXYZ';
 const DEBLOCAGE = 10;
 const NOMS_TABLES = { bronze: 'Bronze', argent: 'Argent', or: 'Or', diamant: 'Diamant' };
 const ERREUR_GOOGLE = 'Connecte-toi avec Google pour jouer en ligne ou entre amis. Sans compte, tu peux jouer contre les robots.';
+// Salles publiques complétées par des robots : leurs prénoms (toujours affichés « Robot <prénom> »).
+const PRENOMS_ROBOTS = ['Amani', 'Kofi', 'Aïcha', 'Malaika', 'Moussa', 'Nala', 'Zola', 'Fatou', 'Jabari', 'Imani', 'Thandi', 'Sekou',
+  'Mbuyi', 'Kalala', 'Ngalula', 'Ilunga', 'Makiese', 'Bintou', 'Kwame', 'Ayo', 'Nzinga', 'Tshala', 'Mwamba', 'Asha'];
 const nouveauCode = () => Array.from({ length: 4 }, () => LETTRES[Math.floor(Math.random() * LETTRES.length)]).join('');
 
 class SalleKopo extends Room {
@@ -194,10 +197,12 @@ class SalleKopo extends Room {
     if (!r.actif && this.attenteTest === null) return false;
     const attente = this.attenteTest !== null ? this.attenteTest : Math.max(10, Number(r.attente) || 45) * 1000;
     if (Date.now() - this.attenteDepuis < attente || s.joueurs.length >= this.taille) return false;
+    // Prénoms africains tirés au hasard, toujours précédés de « Robot » (et l'icône robot sur le site et l'appli) :
+    // la table a de la vie, sans faire passer les robots pour des joueurs.
+    const libres = PRENOMS_ROBOTS.filter((p) => !s.joueurs.some((j) => j.nom === 'Robot ' + p));
     while (s.joueurs.length < this.taille) {
-      let n = 1;
-      while (s.joueurs.some((j) => j.nom === 'Robot ' + n)) n++;
-      s.joueurs.push({ id: 'robot-' + n + '-' + Math.floor(Math.random() * 1e6), nom: 'Robot ' + n, connecte: true, robot: true, voix: false, muet: true });
+      const p = libres.length ? libres.splice(Math.floor(Math.random() * libres.length), 1)[0] : String(s.joueurs.length + 1);
+      s.joueurs.push({ id: 'robot-' + Math.floor(Math.random() * 1e9), nom: 'Robot ' + p, connecte: true, robot: true, voix: false, muet: true });
     }
     s.robots = 'normaux';
     s.niveauJoueur = 10; // force moyenne : ni trop facile, ni imbattable

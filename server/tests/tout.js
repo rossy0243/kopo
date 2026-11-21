@@ -464,6 +464,8 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.ok(vue && vue.etat !== 'salon', 'la salle démarre avec les robots');
     assert.strictEqual(vue.joueurs.length, 4);
     assert.strictEqual(vue.joueurs.filter((x) => x.robot).length, 3, 'robots affichés comme robots');
+    assert.ok(vue.joueurs.filter((x) => x.robot).every((x) => /^Robot [A-ZÀ-Ü]/.test(x.nom)), 'noms « Robot <prénom> »');
+    assert.strictEqual(new Set(vue.joueurs.map((x) => x.nom)).size, 4, 'noms différents');
     assert.strictEqual(classee, false, 'pas de Ligue avec des robots');
     const enLigne = (await api('/api/en-ligne')).json;
     assert.ok(!enLigne.sallesOuvertes.some((x) => x.id === r.roomId), 'plus proposée aux inconnus');
