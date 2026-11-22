@@ -414,8 +414,12 @@ test('Le valet est une carte ordinaire en mode simple, en délire sans J retour,
   J(m3, 'A', ['VC']);
   assert.strictEqual(m3.joueurCourant, 'B');
   assert.strictEqual(m3.sens, 1);
-  const m4 = I.nouvelleManche(['A', 'B', 'C'], { A: ['VC'], B: ['3P'], C: ['3T'] }, remplir('5C'), 'A', { mode: 'simple', jRetour: true });
-  assert.strictEqual(m4.jRetour, false, 'pas de J retour en mode simple');
+  // Simple + J retour (22/11) : le valet change aussi le sens.
+  const m4 = I.nouvelleManche(['A', 'B', 'C'], { A: ['VC', '4C'], B: ['3P'], C: ['3T'] }, remplir('5C'), 'A', { mode: 'simple', jRetour: true });
+  assert.strictEqual(m4.jRetour, true, 'J retour possible en mode simple');
+  J(m4, 'A', ['VC']);
+  assert.strictEqual(m4.sens, -1);
+  assert.strictEqual(m4.joueurCourant, 'C');
 });
 
 console.log('\nAnnonce et sortie');
@@ -738,10 +742,13 @@ test('Cahier en délire avec J retour : le valet change le sens, comme en partie
   // Départ sur un valet : le sens change aussi avant le premier coup.
   const m2 = I.nouvelleManche(['A', 'B', 'C', 'D'], mains(), remplir('VP'), 'A', { mode: 'delire', jRetour: true, graine: 7, cahier: true });
   assert.strictEqual(m2.sens, -1);
-  // En simple, pas de J retour (règlement), Cahier ou non.
+  // En simple aussi (22/11), le J retour s'applique en Cahier s'il est activé ; sans l'option, rien ne change.
   const m3 = I.nouvelleManche(['A', 'B', 'C', 'D'], mains(), remplir('5C'), 'A', { mode: 'simple', jRetour: true, graine: 7, cahier: true });
   J(m3, 'A', ['VC']);
-  assert.strictEqual(m3.joueurCourant, 'B');
+  assert.strictEqual(m3.joueurCourant, 'D');
+  const m4 = I.nouvelleManche(['A', 'B', 'C', 'D'], mains(), remplir('5C'), 'A', { mode: 'simple', jRetour: false, graine: 7, cahier: true });
+  J(m4, 'A', ['VC']);
+  assert.strictEqual(m4.joueurCourant, 'B');
 });
 
 console.log(`\n${ok} test(s) réussi(s), ${echecs.length} échec(s).`);

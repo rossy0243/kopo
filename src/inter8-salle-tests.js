@@ -79,10 +79,12 @@ test("Style de partie : l'hôte choisit Simple ou Délire dans le salon", () => 
   assert.ok(!S.recevoir(s, 'p1', { type: 'reglages', mode: 'simple' }).ok, 'plus pendant la partie');
 });
 
-test('J retour : seulement en délire, et une ancienne appli qui envoie « délire » seul le garde', () => {
+test('J retour : en simple comme en délire, et une ancienne appli qui envoie « délire » seul le garde', () => {
   const s = salleAvec(3);
   assert.ok(S.recevoir(s, 'p1', { type: 'reglages', mode: 'simple', jRetour: true }).ok);
-  assert.strictEqual(s.jRetour, false, 'pas de J retour en simple');
+  assert.strictEqual(s.jRetour, true, 'J retour possible en simple (22/11)');
+  assert.ok(S.recevoir(s, 'p1', { type: 'reglages', mode: 'simple' }).ok);
+  assert.strictEqual(s.jRetour, false, 'une ancienne appli qui envoie « simple » seul joue sans');
   S.recevoir(s, 'p1', { type: 'reglages', mode: 'delire' });
   assert.strictEqual(s.jRetour, true);
   const t = salleAvec(3);
@@ -600,7 +602,7 @@ test('Mode Cahier : entre les donnes, personne ne change de place (créateur, 16
 
 console.log('\nJ retour et Cahier');
 
-test('Salle en Cahier : le J retour choisi est gardé et agit à chaque donne ; en simple il est toujours coupé', () => {
+test('Salle en Cahier : le J retour choisi est gardé et agit à chaque donne, en simple comme en délire', () => {
   for (const formule of ['normale', 'cahier']) {
     const s = salleAvec(4);
     assert.ok(S.recevoir(s, 'p1', { type: 'reglages', mode: 'delire', jRetour: true, formule, total: 500 }).ok);
@@ -617,7 +619,11 @@ test('Salle en Cahier : le J retour choisi est gardé et agit à chaque donne ; 
     const t = salleAvec(3);
     assert.ok(S.recevoir(t, 'p1', { type: 'reglages', mode: 'simple', jRetour: true, formule, total: 500 }).ok);
     assert.ok(S.recevoir(t, 'p1', { type: 'lancer' }).ok);
-    assert.strictEqual(t.manche.jRetour, false, formule + ' : pas de J retour en simple');
+    assert.strictEqual(t.manche.jRetour, true, formule + ' : J retour aussi en simple');
+    const u = salleAvec(3);
+    assert.ok(S.recevoir(u, 'p1', { type: 'reglages', mode: 'simple', jRetour: false, formule, total: 500 }).ok);
+    assert.ok(S.recevoir(u, 'p1', { type: 'lancer' }).ok);
+    assert.strictEqual(u.manche.jRetour, false, formule + ' : simple sans J retour');
   }
 });
 
