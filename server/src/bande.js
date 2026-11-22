@@ -224,7 +224,9 @@ function creerBande(base, reglages, comptes, matchJour, social) {
       if (s.statut !== 'ouverte') throw erreur('Cette semaine est déjà terminée.');
       const n = (await q.query('SELECT count(*)::int AS n FROM bande_inscriptions WHERE bande_id = $1 AND semaine = $2', [bandeId, lundi])).rows[0].n;
       if (n >= r.membresMax) throw erreur(`Déjà ${r.membresMax} inscrits cette semaine.`);
-      const deja = await q.query('INSERT INTO bande_inscriptions (bande_id, semaine, compte_id, mise) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING RETURNING 1', [bandeId, lundi, compte.id, s.mise]);
+      // L'heure de la mise vient de l'horloge du serveur (comme le reste de la Bande), pas de now() de la base :
+      // c'est elle que le classement compare au début de chaque Match (règle anti-triche).
+      const deja = await q.query('INSERT INTO bande_inscriptions (bande_id, semaine, compte_id, mise, inscrit_le) VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING RETURNING 1', [bandeId, lundi, compte.id, s.mise, now]);
       if (!deja.rows.length) throw erreur('Tu as déjà misé cette semaine.');
       const solde = await comptes.mouvement(q, compte.id, -s.mise, 'mise_bande', `bande:${bandeId}:${lundi}`)
         .catch(() => { throw erreur(`Il te faut ${s.mise} pièces pour miser.`); });
