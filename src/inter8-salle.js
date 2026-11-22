@@ -148,11 +148,26 @@
 
   // Les places autour de la table sont tirées une fois au début de la partie : entre les donnes,
   // personne ne change de place (créateur, 16/11). s.restants garde cet ordre.
+  // Mode Cahier : les deux montants d'élimination proposés, [petit, grand]. Le serveur pose ceux de Pilotage
+  // dans s.totauxCahier ; sinon ceux de départ (500 et 1000).
+  const totauxValides = (t) => Array.isArray(t) && t.length === 2 && t.every((x) => Number.isInteger(x) && x > 0) && t[0] < t[1];
+  const totauxCahier = (s) => (totauxValides(s.totauxCahier) ? s.totauxCahier.slice() : TOTAUX_CAHIER.slice());
+  // Montant demandé → montant retenu : un des deux montants proposés tel quel ; sinon 500 ou 1000 (boutons écrits
+  // en dur dans les anciennes applis) deviennent le petit ou le grand montant ; sinon null (refusé).
+  function totalCahierPour(totaux, t) {
+    if (totaux.includes(t)) return t;
+    const i = TOTAUX_CAHIER.indexOf(t);
+    return i >= 0 ? totaux[i] : null;
+  }
+  // Montant du salon, ramené aux montants proposés (ils ont pu changer dans Pilotage depuis le choix de l'hôte).
+  const totalCahierEffectif = (s) => totalCahierPour(totauxCahier(s), s.totalCahier) || totauxCahier(s)[0];
+
   function lancer(s) {
     s.restants = I.melanger(s.joueurs.map((j) => j.id), s.rng);
     s.paquets = I.nombrePaquets(s.mode);
     if (s.publique) s.formule = 'normale';
     // Barème des cartes (Pilotage : le serveur le pose dans s.baremeCahier) : figé pour toute la partie.
+    s.totalCahier = totalCahierEffectif(s);
     s.cahier = s.formule === 'cahier' ? { total: s.totalCahier, bareme: I.baremeComplet(s.baremeCahier), scores: Object.fromEntries(s.restants.map((id) => [id, 0])), donnes: [] } : null;
     demarrerManche(s);
   }
@@ -474,8 +489,9 @@
           s.formule = msg.formule;
         }
         if (msg.total !== undefined) {
-          if (!TOTAUX_CAHIER.includes(msg.total)) return { ok: false, erreur: 'Impossible.' };
-          s.totalCahier = msg.total;
+          const t = totalCahierPour(totauxCahier(s), msg.total);
+          if (!t) return { ok: false, erreur: 'Impossible.' };
+          s.totalCahier = t;
         }
         if (msg.robots !== undefined) {
           if (s.publique || !NIVEAUX_ROBOTS.concat('gentils').includes(msg.robots)) return { ok: false, erreur: 'Impossible.' };
@@ -596,7 +612,8 @@
       mode: s.mode,
       jRetour: !!s.jRetour,
       formule: s.formule || 'normale',
-      totalCahier: s.totalCahier || TOTAL_CAHIER,
+      totalCahier: totalCahierEffectif(s),
+      totauxCahier: totauxCahier(s), // les deux montants proposés (Pilotage) : boutons « Cahier … » du salon
       cahier: s.cahier ? { total: s.cahier.total, bareme: Object.assign({}, s.cahier.bareme || I.baremeComplet()), scores: Object.assign({}, s.cahier.scores), donnes: s.cahier.donnes.map((d) => ({ numero: d.numero, sorti: d.sorti, points: Object.assign({}, d.points), mains: d.mains /* cartes retournées en fin de donne : tout le monde les a vues */, elimines: d.elimines.slice() })) } : null,
       joueurs: s.joueurs.map((j) => ({ id: j.id, nom: j.nom, connecte: j.connecte, peerId: j.peerId || null, voix: !!j.voix, muet: j.muet !== false, robot: !!j.robot, niveau: j.robot && !j.remplace ? niveauDuRobot(s, j.id) : null, pret: !!j.pret || !!j.robot, remplace: !!j.remplace, absent: estAbsent(s, j.id) })),
       delai: s.delai,
@@ -676,7 +693,7 @@
     return s;
   }
 
-  const Inter8Salle = { JEU, MIN, MAX, MODES, FORMULES, TOTAUX_CAHIER, TOTAL_CAHIER, DELAIS, PAUSE_ROBOT, DUREES, DELAI_ABSENT, DELAI_ANNONCE, RAPIDE, entreRobots, NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, niveauDuRobot, creerSalle, rendrePublique, choixRobot, reconnecter, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
+  const Inter8Salle = { JEU, MIN, MAX, MODES, FORMULES, TOTAUX_CAHIER, TOTAL_CAHIER, totalCahierPour, DELAIS, PAUSE_ROBOT, DUREES, DELAI_ABSENT, DELAI_ANNONCE, RAPIDE, entreRobots, NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, niveauDuRobot, creerSalle, rendrePublique, choixRobot, reconnecter, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
   if (enNode) module.exports = Inter8Salle;
   else root.Inter8Salle = Inter8Salle;
 })(typeof window !== 'undefined' ? window : globalThis);

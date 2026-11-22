@@ -2425,6 +2425,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     const salle = sauvee ? M.importer(sauvee) : M.creerSalle(code);
     // Mode Cahier : barème des cartes réglé dans Pilotage (/api/config), lu au lancement de chaque partie.
     if (jeuSalle === 'inter8' && configServeur && configServeur.cahier) salle.baremeCahier = configServeur.cahier;
+    if (jeuSalle === 'inter8') salle.totauxCahier = totauxCahier().slice(); // montants d'élimination de Pilotage
     if (taille && !sauvee) M.rendrePublique(salle, taille);
     hote = { salle, vus: new Map(), reseau: null };
     session = { code, role: 'hote', nom };
@@ -3030,12 +3031,13 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
         } else if (v.mode === mode) rs.append(el('strong', null, libelle));
       }
     }
-    // Mode Cahier (14/11) : partie normale, ou comptage des points jusqu'à 500 ou 1000. Pas en salle publique.
+    // Mode Cahier (14/11) : partie normale, ou comptage des points jusqu'au petit ou au grand montant (Pilotage). Pas en salle publique.
     const rf = $('reglageFormule'); rf.hidden = v.jeu !== 'inter8' || v.publique; rf.replaceChildren();
     if (!rf.hidden) {
       rf.append(el('span', null, 'Formule'));
       const actuelle = v.formule === 'cahier' ? String(v.totalCahier) : 'normale';
-      for (const [f, libelle] of [['normale', 'Normale'], ['500', 'Cahier 500'], ['1000', 'Cahier 1000']]) {
+      const totaux = Array.isArray(v.totauxCahier) && v.totauxCahier.length === 2 ? v.totauxCahier : totauxCahier();
+      for (const [f, libelle] of [['normale', 'Normale'], ...totaux.map((t) => [String(t), 'Cahier ' + t])]) {
         if (jeSuisHote) {
           const b = el('button', 'btn' + (actuelle === f ? ' actif' : ''), libelle);
           b.onclick = () => { choisirFormule(f); envoyer(f === 'normale' ? { type: 'reglages', formule: 'normale' } : { type: 'reglages', formule: 'cahier', total: Number(f) }); };
@@ -7001,10 +7003,10 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       option.append(b);
     }
     majOption();
-    // Partie normale, ou mode Cahier (comptage des points) à 500 ou 1000.
+    // Partie normale, ou mode Cahier (comptage des points) au petit ou au grand montant (Pilotage).
     const formules = el('div', 'choix choix-niveau-robots'); formules.setAttribute('role', 'group'); formules.setAttribute('aria-label', 'Formule');
     const majFormules = () => formules.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === valeurFormule())));
-    for (const [v, libelle] of [['normale', 'Partie normale'], ['500', 'Cahier 500'], ['1000', 'Cahier 1000']]) {
+    for (const [v, libelle] of formulesInter()) {
       const b = el('button', null, libelle); b.type = 'button'; b.dataset.v = v;
       b.onclick = () => { choisirFormule(v); majFormules(); };
       formules.append(b);
@@ -7497,11 +7499,15 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   // J retour : option du délire, désactivée par défaut. Qui jouait déjà en délire (avant l'option) le garde.
   const jRetourInter = () => { const j = stock.lire('kopo-inter8-jretour'); return j ? j === 'oui' : styleInter() === 'delire'; };
   const ecrireJRetour = (oui) => stock.ecrire('kopo-inter8-jretour', oui ? 'oui' : 'non');
-  // Mode Cahier (14/11) : formule et total d'élimination (500 ou 1000), gardés sur le téléphone.
+  // Mode Cahier (14/11) : formule et total d'élimination, gardés sur le téléphone. Les deux montants proposés
+  // viennent de Pilotage (/api/config), sinon 500 et 1000 ; un total gardé qui n'est plus proposé devient le petit
+  // ou le grand montant, comme sur le serveur.
+  const totauxCahier = () => { const t = configServeur && configServeur.cahierTotaux; return Array.isArray(t) && t.length === 2 ? t : SI.TOTAUX_CAHIER; };
+  const formulesInter = () => [['normale', 'Partie normale'], ...totauxCahier().map((t) => [String(t), 'Cahier ' + t])];
   const formuleInter = () => (stock.lire('kopo-inter8-formule') === 'cahier' ? 'cahier' : 'normale');
-  const totalInter = () => (Number(stock.lire('kopo-inter8-total')) === 1000 ? 1000 : 500);
+  const totalInter = () => SI.totalCahierPour(totauxCahier(), Number(stock.lire('kopo-inter8-total'))) || totauxCahier()[0];
   const ecrireFormule = (formule, total) => { stock.ecrire('kopo-inter8-formule', formule); if (total) stock.ecrire('kopo-inter8-total', total); };
-  const valeurFormule = () => (formuleInter() === 'cahier' ? String(totalInter()) : 'normale'); // boutons « Partie normale · Cahier 500 · Cahier 1000 »
+  const valeurFormule = () => (formuleInter() === 'cahier' ? String(totalInter()) : 'normale'); // boutons « Partie normale · Cahier petit · Cahier grand »
   const choisirFormule = (v) => (v === 'normale' ? ecrireFormule('normale') : ecrireFormule('cahier', Number(v)));
   const reglagesStyleInter = (mode) => ({ mode, jRetour: jRetourInter(), formule: formuleInter(), total: totalInter() });
   function majStyleRobots() {
@@ -7512,7 +7518,9 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     $('jRetourRobots').hidden = !inter;
     $('jRetourRobots').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.v === 'oui') === jRetourInter())));
     $('choixRobots').querySelectorAll('button').forEach((b) => (b.hidden = inter && +b.textContent > SI.MAX - 1));
-    $('formuleRobots').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === valeurFormule())));
+    const fr = $('formuleRobots').querySelectorAll('button');
+    formulesInter().forEach(([v, libelle], i) => { if (fr[i]) { fr[i].dataset.v = v; fr[i].textContent = libelle; } }); // montants de Pilotage
+    fr.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === valeurFormule())));
   }
   $('formuleRobots').querySelectorAll('button').forEach((b) => (b.onclick = () => { choisirFormule(b.dataset.v); majStyleRobots(); }));
   $('styleRobots').querySelectorAll('button').forEach((b) => (b.onclick = () => { if (!stock.lire('kopo-inter8-jretour')) ecrireJRetour(jRetourInter()); stock.ecrire('kopo-inter8-style', b.dataset.v); majStyleRobots(); }));

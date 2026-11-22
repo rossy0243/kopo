@@ -375,12 +375,31 @@ class App extends ChangeNotifier {
   String get styleInter => Stock.lire('kopo-inter8-style') == 'delire' ? 'delire' : 'simple';
   bool get jRetourInter { final j = Stock.lire('kopo-inter8-jretour'); return j != null ? j == 'oui' : styleInter == 'delire'; }
   void ecrireJRetour(bool oui) => Stock.ecrire('kopo-inter8-jretour', oui ? 'oui' : 'non');
-  // Mode Cahier (comptage des points) : formule et total d'élimination (500 ou 1000), gardés sur le téléphone, comme sur le site.
-  static const formulesInter = [('normale', 'Partie normale'), ('500', 'Cahier 500'), ('1000', 'Cahier 1000')];
+  // Mode Cahier (comptage des points) : formule et total d'élimination, gardés sur le téléphone, comme sur le site.
+  // Les deux montants proposés viennent de Pilotage (/api/config, cahierTotaux), sinon 500 et 1000.
+  static const totauxCahierDefaut = [500, 1000];
+  static List<int> totauxValides(Object? t) {
+    if (t is List && t.length == 2 && t.every((x) => x is num && x > 0) && (t[0] as num) < (t[1] as num)) return [for (final x in t) (x as num).toInt()];
+    return totauxCahierDefaut;
+  }
+  List<int> get totauxCahier => totauxValides(config?['cahierTotaux']);
+  /// Montant demandé → montant retenu, comme le serveur : un des montants proposés tel quel, sinon 500 ou 1000
+  /// deviennent le petit ou le grand montant, sinon null.
+  static int? totalCahierPour(List<int> totaux, int? t) {
+    if (t == null) return null;
+    if (totaux.contains(t)) return t;
+    final i = totauxCahierDefaut.indexOf(t);
+    return i >= 0 ? totaux[i] : null;
+  }
+  /// Boutons « Partie normale · Cahier petit · Cahier grand » (montants de Pilotage, ou ceux du salon s'ils sont donnés).
+  List<(String, String)> formulesInter([Object? totauxSalon]) {
+    final t = totauxSalon == null ? totauxCahier : totauxValides(totauxSalon);
+    return [('normale', 'Partie normale'), for (final x in t) ('$x', 'Cahier $x')];
+  }
   String get formuleInter => Stock.lire('kopo-inter8-formule') == 'cahier' ? 'cahier' : 'normale';
-  int get totalInter => '${Stock.lire('kopo-inter8-total')}' == '1000' ? 1000 : 500;
+  int get totalInter => totalCahierPour(totauxCahier, int.tryParse('${Stock.lire('kopo-inter8-total')}')) ?? totauxCahier.first;
   void ecrireFormule(String formule, [int? total]) { Stock.ecrire('kopo-inter8-formule', formule); if (total != null) Stock.ecrire('kopo-inter8-total', total); }
-  /// Boutons « Partie normale · Cahier 500 · Cahier 1000 » : 'normale', '500' ou '1000'.
+  /// Valeur du bouton choisi : 'normale', ou le montant ('500', '1000'…).
   String get valeurFormule => formuleInter == 'cahier' ? '$totalInter' : 'normale';
   void choisirFormule(String v) => v == 'normale' ? ecrireFormule('normale') : ecrireFormule('cahier', int.parse(v));
   Map<String, dynamic> reglagesStyleInter(String mode) => {'mode': mode, 'jRetour': jRetourInter, 'formule': formuleInter, 'total': totalInter};

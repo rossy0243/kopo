@@ -9,7 +9,7 @@ const SK = require('../../src/kopo-salle.js');
 const SI = require('../../src/inter8-salle.js');
 const K = require('../../moteur/kopo-moteur.js');
 const { idAleatoire } = require('./comptes');
-const { etatJeuPour, NOMS_JEUX, evenementEnCours } = require('./reglages');
+const { etatJeuPour, NOMS_JEUX, evenementEnCours, totauxCahier } = require('./reglages');
 const ATTENTE_STICKER = require('./stickers').ATTENTE_MS;
 const { permis, SALLES_MAX, actives: limitesActives } = require('./limites');
 
@@ -65,7 +65,8 @@ class SalleKopo extends Room {
     // Inter (8), mode Cahier (14/11) : comptage des points, salons privés seulement.
     if (this.jeu === 'inter8' && !this.publique && options.formule === 'cahier') {
       this.salle.formule = 'cahier';
-      if (SI.TOTAUX_CAHIER.includes(options.total)) this.salle.totalCahier = options.total;
+      const t = SI.totalCahierPour(this.salle.totauxCahier || SI.TOTAUX_CAHIER, options.total);
+      if (t) this.salle.totalCahier = t;
     }
     // Salle publique : N joueurs inconnus, elle démarre seule quand elle est pleine.
     this.taille = this.publique ? Math.min(this.S.MAX, Math.max(this.S.MIN, Number(options.taille) || this.S.MAX)) : null;
@@ -180,7 +181,9 @@ class SalleKopo extends Room {
   // Inter (8), mode Cahier : barème des cartes de Pilotage. La salle ne le lit qu'au lancement d'une partie
   // (puis il reste figé jusqu'à la fin) : le changer dans Pilotage ne touche jamais une partie en cours.
   baremeAJour() {
-    if (this.jeu === 'inter8' && SalleKopo.services) this.salle.baremeCahier = SalleKopo.services.reglages.get('cahier') || null;
+    if (this.jeu !== 'inter8' || !SalleKopo.services) return;
+    this.salle.baremeCahier = SalleKopo.services.reglages.get('cahier') || null;
+    this.salle.totauxCahier = totauxCahier(SalleKopo.services.reglages.get('cahierTotaux')); // montants d'élimination proposés
   }
 
   // Entraînement : robots et réglages demandés à l'ouverture. Le joueur garde la main dans le salon
@@ -556,7 +559,7 @@ function optionsEntrainement(S, o = {}) {
     reglages.mode = o.mode;
     if (typeof o.jRetour === 'boolean') reglages.jRetour = o.jRetour;
     if (SI.FORMULES.includes(o.formule)) reglages.formule = o.formule;
-    if (SI.TOTAUX_CAHIER.includes(o.total)) reglages.total = o.total;
+    if (Number.isInteger(o.total)) reglages.total = o.total; // vérifié par la salle (montants de Pilotage)
   }
   return { robots, reglages, lancer: o.lancer === true };
 }

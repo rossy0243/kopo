@@ -2,7 +2,7 @@
 'use strict';
 const express = require('express');
 const { DEBLOCAGE } = require('./salle-kopo');
-const { etatJeuPour, NOMS_JEUX, communautesPubliques, versionPlusRecente, PLATEFORMES, evenementEnCours } = require('./reglages');
+const { etatJeuPour, NOMS_JEUX, communautesPubliques, versionPlusRecente, PLATEFORMES, evenementEnCours, totauxCahier } = require('./reglages');
 // Texte de l'annonce d'un événement : « 🎉 Week-end doré : pièces x2 sur les tables gratuites et bonus du jour x2, jusqu'à dimanche 22 h. »
 const JOURS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
 function texteEvenement(ev) {
@@ -83,6 +83,7 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours,
     const ev = evenementEnCours(t.evenement);
     const annonce = t.annonce.active && t.annonce.texte ? t.annonce.texte : ev ? texteEvenement(ev) : null;
     res.json({ jeux, annonce, evenement: ev ? { nom: ev.nom, fin: ev.fin, pieces: ev.pieces, bonus: ev.bonus } : null, maintenance: t.maintenance.active ? t.maintenance.message : null, versionMin: t.versionMin, tables: t.tables, deblocage: DEBLOCAGE, pot: t.pot, remiseAFlot: t.remiseAFlot.seuil, messages: t.messagesRapides,
+      cahierTotaux: totauxCahier(t.cahierTotaux), // montants d'élimination du Cahier [petit, grand] (boutons du site et de l'appli)
       cahier: t.cahier, // barème du mode Cahier (Pilotage), pour les parties que le site fait tourner lui-même
       stickers: { actif: !!(t.stickers && t.stickers.actif), vente: !!(t.stickers && t.stickers.actif && t.stickers.vente) }, // stickers animés : grisés tant que l'admin ne les allume pas
       communautes: communautesPubliques(t.communautes), // groupes à rejoindre (bouton Partager)

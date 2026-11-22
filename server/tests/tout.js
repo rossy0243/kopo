@@ -519,6 +519,13 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.strictEqual(srv.reglages.get('cahier').X, 80);
     await srv.reglages.ecrire('cahier', DEFAUTS.cahier);
   });
+  await test('réglage cahierTotaux : montants d\'élimination, le petit sous le grand', async () => {
+    await assert.rejects(srv.reglages.ecrire('cahierTotaux', { petit: 800, grand: 300 }), /petit montant/);
+    await assert.rejects(srv.reglages.ecrire('cahierTotaux', { petit: 10, grand: 300 }), /50 à 10 000/);
+    await srv.reglages.ecrire('cahierTotaux', { petit: 300, grand: 800 });
+    assert.deepStrictEqual(srv.reglages.get('cahierTotaux'), { petit: 300, grand: 800 });
+    await srv.reglages.ecrire('cahierTotaux', DEFAUTS.cahierTotaux);
+  });
   await test('réglage robotsPublics : attente entre 10 et 600 secondes', async () => {
     await assert.rejects(srv.reglages.ecrire('robotsPublics', { actif: 1, attente: 3 }), /Attente/);
     await srv.reglages.ecrire('robotsPublics', { actif: 0, attente: 60 });
