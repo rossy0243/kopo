@@ -234,6 +234,7 @@ class _DecompteState extends State<_Decompte> {
   }
 }
 
+/// Une ligne du bilan (« .bilan li » du site) : filet en dessous, ta ligne en laiton.
 class _LigneBilan extends StatelessWidget {
   final String texte;
   final Widget pastille;
@@ -241,10 +242,27 @@ class _LigneBilan extends StatelessWidget {
   const _LigneBilan(this.texte, this.pastille, {this.moi = false});
   @override
   Widget build(BuildContext context) => Container(
-        margin: const EdgeInsets.only(bottom: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        decoration: BoxDecoration(color: moi ? const Color(0x2EE2B04A) : const Color(0x0FFFFFFF), borderRadius: BorderRadius.circular(8)),
-        child: Row(children: [Expanded(child: Text(texte, overflow: TextOverflow.ellipsis, style: K.texte(14, poids: moi ? FontWeight.w700 : FontWeight.w400))), pastille]),
+        padding: const EdgeInsets.symmetric(vertical: 5),
+        decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: K.line))),
+        child: Row(children: [
+          Expanded(child: Text(texte, maxLines: 1, overflow: TextOverflow.ellipsis, style: K.texte(15, couleur: moi ? K.brass : K.ink, poids: moi ? FontWeight.w600 : FontWeight.w400))),
+          const SizedBox(width: 10),
+          pastille,
+        ]),
+      );
+}
+
+const _margeRangee = EdgeInsets.symmetric(horizontal: 4, vertical: 9);
+
+/// Le bloc XP et missions du récap (« .recap-progres »).
+class _BoiteProgres extends StatelessWidget {
+  final List<Widget> enfants;
+  const _BoiteProgres(this.enfants);
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(color: const Color(0x33000000), borderRadius: BorderRadius.circular(12), border: Border.all(color: K.line)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: enfants),
       );
 }
 
@@ -308,13 +326,15 @@ class _Recap extends StatelessWidget {
     final paysage = MediaQuery.of(context).orientation == Orientation.landscape;
 
     final gauche = <Widget>[
+      // En-tête du récap (« .recap-tete » du site) : la place en grand (ou la couronne), le titre en laiton.
       Row(children: [
-        if (gagne) const Ico('couronne', taille: 48)
-        else if (place > 0) Text(place == 1 ? '1er' : '${place}e', style: K.titre(46)),
+        if (gagne) const Ico('couronne', taille: 40)
+        else if (place > 0) ConstrainedBox(constraints: const BoxConstraints(minWidth: 56), child: Text((place == 1 ? '1er' : '${place}e').toUpperCase(), textAlign: TextAlign.center, style: K.titre(40, couleur: K.ink).copyWith(height: 1))),
         const SizedBox(width: 12),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(gagne ? 'Tu as gagné !' : '${app.nomDe(v, v['vainqueur'])} gagne !', style: K.titre(34, couleur: gagne ? K.brass : K.ink)),
+            Text((gagne ? 'Tu as gagné !' : '${app.nomDe(v, v['vainqueur'])} gagne !').toUpperCase(), style: K.titre(28).copyWith(letterSpacing: 2, height: 1)),
+            const SizedBox(height: 2),
             if (place > 0) Muet('$place${place == 1 ? 'er' : 'e'} sur ${classement.length}${e != null ? ' · ${e.manches} manche${e.manches > 1 ? 's' : ''} survécue${e.manches > 1 ? 's' : ''}' : ''}'),
           ]),
         ),
@@ -331,7 +351,7 @@ class _Recap extends StatelessWidget {
     final droite = <Widget>[
       Stack(children: [
         Btn.principal(moiOui ? 'Revanche acceptée, on attend les autres…' : oui.isNotEmpty ? 'Revanche ! (${oui.length} prêt${oui.length > 1 ? 's' : ''})' : 'Revanche',
-            icone: 'revanche', large: true, onTap: moiOui ? null : () { app.arreterSuiteAuto(); app.envoyer({'type': 'revanche'}); }),
+            icone: 'revanche', large: true, taille: 17, marge: const EdgeInsets.all(14), onTap: moiOui ? null : () { app.arreterSuiteAuto(); app.envoyer({'type': 'revanche'}); }),
         if (rv != null && rv['resteMs'] is num && rv['totalMs'] is num)
           Positioned(left: 0, right: 0, bottom: 0, child: _Jauge(key: ValueKey('${rv['resteMs']}'), reste: (rv['resteMs'] as num).toInt(), total: (rv['totalMs'] as num).toInt())),
       ]),
@@ -357,11 +377,11 @@ class _Recap extends StatelessWidget {
       ],
       const Ecart(8),
       Row(children: [
-        // Mode Cahier : « Partager » envoie le classement final (image et texte), gagné ou non.
-        if (cahierDe(v) != null || gagne || r?.titre != null) ...[Expanded(child: Btn('Partager', icone: 'partager', onTap: () => cahierDe(v) != null ? partagerCahier(v) : partagerVictoire(v, r))), const SizedBox(width: 6)],
-        if (v['hote'] == v['moi'] && v['publique'] != true) ...[Expanded(child: Btn('Changer', onTap: () { app.arreterSuiteAuto(); app.envoyer({'type': 'rejouer'}); })), const SizedBox(width: 6)],
-        if (cahierDe(v) != null) ...[Expanded(child: Btn('Classement', onTap: () => ouvrirClassementCahier(v, retour: _resultatCahier))), const SizedBox(width: 6)],
-        Expanded(child: Btn('Quitter', onTap: () { app.arreterSuiteAuto(); app.quitter(); })),
+        // Boutons de la rangée du site : 13 px, plus serrés. Mode Cahier : « Partager » envoie le classement final (image et texte), gagné ou non.
+        if (cahierDe(v) != null || gagne || r?.titre != null) ...[Expanded(child: Btn('Partager', icone: 'partager', taille: 13, marge: _margeRangee, onTap: () => cahierDe(v) != null ? partagerCahier(v) : partagerVictoire(v, r))), const SizedBox(width: 6)],
+        if (v['hote'] == v['moi'] && v['publique'] != true) ...[Expanded(child: Btn('Changer', taille: 13, marge: _margeRangee, onTap: () { app.arreterSuiteAuto(); app.envoyer({'type': 'rejouer'}); })), const SizedBox(width: 6)],
+        if (cahierDe(v) != null) ...[Expanded(child: Btn('Classement', taille: 13, marge: _margeRangee, onTap: () => ouvrirClassementCahier(v, retour: _resultatCahier))), const SizedBox(width: 6)],
+        Expanded(child: Btn('Quitter', taille: 13, marge: _margeRangee, onTap: () { app.arreterSuiteAuto(); app.quitter(); })),
       ]),
       const Ecart(10),
       _DeuxColonnes([
@@ -386,7 +406,8 @@ class _Recap extends StatelessWidget {
     final monte = r.niveauApres.niveau > r.niveauAvant.niveau;
     final lignes = [...r.missions, if (r.defi != null) r.defi!];
     return [
-      const Ecart(12),
+      const Ecart(8),
+      _BoiteProgres([
       Row(children: [
         _RondNiveau(r.niveauAvant.niveau, r.niveauApres.niveau, anim),
         const SizedBox(width: 10),
@@ -420,7 +441,8 @@ class _Recap extends StatelessWidget {
           ]),
         ),
       if (r.titre != null) Padding(padding: const EdgeInsets.only(top: 10), child: Text('« ${r.titre} »', textAlign: TextAlign.center, style: K.texte(15, couleur: K.brass, poids: FontWeight.w700).copyWith(fontStyle: FontStyle.italic))),
-      if (e != null && e.avecRobots && !e.guidee) const Padding(padding: EdgeInsets.only(top: 8), child: Muet("Partie d'entraînement (avec des robots) : XP divisée par deux.", taille: 12)),
+      if (e != null && e.avecRobots && !e.guidee) const Padding(padding: EdgeInsets.only(top: 6), child: Muet("Partie d'entraînement (avec des robots) : XP divisée par deux.", taille: 12)),
+      ]),
     ];
   }
 
@@ -559,9 +581,10 @@ class _RondNiveauState extends State<_RondNiveau> {
         scale: 1,
         duration: const Duration(milliseconds: 300),
         child: Container(
-          width: 40, height: 40, alignment: Alignment.center,
-          decoration: BoxDecoration(shape: BoxShape.circle, color: K.brass, border: Border.all(color: const Color(0xFFF3D48A), width: 2)),
-          child: Text('$n', style: K.titre(24, couleur: K.encre)),
+          // « .recap-niveau » du site : rond cerclé de laiton, chiffre laiton.
+          width: 38, height: 38, alignment: Alignment.center,
+          decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: K.brass, width: 2)),
+          child: Text('$n', style: K.titre(22).copyWith(height: 1, letterSpacing: 0)),
         ),
       );
 }
@@ -575,7 +598,7 @@ class _Compteur extends StatelessWidget {
         tween: Tween(begin: anim ? 0 : fin.toDouble(), end: fin.toDouble()),
         duration: Duration(milliseconds: anim ? 1000 : 0),
         curve: Curves.easeOutCubic,
-        builder: (_, x, __) => Text('+${x.round()} XP', style: K.texte(15, couleur: K.brass, poids: FontWeight.w700)),
+        builder: (_, x, __) => Text('+${x.round()} XP', style: K.titre(24).copyWith(height: 1, letterSpacing: 0)),
       );
 }
 

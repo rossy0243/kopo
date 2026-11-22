@@ -83,17 +83,30 @@ class CarteVue extends StatelessWidget {
   final bool forte;
   final bool pale;
   final bool grisee;
-  const CarteVue(this.carte, {super.key, this.inter = false, this.l = 54, this.choisie = false, this.forte = false, this.pale = false, this.grisee = false});
+  /// Hauteur (sinon 78/54 de la largeur).
+  final double? hauteur;
+  /// Carte de ta main en paysage : ombre plus marquée (comme sur le site).
+  final bool ombreMain;
+  const CarteVue(this.carte, {super.key, this.inter = false, this.l = 54, double? h, this.choisie = false, this.forte = false, this.pale = false, this.grisee = false, this.ombreMain = false}) : hauteur = h;
+
+  /// Carte qu'on ne peut pas jouer : assombrie mais opaque (filter: brightness(.5) grayscale(.6) du site),
+  /// pour ne pas voir les cartes du dessous à travers dans une main serrée.
+  static const _grise = ColorFilter.matrix([
+    .26378, .21456, .02166, 0, 0,
+    .06378, .41456, .02166, 0, 0,
+    .06378, .21456, .22166, 0, 0,
+    0, 0, 0, 1, 0,
+  ]);
 
   @override
   Widget build(BuildContext context) {
-    final h = l * 78 / 54;
+    final h = hauteur ?? l * 78 / 54;
     final coin = l * 15 / 54, centre = l * 28 / 54;
     Widget contenu;
     Decoration deco;
     final ombres = <BoxShadow>[
       if (choisie || forte) const BoxShadow(color: K.brass, spreadRadius: 3),
-      BoxShadow(color: const Color(0x59000000), blurRadius: choisie ? 18 : 10, offset: Offset(0, choisie ? 10 : 4)),
+      BoxShadow(color: Color(choisie || ombreMain ? 0x73000000 : 0x59000000), blurRadius: choisie ? 18 : ombreMain ? 14 : 10, offset: Offset(0, choisie ? 10 : ombreMain ? 6 : 4)),
     ];
     if (!inter) {
       final c = KopoCartes.couleur(carte), encre = _encreKopo(c, KopoCartes.rouge(carte));
@@ -146,7 +159,8 @@ class CarteVue extends StatelessWidget {
       }
     }
     Widget w = Container(width: l, height: h, padding: EdgeInsets.symmetric(horizontal: l * 5 / 54, vertical: l * 3 / 54), decoration: deco, child: contenu);
-    if (pale || grisee) w = Opacity(opacity: grisee ? .4 : .45, child: w);
+    if (grisee) w = ColorFiltered(colorFilter: _grise, child: w);
+    if (pale) w = Opacity(opacity: .2, child: w);
     return Semantics(label: inter ? InterCartes.afficher(carte) : '${KopoCartes.valeur(carte)} de ${KopoCartes.noms[KopoCartes.couleur(carte)]}', child: w);
   }
 }
