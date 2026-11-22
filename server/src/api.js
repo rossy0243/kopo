@@ -2,7 +2,7 @@
 'use strict';
 const express = require('express');
 const { DEBLOCAGE } = require('./salle-kopo');
-const { etatJeuPour, NOMS_JEUX, communautesPubliques, versionPlusRecente, PLATEFORMES, evenementEnCours, totauxCahier } = require('./reglages');
+const { etatJeuPour, NOMS_JEUX, communautesPubliques, versionPlusRecente, PLATEFORMES, evenementEnCours, totauxCahier, annonceVisible } = require('./reglages');
 // Texte de l'annonce d'un événement : « 🎉 Week-end doré : pièces x2 sur les tables gratuites et bonus du jour x2, jusqu'à dimanche 22 h. »
 const JOURS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
 function texteEvenement(ev) {
@@ -81,9 +81,10 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours,
     // Événement en cours (Pilotage) : annoncé tout seul (fenêtre d'annonce du site et de l'appli, une fois par texte)
     // quand aucune annonce de l'admin n'est affichée.
     const ev = evenementEnCours(t.evenement);
-    const annonce = t.annonce.active && t.annonce.texte ? t.annonce.texte : ev ? texteEvenement(ev) : null;
+    const annonce = annonceVisible(t.annonce) ? t.annonce.texte : ev ? texteEvenement(ev) : null;
     res.json({ jeux, annonce, evenement: ev ? { nom: ev.nom, fin: ev.fin, pieces: ev.pieces, bonus: ev.bonus } : null, maintenance: t.maintenance.active ? t.maintenance.message : null, versionMin: t.versionMin, tables: t.tables, deblocage: DEBLOCAGE, pot: t.pot, remiseAFlot: t.remiseAFlot.seuil, messages: t.messagesRapides,
       cahierTotaux: totauxCahier(t.cahierTotaux), // montants d'élimination du Cahier [petit, grand] (boutons du site et de l'appli)
+      rythme: t.rythme, // temps entre les coups (Réglages > Rythme des parties), pour les parties que le site fait tourner lui-même
       cahier: t.cahier, // barème du mode Cahier (Pilotage), pour les parties que le site fait tourner lui-même
       stickers: { actif: !!(t.stickers && t.stickers.actif), vente: !!(t.stickers && t.stickers.actif && t.stickers.vente) }, // stickers animés : grisés tant que l'admin ne les allume pas
       communautes: communautesPubliques(t.communautes), // groupes à rejoindre (bouton Partager)
@@ -106,10 +107,11 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours,
   const parIp = new Map();
   setInterval(() => parIp.clear(), 3600e3).unref();
   r.post('/invite', enveloppe(async (req, res) => {
+    if (!(reglages.get('inscriptions') || {}).invites) return res.status(403).json({ erreur: 'Les nouveaux comptes sans Google sont fermés pour l\'instant. Connecte-toi avec Google pour jouer.' });
     const n = (parIp.get(req.ip) || 0) + 1; parIp.set(req.ip, n);
     if (n > 20 && process.env.KOPO_TESTS !== '1') return res.status(429).json({ erreur: 'Trop de comptes créés depuis ce réseau. Réessaie plus tard.' });
     const c = await comptes.creer({ pseudo: req.body.pseudo, pays: paysReseau(req) });
-    await comptes.presence(c.id);
+    await comptes.presence(c.id, clientMobile(req));
     res.json({ jeton: await auth.jetonJoueur(c.id), compte: publicCompte(c) });
   }));
 
@@ -130,7 +132,7 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours,
       throw e;
     });
     if (c.statut === 'banni') return res.status(403).json({ erreur: 'Ce compte est banni.' });
-    await comptes.presence(c.id);
+    await comptes.presence(c.id, clientMobile(req));
     await comptes.noterEmail(c.id, s.email);
     // Empreinte du compte Google (anti-abus du parrainage), puis le code du lien d'invitation s'il y en a un.
     let parrain = null;
@@ -143,12 +145,12 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours,
 
   // Renouveler son jeton (valable 90 jours) sans se reconnecter : l'appli l'appelle au démarrage, par exemple une fois par semaine.
   r.post('/jeton', joueur, enveloppe(async (req, res) => {
-    await comptes.presence(req.compte.id);
+    await comptes.presence(req.compte.id, clientMobile(req));
     res.json({ jeton: await auth.jetonJoueur(req.compte.id), expireDans: 90 * 24 * 3600 });
   }));
 
   r.get('/moi', joueur, enveloppe(async (req, res) => {
-    await comptes.presence(req.compte.id);
+    await comptes.presence(req.compte.id, clientMobile(req));
     res.json({ compte: publicCompte(req.compte), lie: !!req.compte.auth_id, quotaPseudo: await comptes.quotaPseudo(req.compte.id) });
   }));
   r.patch('/moi', joueur, enveloppe(async (req, res) => {

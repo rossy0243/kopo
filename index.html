@@ -4566,6 +4566,18 @@ var qrcode = function() {
   const DELAI_ABSENT = 5; // secondes accordées à un joueur déconnecté ou absent (2 temps écoulés d'affilée)
   // Robots entre eux (plus aucun humain dans la manche) : tout va plus vite, on voit encore les coups.
   const RAPIDE = { pauseRobot: 300, finTour: 1500, depart: 1500, mancheAuto: 3000 };
+  // Rythme réglé dans le tableau de bord (onglet Réglages > Rythme des parties), en secondes :
+  // { finTour, depart, mancheAuto, revanche, pauseRobot, absent, rapide (1 = oui, 0 = non) }. Lu à l'ouverture de la salle.
+  const BORNES_RYTHME = { finTour: [0, 10], depart: [0, 10], mancheAuto: [2, 30], revanche: [5, 60], pauseRobot: [0.2, 5], absent: [2, 15] };
+  function appliquerRythme(s, r) {
+    if (!r || typeof r !== 'object') return s;
+    const sec = (k) => { const n = Number(r[k]), b = BORNES_RYTHME[k]; return Number.isFinite(n) && n >= b[0] && n <= b[1] ? n : null; };
+    for (const k of ['finTour', 'depart', 'mancheAuto', 'revanche']) if (sec(k) !== null) s.durees[k] = Math.round(sec(k) * 1000);
+    s.rythme = { pauseRobot: sec('pauseRobot') !== null ? Math.round(sec('pauseRobot') * 1000) : PAUSE_ROBOT, absent: sec('absent') !== null ? sec('absent') : DELAI_ABSENT, rapide: !(r.rapide === 0 || r.rapide === false || r.rapide === '0') };
+    return s;
+  }
+  const pauseRobotDe = (s) => (s.rythme && s.rythme.pauseRobot >= 0 ? s.rythme.pauseRobot : PAUSE_ROBOT);
+  const absentDe = (s) => (s.rythme && s.rythme.absent > 0 ? s.rythme.absent : DELAI_ABSENT);
 
   // Hasard de qualité cryptographique quand le navigateur le permet.
   function hasardFort() {
@@ -4616,6 +4628,8 @@ var qrcode = function() {
     if (s.etat === 'finManche') return s.restants.every((id) => vraiRobot(s, id));
     return false;
   }
+  // Robots entre eux et « mode rapide » laissé actif dans le tableau de bord : tout va plus vite.
+  const rapide = (s) => entreRobots(s) && !(s.rythme && s.rythme.rapide === false);
 
   // Niveaux des robots. Chaque robot ne voit que ce qu'un joueur voit (K.vuePublique) :
   // sa main, la table, le nombre de cartes de chacun et les cartes déjà montrées.
@@ -4729,7 +4743,7 @@ var qrcode = function() {
     const d = enCours ? delaiPour(s, m.joueurCourant) : 0;
     s.echeance = d ? s.horloge() + d * 1000 : null;
     s.chronoTotal = d * 1000;
-    const pause = s.pauseRobot >= 0 ? s.pauseRobot : entreRobots(s) ? RAPIDE.pauseRobot : PAUSE_ROBOT; // pauseRobot : tests du serveur seulement
+    const pause = s.pauseRobot >= 0 ? s.pauseRobot : rapide(s) ? Math.min(RAPIDE.pauseRobot, pauseRobotDe(s)) : pauseRobotDe(s); // pauseRobot : tests du serveur seulement
     s.robotPret = enCours ? s.horloge() + pause : null;
   }
 
@@ -4741,7 +4755,7 @@ var qrcode = function() {
   }
   function delaiPour(s, id) {
     if (!estAbsent(s, id)) return s.delai;
-    return s.delai ? Math.min(s.delai, DELAI_ABSENT) : DELAI_ABSENT;
+    return s.delai ? Math.min(s.delai, absentDe(s)) : absentDe(s);
   }
   function revenu(s, id) { s.expirations[id] = 0; }
 
@@ -4792,7 +4806,7 @@ var qrcode = function() {
       fin = { table: [{ joueur: j, cartes: mainAvant, compte: false }], annonce: { type: 'sortie', joueur: j, meneur: m.phase === 'terminee' ? null : m.meneur } };
     }
     // Un humain qui vient de jouer (ou de se qualifier) voit la fin du tour au rythme normal.
-    const finTour = entreRobots(s) && vraiRobot(s, j) ? Math.min(s.durees.finTour, RAPIDE.finTour) : s.durees.finTour;
+    const finTour = rapide(s) && vraiRobot(s, j) ? Math.min(s.durees.finTour, RAPIDE.finTour) : s.durees.finTour;
     if (fin && finTour > 0) {
       s.pause = { type: 'finTour', jusqua: s.horloge() + finTour, total: finTour, table: fin.table, annonce: fin.annonce };
     } else finirMancheSiBesoin(s);
@@ -4917,7 +4931,7 @@ var qrcode = function() {
     s.manche = K.nouvelleManche(sieges, mains, premier, redistributions);
     s.etat = 'manche';
     // Compte à rebours : chacun découvre ses cartes et qui commence.
-    const depart = entreRobots(s) ? Math.min(s.durees.depart, RAPIDE.depart) : s.durees.depart;
+    const depart = rapide(s) ? Math.min(s.durees.depart, RAPIDE.depart) : s.durees.depart;
     s.pause = depart > 0 ? { type: 'depart', jusqua: s.horloge() + depart, total: depart } : null;
     armerChrono(s);
   }
@@ -4989,7 +5003,7 @@ var qrcode = function() {
     } else {
       s.etat = 'finManche';
       // Robots entre eux : la manche suivante part vite (sauf juste après l'élimination d'un humain).
-      const auto = entreRobots(s) && vraiRobot(s, m.elimine) ? Math.min(s.durees.mancheAuto, RAPIDE.mancheAuto) : s.durees.mancheAuto;
+      const auto = rapide(s) && vraiRobot(s, m.elimine) ? Math.min(s.durees.mancheAuto, RAPIDE.mancheAuto) : s.durees.mancheAuto;
       s.suiteA = auto > 0 ? s.horloge() + auto : null; // l'hôte peut lancer plus tôt
       s.suiteTotal = auto;
     }
@@ -5248,7 +5262,7 @@ var qrcode = function() {
     return s;
   }
 
-  const KopoSalle = { MIN, MAX, hasardManche, placerDonne, DELAIS, PAUSE_ROBOT, DUREES, creerSalle, rendrePublique, choixRobot, NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, niveauDuRobot, robotGentil, robotNormal, robotFort, reconnecter, DELAI_ABSENT, RAPIDE, entreRobots, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
+  const KopoSalle = { MIN, MAX, hasardManche, placerDonne, DELAIS, PAUSE_ROBOT, DUREES, creerSalle, rendrePublique, choixRobot, NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, niveauDuRobot, robotGentil, robotNormal, robotFort, reconnecter, DELAI_ABSENT, RAPIDE, BORNES_RYTHME, appliquerRythme, entreRobots, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
   if (typeof module !== 'undefined' && module.exports) module.exports = KopoSalle;
   else root.KopoSalle = KopoSalle;
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -6120,6 +6134,20 @@ var qrcode = function() {
   const DELAI_ANNONCE = 3000; // temps laissé pour annoncer avant qu'un robot ne conteste
   // Robots entre eux (plus aucun humain dans la manche) : tout va plus vite, on voit encore les coups.
   const RAPIDE = { pauseRobot: 400, eventail: 400, annonce: 1000, depart: 1500, mancheAuto: 3000 };
+  // Rythme réglé dans le tableau de bord (onglet Réglages > Rythme des parties), en secondes :
+  // { depart, mancheAuto, revanche, pauseRobot, annonce, absent, rapide (1 = oui, 0 = non) }. Lu à l'ouverture de la salle.
+  const BORNES_RYTHME = { depart: [0, 10], mancheAuto: [2, 30], revanche: [5, 60], pauseRobot: [0.2, 5], annonce: [1, 10], absent: [2, 15] };
+  function appliquerRythme(s, r) {
+    if (!r || typeof r !== 'object') return s;
+    const sec = (k) => { const n = Number(r[k]), b = BORNES_RYTHME[k]; return Number.isFinite(n) && n >= b[0] && n <= b[1] ? n : null; };
+    for (const k of ['depart', 'mancheAuto', 'revanche']) if (sec(k) !== null) s.durees[k] = Math.round(sec(k) * 1000);
+    const ms = (k, d) => (sec(k) !== null ? Math.round(sec(k) * 1000) : d);
+    s.rythme = { pauseRobot: ms('pauseRobot', PAUSE_ROBOT), annonce: ms('annonce', DELAI_ANNONCE), absent: sec('absent') !== null ? sec('absent') : DELAI_ABSENT, rapide: !(r.rapide === 0 || r.rapide === false || r.rapide === '0') };
+    return s;
+  }
+  const pauseRobotDe = (s) => (s.rythme && s.rythme.pauseRobot >= 0 ? s.rythme.pauseRobot : PAUSE_ROBOT);
+  const annonceDe = (s) => (s.rythme && s.rythme.annonce > 0 ? s.rythme.annonce : DELAI_ANNONCE);
+  const absentDe = (s) => (s.rythme && s.rythme.absent > 0 ? s.rythme.absent : DELAI_ABSENT);
   const { NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, coupAutomatique } = R;
 
   function hasardFort() {
@@ -6178,6 +6206,8 @@ var qrcode = function() {
     if (s.etat === 'finManche') return s.restants.every((id) => vraiRobot(s, id));
     return false;
   }
+  // Robots entre eux et « mode rapide » laissé actif dans le tableau de bord : tout va plus vite.
+  const rapide = (s) => entreRobots(s) && !(s.rythme && s.rythme.rapide === false);
   // Chaque robot ajouté peut avoir son propre niveau (j.niveau) ; sinon, celui de la table
   // (s.robots), par exemple pour un robot qui remplace un joueur parti. Robots gentils : tous gentils.
   function niveauDuRobot(s, j) {
@@ -6193,7 +6223,7 @@ var qrcode = function() {
   }
   function delaiPour(s, id) {
     if (!estAbsent(s, id)) return s.delai;
-    return s.delai ? Math.min(s.delai, DELAI_ABSENT) : DELAI_ABSENT;
+    return s.delai ? Math.min(s.delai, absentDe(s)) : absentDe(s);
   }
   function revenu(s, id) { s.expirations[id] = 0; }
 
@@ -6203,7 +6233,7 @@ var qrcode = function() {
     const d = enCours ? delaiPour(s, m.joueurCourant) : 0;
     s.echeance = d ? s.horloge() + d * 1000 : null;
     s.chronoTotal = d * 1000;
-    const pause = s.pauseRobot >= 0 ? s.pauseRobot : entreRobots(s) ? RAPIDE.pauseRobot : PAUSE_ROBOT;
+    const pause = s.pauseRobot >= 0 ? s.pauseRobot : rapide(s) ? Math.min(RAPIDE.pauseRobot, pauseRobotDe(s)) : pauseRobotDe(s);
     s.robotPret = enCours ? s.horloge() + pause : null;
   }
 
@@ -6219,7 +6249,7 @@ var qrcode = function() {
     // avant que les robots ne jouent ou ne contestent.
     const m = s.manche;
     // Plusieurs cartes posées d'un coup : elles sont d'abord montrées en éventail à toute la table.
-    if (action.type === 'jouer' && action.cartes.length > 1 && s.robotPret && !(s.pauseRobot >= 0)) s.robotPret += entreRobots(s) ? RAPIDE.eventail : PAUSE_EVENTAIL;
+    if (action.type === 'jouer' && action.cartes.length > 1 && s.robotPret && !(s.pauseRobot >= 0)) s.robotPret += rapide(s) ? RAPIDE.eventail : PAUSE_EVENTAIL;
     // Pendant ces 3 s, personne (humain ou robot) ne peut contester ; ensuite, tout le monde peut,
     // jusqu'au prochain tour du joueur (même si d'autres ont joué entre-temps). Les robots ont
     // droit aux mêmes 3 s que les humains (règle, section 9).
@@ -6227,7 +6257,7 @@ var qrcode = function() {
     const garder = ([j]) => m && (m.contestables || []).includes(j);
     s.graces = Object.fromEntries(Object.entries(s.graces || {}).filter(garder));
     s.oublis = Object.fromEntries(Object.entries(s.oublis || {}).filter(garder));
-    const annonce = entreRobots(s) ? RAPIDE.annonce : DELAI_ANNONCE;
+    const annonce = rapide(s) ? Math.min(RAPIDE.annonce, annonceDe(s)) : annonceDe(s);
     for (const j of nouveaux) s.graces[j] = s.horloge() + annonce;
     // Un robot annonce dans la foulée de son coup, sans attendre sa pause de réflexion.
     // Un robot facile peut oublier : il ne se rattrape pas, on pourra le contester après les 3 s.
@@ -6237,7 +6267,7 @@ var qrcode = function() {
         delete s.graces[j];
       } else s.oublis[j] = true;
     }
-    if (nouveaux.some((j) => !estRobot(s, j)) && s.robotPret) s.robotPret = Math.max(s.robotPret, s.horloge() + DELAI_ANNONCE);
+    if (nouveaux.some((j) => !estRobot(s, j)) && s.robotPret) s.robotPret = Math.max(s.robotPret, s.horloge() + annonceDe(s));
   }
 
   // Les places autour de la table sont tirées une fois au début de la partie : entre les donnes,
@@ -6378,7 +6408,7 @@ var qrcode = function() {
     const differerDepart = s.durees.depart > 0;
     s.manche = I.nouvelleManche(sieges, mains, pioche, premier, { mode: s.mode, jRetour: s.jRetour, graine: Math.floor(s.rng() * 4294967296), differerDepart, cahier: !!s.cahier, bareme: s.cahier && s.cahier.bareme });
     s.etat = 'manche';
-    const depart = entreRobots(s) ? Math.min(s.durees.depart, RAPIDE.depart) : s.durees.depart;
+    const depart = rapide(s) ? Math.min(s.durees.depart, RAPIDE.depart) : s.durees.depart;
     s.pause = depart > 0 ? { type: 'depart', jusqua: s.horloge() + depart, total: depart } : null;
     armerChrono(s);
   }
@@ -6480,7 +6510,7 @@ var qrcode = function() {
   }
   // Manche suivante automatique : vite entre robots (sauf juste après l'élimination d'un humain).
   function suiteAuto(s, robotSorti) {
-    const auto = entreRobots(s) && robotSorti ? Math.min(s.durees.mancheAuto, RAPIDE.mancheAuto) : s.durees.mancheAuto;
+    const auto = rapide(s) && robotSorti ? Math.min(s.durees.mancheAuto, RAPIDE.mancheAuto) : s.durees.mancheAuto;
     s.suiteA = auto > 0 ? s.horloge() + auto : null;
     s.suiteTotal = auto;
   }
@@ -6803,7 +6833,7 @@ var qrcode = function() {
     return s;
   }
 
-  const Inter8Salle = { JEU, MIN, MAX, MODES, FORMULES, TOTAUX_CAHIER, TOTAL_CAHIER, totalCahierPour, DELAIS, PAUSE_ROBOT, DUREES, DELAI_ABSENT, DELAI_ANNONCE, RAPIDE, entreRobots, NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, niveauDuRobot, creerSalle, rendrePublique, choixRobot, reconnecter, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
+  const Inter8Salle = { JEU, MIN, MAX, MODES, FORMULES, TOTAUX_CAHIER, TOTAL_CAHIER, totalCahierPour, DELAIS, PAUSE_ROBOT, DUREES, DELAI_ABSENT, DELAI_ANNONCE, RAPIDE, BORNES_RYTHME, appliquerRythme, entreRobots, NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, niveauDuRobot, creerSalle, rendrePublique, choixRobot, reconnecter, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
   if (enNode) module.exports = Inter8Salle;
   else root.Inter8Salle = Inter8Salle;
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -8012,7 +8042,7 @@ svg .vb { transform-box: view-box; }
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = 'fff5fe2a2bc4'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = '7d43dfd16c5f'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: true };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // La musique des menus était coupée par défaut : on l'allume une fois pour tous (le joueur peut la recouper).
@@ -8498,6 +8528,8 @@ svg .vb { transform-box: view-box; }
     // Mode Cahier : barème des cartes réglé dans Pilotage (/api/config), lu au lancement de chaque partie.
     if (jeuSalle === 'inter8' && configServeur && configServeur.cahier) salle.baremeCahier = configServeur.cahier;
     if (jeuSalle === 'inter8') salle.totauxCahier = totauxCahier().slice(); // montants d'élimination de Pilotage
+    // Temps entre les coups (Réglages > Rythme des parties du tableau de bord), comme sur le serveur. Une partie reprise garde les siens.
+    if (!sauvee && configServeur && configServeur.rythme) M.appliquerRythme(salle, configServeur.rythme[jeuSalle]);
     if (taille && !sauvee) M.rendrePublique(salle, taille);
     hote = { salle, vus: new Map(), reseau: null };
     session = { code, role: 'hote', nom };

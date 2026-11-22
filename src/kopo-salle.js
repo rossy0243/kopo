@@ -13,6 +13,18 @@
   const DELAI_ABSENT = 5; // secondes accordées à un joueur déconnecté ou absent (2 temps écoulés d'affilée)
   // Robots entre eux (plus aucun humain dans la manche) : tout va plus vite, on voit encore les coups.
   const RAPIDE = { pauseRobot: 300, finTour: 1500, depart: 1500, mancheAuto: 3000 };
+  // Rythme réglé dans le tableau de bord (onglet Réglages > Rythme des parties), en secondes :
+  // { finTour, depart, mancheAuto, revanche, pauseRobot, absent, rapide (1 = oui, 0 = non) }. Lu à l'ouverture de la salle.
+  const BORNES_RYTHME = { finTour: [0, 10], depart: [0, 10], mancheAuto: [2, 30], revanche: [5, 60], pauseRobot: [0.2, 5], absent: [2, 15] };
+  function appliquerRythme(s, r) {
+    if (!r || typeof r !== 'object') return s;
+    const sec = (k) => { const n = Number(r[k]), b = BORNES_RYTHME[k]; return Number.isFinite(n) && n >= b[0] && n <= b[1] ? n : null; };
+    for (const k of ['finTour', 'depart', 'mancheAuto', 'revanche']) if (sec(k) !== null) s.durees[k] = Math.round(sec(k) * 1000);
+    s.rythme = { pauseRobot: sec('pauseRobot') !== null ? Math.round(sec('pauseRobot') * 1000) : PAUSE_ROBOT, absent: sec('absent') !== null ? sec('absent') : DELAI_ABSENT, rapide: !(r.rapide === 0 || r.rapide === false || r.rapide === '0') };
+    return s;
+  }
+  const pauseRobotDe = (s) => (s.rythme && s.rythme.pauseRobot >= 0 ? s.rythme.pauseRobot : PAUSE_ROBOT);
+  const absentDe = (s) => (s.rythme && s.rythme.absent > 0 ? s.rythme.absent : DELAI_ABSENT);
 
   // Hasard de qualité cryptographique quand le navigateur le permet.
   function hasardFort() {
@@ -63,6 +75,8 @@
     if (s.etat === 'finManche') return s.restants.every((id) => vraiRobot(s, id));
     return false;
   }
+  // Robots entre eux et « mode rapide » laissé actif dans le tableau de bord : tout va plus vite.
+  const rapide = (s) => entreRobots(s) && !(s.rythme && s.rythme.rapide === false);
 
   // Niveaux des robots. Chaque robot ne voit que ce qu'un joueur voit (K.vuePublique) :
   // sa main, la table, le nombre de cartes de chacun et les cartes déjà montrées.
@@ -176,7 +190,7 @@
     const d = enCours ? delaiPour(s, m.joueurCourant) : 0;
     s.echeance = d ? s.horloge() + d * 1000 : null;
     s.chronoTotal = d * 1000;
-    const pause = s.pauseRobot >= 0 ? s.pauseRobot : entreRobots(s) ? RAPIDE.pauseRobot : PAUSE_ROBOT; // pauseRobot : tests du serveur seulement
+    const pause = s.pauseRobot >= 0 ? s.pauseRobot : rapide(s) ? Math.min(RAPIDE.pauseRobot, pauseRobotDe(s)) : pauseRobotDe(s); // pauseRobot : tests du serveur seulement
     s.robotPret = enCours ? s.horloge() + pause : null;
   }
 
@@ -188,7 +202,7 @@
   }
   function delaiPour(s, id) {
     if (!estAbsent(s, id)) return s.delai;
-    return s.delai ? Math.min(s.delai, DELAI_ABSENT) : DELAI_ABSENT;
+    return s.delai ? Math.min(s.delai, absentDe(s)) : absentDe(s);
   }
   function revenu(s, id) { s.expirations[id] = 0; }
 
@@ -239,7 +253,7 @@
       fin = { table: [{ joueur: j, cartes: mainAvant, compte: false }], annonce: { type: 'sortie', joueur: j, meneur: m.phase === 'terminee' ? null : m.meneur } };
     }
     // Un humain qui vient de jouer (ou de se qualifier) voit la fin du tour au rythme normal.
-    const finTour = entreRobots(s) && vraiRobot(s, j) ? Math.min(s.durees.finTour, RAPIDE.finTour) : s.durees.finTour;
+    const finTour = rapide(s) && vraiRobot(s, j) ? Math.min(s.durees.finTour, RAPIDE.finTour) : s.durees.finTour;
     if (fin && finTour > 0) {
       s.pause = { type: 'finTour', jusqua: s.horloge() + finTour, total: finTour, table: fin.table, annonce: fin.annonce };
     } else finirMancheSiBesoin(s);
@@ -364,7 +378,7 @@
     s.manche = K.nouvelleManche(sieges, mains, premier, redistributions);
     s.etat = 'manche';
     // Compte à rebours : chacun découvre ses cartes et qui commence.
-    const depart = entreRobots(s) ? Math.min(s.durees.depart, RAPIDE.depart) : s.durees.depart;
+    const depart = rapide(s) ? Math.min(s.durees.depart, RAPIDE.depart) : s.durees.depart;
     s.pause = depart > 0 ? { type: 'depart', jusqua: s.horloge() + depart, total: depart } : null;
     armerChrono(s);
   }
@@ -436,7 +450,7 @@
     } else {
       s.etat = 'finManche';
       // Robots entre eux : la manche suivante part vite (sauf juste après l'élimination d'un humain).
-      const auto = entreRobots(s) && vraiRobot(s, m.elimine) ? Math.min(s.durees.mancheAuto, RAPIDE.mancheAuto) : s.durees.mancheAuto;
+      const auto = rapide(s) && vraiRobot(s, m.elimine) ? Math.min(s.durees.mancheAuto, RAPIDE.mancheAuto) : s.durees.mancheAuto;
       s.suiteA = auto > 0 ? s.horloge() + auto : null; // l'hôte peut lancer plus tôt
       s.suiteTotal = auto;
     }
@@ -695,7 +709,7 @@
     return s;
   }
 
-  const KopoSalle = { MIN, MAX, hasardManche, placerDonne, DELAIS, PAUSE_ROBOT, DUREES, creerSalle, rendrePublique, choixRobot, NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, niveauDuRobot, robotGentil, robotNormal, robotFort, reconnecter, DELAI_ABSENT, RAPIDE, entreRobots, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
+  const KopoSalle = { MIN, MAX, hasardManche, placerDonne, DELAIS, PAUSE_ROBOT, DUREES, creerSalle, rendrePublique, choixRobot, NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, niveauDuRobot, robotGentil, robotNormal, robotFort, reconnecter, DELAI_ABSENT, RAPIDE, BORNES_RYTHME, appliquerRythme, entreRobots, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
   if (typeof module !== 'undefined' && module.exports) module.exports = KopoSalle;
   else root.KopoSalle = KopoSalle;
 })(typeof window !== 'undefined' ? window : globalThis);

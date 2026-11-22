@@ -1067,5 +1067,24 @@ test("L'hôte coupe le micro d'un joueur éliminé pour toute la table, le rend,
   assert.ok(!S.vue(s, 'p2').joueurs.find((x) => x.id === 'p3').micCoupe, 'nouvelle partie : micro rendu');
 });
 
+test('Rythme du tableau de bord : temps de la salle réglés en secondes, valeurs hors bornes ignorées', () => {
+  const s = S.creerSalle('RYTM');
+  S.appliquerRythme(s, { finTour: 3, depart: 3, mancheAuto: 6, revanche: 99, pauseRobot: 0.8, absent: 4, rapide: 0 });
+  assert.strictEqual(s.durees.depart, 3000);
+  assert.strictEqual(s.durees.mancheAuto, 6000);
+  assert.strictEqual(s.durees.revanche, S.DUREES.revanche, 'revanche hors bornes : valeur de départ');
+  assert.strictEqual(s.rythme.pauseRobot, 800);
+  assert.strictEqual(s.rythme.absent, 4);
+  assert.strictEqual(s.rythme.rapide, false);
+  const h = (() => { let t = 1000; const f = () => t; return f; })();
+  s.horloge = h; s.durees.depart = 0;
+  S.recevoir(s, 'p1', { type: 'rejoindre', nom: 'A' }); S.recevoir(s, 'p2', { type: 'rejoindre', nom: 'B' });
+  assert.ok(S.recevoir(s, 'p1', { type: 'lancer' }).ok);
+  assert.strictEqual(s.robotPret - h(), 800, 'un robot réfléchit le temps réglé');
+  const t = S.creerSalle('SANS'); S.appliquerRythme(t, null);
+  assert.strictEqual(t.rythme, undefined);
+  assert.deepStrictEqual(t.durees, S.DUREES);
+});
+
 console.log(`\n${ok} tests réussis, ${ko} en échec.`);
 process.exit(ko ? 1 : 0);

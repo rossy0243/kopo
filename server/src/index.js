@@ -49,6 +49,8 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
   const stickers = creerStickers(base, reglages, comptes);
   const bouquets = creerBouquets(base, reglages, comptes);
   const abonnement = creerAbonnement(base, env);
+  abonnement.prix = () => reglages.get('kopoPlus');
+  require('./limites').appliquerLimites(reglages.get('limites'));
   if (!abonnement.microPret()) console.log('Micro éteint (LIVEKIT_URL, LIVEKIT_API_KEY et LIVEKIT_API_SECRET absents).');
   abonnement.majSalles = (id, jusqu) => { for (const s of salles) if (s.majAbonne) s.majAbonne(id, jusqu); };
   // La veille de la fin d'un abonnement (ou de l'essai) : une notification avec les prix.

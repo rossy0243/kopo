@@ -529,7 +529,7 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
   await test('réglage robotsPublics : attente entre 10 et 600 secondes', async () => {
     await assert.rejects(srv.reglages.ecrire('robotsPublics', { actif: 1, attente: 3 }), /Attente/);
     await srv.reglages.ecrire('robotsPublics', { actif: 0, attente: 60 });
-    assert.deepStrictEqual(srv.reglages.get('robotsPublics'), { actif: 0, attente: 60 });
+    assert.deepStrictEqual(srv.reglages.get('robotsPublics'), { actif: 0, attente: 60, robots: 'normaux', force: 10 }); // niveau et force : valeurs de départ
     await srv.reglages.ecrire('robotsPublics', DEFAUTS.robotsPublics);
   });
   await test('un ami rejoint une salle publique avec son code ; une salle privée n\'est jamais proposée aux inconnus', async () => {
@@ -2354,6 +2354,124 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.strictEqual(p.ensemble, 6);
     assert.strictEqual(p.a === a.compte.id ? p.pots_a : p.pots_b, 540);
     assert.strictEqual((await api('/admin/api/suspects')).statut, 401, 'réservé à l\'admin');
+  });
+  console.log('\nTableau de bord admin et nouveaux réglages');
+  const reg = (cle, valeur) => api('/admin/api/reglages/' + cle, { methode: 'PUT', jeton: adminJeton, corps: { valeur } });
+  await test('tableau de bord : chiffres clés, courbes sur 30 jours, heures, appareils, alertes', async () => {
+    for (const periode of ['jour', '7', '30']) {
+      const t = (await api('/admin/api/tableau?periode=' + periode, { jeton: adminJeton })).json;
+      assert.strictEqual(t.periode, { jour: 1, 7: 7, 30: 30 }[periode]);
+      assert.ok(t.cles.actifs >= 1 && t.cles.parties >= 1, JSON.stringify(t.cles));
+      assert.strictEqual(t.parJour.length, 30);
+      assert.ok('bouquets' in t.parJour[0] && 'kopo_plus' in t.parJour[0]);
+      assert.ok(Array.isArray(t.heures) && Array.isArray(t.appareils));
+      assert.strictEqual(typeof t.alertes.signalements, 'number');
+      assert.strictEqual(typeof t.alertes.suspects, 'number');
+      assert.strictEqual(typeof t.maintenant.connectes, 'number');
+    }
+    assert.strictEqual((await api('/admin/api/tableau')).statut, 401, 'réservé à l\'admin');
+  });
+  await test('tableau de bord : revenus des bouquets livrés et de Kopo+, appareil du joueur', async () => {
+    const x = await invite('Payeur' + Date.now() % 1000);
+    const avant = (await api('/admin/api/tableau?periode=jour', { jeton: adminJeton })).json.cles.revenus;
+    const b = await api('/admin/api/bouquets/livrer', { methode: 'POST', jeton: adminJeton, corps: { joueur: x.compte.id, bouquet: 1, message: 'MP-123' } });
+    assert.strictEqual(b.statut, 200, JSON.stringify(b.json));
+    const t = (await api('/admin/api/tableau?periode=jour', { jeton: adminJeton })).json;
+    assert.strictEqual(t.cles.revenus - avant, b.json.bouquet.francs);
+    assert.ok(t.parJour.at(-1).bouquets >= b.json.bouquet.francs);
+    await fetch(URL_ + '/api/moi', { headers: { authorization: 'Bearer ' + x.jeton, 'x-masano-client': 'android/1.4.0' } });
+    const p = (await srv.base.query('SELECT plateforme, version FROM presences WHERE compte_id = $1', [x.compte.id])).rows[0];
+    assert.deepStrictEqual([p.plateforme, p.version], ['android', '1.4.0']);
+  });
+  await test('rythme des parties : réglé dans Pilotage, envoyé au site, appliqué aux nouvelles salles', async () => {
+    assert.strictEqual((await reg('rythme', { kopo: { ...DEFAUTS.rythme.kopo, depart: 30 }, inter8: DEFAUTS.rythme.inter8 })).statut, 400, 'hors bornes');
+    const r = await reg('rythme', { kopo: { ...DEFAUTS.rythme.kopo, finTour: 3, depart: 3, mancheAuto: 6, pauseRobot: 0.8 }, inter8: { ...DEFAUTS.rythme.inter8, annonce: 2, rapide: 0 } });
+    assert.strictEqual(r.statut, 200, JSON.stringify(r.json));
+    const cfg = (await api('/api/config')).json;
+    assert.strictEqual(cfg.rythme.kopo.finTour, 3);
+    const { salles } = require('../src/salle-kopo');
+    const a = await invite('Rythme' + Date.now() % 1000);
+    const client = new Client(URL_.replace('http', 'ws'));
+    const k = await client.create('kopo', { jeton: a.jeton }), i = await client.create('inter8', { jeton: a.jeton });
+    await attendre(100);
+    const sk = [...salles].find((s) => s.roomId === k.roomId), si = [...salles].find((s) => s.roomId === i.roomId);
+    assert.strictEqual(sk.salle.durees.finTour, 3000);
+    assert.strictEqual(sk.salle.durees.mancheAuto, 6000);
+    assert.strictEqual(sk.salle.rythme.pauseRobot, 800);
+    assert.strictEqual(si.salle.rythme.annonce, 2000);
+    assert.strictEqual(si.salle.rythme.rapide, false);
+    await k.leave(); await i.leave();
+    await reg('rythme', DEFAUTS.rythme);
+  });
+  await test('robots des salles publiques : niveau et force réglables', async () => {
+    assert.strictEqual((await reg('robotsPublics', { actif: 1, attente: 45, robots: 'geants', force: 10 })).statut, 400);
+    assert.strictEqual((await reg('robotsPublics', { actif: 1, attente: 45, robots: 'forts', force: 25 })).statut, 400);
+    const r = await reg('robotsPublics', { actif: 1, attente: 45, robots: 'forts', force: 18 });
+    assert.deepStrictEqual(r.json.valeur, { actif: 1, attente: 45, robots: 'forts', force: 18 });
+    await reg('robotsPublics', DEFAUTS.robotsPublics);
+  });
+  await test('plafond de pièces par jour aux tables gratuites', async () => {
+    const x = await invite('Farm' + Date.now() % 1000), y = await invite('Mule' + Date.now() % 1000);
+    assert.strictEqual((await reg('gains', { ...DEFAUTS.gains, plafondJour: 12 })).statut, 200);
+    try {
+      await jouerPartie([x, y]);
+      await jouerPartie([x, y]);
+      const g = async (c) => Number((await srv.base.query("SELECT coalesce(sum(montant), 0) AS n FROM registre_pieces WHERE compte_id = $1 AND motif IN ('manche', 'katapss', 'victoire', 'deuxieme')", [c.compte.id])).rows[0].n);
+      const gx = await g(x), gy = await g(y);
+      assert.ok(gx <= 12 && gy <= 12, `gains plafonnés : ${gx}, ${gy}`);
+      assert.ok(gx + gy > 0, 'le vainqueur gagne quand même jusqu\'au plafond');
+    } finally { await reg('gains', DEFAUTS.gains); }
+  });
+  await test('Kopo+ : prix réglables, note « mois offerts » recalculée', async () => {
+    assert.strictEqual((await reg('kopoPlus', { mois: 3000, an: 2000 })).statut, 400, 'un an moins cher qu\'un mois');
+    assert.strictEqual((await reg('kopoPlus', { mois: 3000, an: 30000 })).statut, 200);
+    const x = await invite('Prix' + Date.now() % 1000);
+    const o = (await api('/api/abonnement', { jeton: x.jeton })).json;
+    assert.deepStrictEqual(o.formules.map((f) => f.francs), [3000, 30000]);
+    assert.strictEqual(o.formules[1].note, '2 mois offerts');
+    await reg('kopoPlus', DEFAUTS.kopoPlus);
+  });
+  await test('création de comptes invités : fermée puis rouverte', async () => {
+    assert.strictEqual((await reg('inscriptions', { invites: 0 })).statut, 200);
+    try { assert.strictEqual((await api('/api/invite', { methode: 'POST', corps: { pseudo: 'Ferme' } })).statut, 403); }
+    finally { await reg('inscriptions', { invites: 1 }); }
+    assert.ok((await invite('Rouvert' + Date.now() % 1000)).jeton);
+  });
+  await test('annonce programmée : visible seulement entre ses dates', async () => {
+    const demain = new Date(Date.now() + 864e5).toISOString();
+    assert.strictEqual((await reg('annonce', { texte: 'Tournoi demain', active: true, debut: demain, fin: '' })).statut, 200);
+    assert.strictEqual((await api('/api/config')).json.annonce, null, 'pas encore');
+    await reg('annonce', { texte: 'Tournoi ce soir', active: true, debut: new Date(Date.now() - 6e4).toISOString(), fin: demain });
+    assert.strictEqual((await api('/api/config')).json.annonce, 'Tournoi ce soir');
+    await reg('annonce', { texte: '', active: false });
+  });
+  await test('notifications programmées, heures des rappels, seuils de sécurité, limites', async () => {
+    assert.strictEqual((await reg('pushProgrammes', [{ texte: '', quand: '2026-12-01T18:00' }])).statut, 400);
+    const p = await reg('pushProgrammes', [{ titre: 'Ce soir', texte: 'Tournoi à 20 h', quand: '2026-12-01T18:00', pays: 'cd' }]);
+    assert.strictEqual(p.json.valeur[0].quand, '2026-12-01T17:00:00.000Z', 'heure de Kinshasa');
+    assert.strictEqual(p.json.valeur[0].pays, 'CD');
+    await reg('pushProgrammes', []);
+    assert.strictEqual((await reg('heuresPush', { ...DEFAUTS.heuresPush, serie: 24 })).statut, 400);
+    assert.strictEqual((await reg('heuresPush', { ...DEFAUTS.heuresPush, matchJour: 20 })).statut, 200);
+    await reg('heuresPush', DEFAUTS.heuresPush);
+    assert.strictEqual((await reg('suspects', { jours: 14, parties: 1, pourcent: 80 })).statut, 400);
+    assert.strictEqual((await reg('suspects', { jours: 30, parties: 5, pourcent: 90 })).statut, 200);
+    assert.strictEqual((await api('/admin/api/suspects', { jeton: adminJeton })).json.jours, 30, 'seuils par défaut du réglage');
+    await reg('suspects', DEFAUTS.suspects);
+    const { limiteurs } = require('../src/limites');
+    assert.strictEqual((await reg('limites', { ...DEFAUTS.limites, apiCompte: 300 })).statut, 200);
+    assert.strictEqual(limiteurs.apiCompte.max, 300, 'appliquée tout de suite');
+    await reg('limites', DEFAUTS.limites);
+    assert.strictEqual(limiteurs.apiCompte.max, 120);
+    const j = (await api('/admin/api/journal', { jeton: adminJeton })).json.find((x) => x.action === 'reglage:limites');
+    assert.ok(j.details.avant && j.details.apres, 'le journal garde l\'ancienne et la nouvelle valeur');
+    assert.strictEqual((await api('/admin/api/reglages/defauts', { jeton: adminJeton })).json.rythme.kopo.depart, 5);
+  });
+  await test('rappels push : heures de silence réglables', () => {
+    const { heureDeSilence } = require('../src/reglages');
+    assert.ok(heureDeSilence(23) && heureDeSilence(3) && !heureDeSilence(8) && !heureDeSilence(21));
+    assert.ok(heureDeSilence(13, { silenceDebut: 12, silenceFin: 14 }) && !heureDeSilence(14, { silenceDebut: 12, silenceFin: 14 }));
+    assert.ok(!heureDeSilence(3, { silenceDebut: 0, silenceFin: 0 }), 'même heure : pas de silence');
   });
   await srv.arreter();
   console.log(`\n${reussis} tests réussis, ${echecs} en échec.`);

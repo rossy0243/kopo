@@ -126,6 +126,10 @@ CREATE TABLE IF NOT EXISTS journal_admin (
 -- ===== Ligue classée et saisons (retention.md §3.4) =====
 ALTER TABLE parties ADD COLUMN IF NOT EXISTS classee boolean NOT NULL DEFAULT false;
 ALTER TABLE parties ADD COLUMN IF NOT EXISTS jeu text NOT NULL DEFAULT 'kopo'; -- 'kopo' ou 'inter8'
+ALTER TABLE parties ADD COLUMN IF NOT EXISTS attente_s integer; -- salle publique : secondes d'attente avant le départ (tableau de bord)
+-- Tableau de bord (22/11) : d'où vient le joueur ce jour-là (web, android, ios) et la version de l'appli.
+ALTER TABLE presences ADD COLUMN IF NOT EXISTS plateforme text;
+ALTER TABLE presences ADD COLUMN IF NOT EXISTS version text;
 
 -- Une saison dure 4 semaines. Une seule est en cours à la fois.
 CREATE TABLE IF NOT EXISTS saisons (

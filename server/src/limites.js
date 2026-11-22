@@ -7,7 +7,7 @@
 function creerLimiteur(max, fenetreMs) {
   const compteurs = new Map(); // cle -> { n, depuis }
   let nettoye = Date.now();
-  return {
+  const lim = {
     max, fenetreMs,
     passer(cle, maintenant = Date.now()) {
       // De temps en temps, on oublie les clés dont la fenêtre est finie (la mémoire ne grossit pas).
@@ -18,10 +18,11 @@ function creerLimiteur(max, fenetreMs) {
       let c = compteurs.get(cle);
       if (!c || maintenant - c.depuis >= fenetreMs) { c = { n: 0, depuis: maintenant }; compteurs.set(cle, c); }
       c.n++;
-      return c.n <= max;
+      return c.n <= lim.max; // lim.max : réglable dans le tableau de bord (appliquerLimites)
     },
     vider() { compteurs.clear(); },
   };
+  return lim;
 }
 
 // Les limites du jeu. Pendant les tests (KOPO_TESTS=1), elles sont coupées, sauf dans leurs propres tests.
@@ -36,6 +37,10 @@ const SALLES_MAX = 3; // salles où un même compte est connecté en même temps
 
 const actives = () => process.env.KOPO_TESTS !== '1' || process.env.KOPO_LIMITES === '1';
 const limiteurs = Object.fromEntries(Object.entries(LIMITES).map(([k, l]) => [k, creerLimiteur(l.max, l.fenetreMs)]));
+// Réglages > Sécurité du tableau de bord : { apiCompte, apiIp, codesCompte } par minute (le reste garde sa valeur).
+function appliquerLimites(r) {
+  for (const k of ['apiCompte', 'apiIp', 'codesCompte']) { const n = Math.trunc(Number(r && r[k])); if (n > 0) limiteurs[k].max = n; }
+}
 function permis(nom, cle) { return !actives() || limiteurs[nom].passer(String(cle)); }
 
-module.exports = { creerLimiteur, LIMITES, SALLES_MAX, permis, limiteurs, actives };
+module.exports = { creerLimiteur, LIMITES, SALLES_MAX, permis, limiteurs, actives, appliquerLimites };
