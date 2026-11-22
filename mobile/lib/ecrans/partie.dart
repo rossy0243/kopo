@@ -108,28 +108,28 @@ class _Entete extends StatelessWidget {
       Expanded(child: info),
       BoutonsMicro(v),
       const SizedBox(width: 6),
-      _BoutonTete(icone: 'reglages', aide: 'Paramètres', petit: petit, onTap: ouvrirParametres),
+      BoutonTete(icone: 'reglages', aide: 'Paramètres', petit: petit, onTap: ouvrirParametres),
       const SizedBox(width: 6),
-      _BoutonTete(icone: 'reactions', aide: 'Réactions', petit: petit, onTap: ouvrirChat),
+      BoutonTete(icone: 'reactions', aide: 'Réactions', petit: petit, onTap: ouvrirChat),
       // Contre les robots (seul humain) : pause. Le serveur arrête robots, chrono et comptes à rebours.
       if (v['pausePossible'] == true && v['enPause'] != true) ...[
         const SizedBox(width: 6),
-        _BoutonTete(icone: 'pause', aide: 'Pause', petit: petit, onTap: () => app.envoyer({'type': 'enPause', 'pause': true})),
+        BoutonTete(icone: 'pause', aide: 'Pause', petit: petit, onTap: () => app.envoyer({'type': 'enPause', 'pause': true})),
       ],
       const SizedBox(width: 6),
-      _BoutonTete(texte: 'Quitter', aide: 'Quitter', petit: petit, onTap: demanderQuitter),
+      BoutonTete(texte: 'Quitter', aide: 'Quitter', petit: petit, onTap: demanderQuitter),
     ]);
   }
 }
 
 /// Bouton de l'en-tête du site (« .btn » : fond à peine clair, filet, coins de 10).
-class _BoutonTete extends StatelessWidget {
+class BoutonTete extends StatelessWidget {
   final String? icone;
   final String? texte;
   final String aide;
   final bool petit;
   final VoidCallback onTap;
-  const _BoutonTete({this.icone, this.texte, required this.aide, required this.onTap, this.petit = false});
+  const BoutonTete({super.key, this.icone, this.texte, required this.aide, required this.onTap, this.petit = false});
   @override
   Widget build(BuildContext context) => Tooltip(
         message: aide,

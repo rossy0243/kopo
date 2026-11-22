@@ -207,10 +207,11 @@ class Fenetre extends StatelessWidget {
         padding: const EdgeInsets.all(14),
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: largeur, maxHeight: MediaQuery.of(context).size.height * .92),
-          child: Material(
+          // Ombre du site : 0 20px 50px rgba(0,0,0,.5).
+          child: DecoratedBox(
+            decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), boxShadow: const [BoxShadow(color: Color(0x80000000), blurRadius: 50, offset: Offset(0, 20))]),
+            child: Material(
             color: K.table2,
-            elevation: 24,
-            shadowColor: Colors.black,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: K.line)),
             child: Stack(children: [
               SingleChildScrollView(
@@ -223,6 +224,7 @@ class Fenetre extends StatelessWidget {
               if (onFermer != null)
                 Positioned(right: 4, top: 4, child: IconButton(onPressed: onFermer, icon: const Icon(Icons.close, color: K.muted), tooltip: 'Fermer')),
             ]),
+          ),
           ),
         ),
       ),
