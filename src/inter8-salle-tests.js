@@ -510,6 +510,25 @@ test('Cahier : le barème est figé au lancement de la partie', () => {
   const t = S.importer(S.exporter(Object.assign(salleAvec(3, 5), {})));
   assert.strictEqual(t.baremeCahier, undefined);
 });
+test('Cahier : montants d\'élimination de Pilotage, 500 / 1000 des anciennes applis', () => {
+  const s = salleAvec(3, 6);
+  s.totauxCahier = [300, 800];
+  assert.deepStrictEqual(S.vue(s, 'p1').totauxCahier, [300, 800]);
+  assert.strictEqual(S.vue(s, 'p1').totalCahier, 300); // 500 par défaut → petit montant
+  assert.ok(S.recevoir(s, 'p1', { type: 'reglages', formule: 'cahier', total: 800 }).ok);
+  assert.strictEqual(s.totalCahier, 800);
+  assert.ok(S.recevoir(s, 'p1', { type: 'reglages', total: 500 }).ok); // ancien bouton « Cahier 500 »
+  assert.strictEqual(s.totalCahier, 300);
+  assert.ok(S.recevoir(s, 'p1', { type: 'reglages', total: 1000 }).ok); // ancien bouton « Cahier 1000 »
+  assert.strictEqual(s.totalCahier, 800);
+  assert.ok(!S.recevoir(s, 'p1', { type: 'reglages', total: 42 }).ok);
+  s.totauxCahier = [200, 400]; // changé dans Pilotage avant le lancement : le grand montant reste le grand
+  assert.ok(S.recevoir(s, 'p1', { type: 'lancer' }).ok);
+  assert.strictEqual(s.cahier.total, 200); // 800 n'est plus proposé et n'est ni 500 ni 1000 : petit montant
+  s.totauxCahier = [100, 150]; // pendant la partie : sans effet sur elle
+  assert.strictEqual(S.vue(s, 'p2').cahier.total, 200);
+  assert.deepStrictEqual(S.totalCahierPour([500, 1000], 1000), 1000);
+});
 test('Cahier : contre les robots, la partie va jusqu\'au bout', () => {
   const s = salleAvec(1, 9);
   assert.ok(S.recevoir(s, 'p1', { type: 'reglages', formule: 'cahier', total: 500 }).ok);

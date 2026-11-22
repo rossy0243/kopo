@@ -121,8 +121,18 @@ void main() {
     expect(find.text('Fermer').hitTestable(), findsOneWidget);
   });
 
-  test('formules du Cahier : trois choix comme sur le site', () {
-    expect(App.formulesInter.map((f) => f.$1), ['normale', '500', '1000']);
+  test('formules du Cahier : trois choix comme sur le site, montants de Pilotage', () {
+    app.config = null;
+    expect(app.formulesInter().map((f) => f.$1), ['normale', '500', '1000']);
+    app.config = {'cahierTotaux': [300, 800]};
+    expect(app.formulesInter().map((f) => f.$2), ['Partie normale', 'Cahier 300', 'Cahier 800']);
+    expect(app.formulesInter([400, 900]).map((f) => f.$1), ['normale', '400', '900']);
+    expect(app.formulesInter([900, 400]).map((f) => f.$1), ['normale', '500', '1000']); // montants invalides : ceux de départ
+    // Total gardé sur le téléphone : 500 / 1000 deviennent le petit / le grand montant, comme sur le serveur.
+    expect(App.totalCahierPour([300, 800], 1000), 800);
+    expect(App.totalCahierPour([300, 800], 300), 300);
+    expect(App.totalCahierPour([300, 800], 42), isNull);
+    app.config = null;
     expect(K.red, isNotNull);
   });
 }
