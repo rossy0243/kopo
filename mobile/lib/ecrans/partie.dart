@@ -13,6 +13,7 @@ import '../commun/theme.dart';
 import '../etat.dart';
 import '../fenetres/cahier.dart';
 import '../fenetres/communes.dart';
+import '../fenetres/fleuve.dart' show PastilleFleuve;
 import '../fenetres/parametres.dart';
 import '../fenetres/partie_fenetres.dart';
 import '../fenetres/social.dart';
@@ -231,6 +232,7 @@ class _Paysage extends StatelessWidget {
           ),
         // L'en-tête, par-dessus la table
         Positioned(left: math.max(10.0, pad.left), right: math.max(10.0, pad.right), top: pad.top + 6, child: _Entete(v, true)),
+        if (app.objectifFleuve != null) Positioned(left: 0, right: 0, top: pad.top + 50, child: IgnorePointer(child: Center(child: PastilleFleuve(app.objectifFleuve!)))),
       ]);
     });
   }
@@ -322,6 +324,7 @@ class _PortraitState extends State<_Portrait> {
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           _Entete(v, false),
           const SizedBox(height: 8),
+          if (app.objectifFleuve != null) ...[Center(child: PastilleFleuve(app.objectifFleuve!)), const SizedBox(height: 8)],
           Expanded(
             child: SingleChildScrollView(
               child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [

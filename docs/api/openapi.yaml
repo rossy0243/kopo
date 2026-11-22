@@ -43,6 +43,7 @@ tags:
   - name: Ligue
   - name: Parrainage
   - name: Match du jour
+  - name: Le Fleuve
   - name: La Bande
   - name: Salles
 
@@ -876,6 +877,72 @@ paths:
                   numero: { type: integer }
                   liste: { type: array, items: { $ref: '#/components/schemas/LigneMatchJour' } }
                   moi: { oneOf: [{ type: 'null' }, { $ref: '#/components/schemas/LigneMatchJour' }] }
+
+  # ------------------------------------------------------------------ Le Fleuve
+  /fleuve:
+    get:
+      tags: [Le Fleuve]
+      summary: 'Le Fleuve (Congo pour Kopo, Niger pour Inter (8)) : pagaies, étoiles, étapes visibles'
+      description: |
+        Fermé tant que l'admin ne l'ouvre pas (`/config` donne `fleuve` : ferme, testeurs ou ouvert). 5 pagaies par jour (Kinshasa), communes
+        aux deux fleuves ; une pagaie se perd à chaque échec. Les étapes renvoyées vont jusqu'à la fin du bief en cours (50 étapes par bief,
+        une escale toutes les 10). Pour jouer : salle temps réel `fleuve` (voir temps-reel.md).
+      responses:
+        '200':
+          description: État des deux fleuves
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ouvert: { type: boolean }
+                  google: { type: boolean }
+                  pagaies: { type: object, properties: { restantes: { type: integer }, max: { type: integer }, retourMs: { type: integer } } }
+                  etoilesVille: { type: integer, description: Étoiles à gagner dans une ville pour affronter son boss }
+                  fleuves:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      properties:
+                        nom: { type: string }
+                        jeu: { enum: [kopo, inter8] }
+                        courante: { type: [integer, 'null'], description: Première étape pas encore réussie (null = tout est fait) }
+                        publiees: { type: integer }
+                        bief: { type: integer }
+                        etoiles: { type: integer }
+                        suiteBientot: { type: boolean }
+                        ville: { type: string }
+                        etapes: { type: array, items: { type: object, properties: { n: { type: integer }, etoiles: { type: integer }, escale: { type: boolean }, ville: { type: string } } } }
+  /fleuve/{fleuve}/{numero}:
+    get:
+      tags: [Le Fleuve]
+      summary: Une étape avant de jouer (objectif, robots, pièges, seuils des étoiles)
+      parameters:
+        - { name: fleuve, in: path, required: true, schema: { enum: [congo, niger] } }
+        - { name: numero, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: L'étape ; `refus` dit pourquoi on ne peut pas la jouer (null sinon)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  numero: { type: integer }
+                  jeu: { enum: [kopo, inter8] }
+                  escale: { type: boolean }
+                  ville: { type: string }
+                  joueurs: { type: integer }
+                  robots: { enum: [faciles, normaux, forts] }
+                  force: { type: integer }
+                  texte: { type: string }
+                  pieges: { type: array, items: { type: object, properties: { id: { type: string }, texte: { type: string } } } }
+                  seuils: { type: object, properties: { deux: { type: integer }, trois: { type: integer } } }
+                  etoiles: { type: integer }
+                  refus: { type: [string, 'null'] }
+                  pagaies: { type: object, properties: { restantes: { type: integer }, max: { type: integer } } }
+                  villeEtoiles: { type: [integer, 'null'] }
+                  etoilesVille: { type: integer }
 
   # ------------------------------------------------------------------ La Bande
   /bandes:

@@ -18,6 +18,7 @@ const { creerParcours } = require('./parcours');
 const { creerParrainage } = require('./parrainage');
 const { creerMatchJour } = require('./match-jour');
 const { creerBande } = require('./bande');
+const { creerFleuve } = require('./fleuve');
 const { creerPush } = require('./push');
 const { creerStickers } = require('./stickers');
 const { creerBouquets } = require('./bouquets');
@@ -47,6 +48,8 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
   const matchJour = creerMatchJour(base, reglages, env);
   const bande = creerBande(base, reglages, comptes, matchJour, social);
   const stickers = creerStickers(base, reglages, comptes);
+  const fleuve = creerFleuve(base, reglages, comptes);
+  await fleuve.nettoyer().catch((e) => console.error('Fleuve :', e.message)); // aucune étape n'a survécu au redémarrage
   const bouquets = creerBouquets(base, reglages, comptes);
   const abonnement = creerAbonnement(base, env);
   abonnement.prix = () => reglages.get('kopoPlus');
@@ -64,7 +67,7 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
   minuteurPush.unref();
   // Jouer en ligne ou entre amis demande un compte Google dès que la connexion Google est active.
   const googleObligatoire = env.CONNEXION_GOOGLE === '1' && !!env.SUPABASE_URL;
-  SalleKopo.services = { base, auth, comptes, reglages, ligue, social, parcours, parrainage, matchJour, bande, stickers, abonnement, googleObligatoire };
+  SalleKopo.services = { base, auth, comptes, reglages, ligue, social, parcours, parrainage, matchJour, bande, fleuve, stickers, abonnement, googleObligatoire };
 
   const app = express();
   app.set('trust proxy', 1);
@@ -81,7 +84,7 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
   // version = commit déployé (Render le donne dans RENDER_GIT_COMMIT) : pour vérifier qu'une mise à jour est en ligne.
   app.get('/sante', (req, res) => res.json({ ok: true, salles: salles.size, version: (env.RENDER_GIT_COMMIT || '').slice(0, 7) || null }));
   // API des joueurs : /api (site) et /api/v1 (applis mobiles, version figée de l'API). Les deux servent les mêmes routes.
-  const routes = routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours, parrainage, matchJour, bande, push, stickers, bouquets, abonnement, env });
+  const routes = routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours, parrainage, matchJour, bande, fleuve, push, stickers, bouquets, abonnement, env });
 
   // Compteur en ligne et salles ouvertes (lu par l'accueil).
   routes.get('/en-ligne', async (req, res) => {
@@ -124,7 +127,7 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
   app.get('/vendor/livekit-client.js', (req, res) => { res.set('Cache-Control', 'public, max-age=604800'); res.type('application/javascript'); res.sendFile(path.join(__dirname, '..', '..', 'vendor', 'livekit-client.umd.js')); });
   app.use('/api/v1', routes);
   app.use('/api', routes);
-  app.use('/admin/api', routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainage, bande, push, stickers, bouquets, abonnement, salles, demarrage: Date.now() }));
+  app.use('/admin/api', routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainage, bande, fleuve, push, stickers, bouquets, abonnement, salles, demarrage: Date.now() }));
   app.get('/admin', (req, res) => { res.set('Cache-Control', 'no-store'); res.set('X-Frame-Options', 'DENY'); res.sendFile(path.join(__dirname, '..', 'public', 'admin.html')); });
 
   const serveurHttp = http.createServer(app);
@@ -140,12 +143,14 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
   jeu.define('inter8-mise', SalleKopo).filterBy(['publique', 'taille', 'mise']);
   // Entraînement contre les robots (Kopo ou Inter (8), options.jeu) : une salle par joueur, sans compte Google.
   jeu.define('entrainement', SalleKopo);
+  // Le Fleuve : une salle par étape jouée, un seul joueur (options.fleuve, options.numero).
+  jeu.define('fleuve', SalleKopo);
   await new Promise((ok) => serveurHttp.listen(port, ok));
   const adresse = serveurHttp.address();
   console.log(`Kopo : serveur prêt sur le port ${adresse.port} (base : ${base.genre}).`);
 
   return {
-    port: adresse.port, base, comptes, reglages, auth, ligue, social, parcours, parrainage, matchJour, bande, push, abonnement, stickers,
+    port: adresse.port, base, comptes, reglages, auth, ligue, social, parcours, parrainage, matchJour, bande, fleuve, push, abonnement, stickers,
     async arreter() { clearInterval(minuteurSaison); clearInterval(minuteurBande); clearInterval(minuteurPush); clearInterval(minuteurRappels); await jeu.gracefullyShutdown(false).catch(() => {}); serveurHttp.close(); await base.fermer(); },
   };
 }

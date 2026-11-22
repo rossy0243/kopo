@@ -115,6 +115,9 @@ class App extends ChangeNotifier {
   int joueursEnLigne = 0;
   List<Map<String, dynamic>> sallesOuvertes = [];
   Map<String, dynamic>? etatJour, etatBandes;
+  /// Le Fleuve : état des deux cartes (GET /fleuve), et l'objectif de l'étape en cours (affiché pendant la partie).
+  Map<String, dynamic>? etatFleuve;
+  String? objectifFleuve;
   int amisEnLigne = 0, demandesAmi = 0;
   String? ligueResume;
   bool pointLigue = false, pointJour = false;
@@ -538,8 +541,15 @@ class App extends ChangeNotifier {
       pointJour = e['actif'] == true && !(e['moi'] is Map && e['moi']['fini'] == true);
     } catch (_) {}
     try { etatBandes = (await Api.get('/bandes') as Map).cast<String, dynamic>(); } catch (_) {}
+    await majFleuve();
     try { final a = await Api.get('/amis') as List; amisEnLigne = a.where((x) => x['en_ligne'] == true).length; } catch (_) {}
     maj();
+  }
+  /// Le Fleuve : on ne demande l'état que s'il n'est pas fermé à tous (réglage de l'admin, dans /config).
+  Future<void> majFleuve() async {
+    final f = config?['fleuve'];
+    if (!enLigne || f == null || f == 'ferme') { etatFleuve = null; return; }
+    try { etatFleuve = (await Api.get('/fleuve') as Map).cast<String, dynamic>(); } catch (_) {}
   }
   Future<void> majOngletLigue() async {
     if (!enLigne) return;
@@ -647,11 +657,13 @@ class App extends ChangeNotifier {
     return true;
   }
 
-  /// facon : {creer, jeu, mode, jRetour} | {code} | {taille, mise, jeu} | {reconnexion, code, taille} | {matchJour} | {robots...}
+  /// facon : {creer, jeu, mode, jRetour} | {code} | {taille, mise, jeu} | {reconnexion, code, taille} | {matchJour} | {fleuve, numero} | {robots...}
   Future<void> entrerServeur(String nom, Map<String, dynamic> facon) async {
-    if (facon['reconnexion'] == null && facon['matchJour'] == null && facon['robots'] == null && exigerGoogle()) return;
+    if (facon['reconnexion'] == null && facon['matchJour'] == null && facon['fleuve'] == null && facon['robots'] == null && exigerGoogle()) return;
     final mises = {for (final m in niveauxMise) m.$1: m.$2};
-    afficherConnexion(facon['matchJour'] != null
+    afficherConnexion(facon['fleuve'] != null
+        ? "Mise à l'eau de la pirogue…"
+        : facon['matchJour'] != null
         ? 'Préparation du Match du jour…'
         : facon['robots'] != null
             ? 'Préparation de la table…'
@@ -678,6 +690,8 @@ class App extends ChangeNotifier {
         }
       } else if (facon['matchJour'] != null) {
         room = await srv.creer('kopo-jour', {'jeton': j});
+      } else if (facon['fleuve'] != null) {
+        room = await srv.creer('fleuve', {'jeton': j, 'fleuve': facon['fleuve'], 'numero': facon['numero']});
       } else if (facon['robots'] != null) {
         room = await srv.creer('entrainement', {'jeton': j, ...(facon['robots'] as Map).cast<String, Object?>()});
       } else if (facon['creer'] != null) {
@@ -699,7 +713,7 @@ class App extends ChangeNotifier {
       }
       reveil.cancel();
       if (_client != jeton) { room.abandonner(); return; }
-      _annoncerMicro = facon['reconnexion'] == null && facon['matchJour'] == null && facon['robots'] == null;
+      _annoncerMicro = facon['reconnexion'] == null && facon['matchJour'] == null && facon['fleuve'] == null && facon['robots'] == null;
       _brancher(room, nom, facon);
     } catch (e) {
       reveil.cancel();
@@ -778,6 +792,19 @@ class App extends ChangeNotifier {
             if (d['fin'] == true) { _depart = true; quitter(); Timer(const Duration(milliseconds: 250), () => resultatMatchJourUi?.call(d)); }
             else if (d['debut'] == true) { toast(d['officiel'] == true ? 'Match du jour n°${d['numero']} : un seul essai, bonne chance !' : 'Entraînement : ce Match ne compte pas.'); }
           }
+        // Le Fleuve : au début, l'objectif de l'étape (rappelé en haut de la table) ; à la fin, les étoiles.
+        case 'fleuve':
+          if (d is Map) {
+            if (d['fin'] == true) {
+              _depart = true; quitter();
+              Timer(const Duration(milliseconds: 250), () { if (d['erreur'] != null) { toast(d['erreur'].toString(), Niv.echec); } else { resultatFleuveUi?.call(d); } });
+            } else if (d['debut'] == true && d['etape'] is Map) {
+              final t = (d['etape'] as Map)['texte']?.toString() ?? '';
+              objectifFleuve = t;
+              toast(d['adoucir'] == true ? "$t · robots un peu moins forts aujourd'hui" : t);
+              maj();
+            }
+          }
       }
     }));
     room.fermee.then((code) {
@@ -810,6 +837,7 @@ class App extends ChangeNotifier {
     if (vocal.actif) vocal.signaler();
   }
   void Function(Map r)? resultatMatchJourUi;
+  void Function(Map r)? resultatFleuveUi;
 
   void envoyer(Map<String, dynamic> msg) => _salle?.envoyer(msg['type'] as String, msg);
   void action(Map<String, dynamic> a) => envoyer({'type': 'action', 'action': a});
@@ -824,6 +852,7 @@ class App extends ChangeNotifier {
     _abonnements.clear();
     if (s != null) { s.quitter().catchError((_) => 1000); }
     vocal.arreter();
+    objectifFleuve = null;
     vue = vueAvant = null;
     _minuteurFenetre?.cancel();
     robotsAComposer = false;
@@ -1225,6 +1254,7 @@ class App extends ChangeNotifier {
     entrerServeur(p, {'robots': {'jeu': inter ? 'inter8' : 'kopo', 'robots': 2, 'niveau': 'gentils', 'delai': 0, 'lancer': true, if (inter) 'mode': 'simple', if (inter) 'jRetour': false}});
   }
   void jouerMatchJour() { final p = lirePseudo(); if (p == null) return; fermerFenetre(); entrerServeur(p, {'matchJour': true}); }
+  void jouerEtapeFleuve(String fleuve, int numero) { final p = lirePseudo(); if (p == null) return; fermerFenetre(); entrerServeur(p, {'fleuve': fleuve, 'numero': numero}); }
   void rejoindreCode(String code) { final p = lirePseudo(); if (p == null) return; fermerFenetre(); entrerServeur(p, {'code': code}); }
 
   void inviterAmi(String id, String pseudoAmi) { amiAInviter = id; amiAInviterPseudo = pseudoAmi; amiAInviterQuand = DateTime.now(); }

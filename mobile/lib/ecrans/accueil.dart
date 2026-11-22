@@ -12,6 +12,7 @@ import '../etat.dart';
 import '../fenetres/accueil_fenetres.dart';
 import '../fenetres/communes.dart';
 import '../fenetres/compet.dart';
+import '../fenetres/fleuve.dart';
 import '../fenetres/parametres.dart';
 import '../fenetres/progres.dart';
 import '../fenetres/social.dart';
@@ -97,8 +98,14 @@ class Accueil extends StatelessWidget {
       resumeBande = x == null ? 'Défie tes amis' : x['inscrit'] == true ? "${x['jeSuisChef'] == true ? '👑 ' : ''}${x['nom']} · ${x['rang']}e" : x['nom'].toString();
     }
     final creerSous = inter ? 'Entre amis, de 2 à 8 · simple ou délire' : 'Entre amis, de 2 à 9';
+    // Le Fleuve : le Congo pour Kopo, le Niger pour Inter (8). Visible quand l'admin l'ouvre (à tous ou aux testeurs).
+    final ef = app.etatFleuve;
+    final fleuves = ef != null && ef['ouvert'] == true ? ef['fleuves'] as Map? : null;
+    final fl = fleuves == null ? null : fleuves[inter ? 'niger' : 'congo'] as Map?;
+    final resumeFleuve = fl == null ? null : (fl['publiees'] as num? ?? 0) > 0 ? "${fl['nom']} · ${fl['courante'] != null ? 'étape ${fl['courante']}' : 'tout est fait'} · ★ ${fl['etoiles']}" : "${fl['nom']} · bientôt";
     return [
       CarteMode('creer', 'Créer une partie', creerSous, coin: '♠', creer: true, amis: app.amisEnLigne, onTap: garde(() => creer(), ouvertInter: true)),
+      if (resumeFleuve != null) CarteMode('fleuve', 'Le Fleuve', resumeFleuve, coin: '♠', onTap: garde(() => ouvrirFleuve(inter ? 'niger' : 'congo'), ouvertInter: true)),
       // Match du jour et Bande : Kopo seulement, les cartes disparaissent avec Inter (8), comme sur le site.
       if (!inter) CarteMode('jour', 'Match du jour', resumeJour ?? 'La même partie pour tous', coin: '♦', point: app.pointJour, onTap: garde(ouvrirMatchJour)),
       if (!inter) CarteMode('bande', 'La Bande', resumeBande ?? 'Défie tes amis', coin: '♥', onTap: garde(() => ouvrirBande())),

@@ -94,7 +94,10 @@
   function forceRobots(s, j) {
     if (s.robots === 'gentils') return 0;
     const plage = PLAGES_FORCE[niveauDuRobot(s, j)] || PLAGES_FORCE.normaux;
-    const n = s.niveauJoueur > 1 ? s.niveauJoueur : 1;
+    // Le Fleuve (serveur) : un robot peut avoir sa propre force (j.force, 1 à 20), sinon celle de la table.
+    const r = j && s.joueurs ? s.joueurs.find((x) => x.id === j) : null;
+    const f = r && !r.remplace && r.force > 0 ? r.force : s.niveauJoueur;
+    const n = f > 1 ? f : 1;
     const t = Math.min(1, (n - 1) / 19);
     return plage[0] + (plage[1] - plage[0]) * t;
   }
@@ -231,7 +234,11 @@
     const avant = m.table.map((p) => ({ joueur: p.joueur, cartes: p.cartes.slice(), compte: p.compte }));
     const phaseAvant = m.phase;
     const mainAvant = (m.mains[action.joueur] || []).slice();
+    // Le Fleuve (serveur) : suivi des coups pour les objectifs et les étoiles. Absent ailleurs.
+    const tailles = s.surAction ? Object.fromEntries(Object.entries(m.mains).map(([k, v]) => [k, v.length])) : null;
+    const courant = m.joueurCourant;
     K.jouer(m, action);
+    if (s.surAction) s.surAction(s, m, action, tailles, courant);
     const j = action.joueur;
     let fin = null;
     if (action.type === 'katapss') {
@@ -360,7 +367,9 @@
     const presents = (l) => l.filter((id) => s.restants.includes(id));
     const tour = K.melanger(s.donne.ordre, hasardManche(s.donne.graine, 0)); // ordre autour de la table, places vides comprises : le même à chaque manche
     const { mains, redistributions } = K.distribuer(presents(s.donne.ordre), rng);
-    const depart = Math.floor(rng() * tour.length);
+    let depart = Math.floor(rng() * tour.length);
+    // Le Fleuve, piège « tu joues en dernier » (1re manche) : on ouvre juste après le joueur.
+    if (s.donne.dernier && s.numeroManche === 0 && tour.includes(s.donne.dernier)) depart = (tour.indexOf(s.donne.dernier) + 1) % tour.length;
     const ouvreur = presents(tour.slice(depart).concat(tour.slice(0, depart)))[0];
     return { sieges: presents(tour), mains, redistributions, premier: ouvreur };
   }

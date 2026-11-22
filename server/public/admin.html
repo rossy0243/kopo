@@ -186,6 +186,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid rgba(226,176,74,.
   <symbol id="d-loupe" viewBox="0 0 32 32"><rect x="8" y="4" width="16" height="24" rx="2.5"/><circle cx="15" cy="14" r="4"/><path d="M18 17l3.5 3.5"/></symbol>
   <symbol id="d-argent" viewBox="0 0 32 32"><rect x="4" y="9" width="24" height="15" rx="2.5"/><circle cx="16" cy="16.5" r="3.5"/><path d="M8 13h.01M24 20h.01"/><circle cx="16" cy="16.5" r="1.2" class="acc"/></symbol>
   <symbol id="d-bande" viewBox="0 0 32 32"><rect x="8" y="4" width="16" height="24" rx="2.5"/><circle cx="13" cy="13" r="2.5"/><circle cx="19" cy="13" r="2.5"/><path d="M10 22a3 3 0 0 1 6 0M16 22a3 3 0 0 1 6 0"/></symbol>
+  <symbol id="d-fleuve" viewBox="0 0 32 32"><rect x="8" y="4" width="16" height="24" rx="2.5"/><path d="M11 12c2-1.5 3.5 1.5 5 0s3-1.5 5 0M11 17c2-1.5 3.5 1.5 5 0s3-1.5 5 0M11 22c2-1.5 3.5 1.5 5 0s3-1.5 5 0"/><circle cx="21" cy="8.5" r="1.5" class="acc"/></symbol>
   <symbol id="d-annonce" viewBox="0 0 32 32"><path d="M6 13v6h4l9 5V8l-9 5z"/><path d="M23 12a5 5 0 0 1 0 8"/><circle cx="25.5" cy="9" r="1.6" class="acc"/></symbol>
   <symbol id="d-plus" viewBox="0 0 32 32"><circle cx="9" cy="16" r="1.8"/><circle cx="16" cy="16" r="1.8"/><circle cx="23" cy="16" r="1.8"/></symbol>
   <symbol id="d-journal" viewBox="0 0 32 32"><rect x="8" y="4" width="16" height="24" rx="2.5"/><path d="M12 10h8M12 14h8M12 18h5"/></symbol>
@@ -221,7 +222,7 @@ const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const nb = (x) => (x ?? 0).toLocaleString('fr-FR');
 const date = (d) => d ? new Date(d).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : '—';
 const dateKin = (d) => d ? new Date(d).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Africa/Kinshasa' }) : '—';
-const MOTIFS = { bienvenue: 'Bienvenue', bonus_jour: 'Bonus du jour', manche: 'Manches survécues', katapss: 'Katapss', victoire: 'Victoires', deuxieme: '2e places', remise_a_flot: 'Remise à flot', admin: 'Corrections admin', cadeau: 'Cadeaux', mise: 'Mises', pot: 'Pots', saison: 'Récompenses de saison', parcours: 'Parcours de saison', boutique: 'Boutique', parrainage: 'Parrainage (parrains)', parrainage_filleul: 'Parrainage (filleuls)', mission: 'Missions du jour', defi: 'Défis de la semaine', bienvenue7: 'Bienvenue 7 jours', mise_bande: 'Mises de Bande', pot_bande: 'Pots de Bande (Chefs)', mise_rendue_bande: 'Mises rendues (2e de Bande)', remboursement_bande: 'Mises de Bande remboursées', achat_pieces: 'Bouquets de pièces (achats)' };
+const MOTIFS = { bienvenue: 'Bienvenue', bonus_jour: 'Bonus du jour', manche: 'Manches survécues', katapss: 'Katapss', victoire: 'Victoires', deuxieme: '2e places', remise_a_flot: 'Remise à flot', admin: 'Corrections admin', cadeau: 'Cadeaux', mise: 'Mises', pot: 'Pots', saison: 'Récompenses de saison', parcours: 'Parcours de saison', boutique: 'Boutique', parrainage: 'Parrainage (parrains)', parrainage_filleul: 'Parrainage (filleuls)', mission: 'Missions du jour', defi: 'Défis de la semaine', bienvenue7: 'Bienvenue 7 jours', mise_bande: 'Mises de Bande', pot_bande: 'Pots de Bande (Chefs)', mise_rendue_bande: 'Mises rendues (2e de Bande)', remboursement_bande: 'Mises de Bande remboursées', achat_pieces: 'Bouquets de pièces (achats)', fleuve: 'Le Fleuve (étoiles et villes)' };
 const DIV = { bois: 'Bois', bronze: 'Bronze', argent: 'Argent', or: 'Or', diamant: 'Diamant', legende: 'Légende' };
 // Bouquets de pièces (argent réel) : les prix du jeu, et un bouquet livré à la main tant que le mobile money n'est pas branché.
 async function bouquetsAdmin() {
@@ -303,7 +304,7 @@ const RUBRIQUES = [
   ['En jeu', [['direct', 'Tables en direct', 'd-direct']]],
   ['Joueurs', [['joueurs', 'Joueurs', 'd-joueurs'], ['signalements', 'Signalements', 'd-signal'], ['suspects', 'Comptes suspects', 'd-loupe']]],
   ['Audience et argent', [['audience', 'Audience', 'd-audience'], ['ventes', 'Ventes et paiements', 'd-argent'], ['economie', 'Économie des pièces', 'd-pieces'], ['stickers', 'Stickers', 'd-sticker']]],
-  ['Compétition', [['ligue', 'Ligue et saisons', 'd-ligue'], ['bandes', 'Bandes et Match du jour', 'd-bande']]],
+  ['Compétition', [['ligue', 'Ligue et saisons', 'd-ligue'], ['bandes', 'Bandes et Match du jour', 'd-bande'], ['fleuve', 'Le Fleuve', 'd-fleuve']]],
   ['Communication', [['notifications', 'Notifications push', 'd-notif'], ['annonces', 'Annonces et événements', 'd-annonce']]],
   ['Administration', [['reglages', 'Réglages du jeu', 'd-pilotage'], ['journal', 'Journal', 'd-journal']]],
 ];
@@ -890,6 +891,62 @@ afficher.ventes = async function ventes() {
 };
 
 // Comptes suspects (sortis de l'onglet Pièces) : seuils réglables dans Réglages > Sécurité.
+// --- Le Fleuve (fleuve.md) : état, biefs des deux fleuves, fabrication par les robots et publication.
+const ETATS_FLEUVE = [['ferme', 'Fermé'], ['testeurs', 'Testeurs'], ['ouvert', 'Ouvert à tous']];
+afficher.fleuve = async function fleuve(vue) {
+  if (vue && vue.bief) return afficherBief(vue.fleuve, vue.bief);
+  const F = await api('/fleuve');
+  const etat = F.reglages.etat || 'ferme';
+  const enCours = Object.values(F.travaux).some((t) => !t.fini);
+  const bloc = (cle, f) => {
+    const dernier = f.biefs.length ? f.biefs[f.biefs.length - 1].bief : 0;
+    const publies = f.biefs.filter((b) => b.publie).length;
+    return `<div class="carte"><div class="titre">${esc(f.nom)} <span class="muted">· ${f.jeu === 'kopo' ? 'Kopo' : 'Inter (8)'}</span></div>
+      <div class="tuiles" style="margin:10px 0">${tuile(publies, 'biefs publiés', publies * 50 + ' étapes')}${tuile(f.biefMeilleur || '—', 'bief du meilleur joueur', f.meilleur ? 'étape ' + f.meilleur : 'personne encore')}${tuile(nb(f.joueurs7j), 'joueurs sur 7 jours')}${tuile(f.alerte ? `<span class="ko">${f.avance}</span>` : f.avance, 'biefs d\'avance', f.alerte ? 'moins de 2 : fabrique la suite' : 'sur le meilleur joueur')}</div>
+      <table><tr><th>Bief</th><th class="n">Étapes</th><th>État</th><th></th></tr>${f.biefs.map((b) => {
+        const t = F.travaux[cle + ':' + b.bief];
+        const fab = t && !t.fini ? `<span class="muted">fabrication ${t.fait} / ${t.total}</span>` : t && t.erreur ? `<span class="ko">${esc(t.erreur)}</span>` : '';
+        return `<tr><td>Bief ${b.bief}</td><td class="n">${b.etapes} / 50</td><td>${b.publie ? '<span class="ok">publié</span>' : 'pas publié'} ${fab}</td><td style="text-align:right;white-space:nowrap"><button class="btn" data-voir="${cle}:${b.bief}">Voir</button> ${b.publie ? '' : `<button class="btn" data-generer="${cle}:${b.bief}">${b.etapes < 50 ? 'Fabriquer' : 'Refaire'}</button> <button class="btn principal" data-publier="${cle}:${b.bief}" ${b.etapes < 50 ? 'disabled' : ''}>Publier</button>`}</td></tr>`;
+      }).join('')}
+      ${(() => { const t = F.travaux[cle + ':' + (dernier + 1)]; return `<tr><td>Bief ${dernier + 1}</td><td class="n">0 / 50</td><td>${t && !t.fini ? `<span class="muted">fabrication ${t.fait} / ${t.total}</span>` : t && t.erreur ? `<span class="ko">${esc(t.erreur)}</span>` : '<span class="muted">pas encore fabriqué</span>'}</td><td style="text-align:right"><button class="btn principal" data-generer="${cle}:${dernier + 1}" ${t && !t.fini ? 'disabled' : ''}>Fabriquer</button></td></tr>`; })()}</table></div>`;
+  };
+  $('#contenu').innerHTML = `<h2>Le Fleuve</h2>
+    <div class="carte"><div class="titre">Ouverture</div><div class="s">Fermé : personne ne le voit. Testeurs : seulement les pseudos de la liste des testeurs (Réglages > Accès et versions). Ouvert : tout le monde.</div>
+      <div class="ligne">${ETATS_FLEUVE.map(([v, l]) => `<button class="btn${v === etat ? ' principal' : ''}" data-etat="${v}">${l}</button>`).join(' ')}</div></div>
+    <p class="muted">Chaque étape est fabriquée par les robots : un robot Fort joue l'étape à la place du joueur, jusqu'à trouver la force des robots qui donne la réussite visée ; les seuils des étoiles viennent des mêmes parties. Comptez quelques secondes par bief pour le Congo, plusieurs minutes pour le Niger. Pagaies, pièces, courbe et objectifs : <button class="lien" id="versReglagesFleuve">Réglages > Le Fleuve</button>.</p>
+    ${Object.entries(F.fleuves).map(([k, f]) => bloc(k, f)).join('')}`;
+  $('#versReglagesFleuve').onclick = () => aller('reglages', 'fleuve');
+  const action = async (fn) => { try { await fn(); } catch (e) { message(e.message); } afficher.fleuve(); };
+  $('#contenu').querySelectorAll('[data-etat]').forEach((b) => (b.onclick = () => {
+    if (b.dataset.etat === 'ouvert' && !confirm('Ouvrir le Fleuve à tous les joueurs ?')) return;
+    action(() => api('/reglages/fleuve', { methode: 'PUT', corps: { valeur: { ...F.reglages, etat: b.dataset.etat } } }));
+  }));
+  $('#contenu').querySelectorAll('[data-voir]').forEach((b) => (b.onclick = () => { const [f, n] = b.dataset.voir.split(':'); aller('fleuve', { fleuve: f, bief: Number(n) }); }));
+  $('#contenu').querySelectorAll('[data-generer]').forEach((b) => (b.onclick = () => { const [f, n] = b.dataset.generer.split(':'); action(() => api(`/fleuve/${f}/biefs/${n}/generer`, { methode: 'POST' })); }));
+  $('#contenu').querySelectorAll('[data-publier]').forEach((b) => (b.onclick = () => {
+    const [f, n] = b.dataset.publier.split(':');
+    if (confirm(`Publier le bief ${n} ? Les joueurs le verront tout de suite.`)) action(() => api(`/fleuve/${f}/biefs/${n}/publier`, { methode: 'POST' }));
+  }));
+  if (enCours) minuteur = setTimeout(() => { if (page === 'fleuve') afficher.fleuve().catch(() => {}); }, 3000);
+};
+async function afficherBief(fleuve, bief) {
+  const l = await api(`/fleuve/${fleuve}/biefs/${bief}`);
+  const robots = { faciles: 'Faciles', normaux: 'Normaux', forts: 'Forts' };
+  $('#contenu').innerHTML = `<h2><button class="lien" id="retourFleuve">Le Fleuve</button> › ${fleuve === 'congo' ? 'Congo' : 'Niger'}, bief ${bief}</h2>
+    <p class="muted">Force des robots de 1 à 60 (Faciles 1 à 20, Normaux 21 à 40, Forts 41 à 60). Réussite : visée → obtenue par le robot testeur. Chiffres réels : essais des joueurs, part des joueurs qui réussissent au premier essai. ⚠ : bien plus dur que prévu.</p>
+    <div class="carte defile"><table><tr><th class="n">N°</th><th>Ville</th><th class="n">Table</th><th>Robots</th><th>Objectif</th><th class="n">Réussite</th><th class="n">Étoiles 2 · 3</th><th class="n">Essais</th><th class="n">1er essai</th><th></th></tr>
+    ${l.map((e) => `<tr><td class="n">${e.numero}</td><td>${e.escale ? '<b>' + esc(e.ville) + '</b> (boss)' : '<span class="muted">' + esc(e.ville) + '</span>'}</td><td class="n">${e.joueurs}</td><td>${robots[e.robots] || esc(e.robots)} ${e.force} <span class="muted">(${e.d})</span></td><td>${esc(e.texte)}${e.pieges.length ? '<br><small class="muted">Piège : ' + e.pieges.map((p) => esc(p.texte)).join(', ') + '</small>' : ''}</td><td class="n${e.horsCible ? ' ko' : ''}">${e.vise} → ${e.taux} %</td><td class="n">${e.seuils.deux} · ${e.seuils.trois}</td><td class="n">${nb(e.chiffres.essais)}</td><td class="n">${e.chiffres.premier === null ? '—' : e.chiffres.premier + ' %'}${e.chiffres.bloque ? ' <span class="ko">⚠</span>' : ''}</td><td style="white-space:nowrap"><button class="btn" data-force="${e.numero}" data-d="${e.d}">Force</button> <button class="btn" data-refaire="${e.numero}">Refaire</button></td></tr>`).join('')}</table></div>`;
+  $('#retourFleuve').onclick = () => aller('fleuve');
+  const action = async (fn) => { try { await fn(); message('Étape mise à jour.'); } catch (e) { message(e.message); } afficherBief(fleuve, bief).catch((e) => message(e.message)); };
+  $('#contenu').querySelectorAll('[data-force]').forEach((b) => (b.onclick = () => {
+    const d = prompt('Force des robots (1 à 60). Les seuils des étoiles seront recalculés.', b.dataset.d);
+    if (d !== null && d !== '') action(() => api(`/fleuve/${fleuve}/etapes/${b.dataset.force}/modifier`, { methode: 'POST', corps: { d: Number(d) } }));
+  }));
+  $('#contenu').querySelectorAll('[data-refaire]').forEach((b) => (b.onclick = () => {
+    if (confirm(`Refaire l'étape ${b.dataset.refaire} (nouvel objectif, nouvelle donne) ? Ceux qui l'ont réussie gardent leurs étoiles.`)) { b.disabled = true; b.textContent = '…'; action(() => api(`/fleuve/${fleuve}/etapes/${b.dataset.refaire}/refaire`, { methode: 'POST' })); }
+  }));
+}
+
 afficher.suspects = async function suspects() {
   const s = await api('/suspects');
   const qui = (id, pseudo, numero, cree, statut) => `<button class="lien" data-joueur="${esc(id)}">${esc(pseudo)}#${esc(numero)}</button><br><small class="muted">créé le ${date(cree)}${statut !== 'actif' ? ' · <span class="statut-' + esc(statut) + '">' + esc(statut) + '</span>' : ''}</small>`;
@@ -1024,6 +1081,35 @@ const ONGLETS_REGLAGES = [
       { c: 'bande.penaliteRetard', l: 'Pénalité d\'un jour manqué', t: 'n', u: 'points', min: 0, max: 100 },
       { c: 'bande.joursCompte', l: 'Âge minimum du compte pour miser', t: 'n', u: 'jours', min: 0 },
       { c: 'bande.partiesMin', l: 'Parties jouées pour miser', t: 'n', u: 'parties', min: 0 }] },
+  ] },
+  { id: 'fleuve', titre: 'Le Fleuve', nouveau: true, sections: [
+    { titre: 'Le Fleuve', aide: 'L\'état (fermé, testeurs, ouvert) se change sur la page « Le Fleuve ». Les testeurs sont ceux de l\'onglet « Accès et versions ».', champs: [
+      { c: 'fleuve.pagaies', l: 'Pagaies par jour', a: 'Communes aux deux fleuves. Une pagaie ne se perd qu\'en cas d\'échec.', t: 'n', u: 'pagaies', min: 1, max: 20 },
+      { c: 'fleuve.piecesEtoile', l: 'Pièces par étoile gagnée', a: 'Une seule fois par étoile ; doublées pour la première étape réussie du jour.', t: 'n', u: 'pièces', min: 0, max: 1000 },
+      { c: 'fleuve.piecesEscale', l: 'Pièces pour une ville passée', a: 'Première victoire sur le boss d\'une escale.', t: 'n', u: 'pièces', min: 0, max: 10000 },
+      { c: 'fleuve.etoilesVille', l: 'Étoiles pour affronter le boss', a: 'Sur les 9 étapes de la ville (27 au plus).', t: 'n', u: 'étoiles', min: 0, max: 27 },
+      { c: 'fleuve.adoucirJours', l: 'Aide après', a: 'Jours d\'échecs sur la même étape avant que les robots baissent d\'un cran.', t: 'n', u: 'jours', min: 1, max: 30 }] },
+    { titre: 'Courbe de difficulté', aide: 'Note de 1 (facile) à 100 (très dur). Chaque étape a la note de départ, plus la montée par bief, plus le décalage de sa place dans la ville. La réussite visée est celle d\'un robot Fort qui joue à la place du joueur.', champs: [
+      { c: 'fleuveRecette.courbe.depart', l: 'Note de la 1re étape', t: 'n', min: 1, max: 100 },
+      { c: 'fleuveRecette.courbe.parBief', l: 'Montée à chaque bief', t: 'n', min: 0, max: 50 },
+      ...[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => ({ c: 'fleuveRecette.cycle.' + i, l: i === 9 ? 'Décalage de l\'escale (étape 10)' : `Décalage de l'étape ${i + 1} de la ville`, t: 'n', min: -50, max: 80 })),
+      { c: 'fleuveRecette.taux.facile', l: 'Réussite visée pour une note de 1', t: 'n', u: '%', min: 5, max: 100 },
+      { c: 'fleuveRecette.taux.dur', l: 'Réussite visée pour une note de 100', t: 'n', u: '%', min: 1, max: 100 },
+      { c: 'fleuveRecette.tolerance', l: 'Écart accepté', t: 'n', u: 'points', min: 1, max: 50 }] },
+    { titre: 'Étoiles', aide: 'Seuils calculés sur les parties d\'essai de chaque étape (1 étoile = objectif réussi).', champs: [
+      { c: 'fleuveRecette.etoiles.deux', l: '2e étoile : atteinte par', t: 'n', u: '% des essais', min: 5, max: 95 },
+      { c: 'fleuveRecette.etoiles.trois', l: '3e étoile : atteinte par', t: 'n', u: '% des essais', min: 1, max: 90 }] },
+    { titre: 'Objectifs et pièges débloqués', aide: 'Bief à partir duquel chaque objectif ou piège peut sortir dans les étapes fabriquées.', champs: [
+      ...[['manches', 'Se qualifier pour N manches'], ['finale', 'Atteindre la finale'], ['gagner', 'Gagner la partie'], ['premier', 'Sortir le premier'], ['top', 'Finir parmi les premiers (Inter)'], ['ramasser', 'Ramasser peu (Kopo)'], ['attaque', 'Faire piocher (Inter)'], ['pioche', 'Piocher peu (Inter)'], ['katapss', 'Faire un Katapss (Kopo)']].map(([k, l]) => ({ c: 'fleuveRecette.des.objectif_' + k, l: 'Objectif : ' + l, t: 'n', u: 'bief', min: 1, max: 999 })),
+      ...[['dernier', 'Jouer en dernier'], ['chrono', 'Chrono plus court'], ['delire', 'Deux paquets (Inter)'], ['jretour', 'J retour (Inter)']].map(([k, l]) => ({ c: 'fleuveRecette.des.piege_' + k, l: 'Piège : ' + l, t: 'n', u: 'bief', min: 1, max: 999 })),
+      { c: 'fleuveRecette.piege.escale', l: 'Chance d\'un piège sur l\'escale', t: 'n', u: '%', min: 0, max: 100 },
+      { c: 'fleuveRecette.piege.autre', l: 'Chance d\'un piège ailleurs', t: 'n', u: '%', min: 0, max: 100 }] },
+    { titre: 'Parties d\'essai', aide: 'Plus d\'essais : des seuils plus justes, mais une fabrication plus longue (surtout pour le Niger).', champs: [
+      { c: 'fleuveRecette.simulations', l: 'Essais pour les étoiles', t: 'n', u: 'parties', min: 20, max: 1000 },
+      { c: 'fleuveRecette.calibrage', l: 'Essais par force essayée', t: 'n', u: 'parties', min: 10, max: 400 },
+      { c: 'fleuveRecette.essais', l: 'Étapes candidates par place', t: 'n', min: 1, max: 20 },
+      { c: 'fleuveRecette.testeur.niveau', l: 'Robot qui joue à la place du joueur', t: 'choix', o: ROBOTS },
+      { c: 'fleuveRecette.testeur.force', l: 'Sa force', t: 'n', u: '/ 20', min: 1, max: 20 }] },
   ] },
   { id: 'cahier', titre: 'Inter (8) Cahier', sections: [
     { titre: 'Montants d\'élimination', aide: 'Les deux montants proposés à l\'hôte du salon. Une partie lancée garde le sien.', champs: [

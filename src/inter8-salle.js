@@ -107,7 +107,12 @@
     const r = s.joueurs.find((x) => x.id === j);
     return r && !r.remplace && NIVEAUX_ROBOTS.includes(r.niveau) ? r.niveau : s.robots;
   }
-  const choixRobot = (s, j) => R.choixRobot(s.manche, j, niveauDuRobot(s, j), s.niveauJoueur, s.rng);
+  // Le Fleuve (serveur) : un robot peut avoir sa propre force (j.force, 1 à 20), sinon celle de la table.
+  function forceDuRobot(s, j) {
+    const r = s.joueurs.find((x) => x.id === j);
+    return r && !r.remplace && r.force > 0 ? r.force : s.niveauJoueur;
+  }
+  const choixRobot = (s, j) => R.choixRobot(s.manche, j, niveauDuRobot(s, j), forceDuRobot(s, j), s.rng);
 
   function estAbsent(s, id) {
     const j = s.joueurs.find((x) => x.id === id);
@@ -133,7 +138,11 @@
   function appliquer(s, action) {
     const courantAvant = s.manche.joueurCourant;
     const contestablesAvant = (s.manche.contestables || []).slice();
+    // Le Fleuve (serveur) : suivi des coups pour les objectifs et les étoiles. Absent ailleurs.
+    const mAvant = s.manche;
+    const tailles = s.surAction ? Object.fromEntries(Object.entries(mAvant.mains).map(([k, v]) => [k, v.length])) : null;
     I.jouer(s.manche, action);
+    if (s.surAction) s.surAction(s, mAvant, action, tailles, courantAvant);
     finirMancheSiBesoin(s);
     // Annoncer ou contester ne change pas le joueur courant : on ne relance pas son chrono.
     if (s.manche && (s.manche.joueurCourant !== courantAvant || action.type === 'jouer' || action.type === 'piocher' || s.etat !== 'manche')) armerChrono(s);
@@ -154,7 +163,7 @@
     // Un robot annonce dans la foulée de son coup, sans attendre sa pause de réflexion.
     // Un robot facile peut oublier : il ne se rattrape pas, on pourra le contester après les 3 s.
     for (const j of nouveaux.filter((x) => estRobot(s, x))) {
-      if (R.robotAnnonce(niveauDuRobot(s, j), s.niveauJoueur, s.rng)) {
+      if (R.robotAnnonce(niveauDuRobot(s, j), forceDuRobot(s, j), s.rng)) {
         I.jouer(m, { type: 'annoncer', joueur: j });
         delete s.graces[j];
       } else s.oublis[j] = true;
@@ -287,10 +296,32 @@
     return premier;
   }
 
+  // Le Fleuve (serveur) : la même donne pour tous. s.donne = { graine, ordre, dernier? } : ordre = les places
+  // fixes (le joueur d'abord, puis les robots). Comme au Kopo (placerDonne), un hasard tiré de la graine et du
+  // numéro de la donne fixe l'ordre autour de la table, le paquet et qui commence ; le joueur reçoit toujours
+  // les 4 premières cartes distribuées. Une donne nulle rejouée prend un autre tirage (sinon elle se répéterait).
+  // dernier : piège « tu joues en dernier » (1re donne), on commence juste après ce joueur.
+  const hasardManche = (graine, manche) => I.hasard((graine + Math.imul(manche, 0x9e3779b1)) >>> 0);
+  function placerDonne(s) {
+    const rng = hasardManche(s.donne.graine, s.numeroManche + 1 + 7919 * (s.nulles || 0));
+    const presents = (l) => l.filter((id) => s.restants.includes(id));
+    const tour = I.melanger(s.donne.ordre, hasardManche(s.donne.graine, 0));
+    const { mains, pioche } = I.distribuer(presents(s.donne.ordre), s.paquets, rng);
+    let depart = Math.floor(rng() * tour.length);
+    if (s.donne.dernier && s.numeroManche === 0 && tour.includes(s.donne.dernier)) depart = (tour.indexOf(s.donne.dernier) + 1) % tour.length;
+    const premier = presents(tour.slice(depart).concat(tour.slice(0, depart)))[0];
+    return { sieges: presents(tour), mains, pioche, premier, graine: Math.floor(rng() * 4294967296) };
+  }
+
   function demarrerManche(s) {
-    const sieges = s.restants.slice(); // mêmes places qu'à la donne précédente
-    const { mains, pioche } = I.distribuer(sieges, s.paquets, s.rng);
-    const premier = choisirPremier(s, sieges);
+    let sieges, mains, pioche, premier, graine;
+    if (s.donne) ({ sieges, mains, pioche, premier, graine } = placerDonne(s));
+    else {
+      sieges = s.restants.slice(); // mêmes places qu'à la donne précédente
+      ({ mains, pioche } = I.distribuer(sieges, s.paquets, s.rng));
+      premier = choisirPremier(s, sieges);
+      graine = Math.floor(s.rng() * 4294967296);
+    }
     s.numeroManche++;
     s.suiteA = null;
     s.graces = {};
@@ -298,7 +329,7 @@
     // Avec une distribution animée, l'effet de la carte de départ (pénalité, tour sauté, J retour)
     // attend la fin du compte à rebours : le joueur sanctionné reçoit ses cartes après les autres.
     const differerDepart = s.durees.depart > 0;
-    s.manche = I.nouvelleManche(sieges, mains, pioche, premier, { mode: s.mode, jRetour: s.jRetour, graine: Math.floor(s.rng() * 4294967296), differerDepart, cahier: !!s.cahier, bareme: s.cahier && s.cahier.bareme });
+    s.manche = I.nouvelleManche(sieges, mains, pioche, premier, { mode: s.mode, jRetour: s.jRetour, graine, differerDepart, cahier: !!s.cahier, bareme: s.cahier && s.cahier.bareme });
     s.etat = 'manche';
     const depart = rapide(s) ? Math.min(s.durees.depart, RAPIDE.depart) : s.durees.depart;
     s.pause = depart > 0 ? { type: 'depart', jusqua: s.horloge() + depart, total: depart } : null;

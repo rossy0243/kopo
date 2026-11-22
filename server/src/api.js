@@ -30,7 +30,7 @@ function clientMobile(req) {
 // Adresse publique du site (liens légaux, liens d'invitation).
 const adresseSite = (env) => String(env.SITE_URL || 'https://masano.online/').replace(/\/?$/, '/');
 
-function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours, parrainage, matchJour, bande, push, stickers, bouquets, abonnement, env = process.env }) {
+function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours, parrainage, matchJour, bande, fleuve, push, stickers, bouquets, abonnement, env = process.env }) {
   const r = express.Router();
   r.use(express.json({ limit: '64kb' })); // la copie du profil (PUT /profil) peut faire quelques dizaines de ko
   // Limite par adresse IP (large : en 4G, beaucoup de joueurs partagent la même adresse).
@@ -88,6 +88,7 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours,
       cahier: t.cahier, // barème du mode Cahier (Pilotage), pour les parties que le site fait tourner lui-même
       stickers: { actif: !!(t.stickers && t.stickers.actif), vente: !!(t.stickers && t.stickers.actif && t.stickers.vente) }, // stickers animés : grisés tant que l'admin ne les allume pas
       communautes: communautesPubliques(t.communautes), // groupes à rejoindre (bouton Partager)
+      fleuve: (t.fleuve && t.fleuve.etat) || 'ferme', // Le Fleuve : ferme, testeurs (GET /fleuve dit si ce joueur y a accès) ou ouvert
       nouveaute: t.nouveaute && t.nouveaute.bande ? 'bande' : null, // fenêtre « Nouveau : Match du jour et Bande »
       // Connexion Google : active quand CONNEXION_GOOGLE=1 et que Google est activé dans Supabase.
       google: env.CONNEXION_GOOGLE === '1' && env.SUPABASE_URL ? origineSupabase(env.SUPABASE_URL) : null,
@@ -193,6 +194,11 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours,
   // --- Match du jour et Bande (competition-amis.md)
   r.get('/match-jour', joueur, enveloppe(async (req, res) => res.json(await matchJour.etat(req.compte))));
   r.get('/match-jour/classement', joueur, enveloppe(async (req, res) => res.json(await matchJour.classement(req.compte, String(req.query.type || 'mondial'), { limite: req.query.limite }))));
+  // --- Le Fleuve (fleuve.md) : cartes du Congo et du Niger, pagaies, étoiles. On joue dans la salle « fleuve ».
+  if (fleuve) {
+    r.get('/fleuve', joueur, enveloppe(async (req, res) => res.json(await fleuve.etat(req.compte))));
+    r.get('/fleuve/:fleuve/:numero', joueur, enveloppe(async (req, res) => res.json(await fleuve.etape(req.compte, req.params.fleuve, req.params.numero))));
+  }
   r.get('/bandes', joueur, enveloppe(async (req, res) => res.json(await bande.mesBandes(req.compte))));
   r.post('/bandes', joueur, enveloppe(async (req, res) => res.json(await bande.creer(req.compte, req.body || {}))));
   r.get('/bandes/ouvertes', joueur, enveloppe(async (req, res) => res.json(await bande.ouvertes(req.compte, req.query.pays))));

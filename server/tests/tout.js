@@ -2473,6 +2473,173 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.ok(heureDeSilence(13, { silenceDebut: 12, silenceFin: 14 }) && !heureDeSilence(14, { silenceDebut: 12, silenceFin: 14 }));
     assert.ok(!heureDeSilence(3, { silenceDebut: 0, silenceFin: 0 }), 'même heure : pas de silence');
   });
+  // ===== Le Fleuve (fleuve.md) =====
+  console.log('Le Fleuve');
+  const FS = require('../src/fleuve-suivi');
+  const FG = require('../src/fleuve-generateur');
+  const regF = (cle, valeur) => api('/admin/api/reglages/' + cle, { methode: 'PUT', jeton: adminJeton, corps: { valeur } });
+  const recetteRapide = { ...FG.RECETTE_DEFAUT, simulations: 20, calibrage: 10, essais: 1 };
+  await test('Fleuve : villes vraies puis retour, étoiles, seuils toujours atteignables', () => {
+    const { villeDe, VILLES } = require('../src/fleuve');
+    assert.strictEqual(villeDe('congo', 1), 'Banana');
+    assert.strictEqual(villeDe('congo', 5), 'Kinshasa');
+    assert.strictEqual(villeDe('congo', VILLES.congo.length + 1), 'Kisangani · retour 2');
+    assert.strictEqual(villeDe('niger', VILLES.niger.length * 2 + 1), 'Onitsha · voyage 3');
+    assert.strictEqual(FS.etoilesDe({ reussi: false, score: 99 }, { deux: 1, trois: 2 }), 0);
+    assert.strictEqual(FS.etoilesDe({ reussi: true, score: 5 }, { deux: 6, trois: 9 }), 1);
+    assert.strictEqual(FS.etoilesDe({ reussi: true, score: 9 }, { deux: 6, trois: 9 }), 3);
+    const s = FG.seuilsDe([3, 3, 3, 3].map((score) => ({ score })));
+    assert.ok(s.deux <= 3 && s.trois <= 3, 'jamais au-dessus du meilleur essai');
+    assert.strictEqual(FS.texteObjectif({ type: 'manches', n: 3 }), 'Qualifie-toi pour 3 manches');
+  });
+  await test('Fleuve : réglages vérifiés, fermé par défaut', async () => {
+    assert.strictEqual(srv.reglages.get('fleuve').etat, 'ferme');
+    assert.strictEqual((await regF('fleuve', { ...DEFAUTS.fleuve, etat: 'grand' })).statut, 400);
+    assert.strictEqual((await regF('fleuve', { ...DEFAUTS.fleuve, pagaies: 0 })).statut, 400);
+    assert.strictEqual((await regF('fleuveRecette', { ...FG.RECETTE_DEFAUT, etoiles: { deux: 10, trois: 40 } })).statut, 400);
+    assert.strictEqual((await regF('fleuveRecette', recetteRapide)).statut, 200);
+    assert.strictEqual((await api('/api/config')).json.fleuve, 'ferme');
+  });
+  let gF;
+  await test('Fleuve : l\'admin fabrique un bief, puis le publie dans l\'ordre', async () => {
+    assert.strictEqual((await api('/admin/api/fleuve/congo/biefs/2/publier', { methode: 'POST', jeton: adminJeton })).statut, 400);
+    const g = await api('/admin/api/fleuve/congo/biefs/1/generer', { methode: 'POST', jeton: adminJeton });
+    assert.strictEqual(g.statut, 200);
+    assert.strictEqual((await api('/admin/api/fleuve/congo/biefs/1/generer', { methode: 'POST', jeton: adminJeton })).statut, 409, 'pas deux fois en même temps');
+    let r;
+    for (let t = 0; t < 1200; t++) { r = (await api('/admin/api/fleuve', { jeton: adminJeton })).json; if (r.travaux['congo:1'].fini) break; await attendre(100); }
+    assert.strictEqual(r.travaux['congo:1'].erreur, null);
+    assert.strictEqual(r.fleuves.congo.biefs[0].etapes, 50);
+    const etapes = (await api('/admin/api/fleuve/congo/biefs/1', { jeton: adminJeton })).json;
+    assert.strictEqual(etapes.length, 50);
+    for (const e of etapes) {
+      assert.ok(e.d >= 1 && e.d <= 60 && e.joueurs >= 2 && e.texte, 'étape ' + e.numero);
+      assert.ok(e.seuils.deux >= 1 && e.seuils.trois >= e.seuils.deux, 'seuils ' + e.numero);
+    }
+    assert.ok(etapes[9].escale && etapes[9].ville === 'Banana');
+    assert.strictEqual((await api('/admin/api/fleuve/congo/biefs/2/publier', { methode: 'POST', jeton: adminJeton })).statut, 400, 'bief 2 pas fabriqué');
+    assert.strictEqual((await api('/admin/api/fleuve/congo/biefs/1/publier', { methode: 'POST', jeton: adminJeton })).statut, 200);
+    const m = await api('/admin/api/fleuve/congo/etapes/3/modifier', { methode: 'POST', jeton: adminJeton, corps: { d: 2 } });
+    assert.deepStrictEqual([m.statut, m.json.d, m.json.publie], [200, 2, true]);
+    assert.ok((await api('/admin/api/journal', { jeton: adminJeton })).json.some((x) => x.action === 'fleuve:publier'));
+  });
+  await test('Fleuve : fermé aux joueurs, puis aux testeurs, puis ouvert', async () => {
+    gF = await connexionG('sb-fleuve-a', { providerId: 'g-fleuve-a' });
+    assert.strictEqual((await api('/api/fleuve', { jeton: gF.jeton })).json.ouvert, false);
+    await assert.rejects(new Client(URL_.replace('http', 'ws')).create('fleuve', { jeton: gF.jeton, fleuve: 'congo', numero: 1 }), /bientôt/);
+    const jeux = srv.reglages.get('jeux');
+    await regF('jeux', { ...jeux, testeurs: [gF.compte.pseudo] });
+    await regF('fleuve', { ...DEFAUTS.fleuve, etat: 'testeurs' });
+    assert.strictEqual((await api('/api/fleuve', { jeton: gF.jeton })).json.ouvert, true, 'testeur');
+    await regF('jeux', jeux);
+    await regF('fleuve', { ...DEFAUTS.fleuve, etat: 'ouvert' });
+    const e = (await api('/api/fleuve', { jeton: gF.jeton })).json;
+    assert.deepStrictEqual([e.ouvert, e.pagaies.restantes, e.fleuves.congo.courante, e.fleuves.congo.etapes.length, e.fleuves.niger.courante], [true, 5, 1, 50, null]);
+    const d2 = (await api('/api/fleuve/congo/2', { jeton: gF.jeton })).json;
+    assert.match(d2.refus, /d'abord/);
+    const inv = await invite('SansGF' + Date.now() % 1000);
+    await assert.rejects(new Client(URL_.replace('http', 'ws')).create('fleuve', { jeton: inv.jeton, fleuve: 'congo', numero: 1 }), /Google/);
+    await assert.rejects(new Client(URL_.replace('http', 'ws')).create('fleuve', { jeton: gF.jeton, fleuve: 'congo', numero: 2 }), /d'abord/);
+  });
+  await test('Fleuve : une étape jouée dans la salle, jusqu\'au résultat', async () => {
+    const client = new Client(URL_.replace('http', 'ws'));
+    const salle = await client.create('fleuve', { jeton: gF.jeton, fleuve: 'congo', numero: 1, rapide: true });
+    let debut = null, fin = null, robots = 0;
+    salle.onMessage('erreur', () => {});
+    salle.onMessage('fleuve', (m) => { if (m.fin) fin = m; else debut = m; });
+    salle.onMessage('vue', (v) => {
+      robots = v.joueurs.filter((j) => j.robot).length;
+      const a = v.manche && (v.manche.actions.find((x) => x.type === 'jouer') || v.manche.actions.find((x) => x.type !== 'katapss'));
+      if (v.etat === 'manche' && a) setTimeout(() => { try { salle.send('action', { action: a }); } catch (e) {} }, 1);
+    });
+    for (let t = 0; t < 1200 && !fin; t++) await attendre(50);
+    await salle.leave().catch(() => {});
+    assert.ok(debut && debut.etape.numero === 1 && debut.etape.texte, 'fenêtre de départ');
+    assert.ok(fin, 'résultat reçu');
+    assert.strictEqual(robots, debut.etape.joueurs - 1);
+    const e = (await api('/api/fleuve', { jeton: gF.jeton })).json;
+    if (fin.reussi) assert.deepStrictEqual([fin.etoiles >= 1, fin.pagaies.restantes, e.fleuves.congo.courante, fin.double, fin.pieces], [true, 5, 2, true, fin.etoiles * 10]);
+    else assert.deepStrictEqual([fin.etoiles, fin.pagaies.restantes, e.fleuves.congo.courante], [0, 4, 1]);
+  });
+  await test('Fleuve : une étape du Niger (Inter (8)) jouée dans la salle', async () => {
+    const e = await FG.fabriquerEtape('niger', 1, { recette: recetteRapide, graine: 12345 });
+    await srv.base.query('INSERT INTO fleuve_etapes (fleuve, numero, bief, recette, publie) VALUES ($1, 1, 1, $2, true)', ['niger', JSON.stringify(e)]);
+    const client = new Client(URL_.replace('http', 'ws'));
+    const salle = await client.create('fleuve', { jeton: gF.jeton, fleuve: 'niger', numero: 1, rapide: true });
+    let debut = null, fin = null, jeu = null;
+    salle.onMessage('erreur', () => {});
+    salle.onMessage('fleuve', (m) => { if (m.fin) fin = m; else debut = m; });
+    salle.onMessage('vue', (v) => {
+      jeu = v.jeu || jeu;
+      const a = v.manche && v.manche.actions && (v.manche.actions.find((x) => x.type === 'jouer') || v.manche.actions[0]);
+      if (v.etat === 'manche' && a) setTimeout(() => { try { salle.send('action', { action: a }); } catch (er) {} }, 1);
+    });
+    for (let t = 0; t < 1200 && !fin; t++) await attendre(50);
+    await salle.leave().catch(() => {});
+    assert.ok(debut && fin, 'départ et résultat');
+    assert.deepStrictEqual([jeu, debut.etape.jeu, fin.fleuve], ['inter8', 'inter8', 'niger']);
+    await srv.base.query("DELETE FROM fleuve_pagaies WHERE compte_id = $1", [gF.compte.id]);
+  });
+  await test('Fleuve : quitter = une pagaie perdue ; pas de pagaie, pas d\'étape', async () => {
+    const avant = (await api('/api/fleuve', { jeton: gF.jeton })).json;
+    const n = avant.fleuves.congo.courante;
+    const salle = await new Client(URL_.replace('http', 'ws')).create('fleuve', { jeton: gF.jeton, fleuve: 'congo', numero: n });
+    salle.onMessage('vue', () => {}); salle.onMessage('fleuve', () => {}); salle.onMessage('erreur', () => {});
+    await attendre(150);
+    await assert.rejects(new Client(URL_.replace('http', 'ws')).create('fleuve', { jeton: gF.jeton, fleuve: 'congo', numero: n }), /en cours/);
+    await salle.leave(true);
+    await attendre(300);
+    const apres = (await api('/api/fleuve', { jeton: gF.jeton })).json;
+    assert.strictEqual(apres.pagaies.restantes, avant.pagaies.restantes - 1);
+    await srv.base.query('UPDATE fleuve_pagaies SET perdues = 5 WHERE compte_id = $1', [gF.compte.id]);
+    await assert.rejects(new Client(URL_.replace('http', 'ws')).create('fleuve', { jeton: gF.jeton, fleuve: 'congo', numero: n }), /repose/);
+    await srv.base.query('DELETE FROM fleuve_pagaies WHERE compte_id = $1', [gF.compte.id]);
+  });
+  await test('Fleuve : étoiles et pièces (doublées au premier succès du jour), escale fermée sans assez d\'étoiles', async () => {
+    const F = srv.fleuve;
+    const g = await connexionG('sb-fleuve-b', { providerId: 'g-fleuve-b' });
+    const c = await srv.comptes.statut(g.compte.id);
+    const solde0 = Number(c.solde);
+    const seuils = (await api('/admin/api/fleuve/congo/biefs/1', { jeton: adminJeton })).json.map((x) => x.seuils);
+    const jouer = async (n, score) => { const d = await F.commencer(c, 'congo', n); return F.terminer(c.id, d.essai, { reussi: true, score }); };
+    const r1 = await jouer(1, seuils[0].trois);
+    assert.deepStrictEqual([r1.etoiles, r1.double, r1.pieces, r1.nouvelles], [3, true, 30, 3]);
+    const r2 = await jouer(2, 0);
+    assert.deepStrictEqual([r2.etoiles, r2.double, r2.pieces], [1, false, 5]);
+    const r2b = await jouer(2, seuils[1].trois); // rejouer pour la 3e étoile : seulement les étoiles nouvelles
+    assert.deepStrictEqual([r2b.etoiles, r2b.pieces, r2b.premiereFois], [3, 10, false]);
+    const rate = await F.terminer(c.id, (await F.commencer(c, 'congo', 3)).essai, { reussi: false, score: 50 });
+    assert.deepStrictEqual([rate.etoiles, rate.pieces, rate.pagaies.restantes], [0, 0, 4]);
+    for (let n = 3; n <= 9; n++) await jouer(n, 0);
+    assert.strictEqual(Number((await srv.comptes.statut(c.id)).solde), solde0 + 30 + 5 + 10 + 7 * 5);
+    await assert.rejects(F.commencer(c, 'congo', 10), /20 étoiles/);
+    const d = (await api('/api/fleuve/congo/10', { jeton: g.jeton })).json;
+    assert.deepStrictEqual([d.escale, d.villeEtoiles, d.ville], [true, 13, 'Banana']);
+    await srv.reglages.ecrire('fleuve', { ...srv.reglages.get('fleuve'), etoilesVille: 13 });
+    const boss = await jouer(10, 0);
+    assert.deepStrictEqual([boss.escale, boss.piecesEscale, boss.pieces], [true, 200, 205]);
+    await srv.reglages.ecrire('fleuve', { ...DEFAUTS.fleuve, etat: 'ouvert' });
+    const reg = (await srv.base.query("SELECT count(*)::int AS n FROM registre_pieces WHERE compte_id = $1 AND motif = 'fleuve'", [c.id])).rows[0].n;
+    assert.strictEqual(reg, 11);
+  });
+  await test('Fleuve : bloqué 5 jours sur une étape, les robots baissent d\'un cran', async () => {
+    const F = srv.fleuve;
+    const g = await connexionG('sb-fleuve-c', { providerId: 'g-fleuve-c' });
+    const c = await srv.comptes.statut(g.compte.id);
+    const maintenant = Date.now();
+    for (let j = 5; j >= 1; j--) {
+      F.regler(() => new Date(maintenant - j * 864e5));
+      const d = await F.commencer(c, 'congo', 1);
+      assert.strictEqual(d.adoucir, 0);
+      await F.terminer(c.id, d.essai, { reussi: false, score: 0 });
+    }
+    F.regler(() => new Date(maintenant));
+    const d = await F.commencer(c, 'congo', 1);
+    assert.strictEqual(d.adoucir, 10);
+    await F.annuler(c.id, d.essai);
+    await srv.reglages.ecrire('fleuve', { ...DEFAUTS.fleuve });
+  });
+
   await srv.arreter();
   console.log(`\n${reussis} tests réussis, ${echecs} en échec.`);
   process.exit(echecs ? 1 : 0);

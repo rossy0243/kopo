@@ -4,7 +4,7 @@ const express = require('express');
 const { enveloppe, publicCompte } = require('./api');
 const { emailSupabase } = require('./comptes');
 
-function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainage, bande, push, stickers, bouquets, abonnement, salles, demarrage }) {
+function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainage, bande, fleuve, push, stickers, bouquets, abonnement, salles, demarrage }) {
   const r = express.Router();
   r.use(express.json({ limit: '50kb' }));
 
@@ -422,6 +422,32 @@ function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainag
     const jour = (await base.query("SELECT count(*)::int AS joueurs, coalesce(round(avg(score)), 0)::int AS moyenne FROM match_jour WHERE jour = $1 AND statut = 'fini'", [bande ? require('./match-jour').jourDe() : null])).rows[0];
     res.json({ matchJour: jour, bandes: bande ? await bande.surveillance() : [] });
   }));
+
+  // --- Le Fleuve (fleuve.md) : biefs, étapes et chiffres réels ; fabrication par les robots, puis publication.
+  if (fleuve) {
+    r.get('/fleuve', enveloppe(async (req, res) => res.json(await fleuve.resumeAdmin())));
+    r.get('/fleuve/:fleuve/biefs/:bief', enveloppe(async (req, res) => res.json(await fleuve.etapesAdmin(req.params.fleuve, req.params.bief))));
+    r.post('/fleuve/:fleuve/biefs/:bief/generer', enveloppe(async (req, res) => {
+      const t = fleuve.generer(req.params.fleuve, req.params.bief);
+      await journal('fleuve:generer', req.params.fleuve + ':' + req.params.bief, null);
+      res.json(t);
+    }));
+    r.post('/fleuve/:fleuve/biefs/:bief/publier', enveloppe(async (req, res) => {
+      const x = await fleuve.publier(req.params.fleuve, req.params.bief);
+      await journal('fleuve:publier', req.params.fleuve + ':' + req.params.bief, null);
+      res.json(x);
+    }));
+    r.post('/fleuve/:fleuve/etapes/:numero/refaire', enveloppe(async (req, res) => {
+      const x = await fleuve.refaire(req.params.fleuve, Math.trunc(Number(req.params.numero)));
+      await journal('fleuve:refaire', req.params.fleuve + ':' + req.params.numero, null);
+      res.json(x);
+    }));
+    r.post('/fleuve/:fleuve/etapes/:numero/modifier', enveloppe(async (req, res) => {
+      const x = await fleuve.modifier(req.params.fleuve, Math.trunc(Number(req.params.numero)), req.body || {});
+      await journal('fleuve:modifier', req.params.fleuve + ':' + req.params.numero, { d: x && x.d });
+      res.json(x);
+    }));
+  }
 
   // --- Pilotage : gains, bonus, tables, pot, annonce, maintenance
   r.get('/reglages', (req, res) => res.json({ ...reglages.tout(), versionAppli: require('./reglages').VERSION_APPLI }));
