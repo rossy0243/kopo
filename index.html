@@ -534,6 +534,8 @@ body.salon:has(#voile:not([hidden])) #filChat { display: none; } /* fenêtre du 
 .main .carte.recue { box-shadow: 0 0 0 3px var(--good), 0 6px 14px rgba(0,0,0,.45); }
 .trophee { font-size: 64px; text-align: center; line-height: 1; animation: saut 1s ease-in-out infinite; }
 .consigne:empty { display: none; }
+#poses.passable { cursor: pointer; }
+.passer-astuce { color: var(--muted); font-size: 14px; font-weight: 400; }
 .passer-fin { display: block; margin: 6px auto 0; padding: 6px 16px; min-height: 0; font-size: 14px; }
 .passer-fin[hidden] { display: none; }
 /* Animations coupées (réglage « Réduites », ou téléphone qui en demande moins) */ html.sans-anim .siege.courant .ligne, html.sans-anim .siege.courant, html.sans-anim .siege.meneur .ligne::after, html.sans-anim .pose .carte.gagnante, html.sans-anim .trophee { animation: none; }
@@ -5157,6 +5159,12 @@ var qrcode = function() {
         else if (!msg.pause && s.enPause) reprendre(s);
         return { ok: true };
       }
+      case 'passerPause': { // contre les robots : toucher la table ramasse le pli (ou saute le compte à rebours) tout de suite
+        if (!joueur || !seulHumain(s, id) || s.etat !== 'manche' || !s.pause || s.enPause) return { ok: false, erreur: 'Impossible.' };
+        s.pause.jusqua = s.horloge();
+        tic(s);
+        return { ok: true };
+      }
       case 'passerFin': { // un humain qui ne joue plus : les robots finissent tout de suite
         if (!joueur || joueur.robot || !entreRobots(s)) return { ok: false, erreur: 'Impossible.' };
         passerEntreRobots(s);
@@ -6691,6 +6699,12 @@ var qrcode = function() {
         else if (!msg.pause && s.enPause) reprendre(s);
         return { ok: true };
       }
+      case 'passerPause': { // contre les robots : toucher la table ramasse le pli (ou saute le compte à rebours) tout de suite
+        if (!joueur || !seulHumain(s, id) || s.etat !== 'manche' || !s.pause || s.enPause) return { ok: false, erreur: 'Impossible.' };
+        s.pause.jusqua = s.horloge();
+        tic(s);
+        return { ok: true };
+      }
       case 'passerFin': { // un humain qui ne joue plus : les robots finissent tout de suite
         if (!joueur || joueur.robot || !entreRobots(s)) return { ok: false, erreur: 'Impossible.' };
         passerEntreRobots(s);
@@ -8042,7 +8056,7 @@ svg .vb { transform-box: view-box; }
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = '7d43dfd16c5f'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = '05e8f4ccf22e'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: true };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // La musique des menus était coupée par défaut : on l'allume une fois pour tous (le joueur peut la recouper).
@@ -9255,6 +9269,12 @@ svg .vb { transform-box: view-box; }
   }
   window.addEventListener('resize', placerSieges);
 
+  // Contre les robots : toucher la table ramasse le pli (ou saute le compte à rebours) sans attendre.
+  function tablePassable(poses, v) {
+    const oui = !!(v.manche && v.manche.pause && v.pausePossible && !v.entreRobots && !v.enPause);
+    poses.classList.toggle('passable', oui);
+    poses.onclick = oui ? () => { poses.onclick = null; poses.classList.remove('passable'); envoyer({ type: 'passerPause' }); } : null;
+  }
   // Sièges autour de la table (Kopo et Inter (8)).
   function dessinerSieges(v) {
     const m = v.manche, pause = m.pause;
@@ -9336,6 +9356,7 @@ svg .vb { transform-box: view-box; }
     m.table.forEach((p, i) => { if (p.compte) for (const c of p.cartes) if (!forte || K.valeur(c) > K.valeur(forte.carte)) forte = { carte: c, i }; });
     const poses = $('poses'); poses.replaceChildren();
     poses.classList.toggle('serre', m.table.length > 4);
+    tablePassable(poses, v);
     const qui = (id) => (id === v.moi ? 'Toi' : nom(v, id));
     if (pause && pause.type === 'depart') {
       // Compte à rebours de départ, avec le joueur qui commence.
@@ -9366,6 +9387,7 @@ svg .vb { transform-box: view-box; }
     const jeJoue = m.enJeu.includes(v.moi);
     // Ce qui se passe est montré par les animations ; on n'écrit que ce que tu dois faire.
     if (v.entreRobots) cons.append(ico('oeil'), v.restants.includes(v.moi) ? ' Les robots finissent la manche entre eux, en accéléré.' : ' Les robots finissent entre eux, en accéléré.');
+    else if (pause && v.pausePossible) cons.append(el('span', 'passer-astuce', 'Touche la table pour continuer.'));
     else if (pause || m.phase === 'terminee') {}
     else if (!v.restants.includes(v.moi) || !jeJoue) cons.append(ico('oeil'), ' Tu regardes la partie.');
     else if (monTour) { if (v.chrono) cons.append(el('span', 'secondes', ''), ' '); cons.append(el('em', null, 'À toi !')); }
@@ -9571,6 +9593,7 @@ svg .vb { transform-box: view-box; }
 
     // Table : compte à rebours de départ, ou la carte du centre et la pioche.
     const poses = $('poses'); poses.replaceChildren(); poses.classList.remove('serre');
+    tablePassable(poses, v);
     if (pause && pause.type === 'depart') {
       const d = el('div', 'depart');
       d.append(el('div', 'depart-titre', finale ? 'Finale' : 'Manche ' + v.numeroManche), el('div', 'decompte', ''),
@@ -9603,6 +9626,7 @@ svg .vb { transform-box: view-box; }
     const actions = m.actions;
     const coups = actions.filter((a) => a.type === 'jouer');
     if (v.entreRobots) cons.append(ico('oeil'), v.restants.includes(v.moi) ? ' Les robots finissent la manche entre eux, en accéléré.' : ' Les robots finissent entre eux, en accéléré.');
+    else if (pause && v.pausePossible) cons.append(el('span', 'passer-astuce', 'Touche la table pour continuer.'));
     else if (pause || m.phase !== 'jeu') {}
     else if (!v.restants.includes(v.moi) || !jeJoue) cons.append(ico('oeil'), ' Tu regardes la partie.');
     else if (monTour) {

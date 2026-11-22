@@ -704,5 +704,27 @@ test('Rythme du tableau de bord : temps de la salle réglés en secondes, valeur
   assert.deepStrictEqual(t.durees, S.DUREES);
 });
 
+
+test('Toucher la table contre les robots : le compte à rebours passe tout de suite, seul contre les robots', () => {
+  const SP = require('./inter8-salle.js');
+  let t = 1000000;
+  const s = SP.creerSalle('TOUC');
+  s.horloge = () => t;
+  SP.recevoir(s, 'p1', { type: 'rejoindre', nom: 'Moi' });
+  SP.recevoir(s, 'p1', { type: 'ajouterRobot' }); SP.recevoir(s, 'p1', { type: 'ajouterRobot' });
+  assert.ok(!SP.recevoir(s, 'p1', { type: 'passerPause' }).ok, 'pas dans le salon');
+  assert.ok(SP.recevoir(s, 'p1', { type: 'lancer' }).ok);
+  assert.strictEqual(s.pause && s.pause.type, 'depart');
+  assert.ok(SP.recevoir(s, 'p1', { type: 'passerPause' }).ok);
+  assert.ok(!s.pause || s.pause.type !== 'depart' || s.pause.jusqua <= t, 'le compte à rebours est passé');
+  // Deux humains : refusé.
+  const d = SP.creerSalle('DEUX');
+  d.horloge = () => t;
+  SP.recevoir(d, 'p1', { type: 'rejoindre', nom: 'A' }); SP.recevoir(d, 'p2', { type: 'rejoindre', nom: 'B' });
+  SP.recevoir(d, 'p1', { type: 'lancer' });
+  assert.ok(d.pause);
+  assert.ok(!SP.recevoir(d, 'p1', { type: 'passerPause' }).ok);
+});
+
 console.log(`\n${ok} test(s) réussi(s), ${ko} échec(s).`);
 if (ko) process.exit(1);
