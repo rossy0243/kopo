@@ -2426,6 +2426,8 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     // Mode Cahier : barème des cartes réglé dans Pilotage (/api/config), lu au lancement de chaque partie.
     if (jeuSalle === 'inter8' && configServeur && configServeur.cahier) salle.baremeCahier = configServeur.cahier;
     if (jeuSalle === 'inter8') salle.totauxCahier = totauxCahier().slice(); // montants d'élimination de Pilotage
+    // Temps entre les coups (Réglages > Rythme des parties du tableau de bord), comme sur le serveur. Une partie reprise garde les siens.
+    if (!sauvee && configServeur && configServeur.rythme) M.appliquerRythme(salle, configServeur.rythme[jeuSalle]);
     if (taille && !sauvee) M.rendrePublique(salle, taille);
     hote = { salle, vus: new Map(), reseau: null };
     session = { code, role: 'hote', nom };

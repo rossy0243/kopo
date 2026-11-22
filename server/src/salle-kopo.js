@@ -55,6 +55,8 @@ class SalleKopo extends Room {
       this.salle.niveauJoueur = d.niveauRobots;
       this.salle.sansPause = true; // même temps pour tous : pas de pause
     } else this.salle = this.S.creerSalle(this.code);
+    // Rythme des parties réglé dans le tableau de bord (temps entre les coups) : figé pour la vie de la salle.
+    if (SalleKopo.services) this.S.appliquerRythme(this.salle, (SalleKopo.services.reglages.get('rythme') || {})[this.jeu]);
     this.baremeAJour();
     // Inter (8) : le style choisi à la création (« Quelle partie ? »), modifiable ensuite dans le salon.
     // J retour en option, en simple comme en délire (22/11). Une ancienne appli qui ne l'envoie pas jouait le délire avec.
@@ -127,7 +129,8 @@ class SalleKopo extends Room {
     const dejaAssis = this.salle && this.salle.joueurs.some((j) => j.id === c.id);
     if (!dejaAssis && limitesActives()) {
       const ailleurs = [...salles].filter((s) => s !== this && s.clientsParId.has(c.id)).length;
-      if (ailleurs >= SALLES_MAX) throw new Error('Tu as déjà trop de parties ouvertes. Quitte-en une pour en commencer une autre.');
+      const max = Math.trunc(Number((SalleKopo.services.reglages.get('limites') || {}).sallesMax)) || SALLES_MAX;
+      if (ailleurs >= max) throw new Error('Tu as déjà trop de parties ouvertes. Quitte-en une pour en commencer une autre.');
     }
     if (!dejaAssis && options.code && !options.retour && !permis('codesCompte', c.id)) throw new Error('Trop de codes essayés. Réessaie dans une minute.');
     // Jeu en maintenance, ou réservé aux testeurs : on n'entre plus (sauf pour reprendre sa place).
@@ -215,8 +218,8 @@ class SalleKopo extends Room {
       const p = libres.length ? libres.splice(Math.floor(Math.random() * libres.length), 1)[0] : String(s.joueurs.length + 1);
       s.joueurs.push({ id: 'robot-' + Math.floor(Math.random() * 1e9), nom: 'Robot ' + p, connecte: true, robot: true, voix: false, muet: true });
     }
-    s.robots = 'normaux';
-    s.niveauJoueur = 10; // force moyenne : ni trop facile, ni imbattable
+    s.robots = ['faciles', 'normaux', 'forts'].includes(r.robots) ? r.robots : 'normaux'; // réglé dans le tableau de bord
+    s.niveauJoueur = Math.min(20, Math.max(1, Math.trunc(Number(r.force)) || 10)); // force 10 : ni trop facile, ni imbattable
     if (this.attenteTest !== null) s.pauseRobot = 0; // tests seulement
     this.classee = false;
     if (!this.locked) this.lock(); // plus de place : les inconnus suivants ouvrent une autre salle
@@ -406,10 +409,14 @@ class SalleKopo extends Room {
       for (const [id, c] of this.clientsParId) c.send('vue', this.vuePour(id));
       return;
     }
+    // Temps d'attente en salle publique (tableau de bord) : de l'arrivée du premier humain au départ de la partie.
+    if (this.publique && s.etat === 'salon' && !this.salonDepuis && s.joueurs.some((j) => !j.robot)) this.salonDepuis = Date.now();
     if (s.etat === 'manche' && s.numeroManche === 1 && (!this.partie || this.partie.enregistree)) {
       const humains = s.joueurs.filter((j) => !j.robot).length;
       const classee = this.classee && !s.joueurs.some((j) => j.robot) && humains >= SalleKopo.services.reglages.get('ligue').joueursMin;
-      this.partie = { id: idAleatoire('p_'), katapss: new Map(), abandons: new Set(), coupures: new Set(), classee, enregistree: false, debut: new Date(), payeurs: new Set() };
+      const attente = this.salonDepuis ? Math.round((Date.now() - this.salonDepuis) / 1000) : null;
+      this.salonDepuis = null;
+      this.partie = { id: idAleatoire('p_'), katapss: new Map(), abandons: new Set(), coupures: new Set(), classee, enregistree: false, debut: new Date(), payeurs: new Set(), attente };
       // La page peut afficher « Partie classée » dès le début.
       for (const c of this.clientsParId.values()) c.send('classee', { classee });
       // Table à mise : chaque joueur paie sa mise au début de chaque partie (revanche comprise).
@@ -496,8 +503,12 @@ class SalleKopo extends Room {
     const fois = ev ? ev.pieces : 1;
     const partage = this.mise ? this.potParPlace(p, ordre) : null;
     await base.transaction(async (q) => {
-      await q.query('INSERT INTO parties (id, code, publique, nb_joueurs, avec_robots, vainqueur, debut, fin, classee, jeu) VALUES ($1,$2,$3,$4,$5,$6,$7, now(), $8, $9)',
-        [p.id, this.code, this.publique, ordre.length, avecRobots, this.comptes.has(s.vainqueur) ? s.vainqueur : null, p.debut, p.classee && !avecRobots, this.jeu]);
+      await q.query('INSERT INTO parties (id, code, publique, nb_joueurs, avec_robots, vainqueur, debut, fin, classee, jeu, attente_s) VALUES ($1,$2,$3,$4,$5,$6,$7, now(), $8, $9, $10)',
+        [p.id, this.code, this.publique, ordre.length, avecRobots, this.comptes.has(s.vainqueur) ? s.vainqueur : null, p.debut, p.classee && !avecRobots, this.jeu, p.attente === undefined ? null : p.attente]);
+      // Plafond du tableau de bord : pièces gagnées au plus par jour (Kinshasa) aux tables gratuites (0 = sans plafond).
+      const plafond = Math.max(0, Math.trunc(Number(g.plafondJour)) || 0);
+      const dejaGagne = async (id) => Number((await q.query(`SELECT coalesce(sum(montant), 0)::int AS n FROM registre_pieces WHERE compte_id = $1
+        AND motif IN ('manche', 'katapss', 'victoire', 'deuxieme') AND cree_le >= date_trunc('day', now() + interval '1 hour') - interval '1 hour'`, [id])).rows[0].n);
       for (const id of humains) {
         const pl = place(id);
         await q.query('INSERT INTO participations (partie_id, compte_id, place, abandon) VALUES ($1,$2,$3,$4)', [p.id, id, pl, p.abandons.has(id)]);
@@ -514,7 +525,11 @@ class SalleKopo extends Room {
           [pl === 1 ? g.victoire : 0, 'victoire'],
           [pl === 2 ? g.deuxieme : 0, 'deuxieme'],
         ];
-        for (const [montant, motif] of gains) if (montant > 0) await comptes.mouvement(q, id, Math.round(montant * fois), motif, p.id);
+        let reste = plafond ? Math.max(0, plafond - (await dejaGagne(id))) : Infinity;
+        for (const [montant, motif] of gains) {
+          const m = Math.min(Math.round(montant * fois), reste);
+          if (m > 0) { await comptes.mouvement(q, id, m, motif, p.id); reste -= m; }
+        }
       }
     });
     // Ligue : points selon la place, envoyés à chacun pour l'écran de fin.

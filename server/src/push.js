@@ -24,7 +24,8 @@ const PAQUET = 50; // envois en parallèle (annonces, rappels)
 const ABONNES_RAPPELS = `(SELECT compte_id FROM push_abonnements UNION SELECT compte_id FROM push_natifs) a JOIN comptes c ON c.id = a.compte_id
   WHERE c.statut NOT IN ('supprime', 'banni') AND coalesce(c.push_prefs->>'match', 'true') <> 'false'`;
 const heureKinshasa = (d) => new Date(d.getTime() + HEURE).getUTCHours();
-const nuit = (d) => { const h = heureKinshasa(d); return h >= 22 || h < 8; };
+// Heures de silence (réglage heuresPush, 22 h à 8 h au départ) : aucun rappel automatique.
+const nuit = (d, hp) => require('./reglages').heureDeSilence(heureKinshasa(d), hp);
 const erreur = (m, statut = 400) => Object.assign(new Error(m), { statut });
 const texteCourt = (t, max) => String(t == null ? '' : t).replace(/\s+/g, ' ').trim().slice(0, max);
 const PLATEFORMES_NATIVES = ['android', 'ios'];
@@ -222,7 +223,7 @@ function creerPush(base, reglages, env = process.env) {
       if (!(actif || fcmActif) || !TYPES_PUSH.includes(type)) return 0;
       const p = await prefsDe(compteId);
       if (!p || p.statut === 'supprime' || p.statut === 'banni' || !p.prefs[type]) return 0;
-      if (nuit(horloge()) && type !== 'invitation' && type !== 'annonce') return 0;
+      if (nuit(horloge(), reglages.get('heuresPush')) && type !== 'invitation' && type !== 'annonce') return 0;
       return envoyerAComptes([compteId], { type, ...message }, options);
     },
 
@@ -334,14 +335,37 @@ function creerPush(base, reglages, env = process.env) {
     // Bande le mercredi à 18 h, fin de saison dès qu'il reste 24 h (jamais la nuit).
     async tic() {
       const maintenant = horloge(), jour = jourDe(maintenant), h = heureKinshasa(maintenant);
-      let n = 0;
-      if (!nuit(maintenant)) n += await api.rappelSaison();
-      if (h === 17 && !rappelsFaits.has('serie-' + jour)) { rappelsFaits.add('serie-' + jour); n += await api.rappelSerie(); }
-      if (h === 18 && !rappelsFaits.has('absent-' + jour)) { rappelsFaits.add('absent-' + jour); n += await api.rappelAbsents(); }
-      if (h === 18 && jour === ajouterJours(lundiDe(jour), 2) && !rappelsFaits.has('bande-' + jour)) { rappelsFaits.add('bande-' + jour); n += await api.rappelBande(); }
-      if (h !== 19 || rappelsFaits.has(jour)) return n;
+      const hp = { ...require('./reglages').DEFAUTS.heuresPush, ...(reglages.get('heuresPush') || {}) }; // heures réglées dans le tableau de bord
+      let n = await api.envoyerProgrammes().catch((e) => { console.error('Push programmés :', e.message); return 0; });
+      if (!nuit(maintenant, hp)) n += await api.rappelSaison();
+      if (h === hp.serie && !rappelsFaits.has('serie-' + jour)) { rappelsFaits.add('serie-' + jour); n += await api.rappelSerie(); }
+      if (h === hp.relance && !rappelsFaits.has('absent-' + jour)) { rappelsFaits.add('absent-' + jour); n += await api.rappelAbsents(); }
+      if (h === hp.bande && jour === ajouterJours(lundiDe(jour), 2) && !rappelsFaits.has('bande-' + jour)) { rappelsFaits.add('bande-' + jour); n += await api.rappelBande(); }
+      if (h !== hp.matchJour || rappelsFaits.has(jour)) return n;
       rappelsFaits.add(jour);
       return n + await api.rappelMatchJour();
+    },
+
+    // Notifications programmées dans le tableau de bord : celles dont l'heure est passée (moins de 6 h) partent une fois.
+    // Plus vieilles de 6 h (serveur arrêté entre-temps) : marquées « manquées », jamais envoyées en retard.
+    async envoyerProgrammes() {
+      const l = reglages.get('pushProgrammes');
+      if (!Array.isArray(l) || !l.length) return 0;
+      const t = horloge().getTime();
+      const dues = l.filter((x) => !x.envoye && Date.parse(x.quand) <= t);
+      if (!dues.length) return 0;
+      let n = 0;
+      const maj = l.map((x) => ({ ...x }));
+      for (const x of dues) {
+        const m = maj.find((y) => y.id === x.id);
+        if (t - Date.parse(x.quand) > 6 * HEURE) { m.envoye = new Date(t).toISOString(); m.resultat = 'manquée'; continue; }
+        m.envoye = new Date(t).toISOString(); // noté avant l'envoi : jamais deux fois
+        await reglages.ecrire('pushProgrammes', maj);
+        try { const r = await api.annonce({ titre: x.titre, texte: x.texte, public: x.pays ? { pays: x.pays } : {} }); m.resultat = `${r.envoyees} envoyée(s)`; n += r.envoyees; }
+        catch (e) { m.resultat = 'échec : ' + e.message; }
+      }
+      await reglages.ecrire('pushProgrammes', maj);
+      return n;
     },
 
     // --- Annonces de l'admin

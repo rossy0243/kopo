@@ -26,6 +26,20 @@
   const DELAI_ANNONCE = 3000; // temps laissé pour annoncer avant qu'un robot ne conteste
   // Robots entre eux (plus aucun humain dans la manche) : tout va plus vite, on voit encore les coups.
   const RAPIDE = { pauseRobot: 400, eventail: 400, annonce: 1000, depart: 1500, mancheAuto: 3000 };
+  // Rythme réglé dans le tableau de bord (onglet Réglages > Rythme des parties), en secondes :
+  // { depart, mancheAuto, revanche, pauseRobot, annonce, absent, rapide (1 = oui, 0 = non) }. Lu à l'ouverture de la salle.
+  const BORNES_RYTHME = { depart: [0, 10], mancheAuto: [2, 30], revanche: [5, 60], pauseRobot: [0.2, 5], annonce: [1, 10], absent: [2, 15] };
+  function appliquerRythme(s, r) {
+    if (!r || typeof r !== 'object') return s;
+    const sec = (k) => { const n = Number(r[k]), b = BORNES_RYTHME[k]; return Number.isFinite(n) && n >= b[0] && n <= b[1] ? n : null; };
+    for (const k of ['depart', 'mancheAuto', 'revanche']) if (sec(k) !== null) s.durees[k] = Math.round(sec(k) * 1000);
+    const ms = (k, d) => (sec(k) !== null ? Math.round(sec(k) * 1000) : d);
+    s.rythme = { pauseRobot: ms('pauseRobot', PAUSE_ROBOT), annonce: ms('annonce', DELAI_ANNONCE), absent: sec('absent') !== null ? sec('absent') : DELAI_ABSENT, rapide: !(r.rapide === 0 || r.rapide === false || r.rapide === '0') };
+    return s;
+  }
+  const pauseRobotDe = (s) => (s.rythme && s.rythme.pauseRobot >= 0 ? s.rythme.pauseRobot : PAUSE_ROBOT);
+  const annonceDe = (s) => (s.rythme && s.rythme.annonce > 0 ? s.rythme.annonce : DELAI_ANNONCE);
+  const absentDe = (s) => (s.rythme && s.rythme.absent > 0 ? s.rythme.absent : DELAI_ABSENT);
   const { NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, coupAutomatique } = R;
 
   function hasardFort() {
@@ -84,6 +98,8 @@
     if (s.etat === 'finManche') return s.restants.every((id) => vraiRobot(s, id));
     return false;
   }
+  // Robots entre eux et « mode rapide » laissé actif dans le tableau de bord : tout va plus vite.
+  const rapide = (s) => entreRobots(s) && !(s.rythme && s.rythme.rapide === false);
   // Chaque robot ajouté peut avoir son propre niveau (j.niveau) ; sinon, celui de la table
   // (s.robots), par exemple pour un robot qui remplace un joueur parti. Robots gentils : tous gentils.
   function niveauDuRobot(s, j) {
@@ -99,7 +115,7 @@
   }
   function delaiPour(s, id) {
     if (!estAbsent(s, id)) return s.delai;
-    return s.delai ? Math.min(s.delai, DELAI_ABSENT) : DELAI_ABSENT;
+    return s.delai ? Math.min(s.delai, absentDe(s)) : absentDe(s);
   }
   function revenu(s, id) { s.expirations[id] = 0; }
 
@@ -109,7 +125,7 @@
     const d = enCours ? delaiPour(s, m.joueurCourant) : 0;
     s.echeance = d ? s.horloge() + d * 1000 : null;
     s.chronoTotal = d * 1000;
-    const pause = s.pauseRobot >= 0 ? s.pauseRobot : entreRobots(s) ? RAPIDE.pauseRobot : PAUSE_ROBOT;
+    const pause = s.pauseRobot >= 0 ? s.pauseRobot : rapide(s) ? Math.min(RAPIDE.pauseRobot, pauseRobotDe(s)) : pauseRobotDe(s);
     s.robotPret = enCours ? s.horloge() + pause : null;
   }
 
@@ -125,7 +141,7 @@
     // avant que les robots ne jouent ou ne contestent.
     const m = s.manche;
     // Plusieurs cartes posées d'un coup : elles sont d'abord montrées en éventail à toute la table.
-    if (action.type === 'jouer' && action.cartes.length > 1 && s.robotPret && !(s.pauseRobot >= 0)) s.robotPret += entreRobots(s) ? RAPIDE.eventail : PAUSE_EVENTAIL;
+    if (action.type === 'jouer' && action.cartes.length > 1 && s.robotPret && !(s.pauseRobot >= 0)) s.robotPret += rapide(s) ? RAPIDE.eventail : PAUSE_EVENTAIL;
     // Pendant ces 3 s, personne (humain ou robot) ne peut contester ; ensuite, tout le monde peut,
     // jusqu'au prochain tour du joueur (même si d'autres ont joué entre-temps). Les robots ont
     // droit aux mêmes 3 s que les humains (règle, section 9).
@@ -133,7 +149,7 @@
     const garder = ([j]) => m && (m.contestables || []).includes(j);
     s.graces = Object.fromEntries(Object.entries(s.graces || {}).filter(garder));
     s.oublis = Object.fromEntries(Object.entries(s.oublis || {}).filter(garder));
-    const annonce = entreRobots(s) ? RAPIDE.annonce : DELAI_ANNONCE;
+    const annonce = rapide(s) ? Math.min(RAPIDE.annonce, annonceDe(s)) : annonceDe(s);
     for (const j of nouveaux) s.graces[j] = s.horloge() + annonce;
     // Un robot annonce dans la foulée de son coup, sans attendre sa pause de réflexion.
     // Un robot facile peut oublier : il ne se rattrape pas, on pourra le contester après les 3 s.
@@ -143,7 +159,7 @@
         delete s.graces[j];
       } else s.oublis[j] = true;
     }
-    if (nouveaux.some((j) => !estRobot(s, j)) && s.robotPret) s.robotPret = Math.max(s.robotPret, s.horloge() + DELAI_ANNONCE);
+    if (nouveaux.some((j) => !estRobot(s, j)) && s.robotPret) s.robotPret = Math.max(s.robotPret, s.horloge() + annonceDe(s));
   }
 
   // Les places autour de la table sont tirées une fois au début de la partie : entre les donnes,
@@ -284,7 +300,7 @@
     const differerDepart = s.durees.depart > 0;
     s.manche = I.nouvelleManche(sieges, mains, pioche, premier, { mode: s.mode, jRetour: s.jRetour, graine: Math.floor(s.rng() * 4294967296), differerDepart, cahier: !!s.cahier, bareme: s.cahier && s.cahier.bareme });
     s.etat = 'manche';
-    const depart = entreRobots(s) ? Math.min(s.durees.depart, RAPIDE.depart) : s.durees.depart;
+    const depart = rapide(s) ? Math.min(s.durees.depart, RAPIDE.depart) : s.durees.depart;
     s.pause = depart > 0 ? { type: 'depart', jusqua: s.horloge() + depart, total: depart } : null;
     armerChrono(s);
   }
@@ -386,7 +402,7 @@
   }
   // Manche suivante automatique : vite entre robots (sauf juste après l'élimination d'un humain).
   function suiteAuto(s, robotSorti) {
-    const auto = entreRobots(s) && robotSorti ? Math.min(s.durees.mancheAuto, RAPIDE.mancheAuto) : s.durees.mancheAuto;
+    const auto = rapide(s) && robotSorti ? Math.min(s.durees.mancheAuto, RAPIDE.mancheAuto) : s.durees.mancheAuto;
     s.suiteA = auto > 0 ? s.horloge() + auto : null;
     s.suiteTotal = auto;
   }
@@ -709,7 +725,7 @@
     return s;
   }
 
-  const Inter8Salle = { JEU, MIN, MAX, MODES, FORMULES, TOTAUX_CAHIER, TOTAL_CAHIER, totalCahierPour, DELAIS, PAUSE_ROBOT, DUREES, DELAI_ABSENT, DELAI_ANNONCE, RAPIDE, entreRobots, NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, niveauDuRobot, creerSalle, rendrePublique, choixRobot, reconnecter, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
+  const Inter8Salle = { JEU, MIN, MAX, MODES, FORMULES, TOTAUX_CAHIER, TOTAL_CAHIER, totalCahierPour, DELAIS, PAUSE_ROBOT, DUREES, DELAI_ABSENT, DELAI_ANNONCE, RAPIDE, BORNES_RYTHME, appliquerRythme, entreRobots, NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, niveauDuRobot, creerSalle, rendrePublique, choixRobot, reconnecter, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
   if (enNode) module.exports = Inter8Salle;
   else root.Inter8Salle = Inter8Salle;
 })(typeof window !== 'undefined' ? window : globalThis);

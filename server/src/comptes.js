@@ -183,9 +183,11 @@ function creerComptes(base, reglages) {
     },
 
     // Le joueur a ouvert le jeu : présence du jour (joueurs actifs, rétention).
-    async presence(id) {
+    // client : { plateforme, version } de l'appli (en-tête X-Masano-Client), ou rien pour le site.
+    async presence(id, client) {
       await base.query('UPDATE comptes SET vu_le = now() WHERE id = $1', [id]);
-      await base.query('INSERT INTO presences (compte_id, jour) VALUES ($1, $2) ON CONFLICT DO NOTHING', [id, jourUTC()]);
+      const plateforme = client && client.plateforme ? client.plateforme : 'web', version = client && client.version ? String(client.version).slice(0, 20) : null;
+      await base.query('INSERT INTO presences (compte_id, jour, plateforme, version) VALUES ($1, $2, $3, $4) ON CONFLICT (compte_id, jour) DO UPDATE SET plateforme = EXCLUDED.plateforme, version = EXCLUDED.version', [id, jourUTC(), plateforme, version]);
     },
 
     // Statut effectif (une suspension expirée est levée).

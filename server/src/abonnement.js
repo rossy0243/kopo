@@ -59,7 +59,16 @@ function creerAbonnement(base_, env = process.env) {
     const tete = b64({ alg: 'HS256', typ: 'JWT' }) + '.' + b64({ iss: livekit.cle, sub: 'kopo-serveur', nbf: t - 10, exp: t + 60, video: { room: salon, roomAdmin: true } });
     return tete + '.' + crypto.createHmac('sha256', livekit.secret).update(tete).digest('base64url');
   };
-  const offre = () => ({ paiement: false, micro: !!livekit, formules: FORMULES.map((f) => ({ ...f })), avantages: AVANTAGES.slice() });
+  // Prix réglés dans le tableau de bord (Réglages > Ventes : { mois, an } en FC), sinon ceux de FORMULES.
+  const formules = () => {
+    const p = (api.prix && api.prix()) || {};
+    const l = FORMULES.map((f) => ({ ...f, francs: Math.trunc(Number(p[f.id])) > 0 ? Math.trunc(Number(p[f.id])) : f.francs }));
+    // « 2 mois offerts » suit les prix : 12 mois moins ce que coûte l'année en mois.
+    const mois = l.find((f) => f.id === 'mois'), an = l.find((f) => f.id === 'an');
+    if (mois && an) { const n = 12 - Math.round(an.francs / mois.francs); an.note = n >= 1 ? `${n} mois offert${n > 1 ? 's' : ''}` : null; }
+    return l;
+  };
+  const offre = () => ({ paiement: false, micro: !!livekit, formules: formules(), avantages: AVANTAGES.slice() });
 
   const etatEssai = (c) => {
     const raison = !c ? 'google' : c.kopo_plus_essai ? 'deja' : !c.auth_id ? 'google' : estAbonne(c) ? 'abonne' : null;
@@ -67,7 +76,8 @@ function creerAbonnement(base_, env = process.env) {
   };
 
   const api = {
-    FORMULES, ESSAI_JOURS, estAbonne,
+    FORMULES, ESSAI_JOURS, estAbonne, formules,
+    prix: null, // () => { mois, an } (branché par index.js sur les réglages)
     // Salles ouvertes, pour que la couronne apparaisse tout de suite (branché par index.js).
     majSalles: () => {},
 
@@ -115,7 +125,7 @@ function creerAbonnement(base_, env = process.env) {
     // Tableau de bord : abonnement activé à la main (paiement mobile money reçu), avec la référence du paiement.
     // Ajouté à la date de fin s'il en reste un, sinon à partir de maintenant. Notification au joueur dans la même transaction.
     async activer({ joueur, formule, message }) {
-      const f = FORMULES.find((x) => x.id === formule);
+      const f = formules().find((x) => x.id === formule);
       if (!f) throw erreur('Formule inconnue.');
       const msg = String(message || '').replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 200);
       if (msg.length < 3) throw erreur('Écris une référence (ex. le numéro de la transaction mobile money).');
