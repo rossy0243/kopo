@@ -36,6 +36,20 @@ jobs:
           cache: true
       - run: flutter --version
       - run: flutter pub get
+      # Clé de signature fixe (secrets ANDROID_CLE_BASE64 et ANDROID_CLE_MOT_DE_PASSE, voir mobile/README.md) :
+      # Android ne vérifie les liens masano.online (App Links) que si l'empreinte de la clé est celle de
+      # .well-known/assetlinks.json, et une mise à jour ne s'installe par-dessus l'ancienne qu'avec la même clé.
+      # Sans les secrets, l'APK est signé avec une clé de test qui change à chaque construction.
+      - name: Clé de signature
+        env:
+          CLE: ${{ secrets.ANDROID_CLE_BASE64 }}
+          MDP: ${{ secrets.ANDROID_CLE_MOT_DE_PASSE }}
+        run: |
+          if [ -z "$CLE" ] || [ -z "$MDP" ]; then echo "::warning::Secrets ANDROID_CLE_BASE64 / ANDROID_CLE_MOT_DE_PASSE absents : APK signé avec une clé de test, les liens masano.online n'ouvriront pas l'appli d'eux-mêmes."; exit 0; fi
+          echo "$CLE" | base64 -d > android/app/masano.jks
+          printf 'storeFile=masano.jks\nstorePassword=%s\nkeyPassword=%s\nkeyAlias=masano\n' "$MDP" "$MDP" > android/key.properties
+          echo "Empreinte (doit être dans .well-known/assetlinks.json) :"
+          keytool -list -v -keystore android/app/masano.jks -storepass "$MDP" | grep 'SHA256:'
       - run: flutter build apk --release
       - uses: actions/upload-artifact@v4
         with:

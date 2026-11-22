@@ -67,9 +67,9 @@ void choisirStyleInter(String p, {String? formule}) {
 }
 
 // ---------------------------------------------------------------- Rejoindre
-void ouvrirRejoindre() {
+void ouvrirRejoindre({String code0 = ''}) {
   if (app.exigerGoogle()) return;
-  final code = TextEditingController();
+  final code = TextEditingController(text: code0);
   void valider() {
     final c = code.text.trim().toUpperCase();
     if (!RegExp(r'^[A-Z]{4}$').hasMatch(c)) { app.toast('Le code fait 4 lettres.', Niv.alerte); return; }
