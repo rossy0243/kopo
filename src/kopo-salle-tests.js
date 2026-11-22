@@ -1028,5 +1028,44 @@ test('Entre les manches, personne ne change de place (créateur, 16/11)', () => 
   }
 });
 
+console.log('\nHôte éliminé et micro');
+test("L'hôte éliminé passe la main à un joueur encore en jeu (humain, présent)", () => {
+  const s = salleAvec(4);
+  S.recevoir(s, 'p4', { type: 'micro', voix: true, muet: false });
+  assert.ok(!S.recevoir(s, 'p1', { type: 'passerHote', cible: 'p2' }).ok, 'pas dans le salon');
+  assert.ok(S.recevoir(s, 'p1', { type: 'lancer' }).ok);
+  assert.ok(!S.recevoir(s, 'p1', { type: 'passerHote', cible: 'p2' }).ok, "pas tant qu'il joue");
+  // p1 (l'hôte) et p4 sont éliminés
+  s.elimines = ['p1', 'p4']; s.restants = ['p2', 'p3'];
+  assert.ok(!S.recevoir(s, 'p2', { type: 'passerHote', cible: 'p3' }).ok, "seul l'hôte");
+  assert.ok(!S.recevoir(s, 'p1', { type: 'passerHote', cible: 'p4' }).ok, 'pas à un éliminé');
+  s.joueurs.find((j) => j.id === 'p3').connecte = false;
+  assert.ok(!S.recevoir(s, 'p1', { type: 'passerHote', cible: 'p3' }).ok, 'pas à un absent');
+  assert.ok(S.recevoir(s, 'p1', { type: 'passerHote', cible: 'p2' }).ok);
+  assert.strictEqual(s.hote, 'p2');
+  assert.strictEqual(S.vue(s, 'p3').hote, 'p2');
+  assert.ok(!S.recevoir(s, 'p1', { type: 'couperMicro', cible: 'p4' }).ok, "l'ancien hôte n'a plus la main");
+});
+test("L'hôte coupe le micro d'un joueur éliminé pour toute la table, le rend, et une nouvelle partie le rend aussi", () => {
+  const s = salleAvec(3);
+  S.recevoir(s, 'p3', { type: 'micro', voix: true, muet: false });
+  assert.ok(!S.recevoir(s, 'p1', { type: 'couperMicro', cible: 'p3' }).ok, 'pas dans le salon');
+  S.recevoir(s, 'p1', { type: 'lancer' });
+  assert.ok(!S.recevoir(s, 'p1', { type: 'couperMicro', cible: 'p3' }).ok, 'pas un joueur encore en jeu');
+  s.elimines = ['p3']; s.restants = ['p1', 'p2'];
+  assert.ok(!S.recevoir(s, 'p2', { type: 'couperMicro', cible: 'p3' }).ok, "seul l'hôte");
+  assert.ok(S.recevoir(s, 'p1', { type: 'couperMicro', cible: 'p3' }).ok);
+  let j = S.vue(s, 'p2').joueurs.find((x) => x.id === 'p3');
+  assert.ok(j.micCoupe && j.muet);
+  S.recevoir(s, 'p3', { type: 'micro', voix: true, muet: false });
+  assert.ok(S.vue(s, 'p2').joueurs.find((x) => x.id === 'p3').muet, 'il ne peut pas rouvrir son micro');
+  assert.ok(S.recevoir(s, 'p1', { type: 'couperMicro', cible: 'p3', coupe: false }).ok);
+  assert.ok(!S.vue(s, 'p2').joueurs.find((x) => x.id === 'p3').micCoupe);
+  S.recevoir(s, 'p1', { type: 'couperMicro', cible: 'p3' });
+  s.etat = 'salon';
+  S.recevoir(s, 'p1', { type: 'lancer' });
+  assert.ok(!S.vue(s, 'p2').joueurs.find((x) => x.id === 'p3').micCoupe, 'nouvelle partie : micro rendu');
+});
+
 console.log(`\n${ok} tests réussis, ${ko} en échec.`);
 process.exit(ko ? 1 : 0);

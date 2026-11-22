@@ -61,7 +61,7 @@ class BoutonsMicro extends StatelessWidget {
         );
     return Row(mainAxisSize: MainAxisSize.min, children: [
       rond(vo.muet ? 'micro-coupe' : 'micro', vo.muet ? K.bad : K.good,
-          (!vo.parler ? 'Micro coupé par la modération' : vo.muet ? 'Micro coupé, toucher pour parler' : 'Micro ouvert, toucher pour couper') + enVocal, vo.basculerMicro),
+          (!vo.parler ? (vo.coupeHote ? 'Micro coupé par l\'hôte jusqu\'à la fin de la partie' : 'Micro coupé par la modération') : vo.muet ? 'Micro coupé, toucher pour parler' : 'Micro ouvert, toucher pour couper') + enVocal, vo.basculerMicro),
       // Téléphone étroit : le son des autres se coupe dans les Paramètres, pour garder la place.
       if (!etroit) rond(vo.sonCoupe ? 'son-coupe' : 'son', vo.sonCoupe ? K.bad : K.brass, vo.sonCoupe ? 'Micro des autres coupé pour toi, toucher pour les réentendre' : 'Couper le micro de tous les autres (pour toi seul)', vo.basculerSon),
     ]);

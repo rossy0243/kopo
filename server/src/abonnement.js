@@ -53,6 +53,12 @@ function creerAbonnement(base_, env = process.env) {
   const net = (v) => String(v || '').trim().replace(/^["']|["']$/g, '').trim();
   const url = adresseLiveKit(net(env.LIVEKIT_URL)), cle = net(env.LIVEKIT_API_KEY), secretLk = net(env.LIVEKIT_API_SECRET);
   const livekit = url && cle && secretLk ? { url, cle, secret: secretLk } : null;
+  // Jeton d'administration d'un salon vocal (1 minute), pour les appels du serveur à l'API de LiveKit.
+  const jetonAdmin = (salon) => {
+    const t = Math.floor(Date.now() / 1000), b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
+    const tete = b64({ alg: 'HS256', typ: 'JWT' }) + '.' + b64({ iss: livekit.cle, sub: 'kopo-serveur', nbf: t - 10, exp: t + 60, video: { room: salon, roomAdmin: true } });
+    return tete + '.' + crypto.createHmac('sha256', livekit.secret).update(tete).digest('base64url');
+  };
   const offre = () => ({ paiement: false, micro: !!livekit, formules: FORMULES.map((f) => ({ ...f })), avantages: AVANTAGES.slice() });
 
   const etatEssai = (c) => {
@@ -149,13 +155,24 @@ function creerAbonnement(base_, env = process.env) {
     // Salle : couper tout de suite le micro d'un joueur qui n'est plus abonné (RoomService.RemoveParticipant de LiveKit).
     async retirerDuVocal({ salon, identite }, fetcher = globalThis.fetch) {
       if (!livekit) return false;
-      const t = Math.floor(Date.now() / 1000), b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
-      const tete = b64({ alg: 'HS256', typ: 'JWT' }) + '.' + b64({ iss: livekit.cle, sub: 'kopo-serveur', nbf: t - 10, exp: t + 60, video: { room: salon, roomAdmin: true } });
-      const jeton = tete + '.' + crypto.createHmac('sha256', livekit.secret).update(tete).digest('base64url');
+      const jeton = jetonAdmin(salon);
       try {
         const r = await fetcher(livekit.url.replace(/^ws/i, 'http') + '/twirp/livekit.RoomService/RemoveParticipant', {
           method: 'POST', headers: { Authorization: 'Bearer ' + jeton, 'Content-Type': 'application/json' },
           body: JSON.stringify({ room: salon, identity: identite }), signal: AbortSignal.timeout(8000) });
+        return r.ok;
+      } catch { return false; }
+    },
+
+    // Salle : retirer (ou rendre) le droit de parler à un joueur du salon vocal, sans le sortir : il entend toujours
+    // la table (RoomService.UpdateParticipant de LiveKit ; ses pistes publiées sont retirées tout de suite).
+    async permissionVocal({ salon, identite, parler }, fetcher = globalThis.fetch) {
+      if (!livekit) return false;
+      try {
+        const r = await fetcher(livekit.url.replace(/^ws/i, 'http') + '/twirp/livekit.RoomService/UpdateParticipant', {
+          method: 'POST', headers: { Authorization: 'Bearer ' + jetonAdmin(salon), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ room: salon, identity: identite, permission: { canSubscribe: true, canPublish: !!parler, canPublishData: false, canPublishSources: parler ? ['MICROPHONE'] : [] } }),
+          signal: AbortSignal.timeout(8000) });
         return r.ok;
       } catch { return false; }
     },

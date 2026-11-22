@@ -24,6 +24,8 @@ class Vocal {
   lk.Room? _salle;
   lk.EventsListener<lk.RoomEvent>? _ecoute;
   bool actif = false, muet = true, parler = false, sonCoupe = false, demande = false;
+  /// L'hôte a coupé mon micro (je suis éliminé), pour toute la table, jusqu'à la fin de la partie.
+  bool coupeHote = false;
   /// Identifiants (= comptes) de ceux qui parlent ; joueurs rendus muets pour moi seul
   /// (gardés sur le téléphone, d'une partie à l'autre, comme sur le site).
   /// LiveKit redit « qui parle » plusieurs fois par seconde quand toute la table parle (le volume change), même
@@ -41,6 +43,7 @@ class Vocal {
   /// Icône du micro d'un joueur : barré quand il a coupé son micro, haut-parleur barré quand je ne l'entends pas.
   String? icone(Map j, Object? moi) {
     if (j['voix'] != true) return null;
+    if (j['micCoupe'] == true) return 'micro-coupe';
     if (j['id'] != moi && entendPas(j['id'].toString())) return 'son-coupe';
     return j['muet'] == true ? 'micro-coupe' : 'micro';
   }
@@ -57,6 +60,7 @@ class Vocal {
   Future<void> recevoir(Map d) async {
     demande = false;
     maj();
+    if (d.containsKey('coupeHote') && d['jeton'] == null) { await coupeParHote(d['coupeHote'] == true, d['parler'] != false); return; }
     if (d['fin'] != null) {
       final etait = _salle != null;
       await couper();
@@ -95,15 +99,42 @@ class Vocal {
       return;
     }
     if (_salle != salle) { await salle.disconnect(); return; }
-    actif = true; parler = d['parler'] == true; muet = true;
+    actif = true; parler = d['parler'] == true; muet = true; coupeHote = d['coupeHote'] == true;
     if (parler) {
       try { await salle.localParticipant?.setMicrophoneEnabled(true); muet = false; }
       catch (_) { toast('Micro non autorisé : tu entends les autres abonnés mais ils ne t\'entendent pas.', 'alerte'); }
+    } else if (coupeHote) {
+      toast(_msgCoupeHote, 'alerte');
     } else {
       toast('Ton micro a été coupé par la modération : tu entends les autres abonnés.', 'alerte');
     }
     signaler();
     maj();
+  }
+
+  static const _msgCoupeHote = 'L\'hôte a coupé ton micro jusqu\'à la fin de la partie : tu entends toujours la table.';
+
+  /// L'hôte coupe le micro d'un joueur éliminé (pour toute la table), ou le lui rend. Le serveur retire aussi le droit
+  /// de parler dans le salon vocal : ce n'est pas seulement un bouton caché. Comme sur le site.
+  Future<void> coupeParHote(bool coupe, bool peutParler) async {
+    final avant = coupeHote;
+    coupeHote = coupe;
+    final s = _salle;
+    if (s != null) {
+      if (coupe && !muet) { try { await s.localParticipant?.setMicrophoneEnabled(false); } catch (_) {} }
+      if (coupe) { muet = true; parler = false; } else { parler = peutParler; }
+      signaler();
+    }
+    maj();
+    if (coupe && !avant) toast(_msgCoupeHote, 'alerte');
+    if (!coupe && avant && peutParler) toast('L\'hôte t\'a rendu la parole : touche le micro pour parler.', 'info');
+  }
+
+  /// Hôte : couper (ou rendre) le micro d'un joueur éliminé, pour toute la table.
+  void couperPourTous(String id, String nom, bool coupe) {
+    envoyer({'type': 'couperMicro', 'cible': id, 'coupe': coupe});
+    final n = nom.isEmpty ? 'ce joueur' : nom;
+    toast(coupe ? 'Micro de $n coupé pour toute la table.' : '${n[0].toUpperCase()}${n.substring(1)} peut de nouveau parler.', 'info');
   }
 
   Future<void> basculerMicro() async {
@@ -156,7 +187,7 @@ class Vocal {
   }
 
   /// En quittant la table.
-  Future<void> arreter() async { demande = false; await couper(); maj(); }
+  Future<void> arreter() async { demande = false; coupeHote = false; await couper(); maj(); }
 }
 
 /// Initiale d'un pseudo, quand il ne tient pas à l'écran.

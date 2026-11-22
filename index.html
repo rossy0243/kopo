@@ -4804,6 +4804,7 @@ var qrcode = function() {
   // personne ne change de place (créateur, 16/11). s.restants garde cet ordre.
   function lancer(s) {
     s.restants = K.melanger(s.joueurs.map((j) => j.id), s.rng);
+    s.joueurs.forEach((j) => { delete j.micCoupe; }); // micro coupé par l'hôte : seulement le temps d'une partie
     demarrerManche(s);
   }
   // Partie publique : une salle de N joueurs démarre seule dès qu'elle est pleine.
@@ -5087,7 +5088,22 @@ var qrcode = function() {
         if (!joueur) return { ok: false, erreur: 'Inconnu.' };
         joueur.voix = !!msg.voix;
         if (typeof msg.peerId === 'string') joueur.peerId = msg.peerId.slice(0, 64);
-        joueur.muet = !!msg.muet;
+        joueur.muet = !!msg.muet || !!joueur.micCoupe; // micro coupé par l'hôte : il reste muet
+        return { ok: true };
+      }
+      case 'passerHote': {
+        // L'hôte éliminé laisse la main à un joueur encore en jeu (humain, présent), le temps qui lui reste à regarder.
+        const cible = s.joueurs.find((j) => j.id === msg.cible);
+        if (id !== s.hote || !['manche', 'finManche'].includes(s.etat) || !s.elimines.includes(id)) return { ok: false, erreur: 'Impossible.' };
+        if (!cible || cible.robot || !cible.connecte || !s.restants.includes(cible.id)) return { ok: false, erreur: 'Choisis un joueur encore en jeu.' };
+        s.hote = cible.id;
+        return { ok: true };
+      }
+      case 'couperMicro': { // { cible, coupe } : l'hôte coupe (ou rend) le micro d'un joueur éliminé, pour toute la table
+        const cible = s.joueurs.find((j) => j.id === msg.cible);
+        if (id !== s.hote || s.etat === 'salon' || !cible || cible.robot || cible.id === id || !s.elimines.includes(cible.id)) return { ok: false, erreur: 'Impossible.' };
+        if (msg.coupe === false) delete cible.micCoupe;
+        else { cible.micCoupe = true; cible.muet = true; }
         return { ok: true };
       }
       case 'lancer': {
@@ -5179,7 +5195,7 @@ var qrcode = function() {
       etat: s.etat,
       moi: id,
       hote: s.hote,
-      joueurs: s.joueurs.map((j) => ({ id: j.id, nom: j.nom, connecte: j.connecte, peerId: j.peerId || null, voix: !!j.voix, muet: j.muet !== false, robot: !!j.robot, niveau: j.robot && !j.remplace ? niveauDuRobot(s, j.id) : null, pret: !!j.pret || !!j.robot, remplace: !!j.remplace, absent: estAbsent(s, j.id) })),
+      joueurs: s.joueurs.map((j) => ({ id: j.id, nom: j.nom, connecte: j.connecte, peerId: j.peerId || null, voix: !!j.voix, muet: j.muet !== false, micCoupe: !!j.micCoupe, robot: !!j.robot, niveau: j.robot && !j.remplace ? niveauDuRobot(s, j.id) : null, pret: !!j.pret || !!j.robot, remplace: !!j.remplace, absent: estAbsent(s, j.id) })),
       delai: s.delai,
       publique: !!s.publique,
       taille: s.taille,
@@ -6242,6 +6258,7 @@ var qrcode = function() {
 
   function lancer(s) {
     s.restants = I.melanger(s.joueurs.map((j) => j.id), s.rng);
+    s.joueurs.forEach((j) => { delete j.micCoupe; }); // micro coupé par l'hôte : seulement le temps d'une partie
     s.paquets = I.nombrePaquets(s.mode);
     if (s.publique) s.formule = 'normale';
     // Barème des cartes (Pilotage : le serveur le pose dans s.baremeCahier) : figé pour toute la partie.
@@ -6589,7 +6606,22 @@ var qrcode = function() {
         if (!joueur) return { ok: false, erreur: 'Inconnu.' };
         joueur.voix = !!msg.voix;
         if (typeof msg.peerId === 'string') joueur.peerId = msg.peerId.slice(0, 64);
-        joueur.muet = !!msg.muet;
+        joueur.muet = !!msg.muet || !!joueur.micCoupe; // micro coupé par l'hôte : il reste muet
+        return { ok: true };
+      }
+      case 'passerHote': {
+        // L'hôte éliminé laisse la main à un joueur encore en jeu (humain, présent), le temps qui lui reste à regarder.
+        const cible = s.joueurs.find((j) => j.id === msg.cible);
+        if (id !== s.hote || !['manche', 'finManche'].includes(s.etat) || !s.elimines.includes(id)) return { ok: false, erreur: 'Impossible.' };
+        if (!cible || cible.robot || !cible.connecte || !s.restants.includes(cible.id)) return { ok: false, erreur: 'Choisis un joueur encore en jeu.' };
+        s.hote = cible.id;
+        return { ok: true };
+      }
+      case 'couperMicro': { // { cible, coupe } : l'hôte coupe (ou rend) le micro d'un joueur éliminé, pour toute la table
+        const cible = s.joueurs.find((j) => j.id === msg.cible);
+        if (id !== s.hote || s.etat === 'salon' || !cible || cible.robot || cible.id === id || !s.elimines.includes(cible.id)) return { ok: false, erreur: 'Impossible.' };
+        if (msg.coupe === false) delete cible.micCoupe;
+        else { cible.micCoupe = true; cible.muet = true; }
         return { ok: true };
       }
       case 'lancer': {
@@ -6693,7 +6725,7 @@ var qrcode = function() {
       totalCahier: totalCahierEffectif(s),
       totauxCahier: totauxCahier(s), // les deux montants proposés (Pilotage) : boutons « Cahier … » du salon
       cahier: s.cahier ? { total: s.cahier.total, bareme: Object.assign({}, s.cahier.bareme || I.baremeComplet()), scores: Object.assign({}, s.cahier.scores), donnes: s.cahier.donnes.map((d) => ({ numero: d.numero, sorti: d.sorti, points: Object.assign({}, d.points), mains: d.mains /* cartes retournées en fin de donne : tout le monde les a vues */, elimines: d.elimines.slice() })) } : null,
-      joueurs: s.joueurs.map((j) => ({ id: j.id, nom: j.nom, connecte: j.connecte, peerId: j.peerId || null, voix: !!j.voix, muet: j.muet !== false, robot: !!j.robot, niveau: j.robot && !j.remplace ? niveauDuRobot(s, j.id) : null, pret: !!j.pret || !!j.robot, remplace: !!j.remplace, absent: estAbsent(s, j.id) })),
+      joueurs: s.joueurs.map((j) => ({ id: j.id, nom: j.nom, connecte: j.connecte, peerId: j.peerId || null, voix: !!j.voix, muet: j.muet !== false, micCoupe: !!j.micCoupe, robot: !!j.robot, niveau: j.robot && !j.remplace ? niveauDuRobot(s, j.id) : null, pret: !!j.pret || !!j.robot, remplace: !!j.remplace, absent: estAbsent(s, j.id) })),
       delai: s.delai,
       publique: !!s.publique,
       taille: s.taille,
@@ -7980,7 +8012,7 @@ svg .vb { transform-box: view-box; }
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = '5f3ebb8f1292'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = 'fff5fe2a2bc4'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: true };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // La musique des menus était coupée par défaut : on l'allume une fois pour tous (le joueur peut la recouper).
@@ -8704,6 +8736,9 @@ svg .vb { transform-box: view-box; }
     if (logo.lastChild.textContent !== nomJeu) { logo.lastChild.textContent = nomJeu; logo.classList.toggle('long', v.jeu === 'inter8'); logo.firstChild.src = v.jeu === 'inter8' ? 'icons/masano-logo.svg' : 'icons/kopo-logo.svg'; }
     garderEcranAllume();
     vocal.maj(v);
+    // L'hôte éliminé a laissé la main : toute la table le sait.
+    if (ancienne && ancienne.code === v.code && ancienne.hote !== v.hote && v.etat !== 'salon' && (v.elimines || []).includes(ancienne.hote))
+      toast(v.hote === v.moi ? `${nom(v, ancienne.hote)} te passe la main : tu es l'hôte.` : ancienne.hote === v.moi ? `${nom(v, v.hote)} est maintenant l'hôte.` : `${nom(v, ancienne.hote)} passe la main à ${nom(v, v.hote)}.`, v.hote === v.moi ? 'succes' : 'info');
     // Plus aucun humain en jeu : on peut sauter la fin (de la manche, si on est qualifié pour la suivante).
     $('btnPasserFin').hidden = !v.entreRobots;
     $('btnPasserFin').textContent = v.restants && v.restants.includes(v.moi) ? 'Passer à la fin de la manche' : 'Passer à la fin';
@@ -9934,7 +9969,7 @@ svg .vb { transform-box: view-box; }
   })));
   const initiale = (nom) => (Array.from(String(nom || '?').trim())[0] || '?').toUpperCase();
   const vocal = {
-    actif: false, muet: true, parler: false, sonCoupe: !!prefs.sonAutresCoupe, salle: null, vue: null, demande: false,
+    actif: false, muet: true, parler: false, coupeHote: false, sonCoupe: !!prefs.sonAutresCoupe, salle: null, vue: null, demande: false,
     // Identifiants (= comptes) qui parlent ; joueurs rendus muets pour moi seul (gardés sur cet appareil, d'une partie à l'autre).
     parleurs: new Set(), coupes: new Set(stock.lire('kopo-micros-coupes') || []),
     dispo() { return MODE_SERVEUR && !LOCAL && !!client && !!client.serveur && !!this.vue && this.vue.joueurs.some((j) => j.id !== this.vue.moi && !j.robot); },
@@ -9947,6 +9982,7 @@ svg .vb { transform-box: view-box; }
     // Réponse du serveur : le jeton du salon vocal, ou la raison du refus (pas abonné, micro pas encore réglé…).
     async recevoir(d) {
       this.demande = false; this.dessiner();
+      if (d && 'coupeHote' in d && !d.jeton) return this.coupeParHote(!!d.coupeHote, d.parler !== false);
       if (d && d.fin) {
         const etait = !!this.salle; this.couper(); this.signaler(); this.dessiner(); this.dessinerParleurs();
         return etait ? toast('Ton abonnement Kopo+ est terminé : micro coupé.', 'info') : undefined;
@@ -9975,12 +10011,32 @@ svg .vb { transform-box: view-box; }
       try { await salle.connect(d.url, d.jeton); } catch (e) { if (this.salle === salle) this.salle = null; console.warn('Micro :', e); const r = String((e && e.message) || '').slice(0, 90); return toast('Micro : connexion au salon vocal impossible.' + (r ? ' (' + r + ')' : ''), 'echec'); }
       if (this.salle !== salle) { salle.disconnect(); return; }
       salle.startAudio().catch(() => {});
-      this.actif = true; this.parler = !!d.parler; this.muet = true;
+      this.actif = true; this.parler = !!d.parler; this.muet = true; this.coupeHote = !!d.coupeHote;
       if (d.parler) {
         try { await salle.localParticipant.setMicrophoneEnabled(true); this.muet = false; }
         catch (e) { toast('Micro non autorisé : tu entends les autres abonnés mais ils ne t\'entendent pas.', 'alerte'); }
-      } else toast('Ton micro a été coupé par la modération : tu entends les autres abonnés.', 'alerte');
+      } else if (d.coupeHote) toast('L\'hôte a coupé ton micro jusqu\'à la fin de la partie : tu entends toujours la table.', 'alerte');
+      else toast('Ton micro a été coupé par la modération : tu entends les autres abonnés.', 'alerte');
       this.signaler(); this.dessiner();
+    },
+    // L'hôte coupe le micro d'un joueur éliminé (pour toute la table), ou le lui rend. Le serveur retire aussi
+    // le droit de parler dans le salon vocal : ce n'est pas seulement un bouton caché.
+    async coupeParHote(coupe, parler) {
+      const avant = this.coupeHote;
+      this.coupeHote = coupe;
+      if (this.salle) {
+        if (coupe && !this.muet) { try { await this.salle.localParticipant.setMicrophoneEnabled(false); } catch (e) {} }
+        if (coupe) { this.muet = true; this.parler = false; } else this.parler = parler;
+        this.signaler();
+      }
+      this.dessiner();
+      if (coupe && !avant) toast('L\'hôte a coupé ton micro jusqu\'à la fin de la partie : tu entends toujours la table.', 'alerte');
+      else if (!coupe && avant && parler) toast('L\'hôte t\'a rendu la parole : touche le micro pour parler.', 'info');
+    },
+    // Hôte : couper (ou rendre) le micro d'un joueur éliminé, pour toute la table.
+    couperPourTous(id, nom, coupe) {
+      envoyer({ type: 'couperMicro', cible: id, coupe });
+      toast(coupe ? `Micro de ${nom || 'ce joueur'} coupé pour toute la table.` : `${nom || 'Ce joueur'} peut de nouveau parler.`, 'info');
     },
     async basculerMicro() {
       if (!this.salle || !this.parler) return;
@@ -10008,7 +10064,7 @@ svg .vb { transform-box: view-box; }
       toast(coupe ? `Tu n'entends plus ${nom || 'ce joueur'}. Les autres l'entendent toujours.` : `Tu entends de nouveau ${nom || 'ce joueur'}.`, 'info');
     },
     // Icône du micro d'un joueur : barré quand il a coupé son micro, haut-parleur barré quand je ne l'entends pas.
-    icone(j) { return !j.voix ? null : j.id !== (this.vue && this.vue.moi) && this.entendPas(j.id) ? 'son-coupe' : j.muet ? 'micro-coupe' : 'micro'; },
+    icone(j) { return !j.voix ? null : j.micCoupe ? 'micro-coupe' : j.id !== (this.vue && this.vue.moi) && this.entendPas(j.id) ? 'son-coupe' : j.muet ? 'micro-coupe' : 'micro'; },
     signaler() { envoyer({ type: 'micro', voix: this.actif, muet: this.muet }); },
     // LiveKit redit « qui parle » plusieurs fois par seconde quand toute la table parle (le volume de chacun change),
     // même quand ce sont les mêmes personnes. Redessiner à chaque fois (sièges, bandeau, mise en page) ralentissait
@@ -10030,7 +10086,7 @@ svg .vb { transform-box: view-box; }
       this.actif = false; this.muet = true; this.parleurs.clear();
       $('audios').replaceChildren();
     },
-    arreter() { this.couper(); this.vue = null; this.demande = false; this.dessiner(); this.dessinerParleurs(); },
+    arreter() { this.couper(); this.coupeHote = false; this.vue = null; this.demande = false; this.dessiner(); this.dessinerParleurs(); },
     dessiner() {
       const box = $('vocal');
       box.hidden = !this.vue;
@@ -10053,7 +10109,7 @@ svg .vb { transform-box: view-box; }
       }
       const n = this.vue.joueurs.filter((j) => j.voix && j.id !== this.vue.moi).length;
       const enVocal = n ? ` (${n} autre${n > 1 ? 's' : ''} abonné${n > 1 ? 's' : ''} en vocal)` : ' (aucun autre abonné en vocal)';
-      const m = etiquette(avecIco(el('button', 'btn ' + (this.muet ? 'coupe' : 'ouvert')), this.muet ? 'micro-coupe' : 'micro'), (!this.parler ? 'Micro coupé par la modération' : this.muet ? 'Micro coupé, toucher pour parler' : 'Micro ouvert, toucher pour couper') + enVocal);
+      const m = etiquette(avecIco(el('button', 'btn ' + (this.muet ? 'coupe' : 'ouvert')), this.muet ? 'micro-coupe' : 'micro'), (!this.parler ? (this.coupeHote ? 'Micro coupé par l\'hôte jusqu\'à la fin de la partie' : 'Micro coupé par la modération') : this.muet ? 'Micro coupé, toucher pour parler' : 'Micro ouvert, toucher pour couper') + enVocal);
       m.onclick = () => this.basculerMicro();
       const so = etiquette(avecIco(el('button', 'btn son-autres' + (this.sonCoupe ? ' coupe' : '')), this.sonCoupe ? 'son-coupe' : 'son'), this.sonCoupe ? 'Micro des autres coupé pour toi, toucher pour les réentendre' : 'Couper le micro de tous les autres (pour toi seul)');
       so.onclick = () => this.basculerSon();
@@ -10162,14 +10218,14 @@ svg .vb { transform-box: view-box; }
     requestAnimationFrame(pas);
   }
   const cleDonne = (v) => v.code + '|' + v.cahier.donnes.length + '|' + Object.keys(v.cahier.scores).join(',');
-  let finDonneOuverte = null;
+  let finDonneOuverte = null, finDonneHote = null;
   const donnesMontrees = new Set();
   function afficherFinDonne(v, finDePartie) {
     const c = v.cahier, d = c.donnes[c.donnes.length - 1];
     if (!d) return finDePartie ? construireFinPartieCahier(v) : null;
     const cle = cleDonne(v);
-    if (finDonneOuverte === cle && ['findonne', 'cahier'].includes($('fenetre').dataset.type) && !$('voile').hidden) return; // déjà à l'écran (le décompte avance tout seul), ou le cahier complet ouvert par-dessus
-    finDonneOuverte = cle;
+    if (finDonneOuverte === cle && finDonneHote === v.hote && ['findonne', 'cahier'].includes($('fenetre').dataset.type) && !$('voile').hidden) return; // déjà à l'écran (le décompte avance tout seul), ou le cahier complet ouvert par-dessus
+    finDonneOuverte = cle; finDonneHote = v.hote; // l'hôte a changé (passé la main) : ses boutons changent aussi
     const dejaVu = donnesMontrees.has(cle);
     donnesMontrees.add(cle);
     const animAvant = sansAnim;
@@ -10225,8 +10281,10 @@ svg .vb { transform-box: view-box; }
           actions.append(p);
         }
         if (v.entreRobots) { const b = el('button', 'btn principal large', 'Passer à la fin'); b.onclick = () => envoyer({ type: 'passerFin' }); actions.append(b); }
-        if (v.hote === v.moi) { const b = el('button', 'btn' + (v.entreRobots ? '' : ' principal') + ' large', 'Donne suivante'); b.onclick = () => envoyer({ type: 'mancheSuivante' }); actions.append(b); }
-        else if (!v.suite) actions.append(el('p', null, "En attente de l'hôte pour la donne suivante…"));
+        if (v.hote === v.moi) {
+          const b = el('button', 'btn' + (v.entreRobots ? '' : ' principal') + ' large', 'Donne suivante'); b.onclick = () => envoyer({ type: 'mancheSuivante' }); actions.append(b);
+          if (v.restants.some((id) => peutPasserHote(v, id))) { const p = avecIco(el('button', 'btn large'), 'couronne', 'Passer la main'); p.onclick = () => choisirNouvelHote(v); actions.append(p); }
+        } else if (!v.suite) actions.append(el('p', null, "En attente de l'hôte pour la donne suivante…"));
         actions.append(toutCahier);
       }
       cote.append(haut, actions);
@@ -10299,6 +10357,7 @@ svg .vb { transform-box: view-box; }
       const b = el('button', 'btn' + (v.entreRobots ? '' : ' principal') + ' large', 'Lancer maintenant' + (suivants === 2 ? ' la finale' : ''));
       b.onclick = () => envoyer({ type: 'mancheSuivante' });
       contenu.push(b);
+      if (v.restants.some((id) => peutPasserHote(v, id))) { const p = avecIco(el('button', 'btn large'), 'couronne', 'Passer la main'); p.onclick = () => choisirNouvelHote(v); contenu.push(p); }
     } else if (!v.suite) contenu.push(el('p', null, "En attente de l'hôte pour la manche suivante…"));
     ouvrirFenetre(contenu);
   }
@@ -12067,6 +12126,37 @@ svg .vb { transform-box: view-box; }
   });
 
   const MOTIFS = [['insultes', 'Insultes ou propos haineux'], ['pseudo', 'Pseudo inacceptable'], ['triche', 'Triche'], ['abandon', 'Quitte les parties'], ['autre', 'Autre']];
+  // Ce que l'hôte peut faire depuis la fiche d'un joueur, en partie (avec le serveur seulement) :
+  // - éliminé, il laisse la main à un joueur encore en jeu ;
+  // - il coupe (ou rend) le micro d'un joueur éliminé, pour toute la table.
+  const avecServeur = () => MODE_SERVEUR && !LOCAL && !!client && !!client.serveur;
+  const peutPasserHote = (v, id) => !!v && avecServeur() && v.hote === v.moi && ['manche', 'finManche'].includes(v.etat) && v.elimines.includes(v.moi)
+    && v.restants.includes(id) && v.joueurs.some((j) => j.id === id && !j.robot && j.connecte);
+  function actionsHote(id, nomJoueur, retour) {
+    const v = vueActuelle, out = [];
+    if (!v || !avecServeur() || v.hote !== v.moi || v.etat === 'salon' || id === v.moi) return out;
+    if (peutPasserHote(v, id)) {
+      const b = avecIco(el('button', 'btn principal large'), 'couronne', 'Lui passer la main');
+      b.onclick = () => { envoyer({ type: 'passerHote', cible: id }); retour(); };
+      out.push(b, el('small', 'muted', 'Tu es éliminé : ' + (nomJoueur || 'ce joueur') + ' devient l\'hôte (manche suivante, revanche…).'));
+    }
+    const jv = v.joueurs.find((j) => j.id === id);
+    if (MICRO_ACTIF && jv && v.elimines.includes(id) && (jv.voix || jv.micCoupe)) {
+      const b = avecIco(el('button', 'btn large'), jv.micCoupe ? 'micro' : 'micro-coupe', jv.micCoupe ? 'Lui rendre la parole' : 'Couper son micro pour toute la table');
+      b.onclick = () => { vocal.couperPourTous(id, nomJoueur, !jv.micCoupe); retour(); };
+      out.push(b, el('small', 'muted', jv.micCoupe ? 'Personne ne l\'entend jusqu\'à la fin de la partie.' : 'Il est éliminé : personne ne l\'entendra plus jusqu\'à la fin de la partie.'));
+    }
+    return out;
+  }
+  // L'hôte éliminé choisit à qui laisser la main parmi les joueurs encore en jeu.
+  function choisirNouvelHote(v) {
+    const ids = v.restants.filter((id) => peutPasserHote(v, id));
+    if (!ids.length) return toast('Aucun joueur encore en jeu ne peut prendre la main.', 'alerte');
+    const z = el('div', 'reglages');
+    ids.forEach((id) => { const b = avecIco(el('button', 'btn large'), 'couronne', nom(v, id)); b.onclick = () => { envoyer({ type: 'passerHote', cible: id }); fermerFenetre(); }; z.append(b); });
+    const annuler = el('button', 'btn large', 'Annuler'); annuler.onclick = () => { fermerFenetre(); if (vueActuelle) afficher(vueActuelle); };
+    ouvrirFenetre([el('h2', null, 'Passer la main'), el('p', null, 'Tu es éliminé. Qui devient l\'hôte de la table ?'), z, annuler]);
+  }
   function ficheJoueur(id, nomJoueur) {
     const contenu = [el('h2', null, nomJoueur || 'Joueur')];
     const retour = () => { fermerFenetre(); if (vueActuelle) afficher(vueActuelle); };
@@ -12078,6 +12168,7 @@ svg .vb { transform-box: view-box; }
       b.onclick = () => { vocal.basculerJoueur(id, nomJoueur); retour(); };
       contenu.push(b, el('small', 'muted', coupe ? 'Tu ne l\'entends plus. Les autres joueurs l\'entendent toujours.' : 'Seulement pour toi : les autres joueurs l\'entendent toujours.'));
     }
+    contenu.push(...actionsHote(id, nomJoueur, retour));
     if (!compteLocal() || !/^c_/.test(id)) {
       contenu.push(el('p', null, 'Amis, blocage et signalement arrivent avec les comptes en ligne.'));
     } else {

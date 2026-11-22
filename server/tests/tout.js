@@ -2104,6 +2104,17 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     const loin = await ab.verifierLiveKit(async () => { throw new Error('getaddrinfo ENOTFOUND'); });
     assert.match(loin.raison, /injoignable/);
     assert.ok(!(await creerAbonnement(null, {}).verifierLiveKit()).ok);
+    // Micro coupé par l'hôte (joueur éliminé) : le droit de parler est retiré dans LiveKit, sans sortir du salon vocal.
+    let appel = null;
+    assert.ok(await ab.permissionVocal({ salon: 'table-1', identite: 'c2', parler: false }, async (u, o) => { appel = { u, o }; return { ok: true }; }));
+    assert.strictEqual(appel.u, 'https://kopo-x.livekit.cloud/twirp/livekit.RoomService/UpdateParticipant');
+    const pc = JSON.parse(appel.o.body);
+    assert.deepStrictEqual([pc.room, pc.identity, pc.permission.canSubscribe, pc.permission.canPublish], ['table-1', 'c2', true, false]);
+    const adm = JSON.parse(Buffer.from(appel.o.headers.Authorization.split('.')[1], 'base64url').toString());
+    assert.strictEqual(adm.video.roomAdmin, true); assert.strictEqual(adm.video.room, 'table-1');
+    await ab.permissionVocal({ salon: 'table-1', identite: 'c2', parler: true }, async (u, o) => { appel = { u, o }; return { ok: true }; });
+    assert.deepStrictEqual(JSON.parse(appel.o.body).permission.canPublishSources, ['MICROPHONE']);
+    assert.strictEqual(await creerAbonnement(null, {}).permissionVocal({ salon: 's', identite: 'x', parler: false }), false);
   });
   await test('abonnement Kopo+ : 2 500 FC le mois, 25 000 FC l\'an, activé par l\'admin, prolongé, couronne à la table', async () => {
     const a = await invite('AboA'), b = await invite('AboB');

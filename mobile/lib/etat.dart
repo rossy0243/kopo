@@ -160,6 +160,15 @@ class App extends ChangeNotifier {
   String nouveauCode() { final r = math.Random(); return List.generate(4, (_) => lettresCode[r.nextInt(lettresCode.length)]).join(); }
 
   // Une pastille en bas de l'écran (en haut pendant une partie) : succès = vert, alerte = ambre, échec = rouge, info = neutre.
+  /// L'hôte éliminé a laissé la main : toute la table le sait (comme sur le site).
+  void _toastNouvelHote(Vue? avant, Vue v) {
+    if (avant == null || avant['code'] != v['code'] || avant['hote'] == v['hote'] || v['etat'] == 'salon') return;
+    if (!((v['elimines'] as List?) ?? const []).contains(avant['hote'])) return;
+    if (v['hote'] == v['moi']) { toast("${nomDe(v, avant['hote'])} te passe la main : tu es l'hôte.", Niv.succes); }
+    else if (avant['hote'] == v['moi']) { toast("${nomDe(v, v['hote'])} est maintenant l'hôte."); }
+    else { toast('${nomDe(v, avant['hote'])} passe la main à ${nomDe(v, v['hote'])}.'); }
+  }
+
   void toast(String t, [Niv niveau = Niv.info]) {
     toastTexte = t;
     toastNiveau = niveau;
@@ -730,6 +739,7 @@ class App extends ChangeNotifier {
           bandeau = null;
           final v = (d as Map).cast<String, dynamic>();
           memoriser(v['code'].toString());
+          _toastNouvelHote(vue, v);
           afficher(v);
           if (_annoncerMicro) {
             _annoncerMicro = false;
