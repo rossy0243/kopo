@@ -97,6 +97,10 @@ const DEFAUTS = {
   stickers: { actif: false, vente: false, remisePack: require('./stickers').REMISE_PACK, offres: require('./stickers').OFFRES_DEFAUT },
   // Bouquets de pièces (argent réel, du moins cher au plus cher, 40 000 FC au plus) : au taux des stickers, bonus croissant.
   bouquets: { bouquets: require('./bouquets').BOUQUETS_DEFAUT },
+  // Le Fleuve (fleuve.md) : fermé jusqu'au lancement (ferme, testeurs, ouvert), 5 pagaies par jour, pièces par étoile et par ville.
+  fleuve: { etat: 'ferme', pagaies: 5, piecesEtoile: 5, piecesEscale: 200, etoilesVille: 20, adoucirJours: 5 },
+  // Recette qui fabrique les étapes du Fleuve (courbe de difficulté, étoiles, objectifs et pièges débloqués).
+  fleuveRecette: require('./fleuve-generateur').RECETTE_DEFAUT,
   messagesRapides: ['👏', '😂', '😮', '🔥', '😡', '👍', '😭', '🙏', 'Bien joué !', 'Bravo !', 'Joli coup !', 'Belle carte !', 'Bien vu !', 'Trop fort !', 'Merci !', 'Désolé !', 'Oups !', 'Aïe !', 'Pas de chance !', 'Je ramasse…', 'Je t’ai eu !', 'Katapss !', 'Vite !', 'Prends ton temps', 'À toi !', 'Encore une !', 'Bonne chance !', 'Bonne partie !', 'GG !', 'Revanche ?', 'On en refait une ?', 'Je reviens', 'Salut tout le monde !', 'À la prochaine !'],
 };
 // Version actuelle de l'appli (const VERSION dans src/source.html). La version minimale demandée
@@ -355,9 +359,10 @@ function creerReglages(base) {
       cache = JSON.parse(JSON.stringify(DEFAUTS));
       for (const l of r.rows) if (l.cle in cache) cache[l.cle] = typeof l.valeur === 'string' ? JSON.parse(l.valeur) : l.valeur;
       // Réglages enregistrés avant l'ajout d'un champ (ex. gains.plafondJour) : le champ manquant prend sa valeur de départ.
-      for (const k of ['gains', 'annonce', 'robotsPublics', 'heuresPush', 'kopoPlus', 'suspects', 'limites', 'inscriptions', 'alertes']) {
+      for (const k of ['gains', 'annonce', 'robotsPublics', 'heuresPush', 'kopoPlus', 'suspects', 'limites', 'inscriptions', 'alertes', 'fleuve']) {
         if (cache[k] && typeof cache[k] === 'object' && !Array.isArray(cache[k])) cache[k] = { ...DEFAUTS[k], ...cache[k] };
       }
+      if (cache.fleuveRecette) cache.fleuveRecette = require('./fleuve-generateur').completerRecette(cache.fleuveRecette);
       if (cache.rythme) cache.rythme = { kopo: { ...DEFAUTS.rythme.kopo, ...cache.rythme.kopo }, inter8: { ...DEFAUTS.rythme.inter8, ...cache.rythme.inter8 } };
       // L'appli s'appelle maintenant Masano : l'ancien message par défaut, enregistré tel quel, prend le nouveau nom.
       if (cache.maintenance && cache.maintenance.message === ANCIEN_MESSAGE_MAINTENANCE) cache.maintenance = { ...cache.maintenance, message: DEFAUTS.maintenance.message };
@@ -444,6 +449,11 @@ function creerReglages(base) {
         valeur = { actif: valeur.actif !== false && valeur.actif !== 0 && valeur.actif !== '0' ? 1 : 0, attente, robots, force };
       }
       if (cle === 'bande') valeur = verifierBande(valeur);
+      if (cle === 'fleuve') {
+        if (!['ferme', 'testeurs', 'ouvert'].includes(valeur.etat)) throw Object.assign(new Error('Le Fleuve : fermé, testeurs ou ouvert.'), { statut: 400 });
+        valeur = { etat: valeur.etat, ...verifierBornes({ ...DEFAUTS.fleuve, ...valeur }, { pagaies: [1, 20, 'Pagaies par jour'], piecesEtoile: [0, 1000, 'Pièces par étoile'], piecesEscale: [0, 10000, 'Pièces par ville'], etoilesVille: [0, 27, 'Étoiles pour le boss'], adoucirJours: [1, 30, 'Jours avant l\'aide'] }) };
+      }
+      if (cle === 'fleuveRecette') valeur = require('./fleuve-generateur').verifierRecette(valeur);
       if (cle === 'cahier') valeur = verifierCahier(valeur);
       if (cle === 'cahierTotaux') valeur = verifierTotauxCahier(valeur);
       if (cle === 'stickers') valeur = require('./stickers').verifierReglage(valeur);

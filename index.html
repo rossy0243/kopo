@@ -995,6 +995,44 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
 .mode-jour { border-color: #f3d48a; }
 @media (orientation: portrait) { .mode.mode-jour, .mode.mode-bande { aspect-ratio: auto; min-height: 74px; grid-template-columns: auto 1fr; justify-items: start; text-align: left; column-gap: 10px; padding: 8px 12px; } .mode-jour .mode-icone, .mode-bande .mode-icone { grid-row: span 2; font-size: 32px; } .mode-jour b, .mode-bande b { font-size: 17px; } }
 .mj { display: grid; gap: 10px; text-align: center; }
+/* Le Fleuve (fleuve.md) : la carte d'un fleuve, ses étapes, ses escales, les pagaies. */
+.mode-fleuve { border-color: #7fc4e8; }
+.fenetre[data-type="fleuve"] { width: min(460px, 100%); padding: 14px; gap: 10px; }
+.fl-tete { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.fl-tete h2 { flex: 1; }
+.fl-pagaies { display: flex; gap: 3px; align-items: center; }
+.fl-pagaie { width: 14px; height: 30px; }
+.fl-pagaie path { fill: #c99a52; stroke: #6b4a1c; stroke-width: 1; }
+.fl-pagaie.perdue { opacity: .22; }
+.fl-info { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--muted); }
+.fl-info b { color: var(--brass); }
+.fl-carte { position: relative; height: min(62vh, 560px); overflow-y: auto; border-radius: 14px; background: linear-gradient(#1a3b2a, #224a33 40%, #1d4130); border: 1px solid var(--line); overscroll-behavior: contain; }
+.fl-niger .fl-carte { background: linear-gradient(#3b3220, #4a3d24 40%, #3f3420); }
+.fl-fond { position: relative; margin: 0 auto; }
+.fl-fond svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.fl-eau { fill: none; stroke: #2f7fb4; stroke-width: 30; stroke-linecap: round; stroke-linejoin: round; }
+.fl-eau2 { fill: none; stroke: #5aa9d8; stroke-width: 18; stroke-linecap: round; stroke-linejoin: round; opacity: .55; stroke-dasharray: 3 14; }
+.fl-etape { position: absolute; width: 40px; height: 40px; margin: -20px 0 0 -20px; border-radius: 50%; border: 3px solid #f3e7c9; background: #2b5e86; color: #fff; font-weight: 700; font-size: 14px; display: grid; place-items: center; padding: 0; box-shadow: 0 3px 0 rgba(0,0,0,.35); }
+.fl-etape.fait { background: var(--brass); color: #1d1606; border-color: #fff3d0; }
+.fl-etape.ferme { background: #3a4a58; color: #8a9aab; border-color: #6c7a88; box-shadow: none; }
+.fl-etape.courante { background: #fff; color: #1d1606; border-color: var(--brass); animation: fl-pouls 1.6s ease-in-out infinite; }
+.fl-etape.escale { width: 54px; height: 54px; margin: -27px 0 0 -27px; font-size: 16px; border-radius: 14px; }
+.fl-etape .fl-et { position: absolute; top: 100%; left: 50%; transform: translateX(-50%); font-size: 11px; letter-spacing: -1px; color: #ffd86b; text-shadow: 0 1px 2px #000; white-space: nowrap; margin-top: 1px; }
+.fl-ville { position: absolute; transform: translateY(-50%); font: 400 20px/1 var(--display); letter-spacing: 1px; color: #fff3d0; text-shadow: 0 2px 4px rgba(0,0,0,.6); white-space: nowrap; pointer-events: none; }
+.fl-bateau { position: absolute; font-size: 26px; margin: -46px 0 0 -13px; pointer-events: none; filter: drop-shadow(0 2px 2px rgba(0,0,0,.5)); }
+.fl-suite { position: absolute; left: 0; right: 0; text-align: center; color: #fff3d0; font-size: 13px; opacity: .85; }
+@keyframes fl-pouls { 50% { box-shadow: 0 0 0 8px rgba(226,176,74,.35); } }
+.fl-biefs { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--muted); }
+.fl-biefs button { background: none; border: 0; color: var(--brass); padding: 6px; }
+.fl-biefs button:disabled { opacity: .3; }
+.fl-etoiles { font-size: 34px; letter-spacing: 6px; color: #ffd86b; line-height: 1; }
+.fl-etoiles .vide { color: rgba(255,255,255,.18); }
+.fl-seuils { display: grid; gap: 4px; text-align: left; background: rgba(255,255,255,.05); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font-size: 13px; }
+.fl-seuils span { color: #ffd86b; display: inline-block; min-width: 48px; }
+.fl-piege { color: var(--warn); font-size: 13px; }
+.fl-objectif { font-size: 19px; font-weight: 700; color: var(--ink); }
+#pillFleuve { justify-self: center; align-self: start; background: rgba(16,35,58,.92); border: 1px solid #7fc4e8; color: var(--ink); border-radius: 999px; padding: 4px 12px; font-size: 12.5px; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
+@media (prefers-reduced-motion: reduce) { .fl-etape.courante { animation: none; } }
 .mj-numero { color: var(--muted); font-size: 13px; letter-spacing: 1px; text-transform: uppercase; }
 .mj-hier { display: block; margin: 6px 0 2px; opacity: .85; }
 .mj-score { font: 400 64px/1 var(--display); color: var(--brass); }
@@ -1507,6 +1545,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   <symbol id="i-regles" viewBox="0 0 32 32"><rect x="8" y="4" width="16" height="24" rx="2.5"/><path d="M12 10h8M12 14.5h8M12 19h5"/><path style="fill:var(--acc,#c7362f);stroke:none" d="M20 20.5l1.8 2.4-1.8 2.4-1.8-2.4z"/></symbol>
   <symbol id="i-plein" viewBox="0 0 32 32"><path d="M5 11V5h6M21 5h6v6M27 21v6h-6M11 27H5v-6"/><rect x="12" y="10" width="8" height="12" rx="1.6"/></symbol>
   <symbol id="i-reglages" viewBox="0 0 32 32"><rect x="8" y="4" width="16" height="24" rx="2.5"/><path d="M12 10h8M12 16h8M12 22h8"/><circle cx="15" cy="10" r="1.8" style="fill:var(--fond)"/><circle cx="18.5" cy="16" r="1.8" style="fill:var(--fond)"/><circle cx="14" cy="22" r="1.8" style="fill:var(--acc,#c7362f);stroke:none"/></symbol>
+  <symbol id="i-fleuve" viewBox="0 0 32 32"><rect x="9" y="5" width="14" height="22" rx="2.5"/><path d="M11.5 20c1.5-1.1 3 1.1 4.5 0s3-1.1 4.5 0M11.5 23.6c1.5-1.1 3 1.1 4.5 0s3-1.1 4.5 0"/><path d="M12 14.5h8l-1.6 2.2h-4.8z"/><path d="M16 9v5.5"/><path style="fill:var(--acc,#c7362f);stroke:none" d="M16.8 9.4l3 2.6h-3z"/></symbol>
   <symbol id="i-jour" viewBox="0 0 32 32"><rect x="9" y="5" width="14" height="22" rx="2.5"/><circle cx="16" cy="14" r="3.2"/><path d="M16 7.6v1.6M16 18.8v1.6M9.6 14h1.6M20.8 14h1.6M11.5 9.5l1.1 1.1M19.4 17.4l1.1 1.1M20.5 9.5l-1.1 1.1M12.6 17.4l-1.1 1.1"/><path style="fill:var(--acc,#c7362f);stroke:none" d="M16 22l1.6 2.1-1.6 2.1-1.6-2.1z"/></symbol>
   <symbol id="i-amis" viewBox="0 0 32 32"><circle cx="12" cy="11" r="4.5"/><path d="M4 26c0-5 3.6-8 8-8s8 3 8 8"/><circle cx="22" cy="10" r="3.6"/><path d="M21 17.2c4.2 0 7 2.6 7 7"/></symbol>
   <symbol id="i-bande" viewBox="0 0 32 32"><rect x="4" y="9" width="11" height="17" rx="2.2" transform="rotate(-12 9.5 17.5)"/><rect x="17" y="9" width="11" height="17" rx="2.2" transform="rotate(12 22.5 17.5)"/><rect x="10.5" y="6" width="11" height="17" rx="2.2" style="fill:var(--fond,#0f3d2e)"/><path style="fill:var(--acc,#c7362f);stroke:none" d="M16 11.2l1.8 2.4-1.8 2.4-1.8-2.4z"/></symbol>
@@ -1569,6 +1608,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     </div>
     <div class="modes" id="modes">
       <button class="mode mode-creer" data-coin="♠" id="btnCreer"><span class="mode-icone"><svg class="ico"><use href="#i-creer"/></svg></span><b>Créer une partie</b><small>Entre amis, de 2 à 9</small></button>
+      <button class="mode mode-jour mode-fleuve" data-coin="♠" id="btnFleuve" hidden><span class="mode-icone"><svg class="ico"><use href="#i-fleuve"/></svg></span><b>Le Fleuve</b><small id="fleuveResume">Remonte le fleuve, étape par étape</small></button>
       <button class="mode mode-jour" data-coin="♦" id="btnMatchJour" hidden><span class="mode-icone"><svg class="ico"><use href="#i-jour"/></svg><i class="point-nouveau" id="pointJour" hidden></i></span><b>Match du jour</b><small id="matchJourResume">La même partie pour tous</small></button>
       <button class="mode mode-bande" data-coin="♥" id="btnBande" hidden><span class="mode-icone"><svg class="ico"><use href="#i-bande"/></svg><i class="point-nouveau" id="pointBande" hidden></i></span><b>La Bande</b><small id="bandeResume">Défie tes amis</small></button>
       <button class="mode mode-enligne" id="btnInconnus" data-coin="♦"><span class="mode-icone"><svg class="ico"><use href="#i-enligne"/></svg></span><b>En ligne</b><small>Avec des inconnus <span id="enLigne"></span></small></button>
@@ -4649,7 +4689,10 @@ var qrcode = function() {
   function forceRobots(s, j) {
     if (s.robots === 'gentils') return 0;
     const plage = PLAGES_FORCE[niveauDuRobot(s, j)] || PLAGES_FORCE.normaux;
-    const n = s.niveauJoueur > 1 ? s.niveauJoueur : 1;
+    // Le Fleuve (serveur) : un robot peut avoir sa propre force (j.force, 1 à 20), sinon celle de la table.
+    const r = j && s.joueurs ? s.joueurs.find((x) => x.id === j) : null;
+    const f = r && !r.remplace && r.force > 0 ? r.force : s.niveauJoueur;
+    const n = f > 1 ? f : 1;
     const t = Math.min(1, (n - 1) / 19);
     return plage[0] + (plage[1] - plage[0]) * t;
   }
@@ -4786,7 +4829,11 @@ var qrcode = function() {
     const avant = m.table.map((p) => ({ joueur: p.joueur, cartes: p.cartes.slice(), compte: p.compte }));
     const phaseAvant = m.phase;
     const mainAvant = (m.mains[action.joueur] || []).slice();
+    // Le Fleuve (serveur) : suivi des coups pour les objectifs et les étoiles. Absent ailleurs.
+    const tailles = s.surAction ? Object.fromEntries(Object.entries(m.mains).map(([k, v]) => [k, v.length])) : null;
+    const courant = m.joueurCourant;
     K.jouer(m, action);
+    if (s.surAction) s.surAction(s, m, action, tailles, courant);
     const j = action.joueur;
     let fin = null;
     if (action.type === 'katapss') {
@@ -4915,7 +4962,9 @@ var qrcode = function() {
     const presents = (l) => l.filter((id) => s.restants.includes(id));
     const tour = K.melanger(s.donne.ordre, hasardManche(s.donne.graine, 0)); // ordre autour de la table, places vides comprises : le même à chaque manche
     const { mains, redistributions } = K.distribuer(presents(s.donne.ordre), rng);
-    const depart = Math.floor(rng() * tour.length);
+    let depart = Math.floor(rng() * tour.length);
+    // Le Fleuve, piège « tu joues en dernier » (1re manche) : on ouvre juste après le joueur.
+    if (s.donne.dernier && s.numeroManche === 0 && tour.includes(s.donne.dernier)) depart = (tour.indexOf(s.donne.dernier) + 1) % tour.length;
     const ouvreur = presents(tour.slice(depart).concat(tour.slice(0, depart)))[0];
     return { sieges: presents(tour), mains, redistributions, premier: ouvreur };
   }
@@ -6223,7 +6272,12 @@ var qrcode = function() {
     const r = s.joueurs.find((x) => x.id === j);
     return r && !r.remplace && NIVEAUX_ROBOTS.includes(r.niveau) ? r.niveau : s.robots;
   }
-  const choixRobot = (s, j) => R.choixRobot(s.manche, j, niveauDuRobot(s, j), s.niveauJoueur, s.rng);
+  // Le Fleuve (serveur) : un robot peut avoir sa propre force (j.force, 1 à 20), sinon celle de la table.
+  function forceDuRobot(s, j) {
+    const r = s.joueurs.find((x) => x.id === j);
+    return r && !r.remplace && r.force > 0 ? r.force : s.niveauJoueur;
+  }
+  const choixRobot = (s, j) => R.choixRobot(s.manche, j, niveauDuRobot(s, j), forceDuRobot(s, j), s.rng);
 
   function estAbsent(s, id) {
     const j = s.joueurs.find((x) => x.id === id);
@@ -6249,7 +6303,11 @@ var qrcode = function() {
   function appliquer(s, action) {
     const courantAvant = s.manche.joueurCourant;
     const contestablesAvant = (s.manche.contestables || []).slice();
+    // Le Fleuve (serveur) : suivi des coups pour les objectifs et les étoiles. Absent ailleurs.
+    const mAvant = s.manche;
+    const tailles = s.surAction ? Object.fromEntries(Object.entries(mAvant.mains).map(([k, v]) => [k, v.length])) : null;
     I.jouer(s.manche, action);
+    if (s.surAction) s.surAction(s, mAvant, action, tailles, courantAvant);
     finirMancheSiBesoin(s);
     // Annoncer ou contester ne change pas le joueur courant : on ne relance pas son chrono.
     if (s.manche && (s.manche.joueurCourant !== courantAvant || action.type === 'jouer' || action.type === 'piocher' || s.etat !== 'manche')) armerChrono(s);
@@ -6270,7 +6328,7 @@ var qrcode = function() {
     // Un robot annonce dans la foulée de son coup, sans attendre sa pause de réflexion.
     // Un robot facile peut oublier : il ne se rattrape pas, on pourra le contester après les 3 s.
     for (const j of nouveaux.filter((x) => estRobot(s, x))) {
-      if (R.robotAnnonce(niveauDuRobot(s, j), s.niveauJoueur, s.rng)) {
+      if (R.robotAnnonce(niveauDuRobot(s, j), forceDuRobot(s, j), s.rng)) {
         I.jouer(m, { type: 'annoncer', joueur: j });
         delete s.graces[j];
       } else s.oublis[j] = true;
@@ -6403,10 +6461,32 @@ var qrcode = function() {
     return premier;
   }
 
+  // Le Fleuve (serveur) : la même donne pour tous. s.donne = { graine, ordre, dernier? } : ordre = les places
+  // fixes (le joueur d'abord, puis les robots). Comme au Kopo (placerDonne), un hasard tiré de la graine et du
+  // numéro de la donne fixe l'ordre autour de la table, le paquet et qui commence ; le joueur reçoit toujours
+  // les 4 premières cartes distribuées. Une donne nulle rejouée prend un autre tirage (sinon elle se répéterait).
+  // dernier : piège « tu joues en dernier » (1re donne), on commence juste après ce joueur.
+  const hasardManche = (graine, manche) => I.hasard((graine + Math.imul(manche, 0x9e3779b1)) >>> 0);
+  function placerDonne(s) {
+    const rng = hasardManche(s.donne.graine, s.numeroManche + 1 + 7919 * (s.nulles || 0));
+    const presents = (l) => l.filter((id) => s.restants.includes(id));
+    const tour = I.melanger(s.donne.ordre, hasardManche(s.donne.graine, 0));
+    const { mains, pioche } = I.distribuer(presents(s.donne.ordre), s.paquets, rng);
+    let depart = Math.floor(rng() * tour.length);
+    if (s.donne.dernier && s.numeroManche === 0 && tour.includes(s.donne.dernier)) depart = (tour.indexOf(s.donne.dernier) + 1) % tour.length;
+    const premier = presents(tour.slice(depart).concat(tour.slice(0, depart)))[0];
+    return { sieges: presents(tour), mains, pioche, premier, graine: Math.floor(rng() * 4294967296) };
+  }
+
   function demarrerManche(s) {
-    const sieges = s.restants.slice(); // mêmes places qu'à la donne précédente
-    const { mains, pioche } = I.distribuer(sieges, s.paquets, s.rng);
-    const premier = choisirPremier(s, sieges);
+    let sieges, mains, pioche, premier, graine;
+    if (s.donne) ({ sieges, mains, pioche, premier, graine } = placerDonne(s));
+    else {
+      sieges = s.restants.slice(); // mêmes places qu'à la donne précédente
+      ({ mains, pioche } = I.distribuer(sieges, s.paquets, s.rng));
+      premier = choisirPremier(s, sieges);
+      graine = Math.floor(s.rng() * 4294967296);
+    }
     s.numeroManche++;
     s.suiteA = null;
     s.graces = {};
@@ -6414,7 +6494,7 @@ var qrcode = function() {
     // Avec une distribution animée, l'effet de la carte de départ (pénalité, tour sauté, J retour)
     // attend la fin du compte à rebours : le joueur sanctionné reçoit ses cartes après les autres.
     const differerDepart = s.durees.depart > 0;
-    s.manche = I.nouvelleManche(sieges, mains, pioche, premier, { mode: s.mode, jRetour: s.jRetour, graine: Math.floor(s.rng() * 4294967296), differerDepart, cahier: !!s.cahier, bareme: s.cahier && s.cahier.bareme });
+    s.manche = I.nouvelleManche(sieges, mains, pioche, premier, { mode: s.mode, jRetour: s.jRetour, graine, differerDepart, cahier: !!s.cahier, bareme: s.cahier && s.cahier.bareme });
     s.etat = 'manche';
     const depart = rapide(s) ? Math.min(s.durees.depart, RAPIDE.depart) : s.durees.depart;
     s.pause = depart > 0 ? { type: 'depart', jusqua: s.horloge() + depart, total: depart } : null;
@@ -8056,7 +8136,7 @@ svg .vb { transform-box: view-box; }
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = '05e8f4ccf22e'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = 'f3984bd51665'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: true };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // La musique des menus était coupée par défaut : on l'allume une fois pour tous (le joueur peut la recouper).
@@ -8422,8 +8502,8 @@ svg .vb { transform-box: view-box; }
   // facon : { creer: true } | { code } | { taille } (salle publique) | { reconnexion: jeton de reconnexion }
   async function entrerServeur(nom, facon) {
     clearTimeout(rechercheEnCours);
-    if (!facon.reconnexion && !facon.matchJour && await exigerGoogle()) return; // reprendre sa place reste permis
-    afficherConnexion(facon.matchJour ? 'Préparation du Match du jour…' : facon.taille ? `Recherche d'une ${facon.mise ? 'table ' + (NIVEAUX_MISE.find((x) => x[0] === facon.mise) || [])[1] : 'salle'} de ${facon.taille}…` : facon.code ? 'Connexion à la partie ' + facon.code + '…' : 'Ouverture de la partie…');
+    if (!facon.reconnexion && !facon.matchJour && !facon.fleuve && await exigerGoogle()) return; // reprendre sa place reste permis
+    afficherConnexion(facon.fleuve ? 'Mise à l\'eau de la pirogue…' : facon.matchJour ? 'Préparation du Match du jour…' : facon.taille ? `Recherche d'une ${facon.mise ? 'table ' + (NIVEAUX_MISE.find((x) => x[0] === facon.mise) || [])[1] : 'salle'} de ${facon.taille}…` : facon.code ? 'Connexion à la partie ' + facon.code + '…' : 'Ouverture de la partie…');
     let room;
     // L'hébergeur gratuit endort le serveur après un moment sans joueurs : le réveil prend jusqu'à une minute.
     const reveil = setTimeout(() => afficherConnexion('Réveil du serveur, ça peut prendre jusqu\'à une minute…'), 6000);
@@ -8432,13 +8512,14 @@ svg .vb { transform-box: view-box; }
       const cli = new Colyseus.Client(SERVEUR.replace(/^http/, 'ws'));
       if (facon.reconnexion) room = await cli.reconnect(facon.reconnexion).catch(() => facon.code ? reprendreServeur(cli, c.jeton, facon.code).then((r) => r || Promise.reject(new Error('reconnexion'))) : Promise.reject(new Error('reconnexion')));
       else if (facon.matchJour) room = await cli.create('kopo-jour', { jeton: c.jeton });
+      else if (facon.fleuve) room = await cli.create('fleuve', { jeton: c.jeton, fleuve: facon.fleuve, numero: facon.numero });
       else if (facon.creer) room = await cli.create(facon.jeu === 'inter8' ? 'inter8' : 'kopo', Object.assign({ jeton: c.jeton, code: nouveauCode() }, facon.jeu === 'inter8' ? { mode: facon.mode, jRetour: !!facon.jRetour, formule: facon.formule, total: facon.total } : {}));
       // Par le code : la table peut être de Kopo ou d'Inter (8), on cherche dans les deux.
       else if (facon.code) room = (await reprendreServeur(cli, c.jeton, facon.code)) || await cli.join('kopo', { jeton: c.jeton, code: facon.code }).catch((e) => cli.join('inter8', { jeton: c.jeton, code: facon.code }).catch(() => { throw e; }));
       else if (facon.mise) room = await cli.joinOrCreate(facon.jeu === 'inter8' ? 'inter8-mise' : 'kopo-mise', { jeton: c.jeton, publique: true, taille: facon.taille, mise: facon.mise });
       else room = await cli.joinOrCreate(facon.jeu === 'inter8' ? 'inter8' : 'kopo', { jeton: c.jeton, publique: true, taille: facon.taille });
       clearTimeout(reveil);
-      if (!facon.reconnexion && !facon.matchJour) vocal.annoncer = true; // « Nouveau : le micro » à la première vue de la table
+      if (!facon.reconnexion && !facon.matchJour && !facon.fleuve) vocal.annoncer = true; // « Nouveau : le micro » à la première vue de la table
       brancherSalleServeur(cli, room, nom, facon);
     } catch (e) {
       clearTimeout(reveil);
@@ -8497,6 +8578,12 @@ svg .vb { transform-box: view-box; }
       if (moi !== client || !d) return;
       if (d.fin) { moi.depart = true; quitter(); setTimeout(() => resultatMatchJour(d), 250); }
       else if (d.debut) toast(d.officiel ? `Match du jour n°${d.numero} : un seul essai, bonne chance !` : 'Entraînement : ce Match ne compte pas.');
+    });
+    // Le Fleuve : au début, l'objectif de l'étape (rappelé en haut de l'écran) ; à la fin, les étoiles.
+    room.onMessage('fleuve', (d) => {
+      if (moi !== client || !d) return;
+      if (d.fin) { moi.depart = true; quitter(); setTimeout(() => (d.erreur ? toast(d.erreur, 'echec') : resultatFleuve(d)), 250); }
+      else if (d.debut && d.etape) { pastilleFleuve('🛶 ' + d.etape.texte); toast(d.adoucir ? d.etape.texte + ' · robots un peu moins forts aujourd\'hui' : d.etape.texte); }
     });
     room.onLeave((code) => {
       if (moi !== client || moi.depart) return;
@@ -8659,6 +8746,7 @@ svg .vb { transform-box: view-box; }
     clearTimeout(rechercheEnCours);
     if (accueil && document.fullscreenElement) document.exitFullscreen().catch(() => {});
     vocal.arreter();
+    pastilleFleuve(null);
     hote = client = vueActuelle = null;
     session = null;
     stock.effacer(cleSession);
@@ -11167,6 +11255,7 @@ svg .vb { transform-box: view-box; }
 
   // Cartes de l'accueil : « Match du jour » (score, ou temps restant) et « La Bande » (ma place).
   async function majCartesCompetition() {
+    majCarteFleuve();
     $('btnMatchJour').hidden = $('btnBande').hidden = !MODE_SERVEUR || jeuChoisi() === 'inter8'; // Kopo seulement
     if (!MODE_SERVEUR) return;
     if (!compteLocal()) return proposerLienBande(); // lien de Bande ouvert sur un téléphone sans compte
@@ -11303,6 +11392,186 @@ svg .vb { transform-box: view-box; }
     if (r.officiel) bandeauPush('match').then((x) => x && zonePush.append(x));
   }
 
+
+  // ------------------------------------------------------------------ Le Fleuve (fleuve.md)
+  // Deux cartes à remonter étape par étape : le Congo (Kopo) et le Niger (Inter (8)). Chaque étape : une petite
+  // partie contre des robots avec un objectif, 1 à 3 étoiles. 5 pagaies par jour : une se perd à chaque échec.
+  // Une escale (une vraie ville) toutes les 10 étapes : son boss demande des étoiles. Le serveur décide de tout.
+  const FLEUVES = { congo: { nom: 'Congo', jeu: 'kopo', jeuNom: 'Kopo' }, niger: { nom: 'Niger', jeu: 'inter8', jeuNom: 'Inter (8)' } };
+  const ROBOTS_NOMS = { faciles: 'Faciles', normaux: 'Normaux', forts: 'Forts' };
+  const PAR_BIEF = 50;
+  let etatFleuve = null, biefVu = {};
+  const fleuveDuJeu = () => (jeuChoisi() === 'inter8' ? 'niger' : 'congo');
+  const etoilesTexte = (n) => '★'.repeat(n) + '☆'.repeat(3 - n);
+  function pastilleFleuve(texte) {
+    let p = $('pillFleuve');
+    if (!texte) { if (p) p.remove(); return; }
+    if (!p) { p = el('div'); p.id = 'pillFleuve'; p.setAttribute('role', 'status'); const t = document.querySelector('#ecranPartie .table'); (t || document.body).prepend(p); }
+    p.textContent = texte;
+  }
+  function pagaiesEl(p) {
+    const z = el('div', 'fl-pagaies'); z.title = `${p.restantes} pagaie${p.restantes > 1 ? 's' : ''} sur ${p.max}`;
+    for (let i = 0; i < p.max; i++) {
+      const t = document.createElement('template');
+      t.innerHTML = `<svg class="fl-pagaie${i < p.restantes ? '' : ' perdue'}" viewBox="0 0 14 30" aria-hidden="true"><path d="M6 1h2v15h-2z"/><path d="M7 15c3.5 0 4.5 3 4.5 7s-2 7-4.5 7-4.5-3-4.5-7 1-7 4.5-7z"/></svg>`;
+      z.append(t.content.firstChild);
+    }
+    return z;
+  }
+  // Carte de l'accueil : visible quand le Fleuve est ouvert pour ce joueur.
+  async function majCarteFleuve(recharger = true) {
+    const b = $('btnFleuve'); if (!b) return;
+    if (!MODE_SERVEUR || !compteLocal() || !configServeur || !configServeur.fleuve || configServeur.fleuve === 'ferme') { b.hidden = true; return; }
+    if (recharger || !etatFleuve) { try { etatFleuve = await apiJoueur('/fleuve'); } catch (e) { return; } }
+    b.hidden = !etatFleuve.ouvert;
+    const f = etatFleuve.fleuves && etatFleuve.fleuves[fleuveDuJeu()];
+    if (f) $('fleuveResume').textContent = f.publiees ? `${f.nom} · ${f.courante ? 'étape ' + f.courante : 'tout est fait'} · ★ ${f.etoiles}` : `${f.nom} · bientôt`;
+  }
+  window.majCarteFleuve = majCarteFleuve;
+
+  async function ouvrirFleuve(fleuve) {
+    if (!MODE_SERVEUR) return toast('Le Fleuve se joue en ligne.', 'alerte');
+    try { if (!(await compteEnLigne())) return; etatFleuve = await apiJoueur('/fleuve'); } catch (x) { return toast(x.message, 'echec'); }
+    if (!etatFleuve.ouvert) return toast('Le Fleuve arrive bientôt.', 'alerte');
+    if (!etatFleuve.google) return fenetreGoogle('Le Fleuve', 'Remonte le Congo et le Niger, étape par étape, et gagne des étoiles. Connecte-toi avec Google pour jouer : ta progression te suit sur tous tes téléphones.');
+    afficherCarteFleuve(fleuve || fleuveDuJeu());
+  }
+  window.ouvrirFleuve = ouvrirFleuve;
+
+  function afficherCarteFleuve(cle) {
+    const E = etatFleuve, f = E.fleuves[cle], F = FLEUVES[cle];
+    const tete = el('div', 'fl-tete');
+    tete.append(el('h2', null, 'Le ' + F.nom), pagaiesEl(E.pagaies));
+    const onglets = el('div', 'ligue-onglets');
+    for (const k of Object.keys(FLEUVES)) { const b = el('button', null, `${FLEUVES[k].nom} · ${FLEUVES[k].jeuNom}`); b.setAttribute('aria-pressed', String(k === cle)); b.onclick = () => afficherCarteFleuve(k); onglets.append(b); }
+    const info = el('div', 'fl-info');
+    const gauche = el('span'); gauche.append('Étoiles ', el('b', null, '★ ' + f.etoiles));
+    info.append(gauche, el('span', null, E.pagaies.restantes < E.pagaies.max ? `Nouvelles pagaies dans ${dureeLisible(E.pagaies.retourMs)}` : 'Une pagaie se perd à chaque échec'));
+    const z = [tete, onglets, info];
+    if (!f.publiees) {
+      z.push(el('p', null, `Le ${F.nom} ouvre bientôt. Reviens dans quelques jours !`));
+    } else {
+      const biefMax = Math.max(1, Math.ceil(f.etapes.length / PAR_BIEF));
+      const bief = Math.min(biefMax, biefVu[cle] || f.bief);
+      biefVu[cle] = bief;
+      const debut = (bief - 1) * PAR_BIEF + 1, etapes = f.etapes.filter((e) => e.n >= debut && e.n < debut + PAR_BIEF);
+      const villes = etapes.filter((e) => e.escale).map((e) => e.ville);
+      const nav = el('div', 'fl-biefs');
+      const prec = el('button', null, '‹ Avant'); prec.disabled = bief <= 1; prec.onclick = () => { biefVu[cle] = bief - 1; afficherCarteFleuve(cle); };
+      const suiv = el('button', null, 'Après ›'); suiv.disabled = bief >= biefMax; suiv.onclick = () => { biefVu[cle] = bief + 1; afficherCarteFleuve(cle); };
+      nav.append(prec, el('span', null, `Bief ${bief}${villes.length ? ' · ' + villes[0] + (villes.length > 1 ? ' → ' + villes[villes.length - 1] : '') : ''}`), suiv);
+      const carte = el('div', 'fl-carte');
+      z.push(nav, carte);
+      ouvrirFenetre([...z, fermerBouton()], 'fleuve');
+      $('fenetre').classList.toggle('fl-niger', cle === 'niger');
+      dessinerCarte(carte, cle, f, etapes);
+      return;
+    }
+    ouvrirFenetre([...z, fermerBouton()], 'fleuve');
+  }
+  function fermerBouton() { const b = el('button', 'btn large', 'Fermer'); b.onclick = () => { fermerFenetre(); $('fenetre').classList.remove('fl-niger'); majCarteFleuve(false); }; return b; }
+
+  // La carte : le fleuve serpente de bas en haut (on le remonte depuis la mer), une étape tous les 74 px.
+  function dessinerCarte(carte, cle, f, etapes) {
+    const PAS = 74, BAS = 70, HAUT = f.suiteBientot && etapes.length && etapes[etapes.length - 1].n === f.publiees ? 110 : 60;
+    const L = Math.min(380, carte.clientWidth || 340), H = BAS + HAUT + PAS * Math.max(0, etapes.length - 1);
+    const fond = el('div', 'fl-fond'); fond.style.width = L + 'px'; fond.style.height = H + 'px';
+    const pos = (i) => ({ x: L / 2 + (L / 2 - 52) * Math.sin(i * 0.72), y: H - BAS - i * PAS });
+    const pts = etapes.map((_, i) => pos(i));
+    // Le lit du fleuve : une courbe douce qui passe par chaque étape, prolongée vers la mer et vers l'amont.
+    const tous = [{ x: pts.length ? pts[0].x : L / 2, y: H + 20 }, ...pts, { x: pts.length ? pts[pts.length - 1].x : L / 2, y: -20 }];
+    let d = `M${tous[0].x},${tous[0].y}`;
+    for (let i = 1; i < tous.length; i++) { const a = tous[i - 1], b = tous[i], my = (a.y + b.y) / 2; d += ` C${a.x},${my} ${b.x},${my} ${b.x},${b.y}`; }
+    const t = document.createElement('template');
+    t.innerHTML = `<svg viewBox="0 0 ${L} ${H}" aria-hidden="true"><path class="fl-eau" d="${d}"/><path class="fl-eau2" d="${d}"/></svg>`;
+    fond.append(t.content.firstChild);
+    let courant = null;
+    etapes.forEach((e, i) => {
+      const p = pts[i];
+      const ferme = !(e.etoiles > 0) && e.n !== f.courante;
+      const b = el('button', 'fl-etape' + (e.escale ? ' escale' : '') + (e.etoiles > 0 ? ' fait' : '') + (e.n === f.courante ? ' courante' : '') + (ferme ? ' ferme' : ''), String(e.n));
+      b.style.left = p.x + 'px'; b.style.top = p.y + 'px';
+      b.setAttribute('aria-label', `Étape ${e.n}${e.escale ? ', ' + e.ville : ''}${e.etoiles ? ', ' + e.etoiles + ' étoile' + (e.etoiles > 1 ? 's' : '') : ferme ? ', fermée' : ''}`);
+      if (e.etoiles > 0) b.append(el('span', 'fl-et', etoilesTexte(e.etoiles)));
+      b.onclick = () => ouvrirEtapeFleuve(cle, e.n);
+      fond.append(b);
+      if (e.escale) {
+        const v = el('div', 'fl-ville', e.ville);
+        v.style.top = p.y + 'px';
+        if (p.x > L / 2) v.style.right = (L - p.x + 36) + 'px'; else v.style.left = (p.x + 36) + 'px';
+        fond.append(v);
+      }
+      if (e.n === f.courante) { courant = b; const k = el('div', 'fl-bateau', '🛶'); k.style.left = p.x + 'px'; k.style.top = p.y + 'px'; fond.append(k); }
+    });
+    if (HAUT > 60) { const s = el('div', 'fl-suite', 'La suite du fleuve arrive bientôt…'); s.style.top = '24px'; fond.append(s); }
+    carte.append(fond);
+    requestAnimationFrame(() => { carte.scrollTop = courant ? Math.max(0, parseFloat(courant.style.top) - carte.clientHeight / 2) : H; });
+  }
+
+  async function ouvrirEtapeFleuve(cle, n) {
+    let e;
+    try { e = await apiJoueur(`/fleuve/${cle}/${n}`); } catch (x) { return toast(x.message, 'echec'); }
+    const F = FLEUVES[cle], z = el('div', 'mj');
+    z.append(el('div', 'mj-numero', `${F.nom} · étape ${e.numero}${e.escale ? ' · boss de ' + e.ville : ' · vers ' + e.ville}`));
+    if (e.etoiles) { const st = el('div', 'fl-etoiles'); st.textContent = '★'.repeat(e.etoiles); if (e.etoiles < 3) st.append(el('span', 'vide', '★'.repeat(3 - e.etoiles))); z.append(st); }
+    z.append(el('div', 'fl-objectif', e.texte));
+    const adv = e.joueurs - 1;
+    z.append(el('p', null, `${F.jeuNom} contre ${adv} robot${adv > 1 ? 's' : ''} ${ROBOTS_NOMS[e.robots] || ''}${e.robots === 'forts' && e.force >= 15 ? ' (très forts)' : ''}.`));
+    for (const p of e.pieges || []) z.append(el('div', 'fl-piege', '⚠ ' + p.texte));
+    const s = el('div', 'fl-seuils');
+    const ligne = (et, t) => { const l = el('div'); l.append(el('span', null, et), t); s.append(l); };
+    ligne('★', 'Réussis l\'objectif');
+    if (e.seuils.trois > e.seuils.deux) ligne('★★', `Réussis avec un score de ${e.seuils.deux} ou plus`);
+    ligne('★★★', `Réussis avec un score de ${e.seuils.trois} ou plus${e.seuils.trois > e.seuils.deux ? '' : ' (2e et 3e étoiles)'}`);
+    s.append(el('small', 'muted', `Score : à chaque manche, quand tu sors, 1 point par adversaire encore en jeu ; +10 si tu gagnes la partie.${F.jeu === 'inter8' ? ' Et 1 point toutes les 2 cartes que tu fais piocher.' : ''}`));
+    z.append(s);
+    if (e.escale && e.villeEtoiles !== null && !e.etoiles) z.append(el('p', null, `Pour affronter le boss de ${e.ville}, il te faut ${e.etoilesVille} étoiles dans la ville : tu en as ${e.villeEtoiles}.`));
+    const boutons = [];
+    if (e.refus) z.append(el('p', 'fl-piege', e.refus));
+    else if (e.pagaies.restantes <= 0) z.append(el('p', 'fl-piege', `Ta pirogue se repose. Nouvelles pagaies dans ${dureeLisible(etatFleuve ? etatFleuve.pagaies.retourMs : 0)}.`));
+    else {
+      z.append(el('small', 'muted', `Si tu échoues, tu perds une pagaie (il t'en reste ${e.pagaies.restantes}).`));
+      const go = el('button', 'btn principal large', e.etoiles ? (e.etoiles < 3 ? 'Rejouer pour plus d\'étoiles' : 'Rejouer') : 'Jouer'); go.onclick = () => jouerEtapeFleuve(cle, e.numero);
+      boutons.push(go);
+    }
+    const carte = el('button', 'btn large', 'Retour à la carte'); carte.onclick = () => afficherCarteFleuve(cle);
+    ouvrirFenetre([z, ...boutons, carte]);
+  }
+  function jouerEtapeFleuve(cle, n) {
+    const p = lirePseudo(); if (!p) return;
+    fermerFenetre();
+    entrerServeur(p, { fleuve: cle, numero: n });
+  }
+
+  // Fin d'une étape : étoiles, pièces, pagaies, et la suite.
+  async function resultatFleuve(r) {
+    const F = FLEUVES[r.fleuve] || FLEUVES.congo, z = el('div', 'mj');
+    z.append(el('div', 'mj-numero', `${F.nom} · étape ${r.numero}${r.escale ? ' · ' + r.ville : ''}`));
+    const st = el('div', 'fl-etoiles');
+    for (let i = 0; i < 3; i++) {
+      const x = el('span', i < r.etoiles ? null : 'vide', '★');
+      if (i < r.etoiles && !sansAnim) x.animate([{ transform: 'scale(0)', opacity: 0 }, { transform: 'scale(1.4)', opacity: 1, offset: .6 }, { transform: 'none' }], { duration: 450, delay: 250 + i * 300, easing: 'ease-out', fill: 'backwards' });
+      st.append(x);
+    }
+    z.append(el('h2', null, r.reussi ? (r.escale && r.premiereFois ? `${r.ville} est passée !` : 'Étape réussie !') : r.parti ? 'Étape abandonnée' : 'Pas cette fois…'), st);
+    z.append(el('p', null, r.texte + (r.reussi ? ' : réussi.' : ' : raté.')));
+    if (r.reussi) {
+      z.append(el('small', 'muted', `Score ${r.score} · ★★ à ${r.seuils.deux} · ★★★ à ${r.seuils.trois}`));
+      if (r.pieces > 0) z.append(el('p', 'mj-regle', `+${formatPieces(r.pieces)} pièces${r.double ? ' (doublées : première étape réussie du jour)' : ''}${r.piecesEscale ? `, dont ${formatPieces(r.piecesEscale)} pour la ville` : ''}`));
+      if (r.biefTermine) z.append(el('p', null, 'Bief terminé : un nouveau morceau du fleuve t\'attend.'));
+      if (typeof r.solde === 'number' || typeof r.solde === 'string') soldeServeur(Number(r.solde));
+    } else z.append(el('small', 'muted', `Une pagaie perdue. Il t'en reste ${r.pagaies.restantes}.`));
+    const boutons = [];
+    try { etatFleuve = await apiJoueur('/fleuve'); } catch (e) {}
+    const f = etatFleuve && etatFleuve.fleuves && etatFleuve.fleuves[r.fleuve];
+    if (r.reussi && f && f.courante && f.courante !== r.numero) { const b = el('button', 'btn principal large', `Étape ${f.courante}`); b.onclick = () => ouvrirEtapeFleuve(r.fleuve, f.courante); boutons.push(b); }
+    if (r.pagaies.restantes > 0 && (!r.reussi || r.etoiles < 3)) { const b = el('button', 'btn' + (r.reussi ? '' : ' principal') + ' large', r.reussi ? 'Rejouer pour plus d\'étoiles' : 'Réessayer'); b.onclick = () => ouvrirEtapeFleuve(r.fleuve, r.numero); boutons.push(b); }
+    const carte = el('button', 'btn large', 'Voir la carte'); carte.onclick = () => (etatFleuve ? afficherCarteFleuve(r.fleuve) : ouvrirFleuve(r.fleuve));
+    ouvrirFenetre([z, ...boutons, carte]);
+    majCarteFleuve(false);
+  }
+  $('btnFleuve').onclick = () => ouvrirFleuve();
+  window.resultatFleuve = resultatFleuve;
 
   // ----- Fenêtre « Nouveau » : Match du jour et Bande (annonce-competition.md v1.0)
   // Une seule fois par appareil, sur l'accueil, quand le tableau de bord l'allume (réglage « nouveaute »).
@@ -13844,6 +14113,7 @@ svg .vb { transform-box: view-box; }
     $('btnLigue').hidden = jeu === 'inter8' || !MODE_SERVEUR;
     // Match du jour et Bande : Kopo seulement, les cartes disparaissent avec Inter (8) (14/11).
     $('btnMatchJour').hidden = $('btnBande').hidden = jeu === 'inter8' || !MODE_SERVEUR;
+    if (window.majCarteFleuve) window.majCarteFleuve(false); // Le Fleuve : Congo pour Kopo, Niger pour Inter (8)
     const r = $('btnRegles'); if (r && r.lastChild) r.lastChild.textContent = jeu === 'inter8' ? 'Règles Inter' : 'Règles';
   }
   $('choixJeu').querySelectorAll('button').forEach((b) => (b.onclick = () => { stock.ecrire('kopo-jeu', b.dataset.jeu); majChoixJeu(); }));
@@ -13914,8 +14184,8 @@ svg .vb { transform-box: view-box; }
   $('btnAnnuler').onclick = quitter;
   $('btnPasserFin').onclick = () => { $('btnPasserFin').hidden = true; envoyer({ type: 'passerFin' }); };
   $('btnQuitter').onclick = () => demanderConfirmation(
-    hote ? "Tu es l'hôte : si tu quittes, la partie s'arrête pour tout le monde." : (vueActuelle && vueActuelle.etat === 'manche' ? 'Tu ne pourras pas revenir dans cette partie avec un autre code.' : 'Tu quittes la partie.'),
-    () => { if (client && vueActuelle && vueActuelle.etat === 'salon') {} quitter(); });
+    hote ? "Tu es l'hôte : si tu quittes, la partie s'arrête pour tout le monde." : $('pillFleuve') ? 'Quitter l\'étape compte comme un échec : tu perds une pagaie.' : (vueActuelle && vueActuelle.etat === 'manche' ? 'Tu ne pourras pas revenir dans cette partie avec un autre code.' : 'Tu quittes la partie.'),
+    () => { const etape = !!$('pillFleuve'); quitter(); if (etape) { toast('Étape abandonnée : une pagaie perdue.', 'alerte'); setTimeout(() => window.majCarteFleuve && window.majCarteFleuve(), 800); } });
   $('btnWhatsappSalon').onclick = () => {
     const v = vueActuelle; if (!v) return;
     ouvrirWhatsApp(texteTable(v.jeu, v.code, lienPartie(v.code, v.jeu)));

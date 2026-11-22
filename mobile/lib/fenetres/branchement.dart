@@ -6,6 +6,7 @@ import '../etat.dart';
 import '../reseau/push.dart';
 import 'accueil_fenetres.dart';
 import 'compet.dart';
+import 'fleuve.dart';
 import 'partie_fenetres.dart';
 import 'progres.dart';
 import 'social.dart';
@@ -24,6 +25,7 @@ void brancherFenetres() {
   app.finMancheUi = afficherFinManche;
   app.finPartieUi = afficherFinPartie;
   app.resultatMatchJourUi = resultatMatchJour;
+  app.resultatFleuveUi = resultatFleuve;
   app.vocal.inviterAbonnement = (offre) => ouvrirAbonnement(offre);
   app.vocal.annoncer = () => ouvrirAbonnement(null, true);
   app.onConnecte = () { Push.synchroniser(); };

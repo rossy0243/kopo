@@ -12,6 +12,8 @@ const { idAleatoire } = require('./comptes');
 const { etatJeuPour, NOMS_JEUX, evenementEnCours, totauxCahier } = require('./reglages');
 const ATTENTE_STICKER = require('./stickers').ATTENTE_MS;
 const { permis, SALLES_MAX, actives: limitesActives } = require('./limites');
+const FG = require('./fleuve-generateur');
+const { creerSuivi } = require('./fleuve-suivi');
 
 const salles = new Set(); // salles ouvertes (tableau de bord : en direct)
 const LETTRES = 'ABCDEFGHJKMNPQRSTUVWXYZ';
@@ -33,7 +35,13 @@ class SalleKopo extends Room {
     // Pour les applis qui ne font pas tourner le moteur sur le téléphone (appli Flutter). Sans compte Google,
     // sans pièces, sans ligue, sans XP de parcours : comme « Contre les robots » sur le site.
     this.entrainement = this.roomName === 'entrainement';
-    this.jeu = this.roomName === 'inter8' || this.roomName === 'inter8-mise' || (this.entrainement && options.jeu === 'inter8') ? 'inter8' : 'kopo';
+    // Le Fleuve (salles « fleuve ») : une étape, un joueur seul contre les robots fixés par l'étape. Le jeu suit le fleuve.
+    this.fl = null;
+    if (this.roomName === 'fleuve') {
+      if (!FG.FLEUVES[options.fleuve]) throw new Error('Fleuve inconnu.');
+      this.fl = { fleuve: options.fleuve, numero: Math.trunc(Number(options.numero)) || 0, compteId: null, essai: null, etape: null, suivi: null, termine: false };
+    }
+    this.jeu = this.roomName === 'inter8' || this.roomName === 'inter8-mise' || (this.entrainement && options.jeu === 'inter8') || (this.fl && FG.FLEUVES[this.fl.fleuve] === 'inter8') ? 'inter8' : 'kopo';
     this.S = this.jeu === 'inter8' ? SI : SK;
     this.maxClients = this.S.MAX;
     this.autoDispose = true;
@@ -42,7 +50,7 @@ class SalleKopo extends Room {
     const pris = (c) => [...salles].some((x) => x.code === c);
     this.code = options.code && /^[A-Z]{4}$/.test(options.code) && !pris(options.code) ? options.code : nouveauCode();
     while (pris(this.code)) this.code = nouveauCode();
-    this.publique = !!options.publique && !this.entrainement;
+    this.publique = !!options.publique && !this.entrainement && !this.fl;
     // Match du jour (salles « kopo-jour ») : un joueur seul contre 8 robots, la même donne pour tous ce jour-là.
     this.jour = null;
     if (this.roomName === 'kopo-jour') {
@@ -93,27 +101,28 @@ class SalleKopo extends Room {
     // Salle publique gratuite (Kopo ou Inter (8)) : après une attente sans assez de joueurs, des robots complètent
     // la table (réglage robotsPublics, onglet Pilotage). Jamais aux tables à mise. Les robots restent affichés
     // comme robots ; avec eux la partie ne rapporte ni pièces, ni Ligue, ni XP de parcours (enregistrerPartie).
-    this.robotsPublics = this.publique && !this.mise && !this.jour && !this.entrainement;
+    this.robotsPublics = this.publique && !this.mise && !this.jour && !this.entrainement && !this.fl;
     this.attenteDepuis = null; // arrivée du premier joueur dans le salon
     this.attenteTest = rapide && Number(options.attenteRobots) >= 0 ? Number(options.attenteRobots) : null; // tests seulement (ms)
-    if (rapide) { this.salle.durees = { depart: 0, finTour: 0, mancheAuto: 1 }; if (this.jour || this.entrainement) this.salle.pauseRobot = 0; } // tests seulement
+    if (rapide) { this.salle.durees = { depart: 0, finTour: 0, mancheAuto: 1 }; if (this.jour || this.entrainement || this.fl) this.salle.pauseRobot = 0; } // tests seulement
     this.clientsParId = new Map();
     this.comptes = new Map(); // id -> compte (au moment de l'entrée)
     this.attentes = new Map(); // id -> reconnexion en attente (allowReconnection), annulée si le joueur revient par le code
     this.partie = null; // { id, katapss: Map, abandons: Set, coupures: Set, classee, enregistree }
     // Ligue : seulement en salle publique (inconnus placés au hasard). Dès qu'un joueur entre
     // avec le code (un ami), la salle n'est plus classée : pas de complicité (strategie-pieces §6.3).
-    this.classee = this.publique && !this.jour && this.jeu === 'kopo'; // ligue d'Inter (8) : plus tard, séparée
+    this.classee = this.publique && !this.jour && !this.fl && this.jeu === 'kopo'; // ligue d'Inter (8) : plus tard, séparée
     this.setMetadata(this.meta('salon', 0));
     salles.add(this);
 
     this.onMessage('*', (client, type, msg) => this.recevoir(client, type, msg));
     this.setSimulationInterval(() => {
-      if (this.jour && this.jour.termine) return; // Match du jour fini pour le joueur : les robots s'arrêtent
+      const fini = () => (this.jour && this.jour.termine) || (this.fl && this.fl.termine);
+      if (fini()) return; // Match du jour ou étape du Fleuve finis pour le joueur : les robots s'arrêtent
       if (this.robotsPublics && this.completerAvecRobots()) this.apresChangement();
       // Les robots jouent l'un après l'autre : en test, plusieurs coups par tour de boucle.
-      for (let i = 0; i < (rapide && this.jour ? 50 : 1); i++) { if (!this.S.tic(this.salle)) break; this.apresChangement(); if (this.jour && this.jour.termine) break; }
-    }, rapide && this.jour ? 20 : 200);
+      for (let i = 0; i < (rapide && (this.jour || this.fl) ? 50 : 1); i++) { if (!this.S.tic(this.salle)) break; this.apresChangement(); if (fini()) break; }
+    }, rapide && (this.jour || this.fl) ? 20 : 200);
   }
 
   async onAuth(client, options = {}) {
@@ -140,7 +149,7 @@ class SalleKopo extends Room {
     if (!assis && etat === 'ferme') throw new Error(`${NOMS_JEUX[this.jeu]} n'est pas encore ouvert.`);
     // En ligne et entre amis : compte Google obligatoire (quand la connexion Google est active).
     // Sans compte, on joue contre les robots, sur le téléphone. On laisse revenir un joueur déjà assis.
-    if (!assis && !this.jour && !this.entrainement && SalleKopo.services.googleObligatoire && !c.auth_id) throw new Error(ERREUR_GOOGLE);
+    if (!assis && !this.jour && !this.fl && !this.entrainement && SalleKopo.services.googleObligatoire && !c.auth_id) throw new Error(ERREUR_GOOGLE);
     if (this.entrainement) {
       if (this.proprietaire && this.proprietaire !== c.id) throw new Error('Cette partie n\'est pas la tienne.');
       this.proprietaire = c.id;
@@ -153,6 +162,17 @@ class SalleKopo extends Room {
         if (this.jour.compteId) throw new Error('Cette partie n\'est pas la tienne.');
         this.jour.compteId = c.id;
         this.jour.officiel = r.officiel;
+      }
+    }
+    if (this.fl) {
+      // Une seule personne par étape : son retour après une coupure, ou rien. Tout est vérifié par le service
+      // (Google, Fleuve ouvert, ordre des étapes, pagaies) ; une pagaie ne se perd qu'à l'échec.
+      if (this.fl.compteId) { if (this.fl.compteId !== c.id) throw new Error('Cette partie n\'est pas la tienne.'); }
+      else {
+        const r = await SalleKopo.services.fleuve.commencer(c, this.fl.fleuve, this.fl.numero);
+        if (this.fl.compteId) { SalleKopo.services.fleuve.annuler(c.id, r.essai).catch(() => {}); throw new Error('Cette partie n\'est pas la tienne.'); }
+        Object.assign(this.fl, { compteId: c.id, essai: r.essai, etape: r.etape, adoucir: r.adoucir, public: r.public });
+        this.salle.rng = K.hasard((r.etape.graine ^ 0x5bd1e995) >>> 0); // robots reproductibles, comme dans les essais
       }
     }
     if (this.mise) {
@@ -177,6 +197,7 @@ class SalleKopo extends Room {
     if (this.partie) this.partie.coupures.delete(id);
     this.comptes.set(id, compte);
     if (this.jour && this.salle.etat === 'salon') this.lancerJour(id, client);
+    if (this.fl && this.salle.etat === 'salon') this.lancerFleuve(id, client);
     if (this.entrainement && !ancien && this.salle.etat === 'salon' && !this.salle.joueurs.some((j) => j.robot)) this.preparerEntrainement(id);
     this.apresChangement();
   }
@@ -235,6 +256,40 @@ class SalleKopo extends Room {
     client.send('matchJour', { debut: true, numero: this.jour.numero, officiel: this.jour.officiel });
   }
 
+  // Le Fleuve : les robots, la donne et les pièges de l'étape, puis la partie part tout de suite.
+  lancerFleuve(id, client) {
+    const f = this.fl, s = this.salle;
+    s.joueurs = s.joueurs.filter((j) => j.id === id);
+    s.hote = id;
+    FG.placerRobots(s, f.etape, id, { adoucir: f.adoucir });
+    f.suivi = creerSuivi(id, f.etape);
+    s.surAction = f.suivi.surAction;
+    const r = this.S.recevoir(s, id, { type: 'lancer' });
+    if (!r.ok) console.error('Fleuve : lancement refusé', r.erreur);
+    client.send('fleuve', { debut: true, etape: f.public, adoucir: f.adoucir > 0 });
+  }
+
+  // Suit l'étape : quand l'objectif est jugé (atteint, raté, ou partie finie), le résultat part au service.
+  suivreFleuve() {
+    const f = this.fl;
+    if (!f || f.termine || !f.suivi) return;
+    f.suivi.observer(this.salle);
+    if (f.suivi.fini()) this.terminerFleuve();
+  }
+
+  terminerFleuve({ parti = false } = {}) {
+    const f = this.fl;
+    if (!f || f.termine || !f.compteId) return;
+    f.termine = true;
+    if (!f.suivi) { SalleKopo.services.fleuve.annuler(f.compteId, f.essai).catch(() => {}); return; } // jamais commencée : rien n'est perdu
+    f.suivi.arreter();
+    const resultat = f.suivi.resultat();
+    const envoyer = (m) => { const c = this.clientsParId.get(f.compteId); if (c) try { c.send('fleuve', m); } catch (e) {} };
+    return SalleKopo.services.fleuve.terminer(f.compteId, f.essai, resultat, { parti })
+      .then((r) => { envoyer({ fin: true, ...r }); return r; })
+      .catch((e) => { console.error('Fleuve :', e.message); envoyer({ fin: true, erreur: 'Résultat non enregistré. Réessaie.' }); });
+  }
+
   // Manches passées par le joueur du Match du jour (si la partie s'arrête maintenant).
   manchesJour() {
     const s = this.salle, id = this.jour.compteId;
@@ -275,6 +330,7 @@ class SalleKopo extends Room {
     if (this.clientsParId.get(id) !== client) return;
     this.S.deconnecter(this.salle, id);
     if (this.jour && volontaire) { this.terminerJour({ parti: true }); return; } // quitter = le score s'arrête là
+    if (this.fl && volontaire) { if (!this.fl.termine) this.terminerFleuve({ parti: true }); return; } // quitter l'étape = échec
     if (volontaire && this.partie && this.salle.etat !== 'salon') this.partie.abandons.add(id);
     const partie = this.partie;
     if (!volontaire && partie && this.salle.etat !== 'salon') partie.coupures.add(id); // pas sa faute : pas de points perdus
@@ -313,6 +369,7 @@ class SalleKopo extends Room {
   onDispose() {
     salles.delete(this);
     if (this.jour && !this.jour.termine) this.terminerJour({ parti: true }); // jamais revenu après une coupure
+    if (this.fl && !this.fl.termine) this.terminerFleuve(); // jamais revenu : l'objectif est jugé sur ce qui est fait
   }
 
   recevoir(client, type, msg) {
@@ -322,6 +379,7 @@ class SalleKopo extends Room {
     msg = Object.assign({}, msg && typeof msg === 'object' ? msg : {}, { type });
     if (type === 'rejoindre') return; // l'entrée passe par onJoin
     // Match du jour : la table est fixée par le serveur (robots, donne), pas de revanche ni de réglages.
+    if (this.fl && ['lancer', 'ajouterRobot', 'niveauRobot', 'retirer', 'remplacerParRobot', 'reglages', 'revanche', 'revancheNon', 'rejouer', 'passerFin', 'passerPause', 'enPause'].includes(type)) { client.send('erreur', 'Pas pendant une étape du Fleuve.'); return; }
     if (this.jour && ['lancer', 'ajouterRobot', 'niveauRobot', 'retirer', 'remplacerParRobot', 'reglages', 'revanche', 'revancheNon', 'rejouer', 'passerFin', 'passerPause', 'enPause'].includes(type)) { client.send('erreur', 'Pas pendant le Match du jour.'); return; }
     if (type === 'sync') { client.send('vue', this.vuePour(id)); return; } // la page demande sa vue dès qu'elle écoute
     if (type === 'reaction') { // chat : seulement les messages choisis dans le tableau de bord
@@ -370,7 +428,7 @@ class SalleKopo extends Room {
   async donnerVocal(client, id) {
     const { abonnement, comptes } = SalleKopo.services;
     if (!this.salle.joueurs.some((j) => j.id === id && !j.robot)) return;
-    if (this.entrainement || this.jour) { client.send('vocal', { refuse: 'seul' }); return; }
+    if (this.entrainement || this.jour || this.fl) { client.send('vocal', { refuse: 'seul' }); return; }
     const c = (await comptes.lire(id)) || this.comptes.get(id);
     if (c && this.comptes.has(id)) Object.assign(this.comptes.get(id), { kopo_plus_jusqu: c.kopo_plus_jusqu, micro_coupe: c.micro_coupe });
     if (!abonnement.estAbonne(c)) { client.send('vocal', { refuse: 'abonnement', ...abonnement.offre() }); return; }
@@ -403,8 +461,8 @@ class SalleKopo extends Room {
 
   apresChangement() {
     const s = this.salle;
-    if (this.jour) { // pas de pièces, de ligue ni de parcours : seulement le score du jour
-      this.suivreJour();
+    if (this.jour || this.fl) { // pas de pièces de partie, de ligue ni de parcours : seulement le score du jour, ou l'étape
+      if (this.jour) this.suivreJour(); else this.suivreFleuve();
       if (s.etat !== 'salon' && !this.locked) this.lock();
       for (const [id, c] of this.clientsParId) c.send('vue', this.vuePour(id));
       return;
@@ -611,7 +669,7 @@ async function reprendre(compte, code) {
 // Quelle salle ouverte porte ce code ? (GET /api/salles/:code) Les salles d'entraînement et du Match du jour ne se rejoignent pas.
 function salleParCode(code) {
   for (const s of salles) {
-    if (s.code !== code || s.entrainement || s.jour) continue;
+    if (s.code !== code || s.entrainement || s.jour || s.fl) continue;
     return { code, jeu: s.jeu, salle: s.roomName, roomId: s.roomId, etat: s.salle.etat, publique: s.publique, mise: s.mise ? s.mise.niveau : null, mode: s.jeu === 'inter8' ? s.salle.mode : null, joueurs: s.salle.joueurs.filter((j) => !j.robot).length, places: s.publique ? s.taille : s.S.MAX, pleine: s.salle.joueurs.length >= (s.publique ? s.taille : s.S.MAX) };
   }
   return null;

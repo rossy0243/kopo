@@ -475,3 +475,54 @@ ALTER TABLE abonnements ADD COLUMN IF NOT EXISTS annule_le timestamptz; -- activ
 ALTER TABLE comptes ADD COLUMN IF NOT EXISTS kopo_plus_essai timestamptz;      -- début de l'essai (null = pas encore pris)
 ALTER TABLE comptes ADD COLUMN IF NOT EXISTS kopo_plus_rappel timestamptz;     -- fin d'abonnement déjà annoncée la veille
 ALTER TABLE comptes ADD COLUMN IF NOT EXISTS stickers_bienvenue timestamptz;   -- stickers de bienvenue reçus (une fois)
+
+-- ===== Le Fleuve (fleuve.md, 22/11) : le Congo (Kopo) et le Niger (Inter (8)), étape par étape =====
+-- Les étapes fabriquées par l'admin (recette : table, robots, objectif, pièges, donne, seuils d'étoiles).
+CREATE TABLE IF NOT EXISTS fleuve_etapes (
+  fleuve     text NOT NULL,                        -- congo, niger
+  numero     integer NOT NULL,                     -- 1, 2, 3… (50 par bief, une escale toutes les 10)
+  bief       integer NOT NULL,
+  recette    jsonb NOT NULL,
+  publie     boolean NOT NULL DEFAULT false,       -- visible des joueurs (bief publié)
+  version    integer NOT NULL DEFAULT 1,           -- monte à chaque réécriture
+  cree_le    timestamptz NOT NULL DEFAULT now(),
+  maj_le     timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (fleuve, numero)
+);
+CREATE INDEX IF NOT EXISTS fleuve_etapes_bief ON fleuve_etapes (fleuve, bief);
+-- Meilleur résultat de chaque joueur sur chaque étape réussie.
+CREATE TABLE IF NOT EXISTS fleuve_etoiles (
+  compte_id   text NOT NULL REFERENCES comptes(id),
+  fleuve      text NOT NULL,
+  numero      integer NOT NULL,
+  etoiles     integer NOT NULL,                    -- 1 à 3
+  score       integer NOT NULL DEFAULT 0,
+  reussie_le  timestamptz NOT NULL DEFAULT now(),  -- première réussite
+  maj_le      timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (compte_id, fleuve, numero)
+);
+CREATE INDEX IF NOT EXISTS fleuve_etoiles_etape ON fleuve_etoiles (fleuve, numero);
+-- Chaque essai (pour les pagaies, les chiffres réels de l'admin et l'aide « bloqué depuis 5 jours »).
+CREATE TABLE IF NOT EXISTS fleuve_essais (
+  id         bigserial PRIMARY KEY,
+  compte_id  text NOT NULL REFERENCES comptes(id),
+  fleuve     text NOT NULL,
+  numero     integer NOT NULL,
+  version    integer NOT NULL,
+  adouci     boolean NOT NULL DEFAULT false,       -- robots baissés d'un cran (joueur bloqué)
+  debut      timestamptz NOT NULL DEFAULT now(),
+  fin        timestamptz,
+  statut     text NOT NULL DEFAULT 'en_cours',     -- en_cours, reussi, rate, parti, coupe
+  etoiles    integer NOT NULL DEFAULT 0,
+  score      integer NOT NULL DEFAULT 0,
+  pagaie     boolean NOT NULL DEFAULT false        -- une pagaie perdue
+);
+CREATE INDEX IF NOT EXISTS fleuve_essais_compte ON fleuve_essais (compte_id, statut);
+CREATE INDEX IF NOT EXISTS fleuve_essais_etape ON fleuve_essais (fleuve, numero);
+-- Pagaies perdues par jour de Kinshasa (5 par jour, communes aux deux fleuves).
+CREATE TABLE IF NOT EXISTS fleuve_pagaies (
+  compte_id  text NOT NULL REFERENCES comptes(id),
+  jour       date NOT NULL,
+  perdues    integer NOT NULL DEFAULT 0,
+  PRIMARY KEY (compte_id, jour)
+);
