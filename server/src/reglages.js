@@ -54,6 +54,9 @@ const DEFAUTS = {
   relance: { actif: 1, jours: 3, pieces: 100 },
   // Inter (8), mode Cahier : points de chaque carte restée en main (X = joker). Lu par le serveur au début de
   // chaque partie (figé jusqu'à la fin) : rien à changer dans l'appli. Valeurs de départ : barème du créateur (14/11).
+  // Montants d'élimination proposés aux joueurs (« Cahier petit » et « Cahier grand »). Une partie lancée garde le sien.
+  // Les anciennes applis envoient 500 ou 1000 : le serveur les prend pour le petit et le grand montant.
+  cahierTotaux: { petit: 500, grand: 1000 },
   cahier: { X: 50, A: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 25, 9: 9, 10: 10, V: 10, D: 10, R: 10 },
   evenement: { actif: 0, nom: '', debut: '', fin: '', pieces: 2, bonus: 2 },
   // La Bande : maison = % des mises détruit ; inscrits de 2 à 20 ; 5 Matchs sur 7 au moins, sinon la mise est détruite ;
@@ -181,6 +184,15 @@ function verifierCahier(v) {
   }
   return out;
 }
+
+// Montants d'élimination du Cahier : entiers de 50 à 10 000, le petit sous le grand.
+function verifierTotauxCahier(v) {
+  const petit = entier(v.petit), grand = entier(v.grand);
+  if (!(petit >= 50 && petit <= 10000 && grand >= 50 && grand <= 10000)) throw Object.assign(new Error('Montants d\'élimination : entiers de 50 à 10 000.'), { statut: 400 });
+  if (petit >= grand) throw Object.assign(new Error('Le petit montant doit être plus bas que le grand.'), { statut: 400 });
+  return { petit, grand };
+}
+const totauxCahier = (r) => (r && r.petit && r.grand ? [r.petit, r.grand] : [500, 1000]);
 
 // État des jeux : chaque jeu ouvert, testeurs ou maintenance ; au moins un jeu ouvert ; pseudos des testeurs.
 const ETATS_JEU = ['ouvert', 'testeurs', 'maintenance'];
@@ -322,6 +334,7 @@ function creerReglages(base) {
       }
       if (cle === 'bande') valeur = verifierBande(valeur);
       if (cle === 'cahier') valeur = verifierCahier(valeur);
+      if (cle === 'cahierTotaux') valeur = verifierTotauxCahier(valeur);
       if (cle === 'stickers') valeur = require('./stickers').verifierReglage(valeur);
       if (cle === 'bouquets') valeur = require('./bouquets').verifierReglage(valeur);
       if (cle === 'durcissement') {
@@ -346,4 +359,4 @@ function creerReglages(base) {
   };
 }
 
-module.exports = { verifierCahier, evenementEnCours, verifierEvenement, verifierMobile, PLATEFORMES, verifierCommunautes, communautesPubliques, RESEAUX, verifierJeux, etatJeuPour, NOMS_JEUX, creerReglages, DEFAUTS, VERSION_APPLI, versionPlusRecente, verifierMessages, verifierLigue, verifierBande, DIVISIONS, MESSAGE_MAX };
+module.exports = { verifierTotauxCahier, totauxCahier, verifierCahier, evenementEnCours, verifierEvenement, verifierMobile, PLATEFORMES, verifierCommunautes, communautesPubliques, RESEAUX, verifierJeux, etatJeuPour, NOMS_JEUX, creerReglages, DEFAUTS, VERSION_APPLI, versionPlusRecente, verifierMessages, verifierLigue, verifierBande, DIVISIONS, MESSAGE_MAX };
