@@ -372,7 +372,8 @@ class SalleKopo extends Room {
     if (c && this.comptes.has(id)) Object.assign(this.comptes.get(id), { kopo_plus_jusqu: c.kopo_plus_jusqu, micro_coupe: c.micro_coupe });
     if (!abonnement.estAbonne(c)) { client.send('vocal', { refuse: 'abonnement', ...abonnement.offre() }); return; }
     if (!abonnement.microPret()) { client.send('vocal', { refuse: 'bientot' }); return; }
-    client.send('vocal', abonnement.jetonVocal({ compte: c, salon: 'table-' + this.roomId, parler: !c.micro_coupe }));
+    const coupeHote = this.salle.joueurs.some((j) => j.id === id && j.micCoupe); // l'hôte a coupé son micro (éliminé)
+    client.send('vocal', Object.assign(abonnement.jetonVocal({ compte: c, salon: 'table-' + this.roomId, parler: !c.micro_coupe && !coupeHote }), coupeHote ? { coupeHote: true } : null));
   }
 
   // Sticker animé : interrupteur de l'admin allumé, joueur assis, un toutes les 5 s, et une utilisation à décompter
@@ -424,7 +425,25 @@ class SalleKopo extends Room {
     if (s.etat === 'salon' && this.maxClients !== places) this.maxClients = places; // place ajoutée par reserverRetour
     if (s.etat === 'salon' && this.locked && s.joueurs.length < places) this.unlock();
     this.setMetadata(this.meta(s.etat, s.joueurs.filter((j) => !j.robot).length));
+    this.suivreMicros();
     for (const [id, c] of this.clientsParId) c.send('vue', this.vuePour(id));
+  }
+
+  // Micro coupé par l'hôte (joueur éliminé) : LiveKit lui retire tout de suite le droit de parler, et le lui rend
+  // quand l'hôte change d'avis ou qu'une nouvelle partie commence. Le joueur est prévenu (message « vocal »).
+  suivreMicros() {
+    this.micsCoupes = this.micsCoupes || new Set();
+    const { abonnement } = SalleKopo.services;
+    for (const j of this.salle.joueurs) {
+      const coupe = !!j.micCoupe, avant = this.micsCoupes.has(j.id);
+      if (coupe === avant) continue;
+      if (coupe) this.micsCoupes.add(j.id); else this.micsCoupes.delete(j.id);
+      const c = this.comptes.get(j.id), parler = !coupe && !(c && c.micro_coupe);
+      if (abonnement && abonnement.permissionVocal) abonnement.permissionVocal({ salon: 'table-' + this.roomId, identite: j.id, parler }).catch(() => {});
+      const cl = this.clientsParId.get(j.id);
+      if (cl) cl.send('vocal', { coupeHote: coupe, parler });
+    }
+    for (const id of [...this.micsCoupes]) if (!this.salle.joueurs.some((j) => j.id === id)) this.micsCoupes.delete(id); // parti de la table
   }
 
   // Mises : prélevées au début de la partie. Un joueur qui n'a plus assez (dépensé entre-temps)

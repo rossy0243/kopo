@@ -251,6 +251,7 @@
   // personne ne change de place (créateur, 16/11). s.restants garde cet ordre.
   function lancer(s) {
     s.restants = K.melanger(s.joueurs.map((j) => j.id), s.rng);
+    s.joueurs.forEach((j) => { delete j.micCoupe; }); // micro coupé par l'hôte : seulement le temps d'une partie
     demarrerManche(s);
   }
   // Partie publique : une salle de N joueurs démarre seule dès qu'elle est pleine.
@@ -534,7 +535,22 @@
         if (!joueur) return { ok: false, erreur: 'Inconnu.' };
         joueur.voix = !!msg.voix;
         if (typeof msg.peerId === 'string') joueur.peerId = msg.peerId.slice(0, 64);
-        joueur.muet = !!msg.muet;
+        joueur.muet = !!msg.muet || !!joueur.micCoupe; // micro coupé par l'hôte : il reste muet
+        return { ok: true };
+      }
+      case 'passerHote': {
+        // L'hôte éliminé laisse la main à un joueur encore en jeu (humain, présent), le temps qui lui reste à regarder.
+        const cible = s.joueurs.find((j) => j.id === msg.cible);
+        if (id !== s.hote || !['manche', 'finManche'].includes(s.etat) || !s.elimines.includes(id)) return { ok: false, erreur: 'Impossible.' };
+        if (!cible || cible.robot || !cible.connecte || !s.restants.includes(cible.id)) return { ok: false, erreur: 'Choisis un joueur encore en jeu.' };
+        s.hote = cible.id;
+        return { ok: true };
+      }
+      case 'couperMicro': { // { cible, coupe } : l'hôte coupe (ou rend) le micro d'un joueur éliminé, pour toute la table
+        const cible = s.joueurs.find((j) => j.id === msg.cible);
+        if (id !== s.hote || s.etat === 'salon' || !cible || cible.robot || cible.id === id || !s.elimines.includes(cible.id)) return { ok: false, erreur: 'Impossible.' };
+        if (msg.coupe === false) delete cible.micCoupe;
+        else { cible.micCoupe = true; cible.muet = true; }
         return { ok: true };
       }
       case 'lancer': {
@@ -626,7 +642,7 @@
       etat: s.etat,
       moi: id,
       hote: s.hote,
-      joueurs: s.joueurs.map((j) => ({ id: j.id, nom: j.nom, connecte: j.connecte, peerId: j.peerId || null, voix: !!j.voix, muet: j.muet !== false, robot: !!j.robot, niveau: j.robot && !j.remplace ? niveauDuRobot(s, j.id) : null, pret: !!j.pret || !!j.robot, remplace: !!j.remplace, absent: estAbsent(s, j.id) })),
+      joueurs: s.joueurs.map((j) => ({ id: j.id, nom: j.nom, connecte: j.connecte, peerId: j.peerId || null, voix: !!j.voix, muet: j.muet !== false, micCoupe: !!j.micCoupe, robot: !!j.robot, niveau: j.robot && !j.remplace ? niveauDuRobot(s, j.id) : null, pret: !!j.pret || !!j.robot, remplace: !!j.remplace, absent: estAbsent(s, j.id) })),
       delai: s.delai,
       publique: !!s.publique,
       taille: s.taille,

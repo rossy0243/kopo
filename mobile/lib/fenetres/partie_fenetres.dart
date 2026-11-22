@@ -12,6 +12,7 @@ import '../commun/theme.dart';
 import '../etat.dart';
 import 'cahier.dart';
 import 'communes.dart';
+import 'social.dart' show hotePeutPasser, choisirNouvelHote;
 
 // ---------------------------------------------------------------- chat
 // Onglet du chat ouvert la dernière fois : « Messages » (émojis et phrases) ou « Stickers ».
@@ -209,6 +210,7 @@ void afficherFinManche(Vue v0) {
         Btn('Lancer maintenant${suivants == 2 ? ' la finale' : ''}', style: v['entreRobots'] == true ? StyleBtn.normal : StyleBtn.principal, large: true, onTap: () => app.envoyer({'type': 'mancheSuivante'}))
       else if (v['suite'] == null)
         Text("En attente de l'hôte pour la manche suivante…", style: K.texte(15, couleur: K.muted)),
+      if (hotePeutPasser(v)) ...[const Ecart(8), Btn('Passer la main', icone: 'couronne', large: true, onTap: choisirNouvelHote)],
     ]);
   }, 'finManche');
 }
