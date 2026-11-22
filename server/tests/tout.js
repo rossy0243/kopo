@@ -411,6 +411,12 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     const ordre = [fin.vainqueur, ...fin.elimines.slice().reverse()];
     assert.strictEqual((await srv.comptes.lire(ordre[0])).solde, 500 + 2 * 5 + 40, 'vainqueur : comme 2 manches et la victoire');
   });
+  await test('Inter (8) entre amis : simple + J retour choisi à la création, gardé jusqu\'au bout', async () => {
+    const js = [await invite('SimJ_A'), await invite('SimJ_B'), await invite('SimJ_C')];
+    const fin = await jouerPartie(js, { jeu: 'inter8', options: { mode: 'simple', jRetour: true } });
+    assert.strictEqual(fin.mode, 'simple');
+    assert.strictEqual(fin.jRetour, true);
+  });
   await test('Inter (8) entre amis : partie complète en délire, gains, partie notée « inter8 », XP du parcours de saison', async () => {
     const js = [await invite('Inter_A'), await invite('Inter_B'), await invite('Inter_C')];
     const fin = await jouerPartie(js, { jeu: 'inter8', reglages: { mode: 'delire' } });

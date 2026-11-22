@@ -57,10 +57,10 @@ class SalleKopo extends Room {
     } else this.salle = this.S.creerSalle(this.code);
     this.baremeAJour();
     // Inter (8) : le style choisi à la création (« Quelle partie ? »), modifiable ensuite dans le salon.
-    // Délire : 2 paquets, J retour en option (une ancienne appli qui ne l'envoie pas jouait avec).
+    // J retour en option, en simple comme en délire (22/11). Une ancienne appli qui ne l'envoie pas jouait le délire avec.
     if (this.jeu === 'inter8' && SI.MODES.includes(options.mode)) {
       this.salle.mode = options.mode;
-      this.salle.jRetour = options.mode === 'delire' && (options.jRetour === undefined ? true : options.jRetour === true);
+      this.salle.jRetour = options.jRetour === undefined ? options.mode === 'delire' : options.jRetour === true;
     }
     // Inter (8), mode Cahier (14/11) : comptage des points, salons privés seulement.
     if (this.jeu === 'inter8' && !this.publique && options.formule === 'cahier') {

@@ -98,7 +98,7 @@
   // options : { mode: 'simple' | 'delire', jRetour, graine } (la graine sert à remélanger la défausse).
   // options.cahier : mode Cahier, la donne s'arrête dès que le premier joueur sort (m.sorti), et
   // m.points donne les points de chacun (barème BAREME_CAHIER, 0 pour celui qui sort).
-  // jRetour : option du mode délire (le valet change le sens du jeu), désactivée par défaut.
+  // jRetour : option en simple comme en délire (le valet change le sens du jeu), désactivée par défaut.
   // options.differerDepart : l'effet de la carte de départ attend appliquerDepart(m)
   // (l'appli le déclenche à la fin de la distribution).
   function nouvelleManche(sieges, mains, pioche, premier, options) {
@@ -110,8 +110,8 @@
       pioche: pioche.slice(),
       defausse: [], // la dernière carte est la carte de référence
       mode: o.mode === 'delire' ? 'delire' : 'simple',
-      jRetour: o.mode === 'delire' && !!o.jRetour,
-      sens: 1, // 1 = aiguilles d'une montre, -1 = sens inverse (J retour, mode délire)
+      jRetour: !!o.jRetour,
+      sens: 1, // 1 = aiguilles d'une montre, -1 = sens inverse (J retour)
       libre: false, // le joueur courant pose la carte de son choix
       demande: null, // { valeur, par } : « Inter demande »
       joueurCourant: premier,

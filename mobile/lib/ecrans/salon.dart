@@ -176,7 +176,7 @@ class Salon extends StatelessWidget {
           Stock.ecrire('kopo-inter8-style', m);
           app.envoyer({'type': 'reglages', ...app.reglagesStyleInter(m)});
         }, v['mode'] == 'delire' ? 'Délire · 2 paquets' : 'Simple · 1 paquet'),
-      if (inter && v['mode'] == 'delire')
+      if (inter)
         ligne('J retour', const [(false, 'Non'), (true, 'Oui')], v['jRetour'] == true, (o) {
           app.ecrireJRetour(o);
           app.envoyer({'type': 'reglages', 'jRetour': o});

@@ -75,7 +75,7 @@ class _Entete extends StatelessWidget {
     final inter = v['jeu'] == 'inter8';
     final cahier = cahierDe(v);
     final finale = (v['restants'] as List).length == 2;
-    final style = inter ? ' · ${v['mode'] == 'delire' ? (v['jRetour'] == true ? 'Délire · J retour' : 'Délire') : 'Simple'}' : '';
+    final style = inter ? ' · ${v['mode'] == 'delire' ? 'Délire' : 'Simple'}${v['jRetour'] == true ? ' · J retour' : ''}' : '';
     final w = MediaQuery.of(context).size.width;
     // Téléphone droit et étroit : le logo seul, « Manche 1 · CODE » sur deux lignes (comme sur le site).
     final etroit = !paysage && w <= 420;
@@ -665,7 +665,7 @@ class _CentreTable extends StatelessWidget {
         puces.add(_Chip(const [TextSpan(text: 'Jeu libre : pose la carte de ton choix')]));
       }
       if (m['piochable'] == 0) puces.add(_Chip(const [TextSpan(text: 'Pioche vide : qui ne peut pas jouer passe')], couleur: K.bad));
-      if (v['mode'] == 'delire' && v['jRetour'] == true && (m['enJeu'] as List).length > 2) puces.add(_Chip([const TextSpan(text: 'Sens '), _gras(m['sens'] == 1 ? '↻' : '↺')]));
+      if (v['jRetour'] == true && (m['enJeu'] as List).length > 2) puces.add(_Chip([const TextSpan(text: 'Sens '), _gras(m['sens'] == 1 ? '↻' : '↺')]));
     }
     // Mode Cahier : le cahier s'ouvre à tout moment depuis la table.
     if (cahier != null) {
@@ -879,7 +879,7 @@ class _CentreInter extends StatelessWidget {
     String qui(Object? id) => id == v['moi'] ? 'Toi' : app.nomDe(v, id);
     final jeu = pause == null && m['phase'] == 'jeu';
     final demande = m['demande'] as Map?;
-    final roue = v['mode'] == 'delire' && v['jRetour'] == true && (m['enJeu'] as List).length > 2;
+    final roue = v['jRetour'] == true && (m['enJeu'] as List).length > 2;
     final l = paysage && petit ? 54.0 : 66.0;
     final lp = paysage && petit ? 34.0 : 40.0;
     final vide = m['piochable'] == 0;

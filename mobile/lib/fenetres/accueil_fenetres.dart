@@ -52,8 +52,8 @@ void choisirStyleInter(String p, {String? formule}) {
           const Muet("Inter (8), entre amis. Choisis le style avant d'inviter."),
           const Ecart(10),
           carte('simple', '8', 'Simple', 'Les règles de base, de 2 à 8 joueurs.', '1 paquet (54 cartes)'),
-          carte('delire', 'J', 'Délire', 'Les mêmes règles avec deux paquets, de 2 à 8 joueurs. Le J retour (le valet change le sens du jeu) en option.', '2 paquets (108 cartes)'),
-          const Muet('En délire :', taille: 12),
+          carte('delire', 'J', 'Délire', 'Les mêmes règles avec deux paquets, de 2 à 8 joueurs.', '2 paquets (108 cartes)'),
+          const Muet('J retour (le valet change le sens du jeu), en simple comme en délire :', taille: 12),
           const SizedBox(height: 4),
           Choix(const [(false, 'Sans J retour'), (true, 'Avec J retour')], app.jRetourInter, (v) { app.ecrireJRetour(v); setState(() {}); }),
           const SizedBox(height: 8),
@@ -182,8 +182,9 @@ void ouvrirRobots() {
         const SizedBox(height: 6),
         Choix(const [('simple', 'Simple'), ('delire', 'Délire')], app.styleInter, (v) { if (Stock.lire('kopo-inter8-jretour') == null) app.ecrireJRetour(app.jRetourInter); Stock.ecrire('kopo-inter8-style', v); app.maj(); }),
         const SizedBox(height: 4),
-        Muet(delire ? '2 paquets (108 cartes). Le J retour fait changer le sens du jeu.' : '1 paquet (54 cartes), les règles de base.', taille: 12),
-        if (delire) ...[const SizedBox(height: 6), Choix(const [(false, 'Sans J retour'), (true, 'Avec J retour')], app.jRetourInter, (v) { app.ecrireJRetour(v); app.maj(); })],
+        Muet('${delire ? '2 paquets (108 cartes).' : '1 paquet (54 cartes), les règles de base.'} Le J retour fait changer le sens du jeu.', taille: 12),
+        const SizedBox(height: 6),
+        Choix(const [(false, 'Sans J retour'), (true, 'Avec J retour')], app.jRetourInter, (v) { app.ecrireJRetour(v); app.maj(); }),
         const SizedBox(height: 6),
         Choix(app.formulesInter(), app.valeurFormule, (v) { app.choisirFormule(v); app.maj(); }),
         const Ecart(10),
@@ -223,7 +224,7 @@ void composerTable() {
   void garder() => Stock.ecrire(_cleTable(inter), table);
   const couleurs = {'faciles': K.good, 'normaux': K.brass, 'forts': K.bad};
   app.ouvrirFenetre((context) => StatefulBuilder(builder: (context, setState) => Fenetre(titre: 'Ma table', enfants: [
-        if (inter) Muet('Inter (8) · ${app.styleInter == 'delire' ? 'Délire${app.jRetourInter ? ' avec J retour' : ' sans J retour'}' : 'Simple'}', taille: 12),
+        if (inter) Muet('Inter (8) · ${app.styleInter == 'delire' ? 'Délire' : 'Simple'}${app.jRetourInter ? ' avec J retour' : ' sans J retour'}', taille: 12),
         const Muet('Touche un robot pour changer son niveau, + pour en ajouter.'),
         const Ecart(10),
         Wrap(spacing: 8, runSpacing: 8, children: [
@@ -319,7 +320,8 @@ void montrerReglesInter() {
         li(["Pioche vide : la défausse (sauf la carte du centre) est remélangée et recharge la pioche, pour toute pioche, pénalités comprises. S'il n'y a plus rien du tout, celui qui ne peut pas jouer passe son tour. Si toute la table passe, la manche est rejouée."]),
         titre('Les styles'),
         li([['Simple'], ' : 1 paquet avec jokers (54 cartes), de 2 à 8 joueurs.']),
-        li([['Délire'], ' : 2 paquets (108 cartes). En option, le ', ['J retour'], ' : chaque valet posé inverse le sens du jeu (sans effet à 2 joueurs).']),
+        li([['Délire'], ' : 2 paquets (108 cartes).']),
+        li(['En option, dans les deux styles, le ', ['J retour'], ' : chaque valet posé inverse le sens du jeu (sans effet à 2 joueurs).']),
         const Ecart(6),
         const Muet("La carte de départ n'est jamais un 8. Si c'est un 2, un 10, un As, un joker (ou un valet avec le J retour), son effet s'applique au premier joueur. On tourne dans le sens des aiguilles d'une montre.", taille: 12),
         const Ecart(14),

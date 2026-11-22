@@ -402,7 +402,7 @@ class App extends ChangeNotifier {
   /// Valeur du bouton choisi : 'normale', ou le montant ('500', '1000'…).
   String get valeurFormule => formuleInter == 'cahier' ? '$totalInter' : 'normale';
   void choisirFormule(String v) => v == 'normale' ? ecrireFormule('normale') : ecrireFormule('cahier', int.parse(v));
-  Map<String, dynamic> reglagesStyleInter(String mode) => {'mode': mode, 'jRetour': mode == 'delire' && jRetourInter, 'formule': formuleInter, 'total': totalInter};
+  Map<String, dynamic> reglagesStyleInter(String mode) => {'mode': mode, 'jRetour': jRetourInter, 'formule': formuleInter, 'total': totalInter};
 
   // ---------------------------------------------------------------- démarrage
   Future<void> demarrer() async {

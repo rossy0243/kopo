@@ -1689,7 +1689,8 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       <p class="regles-titre">Les styles</p>
       <ul class="regles">
         <li><b>Simple</b> : 1 paquet avec jokers (54 cartes), de 2 à 8 joueurs.</li>
-        <li><b>Délire</b> : 2 paquets (108 cartes). En option, le <b>J retour</b> : chaque valet posé inverse le sens du jeu (sans effet à 2 joueurs).</li>
+        <li><b>Délire</b> : 2 paquets (108 cartes).</li>
+        <li>En option, dans les deux styles, le <b>J retour</b> : chaque valet posé inverse le sens du jeu (sans effet à 2 joueurs).</li>
       </ul>
       <p class="regles-note">La carte de départ n'est jamais un 8. Si c'est un 2, un 10, un As, un joker (ou un valet avec le J retour), son effet s'applique au premier joueur. On tourne dans le sens des aiguilles d'une montre.</p>
     </template>
@@ -5336,7 +5337,7 @@ var qrcode = function() {
   // options : { mode: 'simple' | 'delire', jRetour, graine } (la graine sert à remélanger la défausse).
   // options.cahier : mode Cahier, la donne s'arrête dès que le premier joueur sort (m.sorti), et
   // m.points donne les points de chacun (barème BAREME_CAHIER, 0 pour celui qui sort).
-  // jRetour : option du mode délire (le valet change le sens du jeu), désactivée par défaut.
+  // jRetour : option en simple comme en délire (le valet change le sens du jeu), désactivée par défaut.
   // options.differerDepart : l'effet de la carte de départ attend appliquerDepart(m)
   // (l'appli le déclenche à la fin de la distribution).
   function nouvelleManche(sieges, mains, pioche, premier, options) {
@@ -5348,8 +5349,8 @@ var qrcode = function() {
       pioche: pioche.slice(),
       defausse: [], // la dernière carte est la carte de référence
       mode: o.mode === 'delire' ? 'delire' : 'simple',
-      jRetour: o.mode === 'delire' && !!o.jRetour,
-      sens: 1, // 1 = aiguilles d'une montre, -1 = sens inverse (J retour, mode délire)
+      jRetour: !!o.jRetour,
+      sens: 1, // 1 = aiguilles d'une montre, -1 = sens inverse (J retour)
       libre: false, // le joueur courant pose la carte de son choix
       demande: null, // { valeur, par } : « Inter demande »
       joueurCourant: premier,
@@ -6118,7 +6119,7 @@ var qrcode = function() {
       code,
       etat: 'salon', // 'salon' | 'manche' | 'finManche' | 'finPartie'
       mode: 'simple', // 'simple' (1 paquet) | 'delire' (2 paquets), choisi par l'hôte dans le salon
-      jRetour: false, // option du mode délire : le valet change le sens du jeu
+      jRetour: false, // option (simple ou délire) : le valet change le sens du jeu
       formule: 'normale', // 'normale' | 'cahier' (salons privés et contre les robots)
       totalCahier: TOTAL_CAHIER, // mode Cahier : total qui élimine
       cahier: null, // mode Cahier en cours : { total, scores: { id: points }, donnes: [{ numero, sorti, points, mains, elimines }] }
@@ -6561,7 +6562,6 @@ var qrcode = function() {
           if (typeof msg.jRetour !== 'boolean') return { ok: false, erreur: 'Impossible.' };
           s.jRetour = msg.jRetour;
         }
-        if (s.mode !== 'delire') s.jRetour = false;
         if (msg.formule !== undefined) {
           if (!FORMULES.includes(msg.formule) || (s.publique && msg.formule !== 'normale')) return { ok: false, erreur: 'Impossible.' };
           s.formule = msg.formule;
@@ -7980,7 +7980,7 @@ svg .vb { transform-box: view-box; }
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = '3e8f534774bf'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = '5f3ebb8f1292'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: true };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // La musique des menus était coupée par défaut : on l'allume une fois pour tous (le joueur peut la recouper).
@@ -9085,8 +9085,8 @@ svg .vb { transform-box: view-box; }
         } else if (actuelle === f) rf.append(el('strong', null, f === 'normale' ? 'Partie normale' : `Cahier · éliminé à ${f} points`));
       }
     }
-    // Délire : le J retour, en option.
-    const rj = $('reglageJRetour'); rj.hidden = v.jeu !== 'inter8' || v.mode !== 'delire'; rj.replaceChildren();
+    // Le J retour, en option (simple ou délire).
+    const rj = $('reglageJRetour'); rj.hidden = v.jeu !== 'inter8'; rj.replaceChildren();
     if (!rj.hidden) {
       rj.append(el('span', null, 'J retour'));
       for (const [oui, libelle] of [[false, 'Non'], [true, 'Oui']]) {
@@ -9479,7 +9479,7 @@ svg .vb { transform-box: view-box; }
     const finale = v.restants.length === 2;
     $('info').innerHTML = '';
     // Le style s'affiche pareil en Cahier et en partie normale (avec « J retour » quand il est activé).
-    const style = v.mode === 'delire' ? (v.jRetour ? 'Délire · J retour' : 'Délire') : 'Simple';
+    const style = (v.mode === 'delire' ? 'Délire' : 'Simple') + (v.jRetour ? ' · J retour' : '');
     if (v.cahier) $('info').append(el('strong', null, 'Donne ' + v.numeroManche), document.createTextNode(` · Cahier ${v.cahier.total} · ${style} · ${v.code}`));
     else $('info').append(el('strong', null, finale ? 'Finale' : 'Manche ' + v.numeroManche), document.createTextNode(` · ${style} · ${v.code}`));
     const pause = m.pause;
@@ -9497,7 +9497,7 @@ svg .vb { transform-box: view-box; }
       else if (m.libre) ent.append(el('span', 'chip', 'Jeu libre : pose la carte de ton choix'));
       // Plus rien à piocher : qui ne peut pas jouer passe son tour (dit à toute la table).
       if (m.piochable === 0) ent.append(el('span', 'chip vide', 'Pioche vide : qui ne peut pas jouer passe'));
-      if (v.mode === 'delire' && v.jRetour && m.enJeu.length > 2) { const c = el('span', 'chip'); c.append('Sens ', el('b', null, m.sens === 1 ? '↻' : '↺')); ent.append(c); }
+      if (v.jRetour && m.enJeu.length > 2) { const c = el('span', 'chip'); c.append('Sens ', el('b', null, m.sens === 1 ? '↻' : '↺')); ent.append(c); }
     }
     // Mode Cahier : le cahier s'ouvre à tout moment depuis l'en-tête.
     if (v.cahier) { const c = el('button', 'chip chip-cahier'); c.type = 'button'; c.append('Cahier · ', el('b', null, String(v.cahier.scores[v.moi] ?? '–')), ` / ${v.cahier.total}`); c.onclick = () => ouvrirCahier(vueActuelle); ent.append(c); }
@@ -9525,7 +9525,7 @@ svg .vb { transform-box: view-box; }
       pioche.setAttribute('aria-label', `Pioche : ${m.pioche} carte${m.pioche > 1 ? 's' : ''}`);
       t.append(ref, pioche); // la carte posée au milieu, la pioche dans un coin
       // Mode délire : le sens du jeu tourne en permanence autour de la carte du centre.
-      if (v.mode === 'delire' && v.jRetour && m.enJeu.length > 2) t.prepend(roueSens(m.sens));
+      if (v.jRetour && m.enJeu.length > 2) t.prepend(roueSens(m.sens));
       poses.append(t);
     }
 
@@ -13034,8 +13034,8 @@ svg .vb { transform-box: view-box; }
       b.onclick = () => { if (!stock.lire('kopo-inter8-jretour')) ecrireJRetour(jRetourInter()); stock.ecrire('kopo-inter8-style', mode); fermerFenetre(); creerPartie(p, 'inter8', mode); };
       return b;
     };
-    // Délire : le J retour est une option (désactivée par défaut), choisie avant d'ouvrir la table.
-    const option = el('div', 'choix choix-niveau-robots option-jretour'); option.setAttribute('role', 'group'); option.setAttribute('aria-label', 'J retour en délire');
+    // Le J retour est une option (simple ou délire), choisie avant d'ouvrir la table.
+    const option = el('div', 'choix choix-niveau-robots option-jretour'); option.setAttribute('role', 'group'); option.setAttribute('aria-label', 'J retour');
     const majOption = () => option.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.v === 'oui') === jRetourInter())));
     for (const [v, libelle] of [['non', 'Sans J retour'], ['oui', 'Avec J retour']]) {
       const b = el('button', null, libelle); b.type = 'button'; b.dataset.v = v;
@@ -13055,8 +13055,8 @@ svg .vb { transform-box: view-box; }
     const annuler = el('button', 'btn large', 'Annuler'); annuler.onclick = fermerFenetre;
     ouvrirFenetre([el('h2', null, 'Quelle partie ?'), el('p', 'muted', "Inter (8), entre amis. Choisis le style avant d'inviter."),
       carte('simple', '8', 'Simple', 'Les règles de base, de 2 à 8 joueurs.', ['1 paquet (54 cartes)']),
-      carte('delire', 'J', 'Délire', 'Les mêmes règles avec deux paquets, de 2 à 8 joueurs. Le J retour (le valet change le sens du jeu) en option.', ['2 paquets (108 cartes)']),
-      el('small', 'muted', 'En délire :'), option,
+      carte('delire', 'J', 'Délire', 'Les mêmes règles avec deux paquets, de 2 à 8 joueurs.', ['2 paquets (108 cartes)']),
+      el('small', 'muted', 'J retour (le valet change le sens du jeu), en simple comme en délire :'), option,
       el('small', 'muted', 'Formule (Cahier : on compte les points de chaque donne, éliminé au total) :'), formules, annuler], 'styleInter');
   }
   $('btnCahier').onclick = async () => { const p = lirePseudo(); if (!p || await exigerGoogle()) return; choisirStyleInter(p, 'cahier'); };
@@ -13549,13 +13549,13 @@ svg .vb { transform-box: view-box; }
   const ecrireFormule = (formule, total) => { stock.ecrire('kopo-inter8-formule', formule); if (total) stock.ecrire('kopo-inter8-total', total); };
   const valeurFormule = () => (formuleInter() === 'cahier' ? String(totalInter()) : 'normale'); // boutons « Partie normale · Cahier petit · Cahier grand »
   const choisirFormule = (v) => (v === 'normale' ? ecrireFormule('normale') : ecrireFormule('cahier', Number(v)));
-  const reglagesStyleInter = (mode) => ({ mode, jRetour: mode === 'delire' && jRetourInter(), formule: formuleInter(), total: totalInter() });
+  const reglagesStyleInter = (mode) => ({ mode, jRetour: jRetourInter(), formule: formuleInter(), total: totalInter() });
   function majStyleRobots() {
     const inter = jeuChoisi() === 'inter8', delire = styleInter() === 'delire';
     document.querySelectorAll('#voileRobots .style-inter').forEach((e) => (e.hidden = !inter));
     $('styleRobots').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === styleInter())));
-    $('aideStyleRobots').textContent = delire ? '2 paquets (108 cartes). Le J retour fait changer le sens du jeu.' : '1 paquet (54 cartes), les règles de base.';
-    $('jRetourRobots').hidden = !inter || !delire;
+    $('aideStyleRobots').textContent = (delire ? '2 paquets (108 cartes).' : '1 paquet (54 cartes), les règles de base.') + ' Le J retour fait changer le sens du jeu.';
+    $('jRetourRobots').hidden = !inter;
     $('jRetourRobots').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.v === 'oui') === jRetourInter())));
     $('choixRobots').querySelectorAll('button').forEach((b) => (b.hidden = inter && +b.textContent > SI.MAX - 1));
     const fr = $('formuleRobots').querySelectorAll('button');
@@ -13635,7 +13635,7 @@ svg .vb { transform-box: view-box; }
     };
     retour.onclick = () => { fermerFenetre(); $('btnModeRobots').click(); };
     dessiner();
-    const style = inter ? el('small', 'muted', `Inter (8) · ${styleInter() === 'delire' ? 'Délire' + (jRetourInter() ? ' avec J retour' : ' sans J retour') : 'Simple'}`) : null;
+    const style = inter ? el('small', 'muted', `Inter (8) · ${styleInter() === 'delire' ? 'Délire' : 'Simple'}${jRetourInter() ? ' avec J retour' : ' sans J retour'}`) : null;
     ouvrirFenetre([el('h2', null, 'Ma table'), ...(style ? [style] : []), el('p', 'muted', 'Touche un robot pour changer son niveau, + pour en ajouter.'), grille,
       el('small', 'muted', 'Facile → Normal → Fort → retiré. Ta table est gardée pour la prochaine fois.'), jouer, retour]);
   }

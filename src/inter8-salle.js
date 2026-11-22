@@ -41,7 +41,7 @@
       code,
       etat: 'salon', // 'salon' | 'manche' | 'finManche' | 'finPartie'
       mode: 'simple', // 'simple' (1 paquet) | 'delire' (2 paquets), choisi par l'hôte dans le salon
-      jRetour: false, // option du mode délire : le valet change le sens du jeu
+      jRetour: false, // option (simple ou délire) : le valet change le sens du jeu
       formule: 'normale', // 'normale' | 'cahier' (salons privés et contre les robots)
       totalCahier: TOTAL_CAHIER, // mode Cahier : total qui élimine
       cahier: null, // mode Cahier en cours : { total, scores: { id: points }, donnes: [{ numero, sorti, points, mains, elimines }] }
@@ -484,7 +484,6 @@
           if (typeof msg.jRetour !== 'boolean') return { ok: false, erreur: 'Impossible.' };
           s.jRetour = msg.jRetour;
         }
-        if (s.mode !== 'delire') s.jRetour = false;
         if (msg.formule !== undefined) {
           if (!FORMULES.includes(msg.formule) || (s.publique && msg.formule !== 'normale')) return { ok: false, erreur: 'Impossible.' };
           s.formule = msg.formule;
