@@ -8,6 +8,8 @@ const Map<String, String> iconesSvg = {
   'partager': '<rect x="5" y="10" width="13" height="18" rx="2.5"/><path d="M13 19L26 6M19 6h7v7"/>',
   'regles': '<rect x="8" y="4" width="16" height="24" rx="2.5"/><path d="M12 10h8M12 14.5h8M12 19h5"/><path fill="#c7362f" stroke="none" d="M20 20.5l1.8 2.4-1.8 2.4-1.8-2.4z"/>',
   'plein': '<path d="M5 11V5h6M21 5h6v6M27 21v6h-6M11 27H5v-6"/><rect x="12" y="10" width="8" height="12" rx="1.6"/>',
+  'reactions': '<rect x="9" y="4" width="14" height="20" rx="2.5"/><path d="M13 24l-3 5 7-5"/><path d="M13 11h6M13 16h4"/><circle cx="20.5" cy="16" r="1.6" fill="#c7362f" stroke="none"/>',
+  'pause': '<rect x="9" y="7" width="5" height="18" rx="1.6"/><rect x="18" y="7" width="5" height="18" rx="1.6"/>',
   'reglages': '<rect x="8" y="4" width="16" height="24" rx="2.5"/><path d="M12 10h8M12 16h8M12 22h8"/><circle cx="15" cy="10" r="1.8" fill="#183252"/><circle cx="18.5" cy="16" r="1.8" fill="#183252"/><circle cx="14" cy="22" r="1.8" fill="#c7362f" stroke="none"/>',
   'cahier': '<rect x="8" y="4" width="17" height="24" rx="2.5"/><path d="M5.5 9h4M5.5 14h4M5.5 19h4M5.5 24h4M13 11h8M13 15.5h8M13 20h4"/><path fill="#c7362f" stroke="none" d="M19.5 25.5l5.5-7 1.8 1.4-5.5 7-2.3.9z"/>',
   'jour': '<rect x="9" y="5" width="14" height="22" rx="2.5"/><circle cx="16" cy="14" r="3.2"/><path d="M16 7.6v1.6M16 18.8v1.6M9.6 14h1.6M20.8 14h1.6M11.5 9.5l1.1 1.1M19.4 17.4l1.1 1.1M20.5 9.5l-1.1 1.1M12.6 17.4l-1.1 1.1"/><path fill="#c7362f" stroke="none" d="M16 22l1.6 2.1-1.6 2.1-1.6-2.1z"/>',

@@ -74,8 +74,13 @@ class Btn extends StatelessWidget {
   final bool large;
   final double taille;
   final EdgeInsets? marge;
-  const Btn(this.texte, {super.key, this.onTap, this.style = StyleBtn.normal, this.icone, this.enfant, this.large = false, this.taille = 15, this.marge});
-  const Btn.principal(this.texte, {super.key, this.onTap, this.icone, this.enfant, this.large = false, this.taille = 15, this.marge}) : style = StyleBtn.principal;
+  final double rayon;
+  const Btn(this.texte, {super.key, this.onTap, this.style = StyleBtn.normal, this.icone, this.enfant, this.large = false, this.taille = 15, this.marge, this.rayon = 10});
+  const Btn.principal(this.texte, {super.key, this.onTap, this.icone, this.enfant, this.large = false, this.taille = 15, this.marge, this.rayon = 10}) : style = StyleBtn.principal;
+
+  /// Le même bouton, à une autre taille (boutons de la partie, comme sur le site).
+  Btn copie({double? rayon, double? taille, EdgeInsets? marge}) =>
+      Btn(texte, onTap: onTap, style: style, icone: icone, enfant: enfant, large: large, taille: taille ?? this.taille, marge: marge ?? this.marge, rayon: rayon ?? this.rayon);
 
   @override
   Widget build(BuildContext context) {
@@ -100,9 +105,9 @@ class Btn extends StatelessWidget {
       opacity: actif ? 1 : .45,
       child: Material(
         color: fond,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: BorderSide(color: bord)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rayon), side: BorderSide(color: bord)),
         child: InkWell(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(rayon),
           onTap: onTap,
           child: Padding(padding: marge ?? const EdgeInsets.symmetric(horizontal: 16, vertical: 11), child: Center(widthFactor: 1, heightFactor: 1, child: contenu)),
         ),
@@ -117,7 +122,9 @@ enum TypePastille { ok, ko, tour, neutre }
 class Pastille extends StatelessWidget {
   final String texte;
   final TypePastille type;
-  const Pastille(this.texte, {super.key, this.type = TypePastille.neutre});
+  /// Dans un siège (portrait) : un peu plus petite, comme sur le site.
+  final bool petite;
+  const Pastille(this.texte, {super.key, this.type = TypePastille.neutre, this.petite = false});
   @override
   Widget build(BuildContext context) {
     final (fond, encre) = switch (type) {
@@ -127,9 +134,9 @@ class Pastille extends StatelessWidget {
       TypePastille.neutre => (const Color(0x1AFFFFFF), K.muted),
     };
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      padding: EdgeInsets.symmetric(horizontal: petite ? 6 : 7, vertical: petite ? 0 : 1),
       decoration: BoxDecoration(color: fond, borderRadius: BorderRadius.circular(99)),
-      child: Text(texte, style: K.texte(12, couleur: encre, poids: FontWeight.w600)),
+      child: Text(texte, style: K.texte(petite ? 10 : 11, couleur: encre, poids: FontWeight.w600)),
     );
   }
 }
