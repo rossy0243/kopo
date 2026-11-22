@@ -2,7 +2,6 @@
 // - en paysage, les joueurs autour d'une table ovale bleue, la consigne au milieu, ta main en éventail en bas,
 //   ton siège en bas à gauche, les boutons en bas à droite et KATAPSS (ou J'annonce, Contester) en rond au milieu à droite ;
 // - en portrait, les sièges en grille, le panneau de la table, puis « Ta main » et ses boutons en bas de l'écran.
-import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -480,7 +479,7 @@ class _Siege extends StatelessWidget {
         }(),
     ];
     final chrono = courant && v['chrono'] != null && pause == null && q < 0 && m['elimine'] != id
-        ? Horloge(builder: (_) => Barre(app.resteChrono / math.max(1, app.totalChrono), hauteur: 3, couleur: app.resteChrono < 2000 ? K.bad : K.brass))
+        ? Horloge(fluide: true, builder: (_) => Barre(app.resteChrono / math.max(1, app.totalChrono), hauteur: 3, couleur: app.resteChrono < 2000 ? K.bad : K.brass))
         : null;
 
     // La ligne : icône, pseudo, couronne Kopo+, meneur (↻), nombre de cartes.
@@ -635,6 +634,9 @@ class _Chip extends StatelessWidget {
 
 TextSpan _gras(String t, {Color? couleur}) => TextSpan(text: t, style: TextStyle(fontSize: 17, height: 1, fontWeight: FontWeight.w700, color: couleur));
 
+/// Seul contre les robots, pendant le pli laissé sur la table ou le compte à rebours : on peut passer.
+bool _passable(Vue v, Map? pause) => pause != null && v['pausePossible'] == true && v['enPause'] != true && v['entreRobots'] != true;
+
 class _CentreTable extends StatelessWidget {
   final Vue v;
   final Map m;
@@ -677,7 +679,7 @@ class _CentreTable extends StatelessWidget {
     final monTour = m['joueurCourant'] == v['moi'];
     final barre = (v['chrono'] != null && monTour) || pause != null;
     final restants = v['restants'] as List;
-    return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: paysage ? CrossAxisAlignment.center : CrossAxisAlignment.stretch, children: [
+    final colonne = Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: paysage ? CrossAxisAlignment.center : CrossAxisAlignment.stretch, children: [
       if (puces.isNotEmpty) ...[
         Wrap(alignment: paysage ? WrapAlignment.center : WrapAlignment.start, spacing: 8, runSpacing: 6, children: puces),
         SizedBox(height: paysage ? 6 : 8),
@@ -703,10 +705,13 @@ class _CentreTable extends StatelessWidget {
         SizedBox(height: paysage ? 6 : 8),
         FractionallySizedBox(
           widthFactor: paysage ? .6 : 1,
-          child: Horloge(builder: (_) => Barre(app.resteChrono / math.max(1, app.totalChrono), hauteur: 4, couleur: pause != null ? K.muted : app.resteChrono < 2000 ? K.bad : K.brass)),
+          child: Horloge(fluide: true, builder: (_) => Barre(app.resteChrono / math.max(1, app.totalChrono), hauteur: 4, couleur: pause != null ? K.muted : app.resteChrono < 2000 ? K.bad : K.brass)),
         ),
       ],
     ]);
+    // Contre les robots : toucher la table ramasse le pli (ou saute le compte à rebours) sans attendre.
+    if (!_passable(v, pause)) return colonne;
+    return GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => app.envoyer({'type': 'passerPause'}), child: colonne);
   }
 
   /// Ce que tu dois faire (ce qui se passe est montré par les animations).
@@ -721,6 +726,8 @@ class _CentreTable extends StatelessWidget {
     final c = <InlineSpan>[];
     if (v['entreRobots'] == true) {
       c.addAll([oeil(), TextSpan(text: restants.contains(v['moi']) ? ' Les robots finissent la manche entre eux, en accéléré.' : ' Les robots finissent entre eux, en accéléré.')]);
+    } else if (_passable(v, pause)) {
+      c.add(TextSpan(text: 'Touche la table pour continuer.', style: TextStyle(color: K.muted, fontSize: paysage ? 13 : 14, fontWeight: FontWeight.w400)));
     } else if (pause != null || !phaseJeu) {
     } else if (!restants.contains(v['moi']) || !jeJoue) {
       c.addAll([oeil(), const TextSpan(text: ' Tu regardes la partie.')]);
@@ -954,25 +961,47 @@ class _RoueSensState extends State<_RoueSens> with SingleTickerProviderStateMixi
 }
 
 // ---------------------------------------------------------------- horloge (chrono, compte à rebours)
-/// Se redessine 10 fois par seconde tant qu'un chrono tourne.
+/// Se redessine tant qu'un chrono tourne, au rythme de l'écran.
+/// fluide : à chaque image (barres qui se vident en continu) ; sinon seulement quand la seconde affichée change
+/// (textes « 5 s », compte à rebours), ce qui économise la batterie. S'arrête tout seul quand le chrono est fini.
 class Horloge extends StatefulWidget {
   final WidgetBuilder builder;
-  const Horloge({super.key, required this.builder});
+  final bool fluide;
+  const Horloge({super.key, required this.builder, this.fluide = false});
   @override
   State<Horloge> createState() => _HorlogeState();
 }
 
-class _HorlogeState extends State<Horloge> {
-  Timer? _t;
-  @override
-  void initState() {
-    super.initState();
-    _t = Timer.periodic(const Duration(milliseconds: 100), (_) { if (mounted && app.finChrono != null) setState(() {}); });
+class _HorlogeState extends State<Horloge> with SingleTickerProviderStateMixin {
+  late final _t = createTicker(_tic);
+  int _seconde = -1;
+  bool _demarrage = false;
+
+  void _tic(Duration _) {
+    if (!mounted) return;
+    final reste = app.finChrono == null ? 0 : app.resteChrono;
+    final s = (reste / 1000).ceil();
+    if (widget.fluide || s != _seconde) { _seconde = s; setState(() {}); }
+    if (reste <= 0) _t.stop(); // relancé par build() au prochain chrono
   }
+
+  // Un nouveau chrono arrive avec une nouvelle vue (l'écran est reconstruit) : on relance le ticker après l'image.
+  void _relancer() {
+    if (_demarrage || _t.isActive || app.finChrono == null || app.resteChrono <= 0) return;
+    _demarrage = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _demarrage = false;
+      if (mounted && !_t.isActive && app.finChrono != null && app.resteChrono > 0) _t.start();
+    });
+  }
+
   @override
-  void dispose() { _t?.cancel(); super.dispose(); }
+  void dispose() { _t.dispose(); super.dispose(); }
   @override
-  Widget build(BuildContext context) => widget.builder(context);
+  Widget build(BuildContext context) {
+    _relancer();
+    return widget.builder(context);
+  }
 }
 
 int? _dernierDecompte, _dernierTic;

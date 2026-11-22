@@ -1086,5 +1086,36 @@ test('Rythme du tableau de bord : temps de la salle réglés en secondes, valeur
   assert.deepStrictEqual(t.durees, S.DUREES);
 });
 
+
+test('Toucher la table contre les robots : le pli ou le compte à rebours passe tout de suite, seul contre les robots', () => {
+  const SP = require('./kopo-salle.js');
+  let t = 1000000;
+  const s = SP.creerSalle('TOUC');
+  s.horloge = () => t;
+  SP.recevoir(s, 'p1', { type: 'rejoindre', nom: 'Moi' });
+  SP.recevoir(s, 'p1', { type: 'ajouterRobot' }); SP.recevoir(s, 'p1', { type: 'ajouterRobot' });
+  assert.ok(!SP.recevoir(s, 'p1', { type: 'passerPause' }).ok, 'pas dans le salon');
+  assert.ok(SP.recevoir(s, 'p1', { type: 'lancer' }).ok);
+  assert.strictEqual(s.pause && s.pause.type, 'depart');
+  assert.ok(SP.recevoir(s, 'p1', { type: 'passerPause' }).ok);
+  assert.ok(!s.pause || s.pause.type !== 'depart' || s.pause.jusqua <= t, 'le compte à rebours est passé');
+  // Pendant la partie : chaque pause se passe d'un toucher, sans attendre.
+  let passees = 0;
+  for (let i = 0; i < 4000 && s.etat === 'manche'; i++) {
+    if (s.pause && s.pause.jusqua > t) { assert.ok(SP.recevoir(s, 'p1', { type: 'passerPause' }).ok); passees++; continue; }
+    const v = SP.vue(s, 'p1');
+    if (v.manche && v.manche.actions && v.manche.actions.length) { SP.recevoir(s, 'p1', { type: 'action', action: v.manche.actions[0] }); continue; }
+    t += 50; SP.tic(s);
+  }
+  assert.ok(passees > 0, 'au moins une pause passée');
+  // Deux humains : refusé.
+  const d = SP.creerSalle('DEUX');
+  d.horloge = () => t;
+  SP.recevoir(d, 'p1', { type: 'rejoindre', nom: 'A' }); SP.recevoir(d, 'p2', { type: 'rejoindre', nom: 'B' });
+  SP.recevoir(d, 'p1', { type: 'lancer' });
+  assert.ok(d.pause);
+  assert.ok(!SP.recevoir(d, 'p1', { type: 'passerPause' }).ok);
+});
+
 console.log(`\n${ok} tests réussis, ${ko} en échec.`);
 process.exit(ko ? 1 : 0);

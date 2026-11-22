@@ -1,5 +1,6 @@
 // La page : l'écran du moment, puis par-dessus la fenêtre ouverte, le fil du chat, le bandeau,
 // les toasts et le calque des animations (bulles, tampons). Comme #voile, #toast, #calque sur le site.
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -37,10 +38,18 @@ class _RacineState extends State<Racine> {
     super.dispose();
   }
 
+  // Plusieurs changements d'affilée (une vue du serveur en déclenche souvent plusieurs) : un seul parcours de l'arbre.
+  bool _prevu = false;
   void _maj() {
+    if (!mounted || _prevu) return;
+    _prevu = true;
+    scheduleMicrotask(() { _prevu = false; _reconstruire(); });
+  }
+
+  void _reconstruire() {
     if (!mounted) return;
     if (SchedulerBinding.instance.schedulerPhase == SchedulerPhase.persistentCallbacks) {
-      SchedulerBinding.instance.addPostFrameCallback((_) => _maj());
+      SchedulerBinding.instance.addPostFrameCallback((_) => _reconstruire());
       return;
     }
     void tout(Element e) {

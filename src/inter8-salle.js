@@ -583,6 +583,12 @@
         else if (!msg.pause && s.enPause) reprendre(s);
         return { ok: true };
       }
+      case 'passerPause': { // contre les robots : toucher la table ramasse le pli (ou saute le compte à rebours) tout de suite
+        if (!joueur || !seulHumain(s, id) || s.etat !== 'manche' || !s.pause || s.enPause) return { ok: false, erreur: 'Impossible.' };
+        s.pause.jusqua = s.horloge();
+        tic(s);
+        return { ok: true };
+      }
       case 'passerFin': { // un humain qui ne joue plus : les robots finissent tout de suite
         if (!joueur || joueur.robot || !entreRobots(s)) return { ok: false, erreur: 'Impossible.' };
         passerEntreRobots(s);
