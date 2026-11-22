@@ -181,9 +181,9 @@ class Salon extends StatelessWidget {
           app.ecrireJRetour(o);
           app.envoyer({'type': 'reglages', 'jRetour': o});
         }, v['jRetour'] == true ? 'Oui' : 'Non'),
-      // Mode Cahier : partie normale, ou comptage des points jusqu'à 500 ou 1000. Pas en salle publique.
+      // Mode Cahier : partie normale, ou comptage des points jusqu'au petit ou au grand montant (Pilotage). Pas en salle publique.
       if (inter && v['publique'] != true)
-        ligne('Formule', const [('normale', 'Normale'), ('500', 'Cahier 500'), ('1000', 'Cahier 1000')], formule, (f) {
+        ligne('Formule', [for (final (c, l) in app.formulesInter(v['totauxCahier'])) (c, c == 'normale' ? 'Normale' : l)], formule, (f) {
           app.choisirFormule(f);
           app.envoyer(f == 'normale' ? {'type': 'reglages', 'formule': 'normale'} : {'type': 'reglages', 'formule': 'cahier', 'total': int.parse(f)});
         }, formule == 'normale' ? 'Partie normale' : 'Cahier · éliminé à $formule points'),
