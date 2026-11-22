@@ -120,7 +120,7 @@ class Salon extends StatelessWidget {
                 app.envoyer(f == 'normale' ? {'type': 'reglages', 'formule': 'normale'} : {'type': 'reglages', 'formule': 'cahier', 'total': int.parse(f)});
               })
             : Text(v['formule'] == 'cahier' ? 'Cahier · éliminé à ${v['totalCahier'] ?? 500} points' : 'Partie normale', style: K.texte(15, poids: FontWeight.w700))),
-      if (inter && v['mode'] == 'delire')
+      if (inter)
         ligne('J retour', hote
             ? Choix(const [(false, 'Non'), (true, 'Oui')], v['jRetour'] == true, (o) {
                 app.ecrireJRetour(o);

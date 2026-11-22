@@ -25,7 +25,7 @@ class Partie extends StatelessWidget {
     if (m == null) return const SizedBox();
     final inter = v['jeu'] == 'inter8';
     final finale = (v['restants'] as List).length == 2;
-    final style = inter ? ' · ${v['mode'] == 'delire' ? (v['jRetour'] == true ? 'Délire · J retour' : 'Délire') : 'Simple'}' : '';
+    final style = inter ? ' · ${v['mode'] == 'delire' ? 'Délire' : 'Simple'}${v['jRetour'] == true ? ' · J retour' : ''}' : '';
     final cahier = cahierDe(v);
     final jeJoue = (m['enJeu'] as List).contains(v['moi']);
     final paysage = MediaQuery.of(context).orientation == Orientation.landscape;
@@ -355,7 +355,7 @@ class _CentreInter extends StatelessWidget {
     String qui(Object? id) => id == v['moi'] ? 'Toi' : app.nomDe(v, id);
     final jeu = pause == null && m['phase'] == 'jeu';
     final demande = m['demande'] as Map?;
-    final roue = v['mode'] == 'delire' && v['jRetour'] == true && (m['enJeu'] as List).length > 2;
+    final roue = v['jRetour'] == true && (m['enJeu'] as List).length > 2;
     if (pause?['type'] == 'depart') return _Depart(v, m);
     return SingleChildScrollView(
       child: Column(mainAxisSize: MainAxisSize.min, children: [

@@ -383,7 +383,7 @@ class App extends ChangeNotifier {
   /// Boutons « Partie normale · Cahier 500 · Cahier 1000 » : 'normale', '500' ou '1000'.
   String get valeurFormule => formuleInter == 'cahier' ? '$totalInter' : 'normale';
   void choisirFormule(String v) => v == 'normale' ? ecrireFormule('normale') : ecrireFormule('cahier', int.parse(v));
-  Map<String, dynamic> reglagesStyleInter(String mode) => {'mode': mode, 'jRetour': mode == 'delire' && jRetourInter, 'formule': formuleInter, 'total': totalInter};
+  Map<String, dynamic> reglagesStyleInter(String mode) => {'mode': mode, 'jRetour': jRetourInter, 'formule': formuleInter, 'total': totalInter};
 
   // ---------------------------------------------------------------- démarrage
   Future<void> demarrer() async {
