@@ -1110,7 +1110,10 @@ const ONGLETS_REGLAGES = [
       { c: 'fleuve.piecesEscale', l: 'Pièces pour une ville passée', a: 'Première victoire sur le boss d\'une escale.', t: 'n', u: 'pièces', min: 0, max: 10000 },
       { c: 'fleuve.etoilesVille', l: 'Étoiles pour affronter le boss', a: 'Sur les 9 étapes de la ville (27 au plus).', t: 'n', u: 'étoiles', min: 0, max: 27 },
       { c: 'fleuve.adoucirJours', l: 'Aide après', a: 'Jours d\'échecs sur la même étape avant que les robots baissent d\'un cran.', t: 'n', u: 'jours', min: 1, max: 30 },
-      { c: 'fleuve.piecesCourse', l: 'Prix de la course de la semaine', a: 'Pièces offertes au gagnant de la course entre amis, sur chaque fleuve (le plus d\'étoiles nouvelles du lundi au dimanche). Personne ne mise.', t: 'n', u: 'pièces', min: 0, max: 10000 }] },
+      { c: 'fleuve.piecesCourse', l: 'Prix de la course de la semaine', a: 'Pièces offertes au gagnant de la course entre amis, sur chaque fleuve (le plus d\'étoiles nouvelles du lundi au dimanche). Personne ne mise.', t: 'n', u: 'pièces', min: 0, max: 10000 },
+      { c: 'fleuve.prixPagaie1', l: 'Prix de la 1re pagaie achetée', a: 'Quand un joueur n\'a plus de pagaies, il peut en acheter une avec ses pièces (les pièces sont détruites). 0 = pas en vente.', t: 'n', u: 'pièces', min: 0, max: 100000 },
+      { c: 'fleuve.prixPagaie2', l: 'Prix de la 2e pagaie achetée', a: 'Le même jour, après la 1re. 0 = une seule pagaie en vente par jour.', t: 'n', u: 'pièces', min: 0, max: 100000 },
+      { c: 'fleuve.prixPagaie3', l: 'Prix de la 3e pagaie achetée', a: 'Le même jour, après la 2e. 0 = deux pagaies en vente par jour au plus.', t: 'n', u: 'pièces', min: 0, max: 100000 }] },
     { titre: 'Courbe de difficulté', aide: 'Note de 1 (facile) à 100 (très dur). Chaque étape a la note de départ, plus la montée par bief, plus le décalage de sa place dans la ville. La réussite visée est celle d\'un robot Fort qui joue à la place du joueur.', champs: [
       { c: 'fleuveRecette.courbe.depart', l: 'Note de la 1re étape', t: 'n', min: 1, max: 100 },
       { c: 'fleuveRecette.courbe.parBief', l: 'Montée à chaque bief', t: 'n', min: 0, max: 50 },

@@ -8210,7 +8210,7 @@ svg .vb { transform-box: view-box; }
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = '16c280f5da72'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = 'e60c7e23671d'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: true };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // La musique des menus était coupée par défaut : on l'allume une fois pour tous (le joueur peut la recouper).
@@ -11798,14 +11798,33 @@ svg .vb { transform-box: view-box; }
     }
     const boutons = [];
     if (e.refus) z.append(el('p', 'fl-piege', e.refus));
-    else if (e.pagaies.restantes <= 0) z.append(el('p', 'fl-piege', `Ta pirogue se repose. Nouvelles pagaies dans ${dureeLisible(etatFleuve ? etatFleuve.pagaies.retourMs : 0)}.`));
-    else {
+    else if (e.pagaies.restantes <= 0) {
+      z.append(el('p', 'fl-piege', `Ta pirogue se repose. Nouvelles pagaies dans ${dureeLisible(etatFleuve ? etatFleuve.pagaies.retourMs : 0)}.`));
+      const b = boutonPagaie(e.pagaies, () => ouvrirEtapeFleuve(cle, e.numero)); if (b) boutons.push(b);
+    } else {
       z.append(el('small', 'muted', `Si tu échoues, tu perds une pagaie (il t'en reste ${e.pagaies.restantes}).`));
       const go = el('button', 'btn principal large', e.etoiles ? (e.etoiles < 3 ? 'Rejouer pour plus d\'étoiles' : 'Rejouer') : 'Jouer'); go.onclick = () => jouerEtapeFleuve(cle, e.numero);
       boutons.push(go);
     }
     const carte = el('button', 'btn large', 'Retour à la carte'); carte.onclick = () => afficherCarteFleuve(cle);
     ouvrirFenetre([z, ...boutons, carte]);
+  }
+  // Plus de pagaies : en acheter une avec ses pièces (prix du tableau de bord, qui monte à chaque achat du jour).
+  // Ces pièces sont détruites. null : plus rien à vendre aujourd'hui.
+  function boutonPagaie(p, apres) {
+    if (!p || p.restantes > 0 || p.prix == null) return null;
+    const b = el('button', 'btn principal large', `Acheter une pagaie · ${formatPieces(p.prix)} pièces`);
+    b.onclick = async () => {
+      b.disabled = true;
+      try {
+        const r = await apiJoueur('/fleuve/pagaie', 'POST');
+        soldeServeur(Number(r.solde));
+        try { etatFleuve = await apiJoueur('/fleuve'); } catch (x) {}
+        toast(`Nouvelle pagaie : −${formatPieces(r.paye)} pièces`, 'succes');
+        apres();
+      } catch (x) { b.disabled = false; toast(x.message, 'echec'); }
+    };
+    return b;
   }
   function jouerEtapeFleuve(cle, n) {
     const p = lirePseudo(); if (!p) return;
@@ -11859,6 +11878,7 @@ svg .vb { transform-box: view-box; }
     if (r.reussi && r.biefTermine && f) brumeFleuve[r.fleuve] = f.bief;
     if (r.reussi && f && f.courante && f.courante !== r.numero) { const b = el('button', 'btn principal large', `Étape ${f.courante}`); b.onclick = () => ouvrirEtapeFleuve(r.fleuve, f.courante); boutons.push(b); }
     if (r.pagaies.restantes > 0 && (!r.reussi || r.etoiles < 3)) { const b = el('button', 'btn' + (r.reussi ? '' : ' principal') + ' large', r.reussi ? 'Rejouer pour plus d\'étoiles' : 'Réessayer'); b.onclick = () => ouvrirEtapeFleuve(r.fleuve, r.numero); boutons.push(b); }
+    else if (!r.reussi) { const b = boutonPagaie(etatFleuve ? etatFleuve.pagaies : r.pagaies, () => ouvrirEtapeFleuve(r.fleuve, r.numero)); if (b) boutons.push(b); }
     const carte = el('button', 'btn large', 'Voir la carte'); carte.onclick = () => (etatFleuve ? afficherCarteFleuve(r.fleuve) : ouvrirFleuve(r.fleuve));
     ouvrirFenetre([z, ...boutons, carte]);
     majCarteFleuve(false);

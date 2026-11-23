@@ -897,7 +897,7 @@ paths:
                 properties:
                   ouvert: { type: boolean }
                   google: { type: boolean }
-                  pagaies: { type: object, properties: { restantes: { type: integer }, max: { type: integer }, retourMs: { type: integer } } }
+                  pagaies: { type: object, properties: { restantes: { type: integer }, max: { type: integer, description: Pagaies du jour + pagaies achetées }, achetees: { type: integer }, prix: { type: [integer, 'null'], description: 'Prix en pièces de la prochaine pagaie à acheter (null = plus rien en vente aujourd''hui)' }, retourMs: { type: integer } } }
                   etoilesVille: { type: integer, description: Étoiles à gagner dans une ville pour affronter son boss }
                   lance: { type: [string, 'null'], format: date-time, description: 'Date du lancement (bouton admin « Lancer le Fleuve ») : la Bande et le Match du jour sont fermés' }
                   rembourse: { type: integer, description: 'Pièces rendues à ce joueur à la fermeture de la Bande (motif fermeture_bande), 0 sinon' }
@@ -928,6 +928,25 @@ paths:
                             finMs: { type: integer }
                             pieces: { type: integer, description: Prix offert par le jeu au gagnant }
                             amis: { type: integer }
+  /fleuve/pagaie:
+    post:
+      tags: [Le Fleuve]
+      summary: Acheter une pagaie avec ses pièces, quand on n'en a plus
+      description: >-
+        Seulement quand `pagaies.restantes` vaut 0. Prix du tableau de bord (100, puis 200, puis 400 pièces au départ),
+        3 par jour au plus, remis à zéro à minuit (Kinshasa). Les pièces sont détruites (motif `pagaie`). Compte Google obligatoire.
+        409 s'il reste des pagaies, 403 si plus rien n'est en vente aujourd'hui, 400 si le solde ne suffit pas.
+      responses:
+        '200':
+          description: Pagaie achetée
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pagaies: { type: object, description: Même forme que dans GET /fleuve (sans retourMs) }
+                  solde: { type: integer }
+                  paye: { type: integer }
   /fleuve/{fleuve}/{numero}:
     get:
       tags: [Le Fleuve]

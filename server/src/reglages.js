@@ -98,7 +98,9 @@ const DEFAUTS = {
   // Bouquets de pièces (argent réel, du moins cher au plus cher, 40 000 FC au plus) : au taux des stickers, bonus croissant.
   bouquets: { bouquets: require('./bouquets').BOUQUETS_DEFAUT },
   // Le Fleuve (fleuve.md) : fermé jusqu'au lancement (ferme, testeurs, ouvert), 5 pagaies par jour, pièces par étoile et par ville.
-  fleuve: { etat: 'ferme', pagaies: 5, piecesEtoile: 5, piecesEscale: 200, etoilesVille: 20, adoucirJours: 5, piecesCourse: 300, lance: null, fleuves: { congo: 'ouvert', niger: 'ouvert', kasai: 'ferme', oubangui: 'ferme', nil: 'ferme' } }, // lance : date du lancement (Bande fermée, mises rendues)
+  // prixPagaie1 à 3 : prix en pièces de la 1re, 2e et 3e pagaie achetée dans la journée, quand on n'en a plus (0 = pas en vente).
+  // Ces pièces sont détruites : c'est un puits pour les joueurs riches, sans aide contre les autres joueurs (le Fleuve se joue seul).
+  fleuve: { etat: 'ferme', pagaies: 5, piecesEtoile: 5, piecesEscale: 200, etoilesVille: 20, adoucirJours: 5, piecesCourse: 300, prixPagaie1: 100, prixPagaie2: 200, prixPagaie3: 400, lance: null, fleuves: { congo: 'ouvert', niger: 'ouvert', kasai: 'ferme', oubangui: 'ferme', nil: 'ferme' } }, // lance : date du lancement (Bande fermée, mises rendues)
   // Recette qui fabrique les étapes du Fleuve (courbe de difficulté, étoiles, objectifs et pièges débloqués).
   fleuveRecette: require('./fleuve-generateur').RECETTE_DEFAUT,
   messagesRapides: ['👏', '😂', '😮', '🔥', '😡', '👍', '😭', '🙏', 'Bien joué !', 'Bravo !', 'Joli coup !', 'Belle carte !', 'Bien vu !', 'Trop fort !', 'Merci !', 'Désolé !', 'Oups !', 'Aïe !', 'Pas de chance !', 'Je ramasse…', 'Je t’ai eu !', 'Katapss !', 'Vite !', 'Prends ton temps', 'À toi !', 'Encore une !', 'Bonne chance !', 'Bonne partie !', 'GG !', 'Revanche ?', 'On en refait une ?', 'Je reviens', 'Salut tout le monde !', 'À la prochaine !'],
@@ -460,7 +462,7 @@ function creerReglages(base) {
           if (!['ferme', 'testeurs', 'ouvert'].includes(v)) throw Object.assign(new Error(`Fleuve ${k} : fermé, testeurs ou ouvert.`), { statut: 400 });
           fleuves[k] = v;
         }
-        valeur = { etat: valeur.etat, lance, fleuves, ...verifierBornes({ ...DEFAUTS.fleuve, ...valeur }, { pagaies: [1, 20, 'Pagaies par jour'], piecesEtoile: [0, 1000, 'Pièces par étoile'], piecesEscale: [0, 10000, 'Pièces par ville'], etoilesVille: [0, 27, 'Étoiles pour le boss'], adoucirJours: [1, 30, 'Jours avant l\'aide'], piecesCourse: [0, 10000, 'Pièces du gagnant de la semaine'] }) };
+        valeur = { etat: valeur.etat, lance, fleuves, ...verifierBornes({ ...DEFAUTS.fleuve, ...valeur }, { pagaies: [1, 20, 'Pagaies par jour'], piecesEtoile: [0, 1000, 'Pièces par étoile'], piecesEscale: [0, 10000, 'Pièces par ville'], etoilesVille: [0, 27, 'Étoiles pour le boss'], adoucirJours: [1, 30, 'Jours avant l\'aide'], piecesCourse: [0, 10000, 'Pièces du gagnant de la semaine'], prixPagaie1: [0, 100000, 'Prix de la 1re pagaie achetée'], prixPagaie2: [0, 100000, 'Prix de la 2e pagaie achetée'], prixPagaie3: [0, 100000, 'Prix de la 3e pagaie achetée'] }) };
       }
       if (cle === 'fleuveRecette') valeur = require('./fleuve-generateur').verifierRecette(valeur);
       if (cle === 'cahier') valeur = verifierCahier(valeur);
