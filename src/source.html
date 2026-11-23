@@ -5345,7 +5345,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   const GUIDE_FLEUVE = [
     ['courante', 'Chaque étape a un objectif.', 'Réussis-le pour avancer. Jusqu\'à 3 étoiles par étape.'],
     ['pagaies', '5 pagaies par jour.', 'Réussir ne coûte rien, rater coûte 1 pagaie. Elles reviennent à minuit.'],
-    ['escale', 'Les villes', '{N} étoiles sur 30 pour passer chaque ville. La dernière étape de la ville est la plus dure.'],
+    ['escale', 'Les villes', '{N} étoiles sur 27 pour passer chaque ville. La dernière étape de la ville est la plus dure.'],
   ];
   function bullesGuide(liste, fin) {
     let i = 0;
@@ -5401,7 +5401,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     const kopo = liste('kopo'), inter = liste('inter8');
     li(ouverts.length > 2 ? `${ouverts.length} fleuves.` : 'Deux fleuves.', [kopo && `${kopo[0].toUpperCase() + kopo.slice(1)} ${kopo.includes(' et ') ? 'se jouent' : 'se joue'} au Kopo`, inter && `${inter} à l'Inter (8)`].filter(Boolean).join(', ') + '.');
     li('5 pagaies par jour.', 'Réussir ne coûte rien, rater coûte 1 pagaie. Elles reviennent à minuit.');
-    li(`Les villes : ${N} étoiles sur 30.`, 'Il les faut pour affronter le boss de la ville, la dernière étape, la plus dure. Il te manque des étoiles ? Rejoue une étape où tu n\'en as pas 3.');
+    li(`Les villes : ${N} étoiles sur 27.`, 'Il les faut pour affronter le boss de la ville, la dernière étape, la plus dure. Il te manque des étoiles ? Rejoue une étape où tu n\'en as pas 3.');
     li('Tes amis rament avec toi.', 'Vois où ils en sont et passe devant. Le plus d\'étoiles de la semaine entre amis gagne la course.');
     const ok = el('button', 'btn principal large', 'Compris !'); ok.onclick = fermerFenetre;
     const rev = el('button', 'btn large', 'Revoir le guide sur la carte');
@@ -5797,7 +5797,8 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       const pod = el('div', 'nv-podium');
       const ligne = (e, b, t) => { const d = el('div'); d.append(el('span', 'e', e)); const s2 = el('span'); s2.append(el('b', null, b), ' ' + t); d.append(s2); pod.append(d); };
       ligne('🛶', 'Tes amis sur la carte', ': vois où ils en sont et passe devant');
-      ligne('🏁', 'La course de la semaine', ': le plus d\'étoiles entre amis gagne 300 pièces');
+      const prix = (((etatFleuve && etatFleuve.fleuves) || {}).congo || {}).course; // prix réglé dans l'admin
+      ligne('🏁', 'La course de la semaine', `: le plus d'étoiles entre amis gagne ${formatPieces(prix && prix.pieces != null ? prix.pieces : 300)} pièces`);
       ligne('⛵', 'Premier à une ville', ': la marque reste sur ton profil');
       contenu = [el('span', 'nv-badge', 'NOUVEAU'), el('h2', null, 'Tes amis rament avec toi'), pod, el('div', 'nv-petit', 'Personne ne mise, personne ne perd de pièces.')];
     } else {
@@ -8064,7 +8065,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       await couperPush(); ecrirePushLocal({ coupe: true }); return false;
     });
     const prefsPush = e.prefs || {};
-    for (const [t, texte, aide] of [['invitation', 'Invitations', 'Un ami t\'invite à sa table'], ['ami', 'Demandes d\'ami', 'Reçues et acceptées'], ['match', 'Rappel du Match du jour', 'À 19 h, si tu ne l\'as pas joué'], ['annonce', 'Annonces de Masano', 'Tournois, nouveautés'], ['fleuve', 'Le Fleuve', 'Un ami t\'a dépassé (une fois par jour au plus)']].filter(([t]) => t !== 'fleuve' || (configServeur && configServeur.fleuve && configServeur.fleuve !== 'ferme'))) {
+    for (const [t, texte, aide] of [['invitation', 'Invitations', 'Un ami t\'invite à sa table'], ['ami', 'Demandes d\'ami', 'Reçues et acceptées'], ['match', 'Rappel du Match du jour', 'À 19 h, si tu ne l\'as pas joué'], ['annonce', 'Annonces de Masano', 'Tournois, nouveautés'], ['fleuve', 'Le Fleuve', 'Un ami t\'a dépassé (une fois par jour au plus)']].filter(([t]) => (t !== 'fleuve' || (configServeur && configServeur.fleuve && configServeur.fleuve !== 'ferme')) && (t !== 'match' || !fleuveLance()))) {
       interrupteur(texte, aide, prefsPush[t] !== false, async (v) => { const r = await apiJoueur('/push/prefs', 'PATCH', { [t]: v }); etatPush = Object.assign(etatPush || {}, { prefs: r.prefs }); return r.prefs[t]; });
     }
   }
