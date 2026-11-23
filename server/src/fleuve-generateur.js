@@ -32,7 +32,9 @@ const PIEGES = {
 const RECETTE_DEFAUT = {
   courbe: { depart: 8, parBief: 6 }, // note de la 1re étape, et de combien tout le cycle monte à chaque bief
   cycle: [-6, -4, 0, 2, 4, 6, 8, 10, 14, 28], // décalage de chaque étape d'une ville (10 = l'escale, la plus dure)
-  taux: { facile: 92, dur: 25 }, // réussite visée (robot Fort à la place du joueur) pour une note de 1 et de 100
+  // Réussite visée (robot Fort à la place du joueur) pour une note de 1 et de 100. Le Fleuve est dur dès
+  // le bief 1 (environ 50 % à 36 % de réussite), puis de plus en plus dur jusqu'à 10 %.
+  taux: { facile: 50, dur: 10 },
   tolerance: 12, // écart accepté entre la réussite obtenue et la réussite visée (en points)
   etoiles: { deux: 50, trois: 15 }, // 2 étoiles : mieux que la moitié des essais ; 3 : parmi les 15 % meilleurs
   simulations: 200, // essais pour les seuils d'étoiles

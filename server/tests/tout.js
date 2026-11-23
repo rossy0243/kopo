@@ -2509,6 +2509,11 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.ok(s.deux <= 3 && s.trois <= 3, 'jamais au-dessus du meilleur essai');
     assert.strictEqual(FS.texteObjectif({ type: 'manches', n: 3 }), 'Qualifie-toi pour 3 manches');
   });
+  await test('Fleuve : dur dès le bief 1, puis de plus en plus dur', () => {
+    const vise = (n) => FG.tauxVise(FG.noteVisee(n));
+    for (let n = 1; n <= FG.ETAPES_PAR_BIEF; n++) assert.ok(vise(n) <= 50, `étape ${n} : ${vise(n)} % visés, trop facile`);
+    assert.ok(vise(FG.ETAPES_PAR_BIEF * 9 + 1) < vise(1), 'le bief 10 plus dur que le bief 1');
+  });
   await test('Fleuve : réglages vérifiés, fermé par défaut', async () => {
     assert.strictEqual(srv.reglages.get('fleuve').etat, 'ferme');
     assert.strictEqual((await regF('fleuve', { ...DEFAUTS.fleuve, etat: 'grand' })).statut, 400);

@@ -376,6 +376,10 @@ function creerReglages(base) {
         if (cache[k] && typeof cache[k] === 'object' && !Array.isArray(cache[k])) cache[k] = { ...DEFAUTS[k], ...cache[k] };
       }
       if (cache.fleuveRecette) cache.fleuveRecette = require('./fleuve-generateur').completerRecette(cache.fleuveRecette);
+      // Ancienne réussite visée par défaut (92 % → 25 %, bief 1 trop facile) enregistrée telle quelle : elle prend la nouvelle.
+      if (cache.fleuveRecette && cache.fleuveRecette.taux.facile === 92 && cache.fleuveRecette.taux.dur === 25) {
+        cache.fleuveRecette = { ...cache.fleuveRecette, taux: { ...require('./fleuve-generateur').RECETTE_DEFAUT.taux } };
+      }
       if (cache.rythme) cache.rythme = { kopo: { ...DEFAUTS.rythme.kopo, ...cache.rythme.kopo }, inter8: { ...DEFAUTS.rythme.inter8, ...cache.rythme.inter8 } };
       // L'appli s'appelle maintenant Masano : l'ancien message par défaut, enregistré tel quel, prend le nouveau nom.
       if (cache.maintenance && cache.maintenance.message === ANCIEN_MESSAGE_MAINTENANCE) cache.maintenance = { ...cache.maintenance, message: DEFAUTS.maintenance.message };
