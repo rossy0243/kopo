@@ -1,0 +1,99 @@
+# Construit l'appli iPhone (mobile/) sur un Mac de GitHub. Pas besoin d'avoir un Mac.
+# - Chaque PR et chaque fusion sur main qui touchent l'appli : construction SANS signature (vérifie que l'appli iPhone compile).
+# - Si les 4 secrets Apple sont présents (voir mobile/README.md, « Publication iPhone ») et que c'est main ou un lancement
+#   à la main (onglet Actions > Appli iPhone > Run workflow) : construction signée et envoi direct sur App Store Connect
+#   (TestFlight). La version se choisit ensuite dans App Store Connect pour l'examen d'Apple.
+# Signature gérée par Apple (« cloud signing ») avec la clé d'API App Store Connect : pas de certificat ni de profil à gérer.
+# Version App Store : sans achats (--dart-define=STORE=appstore, voir Api.sansAchats), comme la version Google Play.
+name: Appli iPhone
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['mobile/**', '.github/workflows/ios.yml']
+  pull_request:
+    paths: ['mobile/**', '.github/workflows/ios.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  ios:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: mobile
+    env:
+      # Numéro de build : celui du run, qui ne fait que monter. App Store Connect refuse un numéro déjà envoyé.
+      # Le numéro de version (1.0.0) vient de pubspec.yaml.
+      NUMERO: ${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.9  # même version que l'APK Android (apk.yml)
+          cache: true
+      - run: flutter --version && xcodebuild -version
+      - run: flutter pub get
+      - name: Vérification sans signature
+        run: flutter build ios --release --no-codesign --dart-define=STORE=appstore --build-number=$NUMERO
+      - name: Secrets Apple
+        id: apple
+        if: github.event_name != 'pull_request'
+        env:
+          EQUIPE: ${{ secrets.APPLE_TEAM_ID }}
+          CLE_ID: ${{ secrets.ASC_KEY_ID }}
+          EMETTEUR: ${{ secrets.ASC_ISSUER_ID }}
+          CLE_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          if [ -z "$EQUIPE" ] || [ -z "$CLE_ID" ] || [ -z "$EMETTEUR" ] || [ -z "$CLE_P8" ]; then
+            echo "::notice::Secrets Apple absents (APPLE_TEAM_ID, ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8) : appli vérifiée sans signature, rien n'est envoyé à Apple."
+            echo "ok=0" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          mkdir -p "$RUNNER_TEMP/asc"
+          # La clé .p8 peut être collée telle quelle (-----BEGIN PRIVATE KEY-----) ou en base64.
+          if printf '%s' "$CLE_P8" | grep -q 'BEGIN PRIVATE KEY'; then printf '%s\n' "$CLE_P8" > "$RUNNER_TEMP/asc/cle.p8"
+          else printf '%s' "$CLE_P8" | base64 -d > "$RUNNER_TEMP/asc/cle.p8"; fi
+          cat > "$RUNNER_TEMP/asc/export.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>$EQUIPE</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>uploadSymbols</key><true/>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict></plist>
+          PLIST
+          echo "ok=1" >> "$GITHUB_OUTPUT"
+      - name: Archive signée
+        if: steps.apple.outputs.ok == '1'
+        env:
+          EQUIPE: ${{ secrets.APPLE_TEAM_ID }}
+          CLE_ID: ${{ secrets.ASC_KEY_ID }}
+          EMETTEUR: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          flutter build ios --release --config-only --dart-define=STORE=appstore --build-number=$NUMERO
+          xcodebuild archive -workspace ios/Runner.xcworkspace -scheme Runner -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/Masano.xcarchive" \
+            DEVELOPMENT_TEAM="$EQUIPE" CODE_SIGN_STYLE=Automatic \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/asc/cle.p8" -authenticationKeyID "$CLE_ID" -authenticationKeyIssuerID "$EMETTEUR"
+      - name: Envoi sur App Store Connect (TestFlight)
+        if: steps.apple.outputs.ok == '1'
+        env:
+          CLE_ID: ${{ secrets.ASC_KEY_ID }}
+          EMETTEUR: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/Masano.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/asc/export.plist" -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/asc/cle.p8" -authenticationKeyID "$CLE_ID" -authenticationKeyIssuerID "$EMETTEUR"
+          echo "::notice::Build $NUMERO envoyé sur App Store Connect. Il apparaît dans TestFlight après 10 à 30 minutes de traitement par Apple."
+      - name: Effacer la clé
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/asc"
