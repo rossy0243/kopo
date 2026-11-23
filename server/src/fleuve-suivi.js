@@ -50,7 +50,7 @@ function creerSuivi(moi, etape) {
   const def = OBJECTIFS[o.type] || OBJECTIFS.gagner;
   const limite = def.limite(o);
   const manches = new Map(); // objet manche -> { joueurs, rang (0 = sorti premier), tours, ramasse, katapss, piochees, faitPiocher, nulle }
-  let elimine = false, gagne = false, fin = false, place = null, totalJoueurs = null;
+  let elimine = false, gagne = false, fin = false, place = null, totalJoueurs = null, restants = null;
   const entree = (m) => {
     let e = manches.get(m);
     if (!e) { e = { joueurs: m.sieges.length, rang: null, tours: 0, ramasse: 0, katapss: 0, piochees: 0, faitPiocher: 0, nulle: false }; manches.set(m, e); }
@@ -84,6 +84,7 @@ function creerSuivi(moi, etape) {
     observer(s) {
       if (fin) return;
       if (totalJoueurs === null && s.joueurs) totalJoueurs = s.joueurs.length;
+      if (s.restants) restants = s.restants.length;
       const m = s.manche;
       if (m && m.sieges && m.sieges.includes(moi)) {
         const e = entree(m);
@@ -124,7 +125,35 @@ function creerSuivi(moi, etape) {
         case 'katapss': reussi = somme('katapss') > 0; break;
         default: reussi = false;
       }
-      return { reussi, score, manches: n, gagne, elimine, place, ramasse, piochees, faitPiocher, premierSorti };
+      return { reussi, score, manches: n, gagne, elimine, place, ramasse, piochees, faitPiocher, premierSorti, katapss: somme('katapss') };
+    },
+    // Où en est l'étape, pour la jauge en direct (fleuve.md, « Les étoiles en direct ») : score provisoire,
+    // avancée de l'objectif (texte court et part de 0 à 1) et état : en_cours, danger (encore un faux pas et c'est
+    // raté), ok (objectif atteint) ou rate (plus aucune étoile possible). Même calcul que le verdict de la fin.
+    direct() {
+      const r = suivi.resultat();
+      const tot = totalJoueurs || 0, reste = restants === null ? tot : restants;
+      let prog = '', val = 0, etat = r.reussi ? 'ok' : 'en_cours';
+      const pl = (k, x) => Math.max(0, Math.min(1, k ? x / k : 0));
+      switch (o.type) {
+        case 'manches': prog = `${Math.min(r.manches, o.n)}/${o.n}`; val = pl(o.n, r.manches); break;
+        case 'finale': case 'gagner': {
+          const cible = o.type === 'finale' ? 2 : 1;
+          prog = r.reussi ? '✓' : `${reste} en jeu`; val = pl(tot - cible, tot - reste); break;
+        }
+        case 'top': prog = `${reste} en jeu`; val = pl(tot - o.n, tot - reste); break;
+        case 'premier': prog = r.premierSorti ? '✓' : `${Math.min(r.manches + 1, o.m)}/${o.m}`; val = r.premierSorti ? 1 : 0; break;
+        case 'ramasser': prog = `ramassé ${r.ramasse}/${o.n}`; val = pl(o.m, r.manches);
+          if (r.ramasse > o.n) etat = 'rate'; else if (!r.reussi && o.n > 0 && r.ramasse === o.n) etat = 'danger'; break;
+        case 'pioche': prog = `pioché ${r.piochees}/${o.n}`; val = pl(o.m, r.manches);
+          if (r.piochees > o.n) etat = 'rate'; else if (!r.reussi && o.n > 0 && r.piochees === o.n) etat = 'danger'; break;
+        case 'attaque': prog = `${Math.min(r.faitPiocher, o.n)}/${o.n}`; val = pl(o.n, r.faitPiocher); break;
+        case 'katapss': prog = r.katapss > 0 ? '✓' : `${Math.min(r.manches + 1, o.m || 1)}/${o.m || 1}`; val = r.katapss > 0 ? 1 : 0; break;
+        default: break;
+      }
+      if (r.reussi) { val = 1; if (!/✓/.test(prog)) prog += ' ✓'; }
+      else if (fin || r.elimine) etat = 'rate';
+      return { score: r.score, prog, val: Math.round(val * 100) / 100, etat };
     },
   };
   return suivi;

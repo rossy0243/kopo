@@ -1053,6 +1053,10 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
 .fl-seuils { display: grid; gap: 4px; text-align: left; background: rgba(255,255,255,.05); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font-size: 13px; }
 .fl-seuils span { color: #ffd86b; display: inline-block; min-width: 48px; }
 .fl-piege { color: var(--warn); font-size: 13px; }
+.fl-preuve { display: flex; align-items: center; gap: 10px; text-align: left; background: rgba(127,196,232,.1); border: 1px solid rgba(127,196,232,.35); border-radius: 12px; padding: 8px 12px; font-size: 13.5px; }
+.fl-preuve b { font: 400 26px/1 var(--display); color: #9fd8f2; letter-spacing: 1px; flex: none; }
+.fl-preuve.or { background: rgba(255,216,107,.12); border-color: rgba(255,216,107,.4); } .fl-preuve.or b { color: #ffd86b; }
+.fl-preuve small { display: block; color: var(--muted); font-size: 11.5px; }
 .fl-objectif { font-size: 19px; font-weight: 700; color: var(--ink); }
 /* Le Fleuve, entre amis : avatars sur la carte, course de la semaine, marques. */
 .fl-amis { position: absolute; display: flex; transform: translateY(-50%); z-index: 2; }
@@ -1072,7 +1076,49 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
 .fl-marques { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
 .fl-marque { font-size: 12px; padding: 3px 8px; border-radius: 999px; background: rgba(255,216,107,.14); color: #ffd86b; border: 1px solid rgba(255,216,107,.35); }
 .fl-passe { font: 400 22px/1.1 var(--display); color: #ffd86b; letter-spacing: 1px; }
-#pillFleuve { justify-self: center; align-self: start; background: rgba(16,35,58,.92); border: 1px solid #7fc4e8; color: var(--ink); border-radius: 999px; padding: 4px 12px; font-size: 12.5px; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
+/* Le Fleuve : la jauge des étoiles en direct (fleuve.md, « Les étoiles en direct »). Téléphone droit : en haut de la table ;
+   couché et PC : dans l'entête, entre « Manche n » et les boutons. */
+#jaugeFleuve { position: relative; justify-self: stretch; align-self: start; width: min(100%, 420px); margin: 0 auto 6px; z-index: 5; background: rgba(16,35,58,.94); border: 1px solid #7fc4e8; border-radius: 14px; padding: 6px 10px 7px; color: var(--ink); box-shadow: 0 6px 18px rgba(0,0,0,.35); transition: border-color .3s; }
+#jaugeFleuve.ok { border-color: var(--good); } #jaugeFleuve.danger { border-color: var(--warn); } #jaugeFleuve.rate { border-color: var(--bad); }
+#jaugeFleuve.secoue { animation: secoueJauge .45s; }
+@keyframes secoueJauge { 20% { transform: translateX(-6px) } 40% { transform: translateX(5px) } 60% { transform: translateX(-4px) } 80% { transform: translateX(2px) } }
+.jf-haut { display: flex; align-items: center; gap: 8px; font-size: 12.5px; line-height: 1.2; }
+.jf-obj { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.jf-prog { flex: none; font-weight: 700; font-size: 12px; padding: 1px 8px; border-radius: 99px; background: rgba(127,196,232,.18); color: #9fd8f2; }
+#jaugeFleuve.ok .jf-prog { background: rgba(63,191,127,.2); color: #6fdca3; } #jaugeFleuve.danger .jf-prog { background: rgba(240,166,58,.2); color: #f5b860; } #jaugeFleuve.rate .jf-prog { background: rgba(239,107,95,.2); color: #ff8d82; }
+.jf-bas { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.jf-e1 { position: relative; flex: none; width: 24px; height: 24px; display: grid; place-items: center; }
+.jf-e1 svg { position: absolute; inset: 0; } .jf-e1 svg circle { transition: stroke-dasharray .6s ease-out, stroke .3s; }
+.jf-et { font-size: 17px; line-height: 1; color: rgba(255,255,255,.22); display: inline-block; transition: color .3s; }
+.jf-et.or { color: #ffd86b; text-shadow: 0 0 8px rgba(255,216,107,.6); }
+.jf-croix { position: absolute; inset: 0; display: grid; place-items: center; color: var(--bad); font-weight: 800; font-size: 20px; }
+.jf-piste { position: relative; flex: 1; height: 8px; border-radius: 99px; background: rgba(255,255,255,.1); margin: 0 10px 0 2px; }
+.jf-rempli { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 99px; background: linear-gradient(90deg, #7fc4e8, #ffd86b); transition: width .6s ease-out; }
+#jaugeFleuve.rate .jf-rempli { background: rgba(255,255,255,.22); }
+.jf-cran { position: absolute; top: 50%; transform: translate(-50%, -50%); display: grid; place-items: center; }
+.jf-cran .jf-rond { position: relative; width: 24px; height: 24px; border-radius: 50%; background: var(--table); border: 1.5px solid rgba(255,255,255,.25); display: grid; place-items: center; transition: border-color .3s, background .3s; }
+.jf-cran.atteint .jf-rond { border-color: #ffd86b; background: #2b2a1c; }
+.jf-cran .jf-et { font-size: 9.5px; letter-spacing: -1px; } .jf-cran.trois .jf-et { font-size: 7.5px; }
+.jf-cran small { position: absolute; top: 15px; font-size: 9.5px; color: var(--muted); font-weight: 600; }
+.jf-score { flex: none; min-width: 44px; text-align: right; font-weight: 700; font-size: 14px; font-variant-numeric: tabular-nums; }
+.jf-score small { font-weight: 600; font-size: 10px; color: var(--muted); margin-left: 2px; }
+.jf-plus { position: absolute; right: 6px; top: calc(100% + 40px); font-weight: 800; font-size: 15px; color: #ffd86b; white-space: nowrap; pointer-events: none; background: #1d1606; border: 1px solid rgba(255,216,107,.6); border-radius: 99px; padding: 1px 9px; box-shadow: 0 4px 10px rgba(0,0,0,.5); animation: plusJauge 1.4s ease-out forwards; }
+.jf-plus small { font-size: 11px; font-weight: 600; color: var(--ink); margin-left: 4px; }
+@keyframes plusJauge { 0% { opacity: 0; transform: translateY(6px) } 12% { opacity: 1; transform: none } 75% { opacity: 1 } 100% { opacity: 0; transform: translateY(-14px) } }
+.jf-bulle { position: absolute; left: 50%; top: calc(100% + 6px); transform: translateX(-50%); white-space: nowrap; font-weight: 700; font-size: 13px; padding: 5px 12px; border-radius: 99px; background: #ffd86b; color: #1d1606; box-shadow: 0 6px 16px rgba(0,0,0,.45); pointer-events: none; animation: bulleJauge 2.2s ease-out forwards; }
+.jf-bulle.bien { background: var(--good); color: #062014; } .jf-bulle.alerte { background: var(--warn); color: #2a1700; } .jf-bulle.echec { background: var(--bad); color: #2a0805; }
+@keyframes bulleJauge { 0% { opacity: 0; transform: translateX(-50%) translateY(-6px) scale(.9) } 10% { opacity: 1; transform: translateX(-50%) } 85% { opacity: 1 } 100% { opacity: 0; transform: translateX(-50%) } }
+.jf-pop { animation: popEtoile .7s cubic-bezier(.3,1.6,.5,1); }
+@keyframes popEtoile { 0% { transform: scale(1) } 40% { transform: scale(1.7) } 100% { transform: scale(1) } }
+.jf-rayons { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; }
+.jf-rayons i { position: absolute; width: 3px; height: 8px; border-radius: 2px; background: #ffd86b; left: -1.5px; top: -4px; animation: rayonJauge .9s ease-out forwards; }
+@keyframes rayonJauge { 0% { opacity: 1; transform: rotate(var(--a)) translateY(-10px) } 100% { opacity: 0; transform: rotate(var(--a)) translateY(-32px) } }
+#jaugeFleuve.entete { flex: 0 1 auto; width: clamp(220px, 36vw, 430px); margin: 0 10px 0 4px; padding: 3px 9px 4px; border-radius: 11px; box-shadow: none; align-self: center; }
+#jaugeFleuve.entete .jf-haut { font-size: 11px; } #jaugeFleuve.entete .jf-prog { font-size: 10.5px; padding: 0 6px; }
+#jaugeFleuve.entete .jf-bas { margin-top: 2px; gap: 6px; } #jaugeFleuve.entete .jf-e1 { width: 19px; height: 19px; } #jaugeFleuve.entete .jf-e1 .jf-et { font-size: 13px; }
+#jaugeFleuve.entete .jf-piste { height: 6px; } #jaugeFleuve.entete .jf-cran .jf-rond { width: 18px; height: 18px; } #jaugeFleuve.entete .jf-cran small { display: none; }
+#jaugeFleuve.entete .jf-score { font-size: 12px; min-width: 36px; } #jaugeFleuve.entete .jf-plus { top: calc(100% + 38px); right: 0; }
+@media (prefers-reduced-motion: reduce) { #jaugeFleuve *, #jaugeFleuve { animation-duration: .01s !important; transition: none !important; } }
 .fl-cadenas { position: absolute; transform: translate(-50%, 0); margin-top: 30px; padding: 2px 8px; border-radius: 999px; background: #1d1606; color: #ffd86b; border: 1px solid rgba(255,216,107,.5); font-size: 12px; font-weight: 700; white-space: nowrap; z-index: 2; pointer-events: none; }
 .fl-etape.escale.fait::after { content: '🪙'; position: absolute; top: -10px; right: -10px; font-size: 16px; filter: drop-shadow(0 1px 1px rgba(0,0,0,.6)); }
 .fl-brume { position: absolute; inset: 0; z-index: 4; pointer-events: none; background: linear-gradient(rgba(220,232,238,.97), rgba(220,232,238,.85) 70%, rgba(220,232,238,0)); }
@@ -8222,7 +8268,7 @@ svg .vb { transform-box: view-box; }
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = '7ec4d49fff7b'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = 'afbefd10a2c3'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: true };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // La musique des menus était coupée par défaut : on l'allume une fois pour tous (le joueur peut la recouper).
@@ -8670,8 +8716,10 @@ svg .vb { transform-box: view-box; }
     // Le Fleuve : au début, l'objectif de l'étape (rappelé en haut de l'écran) ; à la fin, les étoiles.
     room.onMessage('fleuve', (d) => {
       if (moi !== client || !d) return;
-      if (d.fin) { moi.depart = true; quitter(); setTimeout(() => (d.erreur ? toast(d.erreur, 'echec') : resultatFleuve(d)), 250); }
-      else if (d.debut && d.etape) { pastilleFleuve('🛶 ' + d.etape.texte); toast(d.adoucir ? d.etape.texte + ' · robots un peu moins forts aujourd\'hui' : d.etape.texte); }
+      // Fin : on laisse d'abord la jauge montrer la dernière étoile gagnée (ou l'objectif raté).
+      if (d.fin) { moi.depart = true; const attente = jaugeFleuve.recente() ? 1700 : 0; setTimeout(() => { quitter(); setTimeout(() => (d.erreur ? toast(d.erreur, 'echec') : resultatFleuve(d)), 250); }, attente); }
+      else if (d.direct) jaugeFleuve.maj(d.direct);
+      else if (d.debut && d.etape) { jaugeFleuve.debut(d.etape); toast(d.adoucir ? d.etape.texte + ' · robots un peu moins forts aujourd\'hui' : d.etape.texte); }
     });
     room.onLeave((code) => {
       if (moi !== client || moi.depart) return;
@@ -8834,7 +8882,7 @@ svg .vb { transform-box: view-box; }
     clearTimeout(rechercheEnCours);
     if (accueil && document.fullscreenElement) document.exitFullscreen().catch(() => {});
     vocal.arreter();
-    pastilleFleuve(null);
+    jaugeFleuve.retirer();
     hote = client = vueActuelle = null;
     session = null;
     stock.effacer(cleSession);
@@ -11506,12 +11554,105 @@ svg .vb { transform-box: view-box; }
   }
   function retenirFleuve(cle) { if (!FLEUVES[cle]) return; const d = stock.lire('kopo-fleuve-dernier') || {}; d[FLEUVES[cle].jeu] = cle; stock.ecrire('kopo-fleuve-dernier', d); }
   const etoilesTexte = (n) => '★'.repeat(n) + '☆'.repeat(3 - n);
-  function pastilleFleuve(texte) {
-    let p = $('pillFleuve');
-    if (!texte) { if (p) p.remove(); return; }
-    if (!p) { p = el('div'); p.id = 'pillFleuve'; p.setAttribute('role', 'status'); const t = document.querySelector('#ecranPartie .table'); (t || document.body).prepend(p); }
-    p.textContent = texte;
-  }
+  // La jauge des étoiles en direct (fleuve.md, « Les étoiles en direct ») : le serveur envoie l'avancée de l'étape
+  // ({ score, prog, val, etat, texte, seuils }) à chaque changement ; la page compare avec la précédente pour
+  // fêter un point, une étoile, l'objectif réussi, ou prévenir d'un danger. Les étoiles 2 et 3 ne comptent que
+  // si l'objectif est réussi : un objectif raté les éteint toutes.
+  const jaugeFleuve = (() => {
+    let etape = null, avant = null, quand = 0;
+    const paysage = () => matchMedia('(orientation: landscape)').matches;
+    function boite() {
+      let j = $('jaugeFleuve');
+      const p = paysage(), parent = p ? $('info') && $('info').parentElement : document.querySelector('#ecranPartie .table');
+      if (!parent) return null;
+      if (!j) { j = el('div'); j.id = 'jaugeFleuve'; j.setAttribute('role', 'status'); j.setAttribute('aria-live', 'polite'); }
+      if (j.parentElement !== parent) { if (p) $('info').after(j); else parent.prepend(j); }
+      j.classList.toggle('entete', p);
+      return j;
+    }
+    function rayons(cible) {
+      if (sansAnim) return;
+      const r = el('span', 'jf-rayons');
+      for (let i = 0; i < 10; i++) { const x = el('i'); x.style.setProperty('--a', i * 36 + 'deg'); r.append(x); }
+      cible.append(r); setTimeout(() => r.remove(), 1000);
+    }
+    function dessiner(d, effets = {}) {
+      const j = boite(); if (!j) return;
+      const sl = d.seuils || {}, deux = sl.deux || 0, trois = sl.trois || 0, rate = d.etat === 'rate', ok = d.etat === 'ok';
+      j.classList.remove('ok', 'danger', 'rate'); if (d.etat !== 'en_cours') j.classList.add(d.etat);
+      j.replaceChildren();
+      const haut = el('div', 'jf-haut');
+      haut.append(el('span', 'jf-obj', '🛶 ' + (d.texte || '')), el('span', 'jf-prog', d.prog || ''));
+      const bas = el('div', 'jf-bas'), e1 = el('span', 'jf-e1');
+      const R = 10.5, C = 2 * Math.PI * R, v = rate ? 0 : ok ? 1 : Math.max(0, Math.min(1, d.val || 0));
+      const couleur = ok ? '#ffd86b' : d.etat === 'danger' ? '#f0a63a' : '#7fc4e8';
+      e1.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="${R}" fill="none" stroke="rgba(255,255,255,.14)" stroke-width="2"/><circle cx="12" cy="12" r="${R}" fill="none" stroke="${couleur}" stroke-width="2" stroke-linecap="round" stroke-dasharray="${(C * (effets.val0 ?? v)).toFixed(2)} ${C.toFixed(2)}" transform="rotate(-90 12 12)"/></svg>`;
+      const s1 = el('span', 'jf-et' + (ok ? ' or' : ''), '★'); e1.append(s1);
+      if (rate) e1.append(el('span', 'jf-croix', '✕'));
+      const piste = el('div', 'jf-piste'), max = Math.max(trois * 1.12, d.score, 1);
+      const rempli = el('div', 'jf-rempli'); rempli.style.width = (100 * Math.min(1, (effets.score0 ?? d.score) / max)) + '%'; piste.append(rempli);
+      const crans = {};
+      if (deux && trois) for (const [i, seuil] of [[2, deux], [3, trois]]) {
+        const atteint = d.score >= seuil && !rate;
+        const c = el('span', 'jf-cran' + (i === 3 ? ' trois' : '') + (atteint ? ' atteint' : '')); c.style.left = (100 * seuil / max) + '%';
+        const rond = el('span', 'jf-rond'); rond.append(el('span', 'jf-et' + (atteint ? ' or' : ''), i === 2 ? '★★' : '★★★'));
+        c.append(rond, el('small', null, String(seuil))); piste.append(c); crans[i] = c;
+      }
+      const sc = el('span', 'jf-score'); sc.append(String(d.score), el('small', null, 'pts'));
+      bas.append(e1, piste, sc);
+      j.append(haut, bas);
+      j.setAttribute('aria-label', `${d.texte} : ${d.prog}. Score ${d.score}.`);
+      // Les barres glissent jusqu'à leur nouvelle valeur.
+      if (effets.score0 !== undefined || effets.val0 !== undefined) requestAnimationFrame(() => requestAnimationFrame(() => {
+        rempli.style.width = (100 * Math.min(1, d.score / max)) + '%';
+        const cercle = e1.querySelectorAll('circle')[1]; if (cercle) cercle.setAttribute('stroke-dasharray', `${(C * v).toFixed(2)} ${C.toFixed(2)}`);
+      }));
+      if (effets.plus) { const p = el('div', 'jf-plus', '+' + effets.plus.n); if (effets.plus.label) p.append(el('small', null, effets.plus.label)); j.append(p); setTimeout(() => p.remove(), 1500); }
+      for (const i of effets.etoiles || []) {
+        const cible = i === 1 ? e1 : crans[i]; if (!cible) continue;
+        const et = cible.querySelector('.jf-et'); setTimeout(() => { if (!sansAnim) et.classList.add('jf-pop'); rayons(i === 1 ? e1 : cible); }, 350);
+      }
+      if (effets.bulle) { const b = el('div', 'jf-bulle' + (effets.bulle.ton ? ' ' + effets.bulle.ton : ''), effets.bulle.texte); j.append(b); setTimeout(() => b.remove(), 2300); }
+      if (effets.secoue && !sansAnim) { j.classList.remove('secoue'); void j.offsetWidth; j.classList.add('secoue'); }
+    }
+    // Ce que tu viens de faire, d'après la table : « qualifié 2e », « victoire », ou les cartes que tu as fait piocher.
+    function raison() {
+      const v = vueActuelle, m = v && v.manche;
+      if (v && v.etat === 'finPartie' && v.vainqueur === v.moi) return 'victoire';
+      const r = m && m.qualifies ? m.qualifies.findIndex((q) => q.joueur === v.moi) : -1;
+      return r >= 0 ? (r === 0 ? 'qualifié 1er' : `qualifié ${r + 1}e`) : '';
+    }
+    return {
+      debut(e) { etape = e; avant = null; quand = 0; dessiner({ score: 0, prog: '', val: 0, etat: 'en_cours', texte: e.texte, seuils: e.seuils }); },
+      maj(d) {
+        const a = avant, ef = {}, sl = d.seuils || {}, type = etape && etape.objectif && etape.objectif.type;
+        avant = d;
+        if (a) {
+          if (d.score > a.score) { ef.plus = { n: d.score - a.score, label: raison() }; ef.score0 = a.score; }
+          if (d.val !== a.val) ef.val0 = a.etat === 'rate' ? 0 : a.etat === 'ok' ? 1 : a.val;
+          const etoiles = [];
+          if (d.etat !== 'rate') for (const [i, seuil] of [[2, sl.deux], [3, sl.trois]]) if (seuil && a.score < seuil && d.score >= seuil) etoiles.push(i);
+          if (d.etat === 'ok' && a.etat !== 'ok') etoiles.unshift(1);
+          ef.etoiles = etoiles;
+          const n = 1 + (d.score >= sl.deux ? 1 : 0) + (d.score >= sl.trois ? 1 : 0);
+          if (d.etat === 'rate' && a.etat !== 'rate') { ef.bulle = { texte: 'Objectif raté : plus d\'étoile possible', ton: 'echec' }; ef.secoue = true; }
+          else if (d.etat === 'ok' && a.etat !== 'ok') { ef.bulle = { texte: '★'.repeat(n) + ' Objectif réussi !', ton: 'bien' }; }
+          else if (etoiles.includes(3)) ef.bulle = { texte: '★★★ 3e étoile !' };
+          else if (etoiles.includes(2)) ef.bulle = { texte: '★★ 2e étoile !' };
+          else if (d.etat === 'danger' && a.etat !== 'danger') ef.bulle = { texte: type === 'ramasser' ? 'Attention : plus le droit de ramasser' : type === 'pioche' ? 'Attention : plus le droit de piocher' : 'Attention : l\'objectif est en danger', ton: 'alerte' };
+          else if (d.prog !== a.prog && d.val > a.val && d.etat === 'en_cours') ef.bulle = { texte: '✓ ' + d.prog, ton: 'bien' };
+          if (ef.bulle || ef.plus) quand = Date.now();
+        }
+        dessiner(d, ef);
+      },
+      // La jauge vient-elle de bouger ? (la fin d'étape attend qu'on ait vu l'étoile s'allumer)
+      recente: () => Date.now() - quand < 1500,
+      retirer() { etape = avant = null; const j = $('jaugeFleuve'); if (j) j.remove(); },
+      // Le téléphone tourne : la jauge change de place.
+      replacer() { if ($('jaugeFleuve') && avant) dessiner(avant); },
+    };
+  })();
+  window.addEventListener('resize', () => jaugeFleuve.replacer());
   function pagaiesEl(p) {
     const z = el('div', 'fl-pagaies'); z.title = `${p.restantes} pagaie${p.restantes > 1 ? 's' : ''} sur ${p.max}`;
     for (let i = 0; i < p.max; i++) {
@@ -11795,6 +11936,7 @@ svg .vb { transform-box: view-box; }
     const adv = e.joueurs - 1;
     z.append(el('p', null, `${F.jeuNom} contre ${adv} robot${adv > 1 ? 's' : ''} ${ROBOTS_NOMS[e.robots] || ''}${e.robots === 'forts' && e.force >= 15 ? ' (très forts)' : ''}.`));
     for (const p of e.pieges || []) z.append(el('div', 'fl-piege', '⚠ ' + p.texte));
+    if (e.premierCoup) z.append(preuveFleuve(e.premierCoup));
     const s = el('div', 'fl-seuils');
     const ligne = (et, t) => { const l = el('div'); l.append(el('span', null, et), t); s.append(l); };
     ligne('★', 'Réussis l\'objectif');
@@ -11845,6 +11987,26 @@ svg .vb { transform-box: view-box; }
     entrerServeur(p, { fleuve: cle, numero: n });
   }
 
+  // « Du premier coup » (fleuve.md) : avant l'étape, la part des joueurs qui l'ont réussie à leur premier essai ;
+  // à la fin d'un premier essai, ta place parmi eux. pct null : moins de 5 joueurs, étape toute neuve.
+  function preuveFleuve(pc, r) {
+    const z = el('div', 'fl-preuve' + (r && r.reussi ? ' or' : '')), d = el('div'), pct = pc.pct;
+    if (!r) {
+      if (pct === null) { z.append(el('b', null, '🌱')); d.append(pc.joueurs ? 'Étape toute neuve : encore peu de joueurs l\'ont tentée.' : 'Étape toute neuve : personne ne l\'a encore tentée.', el('small', null, 'Sois parmi les premiers à la réussir.')); }
+      else { z.append(el('b', null, pct + ' %')); d.append('des pagayeurs l\'ont réussie du premier coup.', el('small', null, `Sur ${pc.joueurs} joueurs qui l'ont tentée.`)); }
+    } else if (r.reussi) {
+      z.append(el('b', null, '🎯'));
+      if (pct === null) d.append('Du premier coup ! Tu es parmi les premiers à passer cette étape.');
+      else if (pct < 50) d.append(`Du premier coup ! Seuls ${pct} % des pagayeurs y arrivent.`, el('small', null, 'Tu fais partie des meilleurs sur cette étape.'));
+      else d.append(`Du premier coup ! Comme ${pct} % des pagayeurs.`);
+    } else {
+      if (pct === null) return null;
+      z.append(el('b', null, (100 - pct) + ' %')); d.append('des pagayeurs ont aussi raté leur premier essai.', el('small', null, 'Pas de honte : retente ta chance.'));
+    }
+    z.append(d);
+    return z;
+  }
+
   // Fin d'une étape : étoiles, pièces, pagaies, et la suite.
   async function resultatFleuve(r) {
     const F = FLEUVES[r.fleuve] || FLEUVES.congo, z = el('div', 'mj');
@@ -11862,6 +12024,7 @@ svg .vb { transform-box: view-box; }
       else c.textContent = '💰';
     }
     z.append(el('h2', null, r.reussi ? (r.escale && r.premiereFois ? `${r.ville} est passée !` : 'Étape réussie !') : r.parti ? 'Étape abandonnée' : 'Pas cette fois…'), st);
+    if (r.premierEssai && r.premierCoup && !r.parti) { const p = preuveFleuve(r.premierCoup, r); if (p) z.append(p); }
     z.append(el('p', null, r.texte + (r.reussi ? ' : réussi.' : ' : raté.')));
     if (r.reussi) {
       z.append(el('small', 'muted', `Score ${r.score} · ★★ à ${r.seuils.deux} · ★★★ à ${r.seuils.trois}`));
@@ -14634,8 +14797,8 @@ svg .vb { transform-box: view-box; }
   $('btnAnnuler').onclick = quitter;
   $('btnPasserFin').onclick = () => { $('btnPasserFin').hidden = true; envoyer({ type: 'passerFin' }); };
   $('btnQuitter').onclick = () => demanderConfirmation(
-    hote ? "Tu es l'hôte : si tu quittes, la partie s'arrête pour tout le monde." : $('pillFleuve') ? 'Quitter l\'étape compte comme un échec : tu perds une pagaie.' : (vueActuelle && vueActuelle.etat === 'manche' ? 'Tu ne pourras pas revenir dans cette partie avec un autre code.' : 'Tu quittes la partie.'),
-    () => { const etape = !!$('pillFleuve'); quitter(); if (etape) { toast('Étape abandonnée : une pagaie perdue.', 'alerte'); setTimeout(() => window.majCarteFleuve && window.majCarteFleuve(), 800); } });
+    hote ? "Tu es l'hôte : si tu quittes, la partie s'arrête pour tout le monde." : $('jaugeFleuve') ? 'Quitter l\'étape compte comme un échec : tu perds une pagaie.' : (vueActuelle && vueActuelle.etat === 'manche' ? 'Tu ne pourras pas revenir dans cette partie avec un autre code.' : 'Tu quittes la partie.'),
+    () => { const etape = !!$('jaugeFleuve'); quitter(); if (etape) { toast('Étape abandonnée : une pagaie perdue.', 'alerte'); setTimeout(() => window.majCarteFleuve && window.majCarteFleuve(), 800); } });
   $('btnWhatsappSalon').onclick = () => {
     const v = vueActuelle; if (!v) return;
     ouvrirWhatsApp(texteTable(v.jeu, v.code, lienPartie(v.code, v.jeu)));
@@ -14780,7 +14943,7 @@ svg .vb { transform-box: view-box; }
   window.__kopo = { get vue() { return vueActuelle; }, monId, MODE_SERVEUR };
   window.kopoReaction = (emoji) => envoyer({ type: 'reaction', emoji }); // pour les émojis rapides (écoute : événement « kopo-reaction »)
   if (LOCAL) window.__kopo.afficher = afficher; // tests des animations
-  if (new URLSearchParams(location.search).has('test')) Object.assign(window.__kopo, { envoyer, imageVictoire, imageCahier }); // tests automatiques
+  if (new URLSearchParams(location.search).has('test')) Object.assign(window.__kopo, { envoyer, imageVictoire, imageCahier, jaugeFleuve }); // tests automatiques
 })();
 </script>
 </body>

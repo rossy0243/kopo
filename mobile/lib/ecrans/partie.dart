@@ -13,7 +13,7 @@ import '../commun/theme.dart';
 import '../etat.dart';
 import '../fenetres/cahier.dart';
 import '../fenetres/communes.dart';
-import '../fenetres/fleuve.dart' show PastilleFleuve;
+import '../fenetres/fleuve.dart' show JaugeFleuve, EffetsJaugeFleuve, lienJaugeFleuve;
 import '../fenetres/parametres.dart';
 import '../fenetres/partie_fenetres.dart';
 import '../fenetres/social.dart';
@@ -36,7 +36,12 @@ class Partie extends StatelessWidget {
     final contenu = paysage ? _Paysage(v, m, inter, jeJoue) : _Portrait(v, m, inter, jeJoue);
     // Qui parle (abonnés Kopo+ en vocal), sous l'en-tête, sans pousser la table.
     final parleurs = Positioned(top: MediaQuery.of(context).padding.top + 54, left: 0, right: 0, child: IgnorePointer(child: BandeauParleurs(v)));
-    if (v['enPause'] != true) return Stack(children: [Positioned.fill(child: contenu), parleurs]);
+    // Le Fleuve : la bulle et le « +4 » sous la jauge, par-dessus la table.
+    final effets = app.directFleuve == null ? null : Positioned(left: 0, top: 0, child: CompositedTransformFollower(
+      link: lienJaugeFleuve, showWhenUnlinked: false, targetAnchor: Alignment.bottomCenter, followerAnchor: Alignment.topCenter, offset: const Offset(0, 6),
+      child: IgnorePointer(child: EffetsJaugeFleuve(app.effetFleuve)),
+    ));
+    if (v['enPause'] != true) return Stack(children: [Positioned.fill(child: contenu), parleurs, ?effets]);
     // Partie en pause : la table est voilée jusqu'à « Reprendre ».
     return Stack(children: [
       Positioned.fill(child: contenu),
@@ -106,6 +111,11 @@ class _Entete extends StatelessWidget {
       logo,
       const SizedBox(width: 10),
       Expanded(child: info),
+      // Le Fleuve, téléphone couché : la jauge des étoiles dans l'en-tête, pour ne rien cacher de la table.
+      if (paysage && app.directFleuve != null) ...[
+        Flexible(flex: 0, child: ConstrainedBox(constraints: BoxConstraints(maxWidth: math.min(430, math.max(220, w * .4))), child: CompositedTransformTarget(link: lienJaugeFleuve, child: JaugeFleuve(app.directFleuve!, effet: app.effetFleuve, compacte: true)))),
+        const SizedBox(width: 8),
+      ],
       BoutonsMicro(v),
       const SizedBox(width: 6),
       BoutonTete(icone: 'reglages', aide: 'Paramètres', petit: petit, onTap: ouvrirParametres),
@@ -232,7 +242,6 @@ class _Paysage extends StatelessWidget {
           ),
         // L'en-tête, par-dessus la table
         Positioned(left: math.max(10.0, pad.left), right: math.max(10.0, pad.right), top: pad.top + 6, child: _Entete(v, true)),
-        if (app.objectifFleuve != null) Positioned(left: 0, right: 0, top: pad.top + 50, child: IgnorePointer(child: Center(child: PastilleFleuve(app.objectifFleuve!)))),
       ]);
     });
   }
@@ -324,7 +333,7 @@ class _PortraitState extends State<_Portrait> {
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           _Entete(v, false),
           const SizedBox(height: 8),
-          if (app.objectifFleuve != null) ...[Center(child: PastilleFleuve(app.objectifFleuve!)), const SizedBox(height: 8)],
+          if (app.directFleuve != null) ...[CompositedTransformTarget(link: lienJaugeFleuve, child: JaugeFleuve(app.directFleuve!, effet: app.effetFleuve)), const SizedBox(height: 8)],
           Expanded(
             child: SingleChildScrollView(
               child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [

@@ -47,6 +47,8 @@ function publicEtape(fleuve, r, version) {
   };
 }
 
+const MIN_PREMIER = 5; // joueurs qu'il faut sur une étape avant d'afficher « X % l'ont réussie du premier coup »
+
 function creerFleuve(base, reglages, comptes, social = null) {
   const cfg = () => reglages.get('fleuve') || {};
   const recette = () => G.completerRecette(reglages.get('fleuveRecette'));
@@ -91,6 +93,16 @@ function creerFleuve(base, reglages, comptes, social = null) {
     return (await q.query('SELECT coalesce(max(numero), 0)::int AS n FROM fleuve_etapes WHERE fleuve = $1 AND publie', [fleuve])).rows[0].n;
   }
   // Étape courante : la première étape publiée pas encore réussie (null : tout est fini, la suite arrive).
+  // Réussite du premier coup sur une étape (fleuve.md, « Du premier coup ») : parmi les joueurs qui l'ont tentée,
+  // part de ceux dont le premier essai a réussi. Un essai coupé par un redémarrage ne compte pas.
+  // pct : null tant que moins de MIN_PREMIER joueurs l'ont tentée (étape toute neuve).
+  async function premierCoup(fleuve, numero, q = base) {
+    const r = (await q.query(`SELECT count(*)::int AS n, count(*) FILTER (WHERE statut = 'reussi')::int AS ok FROM (
+        SELECT DISTINCT ON (compte_id) compte_id, statut FROM fleuve_essais WHERE fleuve = $1 AND numero = $2 AND statut NOT IN ('en_cours', 'coupe') ORDER BY compte_id, id) t`, [fleuve, numero])).rows[0];
+    const n = r ? r.n : 0;
+    return { joueurs: n, pct: n >= MIN_PREMIER ? Math.round((100 * r.ok) / n) : null };
+  }
+
   function courante(etoiles, publiees) {
     for (let n = 1; n <= publiees; n++) if (!(etoiles.get(n) > 0)) return n;
     return null;
@@ -241,7 +253,7 @@ function creerFleuve(base, reglages, comptes, social = null) {
       const etoiles = await etoilesDuJoueur(compte.id, fleuve);
       const raison = refus(etoiles, await dernierePubliee(fleuve), numero);
       const p = await pagaiesDe(compte.id);
-      return { ...publicEtape(fleuve, recetteDe(r), r.version), etoiles: etoiles.get(numero) || 0, refus: raison, pagaies: p, villeEtoiles: estEscale(numero) ? etoilesVille(etoiles, numero) : null, etoilesVille: seuilVille() };
+      return { ...publicEtape(fleuve, recetteDe(r), r.version), etoiles: etoiles.get(numero) || 0, refus: raison, pagaies: p, villeEtoiles: estEscale(numero) ? etoilesVille(etoiles, numero) : null, etoilesVille: seuilVille(), premierCoup: await premierCoup(fleuve, numero) };
     },
 
     // Entrée dans la salle d'une étape : tout est vérifié ici (Google, ouverture, pagaies, ordre des étapes).
@@ -342,6 +354,9 @@ function creerFleuve(base, reglages, comptes, social = null) {
           if (!avant) Object.assign(out, await apresReussite(q, compteId, e.fleuve, e.numero));
         }
         out.pagaies = await pagaiesDe(compteId, q);
+        // Premier essai sur cette étape ? Alors la fin le compare aux autres joueurs.
+        out.premierEssai = (await q.query("SELECT count(*)::int AS n FROM fleuve_essais WHERE compte_id = $1 AND fleuve = $2 AND numero = $3 AND id < $4 AND statut NOT IN ('en_cours', 'coupe')", [compteId, e.fleuve, e.numero, e.id])).rows[0].n === 0;
+        if (out.premierEssai) out.premierCoup = await premierCoup(e.fleuve, e.numero, q);
         return out;
       }).then((out) => {
         // Alertes envoyées après l'enregistrement, sans faire attendre le joueur.

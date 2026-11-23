@@ -2559,6 +2559,15 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.deepStrictEqual([e.ouvert, e.pagaies.restantes, e.fleuves.congo.courante, e.fleuves.congo.etapes.length, e.fleuves.niger.courante], [true, 5, 1, 50, null]);
     const d2 = (await api('/api/fleuve/congo/2', { jeton: gF.jeton })).json;
     assert.match(d2.refus, /d'abord/);
+    assert.deepStrictEqual(d2.premierCoup, { joueurs: 0, pct: null }, 'étape toute neuve');
+    // « X % l'ont réussie du premier coup » : seul le premier essai de chacun compte, à partir de 5 joueurs.
+    const ids = (await srv.base.query('SELECT id FROM comptes ORDER BY id LIMIT 5')).rows.map((x) => x.id);
+    const essai = (id, statut) => srv.base.query("INSERT INTO fleuve_essais (compte_id, fleuve, numero, version, statut) VALUES ($1, 'congo', 3, 1, $2)", [id, statut]);
+    for (const [i, st] of [[0, 'reussi'], [1, 'rate'], [1, 'reussi'], [2, 'coupe'], [2, 'reussi'], [3, 'parti']]) await essai(ids[i], st);
+    assert.deepStrictEqual((await api('/api/fleuve/congo/3', { jeton: gF.jeton })).json.premierCoup, { joueurs: 4, pct: null }, 'moins de 5 joueurs');
+    await essai(ids[4], 'rate');
+    assert.deepStrictEqual((await api('/api/fleuve/congo/3', { jeton: gF.jeton })).json.premierCoup, { joueurs: 5, pct: 40 });
+    await srv.base.query("DELETE FROM fleuve_essais WHERE fleuve = 'congo' AND numero = 3");
     const inv = await invite('SansGF' + Date.now() % 1000);
     await assert.rejects(new Client(URL_.replace('http', 'ws')).create('fleuve', { jeton: inv.jeton, fleuve: 'congo', numero: 1 }), /Google/);
     await assert.rejects(new Client(URL_.replace('http', 'ws')).create('fleuve', { jeton: gF.jeton, fleuve: 'congo', numero: 2 }), /d'abord/);
@@ -2566,9 +2575,10 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
   await test('Fleuve : une étape jouée dans la salle, jusqu\'au résultat', async () => {
     const client = new Client(URL_.replace('http', 'ws'));
     const salle = await client.create('fleuve', { jeton: gF.jeton, fleuve: 'congo', numero: 1, rapide: true });
-    let debut = null, fin = null, robots = 0;
+    let debut = null, fin = null, robots = 0, finDirect = null;
+    const directs = [];
     salle.onMessage('erreur', () => {});
-    salle.onMessage('fleuve', (m) => { if (m.fin) fin = m; else debut = m; });
+    salle.onMessage('fleuve', (m) => { if (m.fin) { fin = m; finDirect = directs[directs.length - 1]; } else if (m.direct) directs.push(m.direct); else debut = m; });
     salle.onMessage('vue', (v) => {
       robots = v.joueurs.filter((j) => j.robot).length;
       const a = v.manche && (v.manche.actions.find((x) => x.type === 'jouer') || v.manche.actions.find((x) => x.type !== 'katapss'));
@@ -2580,8 +2590,32 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.ok(fin, 'résultat reçu');
     assert.strictEqual(robots, debut.etape.joueurs - 1);
     const e = (await api('/api/fleuve', { jeton: gF.jeton })).json;
+    // La jauge en direct : dès le départ, puis à chaque changement ; la dernière annonce le verdict de la fin.
+    assert.ok(directs.length >= 1 && directs[0].texte === debut.etape.texte && directs[0].seuils, 'jauge au départ');
+    assert.deepStrictEqual([finDirect.etat === 'ok', finDirect.score], [fin.reussi, fin.score], 'jauge = verdict');
+    assert.ok(directs.every((d, i) => i === 0 || d.score >= directs[i - 1].score), 'le score ne recule jamais');
+    // Premier essai sur l'étape : la fin le compare aux autres (étape toute neuve ici : pas encore de pourcentage).
+    assert.deepStrictEqual([fin.premierEssai, fin.premierCoup], [true, { joueurs: 1, pct: null }]);
     if (fin.reussi) assert.deepStrictEqual([fin.etoiles >= 1, fin.pagaies.restantes, e.fleuves.congo.courante, fin.double, fin.pieces], [true, 5, 2, true, fin.etoiles * 10]);
     else assert.deepStrictEqual([fin.etoiles, fin.pagaies.restantes, e.fleuves.congo.courante], [0, 4, 1]);
+  });
+  await test('Fleuve : jauge en direct, objectif en danger puis raté', () => {
+    const sv = FS.creerSuivi('a', { jeu: 'kopo', objectif: { type: 'ramasser', n: 1, m: 3 } });
+    const m = { sieges: ['a', 'b', 'c'], mains: { a: ['5C'], b: ['6C'], c: ['7C'] }, enJeu: ['a', 'b', 'c'], joueurCourant: 'b', qualifies: [] };
+    const s = { joueurs: [{ id: 'a' }, { id: 'b' }, { id: 'c' }], restants: ['a', 'b', 'c'], elimines: [], manche: m, etat: 'manche' };
+    sv.observer(s);
+    assert.deepStrictEqual(sv.direct(), { score: 0, prog: 'ramassé 0/1', val: 0, etat: 'en_cours' });
+    sv.surAction(s, m, { joueur: 'a', type: 'ramasser' }, null, 'a'); sv.observer(s);
+    assert.strictEqual(sv.direct().etat, 'danger');
+    m.qualifies = [{ joueur: 'a' }]; sv.observer(s);
+    assert.deepStrictEqual(sv.direct(), { score: 2, prog: 'ramassé 1/1', val: 0.33, etat: 'danger' });
+    sv.surAction(s, m, { joueur: 'a', type: 'ramasser' }, null, 'a'); sv.observer(s);
+    assert.deepStrictEqual(sv.direct(), { score: 2, prog: 'ramassé 2/1', val: 0.33, etat: 'rate' });
+    const q = FS.creerSuivi('a', { jeu: 'kopo', objectif: { type: 'manches', n: 1 } });
+    const m2 = { ...m, qualifies: [] }; q.observer({ ...s, manche: m2 });
+    assert.deepStrictEqual(q.direct(), { score: 0, prog: '0/1', val: 0, etat: 'en_cours' });
+    m2.qualifies = [{ joueur: 'b' }, { joueur: 'a' }]; q.observer({ ...s, manche: m2 });
+    assert.deepStrictEqual(q.direct(), { score: 1, prog: '1/1 ✓', val: 1, etat: 'ok' });
   });
   await test('Fleuve : une étape du Niger (Inter (8)) jouée dans la salle', async () => {
     const e = await FG.fabriquerEtape('niger', 1, { recette: recetteRapide, graine: 12345 });
@@ -2590,7 +2624,7 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     const salle = await client.create('fleuve', { jeton: gF.jeton, fleuve: 'niger', numero: 1, rapide: true });
     let debut = null, fin = null, jeu = null;
     salle.onMessage('erreur', () => {});
-    salle.onMessage('fleuve', (m) => { if (m.fin) fin = m; else debut = m; });
+    salle.onMessage('fleuve', (m) => { if (m.fin) fin = m; else if (!m.direct) debut = m; });
     salle.onMessage('vue', (v) => {
       jeu = v.jeu || jeu;
       const a = v.manche && v.manche.actions && (v.manche.actions.find((x) => x.type === 'jouer') || v.manche.actions[0]);

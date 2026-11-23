@@ -7,6 +7,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../commun/apparences.dart';
+import '../commun/jauge.dart';
 import '../commun/retention.dart';
 import '../commun/stock.dart';
 import '../commun/theme.dart';
@@ -134,15 +135,198 @@ void _partager(String cle) {
 }
 
 /// L'objectif de l'étape, rappelé pendant la partie.
-class PastilleFleuve extends StatelessWidget {
-  final String texte;
-  const PastilleFleuve(this.texte, {super.key});
+/// La jauge des étoiles en direct pendant une étape (fleuve.md, « Les étoiles en direct »), comme sur le site :
+/// l'objectif et son avancée, la 1re étoile dans un anneau, la barre du score avec les crans ★★ et ★★★, le score.
+/// Téléphone droit : en haut de la table ; couché : dans l'en-tête ([compacte]). La bulle et le « +4 » sont
+/// dessinés à part par [EffetsJaugeFleuve], par-dessus la table, accrochés sous la jauge ([lienJaugeFleuve]).
+final lienJaugeFleuve = LayerLink();
+const _fleuveBleu = Color(0xFF7FC4E8);
+
+double _ease(double x) => 1 - math.pow(1 - x.clamp(0.0, 1.0), 3).toDouble();
+double _pop(double age) => age < 0 ? 1 : age < .28 ? 1 + .7 * _ease(age / .28) : age < .7 ? 1.7 - .7 * _ease((age - .28) / .42) : 1;
+
+/// Rejoue l'animation à chaque nouvel effet (même horloge pour la jauge et ses effets).
+mixin _HorlogeEffet<T extends StatefulWidget> on State<T>, SingleTickerProviderStateMixin<T> {
+  late final AnimationController horloge = AnimationController(vsync: this, duration: const Duration(milliseconds: 2300), value: 1);
+  int? _vu;
+  void suivre(EffetJauge? e) {
+    if (e == null || e.id == _vu) return;
+    _vu = e.id;
+    if (app.sansAnim) { horloge.value = 1; } else { horloge.forward(from: 0); }
+  }
+  double get t => horloge.value * 2.3; // secondes depuis l'effet
   @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        decoration: BoxDecoration(color: const Color(0xEB10233A), borderRadius: BorderRadius.circular(99), border: Border.all(color: const Color(0xFF7FC4E8))),
-        child: Text('🛶 $texte', maxLines: 1, overflow: TextOverflow.ellipsis, style: K.texte(12.5)),
+  void dispose() { horloge.dispose(); super.dispose(); }
+}
+
+class JaugeFleuve extends StatefulWidget {
+  final Map d;
+  final EffetJauge? effet;
+  final bool compacte;
+  const JaugeFleuve(this.d, {super.key, this.effet, this.compacte = false});
+  @override
+  State<JaugeFleuve> createState() => _JaugeFleuveEtat();
+}
+
+class _JaugeFleuveEtat extends State<JaugeFleuve> with SingleTickerProviderStateMixin, _HorlogeEffet {
+  @override
+  void initState() { super.initState(); suivre(widget.effet); }
+  @override
+  void didUpdateWidget(JaugeFleuve old) { super.didUpdateWidget(old); suivre(widget.effet); }
+
+  Widget _etoile(String txt, bool allumee, double taille, double echelle) => Transform.scale(
+        scale: echelle,
+        child: Text(txt, style: TextStyle(fontSize: taille, height: 1, letterSpacing: -1, color: allumee ? _or : Colors.white.withValues(alpha: .22), shadows: allumee ? const [Shadow(color: Color(0x99FFD86B), blurRadius: 8)] : null)),
       );
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(animation: horloge, builder: (context, _) {
+        final d = widget.d, e = widget.effet, c = widget.compacte;
+        final etat = '${d['etat']}', ok = etat == 'ok', rate = etat == 'rate';
+        final sl = (d['seuils'] as Map?) ?? const {};
+        final deux = _n(sl['deux']), trois = _n(sl['trois']), score = _n(d['score']);
+        final k = e == null ? 1.0 : _ease(t / .6); // la barre et l'anneau glissent en 0,6 s
+        final scoreVu = e == null ? score.toDouble() : e.score0 + (score - e.score0) * k;
+        final valCible = rate ? 0.0 : ok ? 1.0 : (d['val'] is num ? (d['val'] as num).toDouble() : 0.0);
+        final valVu = e == null ? valCible : e.val0 + (valCible - e.val0) * k;
+        final max = math.max(trois * 1.12, math.max(score.toDouble(), 1.0));
+        final bord = switch (etat) { 'ok' => K.good, 'danger' => K.warn, 'rate' => K.bad, _ => _fleuveBleu };
+        double pop(int i) => e != null && e.etoiles.contains(i) ? _pop(t - .35) : 1.0;
+        bool rayons(int i) => e != null && e.etoiles.contains(i) && t > .35 && t < 1.25 && !app.sansAnim;
+        final r1 = c ? 19.0 : 24.0, rc = c ? 18.0 : 24.0, epais = c ? 6.0 : 8.0;
+        final secoue = e != null && e.secoue && t < .45 ? math.sin(t * 40) * 6 * (1 - t / .45) : 0.0;
+        return Transform.translate(
+          offset: Offset(secoue, 0),
+          child: Container(
+            padding: EdgeInsets.fromLTRB(c ? 9 : 10, c ? 3 : 6, c ? 9 : 10, c ? 4 : 7),
+            decoration: BoxDecoration(color: const Color(0xF010233A), borderRadius: BorderRadius.circular(c ? 11 : 14), border: Border.all(color: bord), boxShadow: c ? null : const [BoxShadow(color: Color(0x59000000), blurRadius: 18, offset: Offset(0, 6))]),
+            child: Semantics(
+              liveRegion: true,
+              label: '${d['texte']} : ${d['prog']}. Score $score.',
+              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Row(children: [
+                  Expanded(child: Text('🛶 ${d['texte'] ?? ''}', maxLines: 1, overflow: TextOverflow.ellipsis, style: K.texte(c ? 11 : 12.5))),
+                  const SizedBox(width: 8),
+                  if ('${d['prog'] ?? ''}'.isNotEmpty)
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: c ? 6 : 8, vertical: c ? 0 : 1),
+                      decoration: BoxDecoration(color: bord.withValues(alpha: .2), borderRadius: BorderRadius.circular(99)),
+                      child: Text('${d['prog']}', style: K.texte(c ? 10.5 : 12, couleur: Color.lerp(bord, Colors.white, .25)!, poids: FontWeight.w700)),
+                    ),
+                ]),
+                SizedBox(height: c ? 2 : 6),
+                Row(children: [
+                  SizedBox(width: r1, height: r1, child: Stack(clipBehavior: Clip.none, alignment: Alignment.center, children: [
+                    CustomPaint(size: Size(r1, r1), painter: _Anneau(valVu, ok ? _or : etat == 'danger' ? K.warn : _fleuveBleu)),
+                    if (rayons(1)) CustomPaint(size: Size(r1, r1), painter: _Rayons((t - .35) / .9)),
+                    _etoile('★', ok, c ? 13 : 17, pop(1)),
+                    if (rate) Text('✕', style: K.texte(c ? 16 : 20, couleur: K.bad, poids: FontWeight.w800)),
+                  ])),
+                  const SizedBox(width: 8),
+                  Expanded(child: LayoutBuilder(builder: (context, place) {
+                    final w = place.maxWidth - 12;
+                    return SizedBox(height: rc + (c ? 0 : 10), child: Stack(clipBehavior: Clip.none, children: [
+                      Positioned(left: 0, right: 12, top: rc / 2 - epais / 2, height: epais, child: Container(decoration: BoxDecoration(color: Colors.white.withValues(alpha: .1), borderRadius: BorderRadius.circular(99)))),
+                      Positioned(left: 0, width: w * (scoreVu / max).clamp(0.0, 1.0), top: rc / 2 - epais / 2, height: epais,
+                          child: Container(decoration: BoxDecoration(borderRadius: BorderRadius.circular(99), gradient: rate ? null : const LinearGradient(colors: [_fleuveBleu, _or]), color: rate ? Colors.white.withValues(alpha: .22) : null))),
+                      if (deux > 0 && trois > 0)
+                        for (final (i, seuil) in [(2, deux), (3, trois)])
+                          Positioned(left: w * seuil / max - rc / 2, top: 0, width: rc, child: Column(children: [
+                            Stack(clipBehavior: Clip.none, alignment: Alignment.center, children: [
+                              Container(
+                                width: rc, height: rc, alignment: Alignment.center,
+                                decoration: BoxDecoration(shape: BoxShape.circle, color: score >= seuil && !rate ? const Color(0xFF2B2A1C) : K.table, border: Border.all(color: score >= seuil && !rate ? _or : Colors.white.withValues(alpha: .25), width: 1.5)),
+                                child: _etoile(i == 2 ? '★★' : '★★★', score >= seuil && !rate, i == 2 ? (c ? 7.5 : 9.5) : (c ? 6 : 7.5), pop(i)),
+                              ),
+                              if (rayons(i)) CustomPaint(size: Size(rc, rc), painter: _Rayons((t - .35) / .9)),
+                            ]),
+                            if (!c) Text('$seuil', style: K.texte(9.5, couleur: K.muted, poids: FontWeight.w600)),
+                          ])),
+                    ]));
+                  })),
+                  const SizedBox(width: 6),
+                  Text.rich(TextSpan(children: [TextSpan(text: '$score', style: K.texte(c ? 12 : 14, poids: FontWeight.w700)), TextSpan(text: ' pts', style: K.texte(10, couleur: K.muted, poids: FontWeight.w600))])),
+                ]),
+              ]),
+            ),
+          ),
+        );
+      });
+}
+
+/// La bulle (« ★★ 2e étoile ! ») et le « +4 qualifié 1er » sous la jauge, par-dessus la table.
+class EffetsJaugeFleuve extends StatefulWidget {
+  final EffetJauge? effet;
+  const EffetsJaugeFleuve(this.effet, {super.key});
+  @override
+  State<EffetsJaugeFleuve> createState() => _EffetsJaugeFleuveEtat();
+}
+
+class _EffetsJaugeFleuveEtat extends State<EffetsJaugeFleuve> with SingleTickerProviderStateMixin, _HorlogeEffet {
+  @override
+  void initState() { super.initState(); suivre(widget.effet); }
+  @override
+  void didUpdateWidget(EffetsJaugeFleuve old) { super.didUpdateWidget(old); suivre(widget.effet); }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(animation: horloge, builder: (context, _) {
+        final e = widget.effet;
+        if (e == null || horloge.value >= 1) return const SizedBox(width: 300);
+        final fond = switch (e.ton) { 'bien' => K.good, 'alerte' => K.warn, 'echec' => K.bad, _ => _or };
+        final ob = t < .2 ? t / .2 : t > 1.9 ? ((2.2 - t) / .3).clamp(0.0, 1.0) : 1.0;
+        final op = t < .15 ? t / .15 : t > 1.0 ? ((1.4 - t) / .4).clamp(0.0, 1.0) : 1.0;
+        return SizedBox(width: 300, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          if (e.bulle != null && t < 2.2)
+            Opacity(opacity: ob, child: Center(child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+              decoration: BoxDecoration(color: fond, borderRadius: BorderRadius.circular(99), boxShadow: const [BoxShadow(color: Color(0x73000000), blurRadius: 16, offset: Offset(0, 6))]),
+              child: Text(e.bulle!, style: K.texte(13, couleur: const Color(0xFF1A0E02), poids: FontWeight.w700)),
+            )))
+          else
+            const SizedBox(height: 28),
+          if (e.plus != null && t < 1.4)
+            Transform.translate(offset: Offset(0, 6 - 20 * _ease(t / 1.4)), child: Opacity(opacity: op, child: Align(alignment: Alignment.centerRight, child: Container(
+              margin: const EdgeInsets.only(top: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 1),
+              decoration: BoxDecoration(color: K.encre, borderRadius: BorderRadius.circular(99), border: Border.all(color: _or.withValues(alpha: .6))),
+              child: Text.rich(TextSpan(children: [
+                TextSpan(text: '+${e.plus}', style: K.texte(15, couleur: _or, poids: FontWeight.w800)),
+                if (e.plusLabel.isNotEmpty) TextSpan(text: '  ${e.plusLabel}', style: K.texte(11, poids: FontWeight.w600)),
+              ])),
+            )))),
+        ]));
+      });
+}
+
+class _Anneau extends CustomPainter {
+  final double v;
+  final Color c;
+  _Anneau(this.v, this.c);
+  @override
+  void paint(Canvas canvas, Size s) {
+    final r = Rect.fromLTWH(1.5, 1.5, s.width - 3, s.height - 3);
+    canvas.drawArc(r, 0, math.pi * 2, false, Paint()..style = PaintingStyle.stroke..strokeWidth = 2..color = Colors.white.withValues(alpha: .14));
+    if (v > 0) canvas.drawArc(r, -math.pi / 2, math.pi * 2 * v.clamp(0.0, 1.0), false, Paint()..style = PaintingStyle.stroke..strokeWidth = 2..strokeCap = StrokeCap.round..color = c);
+  }
+  @override
+  bool shouldRepaint(covariant _Anneau o) => o.v != v || o.c != c;
+}
+
+/// Les rayons d'une étoile qui s'allume (k : 0 → 1).
+class _Rayons extends CustomPainter {
+  final double k;
+  _Rayons(this.k);
+  @override
+  void paint(Canvas canvas, Size s) {
+    final p = Paint()..color = _or.withValues(alpha: (1 - k).clamp(0.0, 1.0))..strokeWidth = 3..strokeCap = StrokeCap.round;
+    final c = s.center(Offset.zero), d = 10 + 22 * _ease(k);
+    for (var i = 0; i < 10; i++) {
+      final a = i * math.pi / 5, u = Offset(math.sin(a), -math.cos(a));
+      canvas.drawLine(c + u * d, c + u * (d + 6), p);
+    }
+  }
+  @override
+  bool shouldRepaint(covariant _Rayons o) => o.k != k;
 }
 
 Widget _pagaies(Map p, {Key? key, bool perte = false}) {
@@ -475,6 +659,40 @@ Widget _ligneEtoiles(int n, {double taille = 34}) => Row(mainAxisAlignment: Main
       for (var i = 0; i < 3; i++) Padding(padding: const EdgeInsets.symmetric(horizontal: 3), child: Text('★', style: TextStyle(fontSize: taille, height: 1, color: i < n ? _or : const Color(0x2EFFFFFF)))),
     ]);
 
+/// « Du premier coup » (fleuve.md), comme sur le site : avant l'étape, la part des joueurs qui l'ont réussie à
+/// leur premier essai ; à la fin d'un premier essai ([r]), ta place parmi eux. pct null : étape toute neuve.
+Widget? preuveFleuve(Map pc, {Map? r}) {
+  final pct = pc['pct'] == null ? null : _n(pc['pct']), joueurs = _n(pc['joueurs']);
+  final reussi = r != null && r['reussi'] == true;
+  String grand, texte;
+  String? petit;
+  if (r == null) {
+    if (pct == null) { grand = '🌱'; texte = joueurs > 0 ? "Étape toute neuve : encore peu de joueurs l'ont tentée." : "Étape toute neuve : personne ne l'a encore tentée."; petit = 'Sois parmi les premiers à la réussir.'; }
+    else { grand = '$pct %'; texte = "des pagayeurs l'ont réussie du premier coup."; petit = "Sur $joueurs joueurs qui l'ont tentée."; }
+  } else if (reussi) {
+    grand = '🎯';
+    if (pct == null) { texte = 'Du premier coup ! Tu es parmi les premiers à passer cette étape.'; }
+    else if (pct < 50) { texte = 'Du premier coup ! Seuls $pct % des pagayeurs y arrivent.'; petit = 'Tu fais partie des meilleurs sur cette étape.'; }
+    else { texte = 'Du premier coup ! Comme $pct % des pagayeurs.'; }
+  } else {
+    if (pct == null) return null;
+    grand = '${100 - pct} %'; texte = 'des pagayeurs ont aussi raté leur premier essai.'; petit = 'Pas de honte : retente ta chance.';
+  }
+  final teinte = reussi ? _or : _fleuveBleu;
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    decoration: BoxDecoration(color: teinte.withValues(alpha: .12), borderRadius: BorderRadius.circular(12), border: Border.all(color: teinte.withValues(alpha: .4))),
+    child: Row(children: [
+      Text(grand, style: K.titre(26, couleur: reussi ? _or : const Color(0xFF9FD8F2))),
+      const SizedBox(width: 10),
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(texte, style: K.texte(13.5)),
+        if (petit != null) Text(petit, style: K.texte(11.5, couleur: K.muted)),
+      ])),
+    ]),
+  );
+}
+
 Future<void> ouvrirEtapeFleuve(String cle, int n) async {
   Map e;
   try { e = await Api.get('/fleuve/$cle/$n') as Map; } catch (x) { app.toast(messageErreur(x), Niv.echec); return; }
@@ -501,6 +719,7 @@ Future<void> ouvrirEtapeFleuve(String cle, int n) async {
         const Ecart(6),
         Muet('${F.jeuNom} contre $adv robot${adv > 1 ? 's' : ''} ${_robotsNoms[e['robots']] ?? ''}${e['robots'] == 'forts' && _n(e['force']) >= 15 ? ' (très forts)' : ''}.', taille: 15, align: TextAlign.center),
         for (final x in pieges) Padding(padding: const EdgeInsets.only(top: 4), child: Text('⚠ ${x['texte']}', textAlign: TextAlign.center, style: K.texte(13, couleur: K.warn))),
+        if (e['premierCoup'] is Map) ...[const Ecart(10), ?preuveFleuve(e['premierCoup'] as Map)],
         const Ecart(10),
         Container(
           padding: const EdgeInsets.all(10),
@@ -604,6 +823,7 @@ Future<void> resultatFleuve(Map r) async {
               ),
           ]),
         ),
+        if (r['premierEssai'] == true && r['premierCoup'] is Map && r['parti'] != true) ...[const Ecart(10), ?preuveFleuve(r['premierCoup'] as Map, r: r)],
         const Ecart(8),
         Text('${r['texte']}${reussi ? ' : réussi.' : ' : raté.'}', textAlign: TextAlign.center, style: K.texte(15)),
         if (reussi) ...[

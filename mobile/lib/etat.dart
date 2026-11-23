@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 import 'commun/cartes.dart';
+import 'commun/jauge.dart';
 import 'commun/retention.dart';
 import 'commun/sons.dart';
 import 'commun/stickers.dart';
@@ -118,6 +119,11 @@ class App extends ChangeNotifier {
   /// Le Fleuve : état des deux cartes (GET /fleuve), et l'objectif de l'étape en cours (affiché pendant la partie).
   Map<String, dynamic>? etatFleuve;
   String? objectifFleuve;
+  /// La jauge des étoiles en direct : l'étape en cours, sa dernière avancée et l'effet à jouer (commun/jauge.dart).
+  Map? etapeFleuve, directFleuve;
+  EffetJauge? effetFleuve;
+  int _idEffet = 0;
+  DateTime _effetQuand = DateTime(2000);
   int amisEnLigne = 0, demandesAmi = 0;
   String? ligueResume;
   bool pointLigue = false, pointJour = false;
@@ -814,11 +820,27 @@ class App extends ChangeNotifier {
         case 'fleuve':
           if (d is Map) {
             if (d['fin'] == true) {
-              _depart = true; quitter();
-              Timer(const Duration(milliseconds: 250), () { if (d['erreur'] != null) { toast(d['erreur'].toString(), Niv.echec); } else { resultatFleuveUi?.call(d); } });
+              // On laisse d'abord la jauge montrer la dernière étoile gagnée (ou l'objectif raté).
+              _depart = true;
+              final attente = DateTime.now().difference(_effetQuand).inMilliseconds < 1500 ? 1700 : 0;
+              Timer(Duration(milliseconds: attente), () {
+                quitter();
+                Timer(const Duration(milliseconds: 250), () { if (d['erreur'] != null) { toast(d['erreur'].toString(), Niv.echec); } else { resultatFleuveUi?.call(d); } });
+              });
+            } else if (d['direct'] is Map && !_depart) {
+              final n = d['direct'] as Map;
+              final type = ((etapeFleuve ?? const {})['objectif'] as Map?)?['type']?.toString();
+              final e = effetJauge(directFleuve, n, type, vue, ++_idEffet);
+              directFleuve = n;
+              if (e != null) { effetFleuve = e; if (e.visible) _effetQuand = DateTime.now(); }
+              objectifFleuve ??= n['texte']?.toString(); // retour après une coupure
+              maj();
             } else if (d['debut'] == true && d['etape'] is Map) {
               final t = (d['etape'] as Map)['texte']?.toString() ?? '';
               objectifFleuve = t;
+              etapeFleuve = d['etape'] as Map;
+              directFleuve = {'score': 0, 'prog': '', 'val': 0, 'etat': 'en_cours', 'texte': t, 'seuils': etapeFleuve!['seuils']};
+              effetFleuve = null;
               toast(d['adoucir'] == true ? "$t · robots un peu moins forts aujourd'hui" : t);
               maj();
             }
@@ -871,6 +893,8 @@ class App extends ChangeNotifier {
     if (s != null) { s.quitter().catchError((_) => 1000); }
     vocal.arreter();
     objectifFleuve = null;
+    etapeFleuve = directFleuve = null;
+    effetFleuve = null;
     vue = vueAvant = null;
     _minuteurFenetre?.cancel();
     robotsAComposer = false;

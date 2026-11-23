@@ -267,6 +267,7 @@ class SalleKopo extends Room {
     const r = this.S.recevoir(s, id, { type: 'lancer' });
     if (!r.ok) console.error('Fleuve : lancement refusé', r.erreur);
     client.send('fleuve', { debut: true, etape: f.public, adoucir: f.adoucir > 0 });
+    this.directFleuve(true);
   }
 
   // Suit l'étape : quand l'objectif est jugé (atteint, raté, ou partie finie), le résultat part au service.
@@ -274,7 +275,21 @@ class SalleKopo extends Room {
     const f = this.fl;
     if (!f || f.termine || !f.suivi) return;
     f.suivi.observer(this.salle);
+    this.directFleuve();
     if (f.suivi.fini()) this.terminerFleuve();
+  }
+
+  // La jauge en direct : l'avancée de l'étape part au joueur dès qu'elle change (texte et seuils compris :
+  // un joueur qui revient après une coupure retrouve sa jauge).
+  directFleuve(forcer = false) {
+    const f = this.fl;
+    if (!f || !f.suivi || !f.compteId) return;
+    const d = f.suivi.direct();
+    const cle = JSON.stringify(d);
+    if (cle === f.dernierDirect && !forcer) return;
+    f.dernierDirect = cle;
+    const c = this.clientsParId.get(f.compteId);
+    if (c) try { c.send('fleuve', { direct: { ...d, texte: f.public.texte, seuils: f.public.seuils || null } }); } catch (e) {}
   }
 
   terminerFleuve({ parti = false } = {}) {
@@ -381,7 +396,7 @@ class SalleKopo extends Room {
     // Match du jour : la table est fixée par le serveur (robots, donne), pas de revanche ni de réglages.
     if (this.fl && ['lancer', 'ajouterRobot', 'niveauRobot', 'retirer', 'remplacerParRobot', 'reglages', 'revanche', 'revancheNon', 'rejouer', 'passerFin', 'passerPause', 'enPause'].includes(type)) { client.send('erreur', 'Pas pendant une étape du Fleuve.'); return; }
     if (this.jour && ['lancer', 'ajouterRobot', 'niveauRobot', 'retirer', 'remplacerParRobot', 'reglages', 'revanche', 'revancheNon', 'rejouer', 'passerFin', 'passerPause', 'enPause'].includes(type)) { client.send('erreur', 'Pas pendant le Match du jour.'); return; }
-    if (type === 'sync') { client.send('vue', this.vuePour(id)); return; } // la page demande sa vue dès qu'elle écoute
+    if (type === 'sync') { client.send('vue', this.vuePour(id)); if (this.fl && this.fl.compteId === id && !this.fl.termine) this.directFleuve(true); return; } // la page demande sa vue dès qu'elle écoute
     if (type === 'reaction') { // chat : seulement les messages choisis dans le tableau de bord
       const liste = SalleKopo.services.reglages.get('messagesRapides') || [];
       if (!liste.includes(typeof msg.emoji === 'string' ? msg.emoji.trim() : '')) { client.send('erreur', 'Ce message n\'est plus proposé.'); return; }
