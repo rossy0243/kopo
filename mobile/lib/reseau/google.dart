@@ -28,8 +28,10 @@ class Google {
     final f = Uri.splitQueryString(u.fragment.isNotEmpty ? u.fragment : u.query);
     final jeton = f['access_token'];
     if (jeton != null && jeton.isNotEmpty) {
+      if (_iPhone) closeInAppWebView().catchError((_) {});
       app.finirConnexionGoogle(jeton);
     } else if (f['error_description'] != null) {
+      if (_iPhone) closeInAppWebView().catchError((_) {});
       app.toast('Connexion Google annulée.', Niv.alerte);
     }
     // Liens du site : ?parrain=CODE, ?bande=CODE, #CODE (une table).
@@ -40,12 +42,16 @@ class Google {
     if (RegExp(r'^[A-Z0-9]{6}$').hasMatch(bande)) app.noterBande(bande);
   }
 
+  /// Sur iPhone, la page Google s'ouvre dans l'appli (fenêtre Safari intégrée) et se referme au retour :
+  /// Apple refuse les applis qui envoient le joueur dans Safari pour se connecter (règle 4.0).
+  static bool get _iPhone => !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
+
   /// supabaseUrl : config.google (l'origine du projet Supabase).
   static Future<void> connecter(String supabaseUrl) async {
     final origine = Uri.parse(supabaseUrl).origin;
     final retour = kIsWeb ? Uri.base.replace(fragment: '', query: '').toString() : retourAppli;
     final url = Uri.parse('$origine/auth/v1/authorize?provider=google&redirect_to=${Uri.encodeComponent(retour)}');
-    final ok = await launchUrl(url, mode: kIsWeb ? LaunchMode.platformDefault : LaunchMode.externalApplication, webOnlyWindowName: kIsWeb ? '_self' : null);
+    final ok = await launchUrl(url, mode: kIsWeb ? LaunchMode.platformDefault : (_iPhone ? LaunchMode.inAppBrowserView : LaunchMode.externalApplication), webOnlyWindowName: kIsWeb ? '_self' : null);
     if (!ok) app.toast("Impossible d'ouvrir la connexion Google.", Niv.echec);
   }
 }
