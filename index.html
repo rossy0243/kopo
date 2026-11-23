@@ -8154,7 +8154,7 @@ svg .vb { transform-box: view-box; }
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = '30cb9d7cc32d'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = '6e2bbf9e3caa'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: true };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // La musique des menus était coupée par défaut : on l'allume une fois pour tous (le joueur peut la recouper).
@@ -11243,7 +11243,7 @@ svg .vb { transform-box: view-box; }
     fermer.onclick = fermerFenetre;
     const pass = el('button', 'btn large', 'Parcours de saison');
     pass.onclick = ouvrirParcours;
-    ouvrirFenetre([el('h2', null, 'Ligue'), z, pass, regle, fermer], 'ligue');
+    ouvrirFenetre([el('h2', null, 'Ligue'), z, ...(fleuveLance() ? [] : [pass]), regle, fermer], 'ligue'); // parcours de saison remplacé par le Fleuve
     charger('amis');
   }
   // Accueil : l'onglet Ligue existe avec le serveur ; un point s'allume si une saison s'est terminée.
@@ -11276,8 +11276,8 @@ svg .vb { transform-box: view-box; }
   // Cartes de l'accueil : « Match du jour » (score, ou temps restant) et « La Bande » (ma place).
   async function majCartesCompetition() {
     majCarteFleuve();
-    $('btnMatchJour').hidden = $('btnBande').hidden = !MODE_SERVEUR || jeuChoisi() === 'inter8'; // Kopo seulement
-    if (!MODE_SERVEUR) return;
+    $('btnMatchJour').hidden = $('btnBande').hidden = !MODE_SERVEUR || jeuChoisi() === 'inter8' || fleuveLance(); // Kopo seulement, retirés au lancement du Fleuve
+    if (!MODE_SERVEUR || fleuveLance()) return;
     if (!compteLocal()) return proposerLienBande(); // lien de Bande ouvert sur un téléphone sans compte
     try {
       const e = etatJour = await apiJoueur('/match-jour');
@@ -11667,10 +11667,13 @@ svg .vb { transform-box: view-box; }
   // Une seule fois par appareil, sur l'accueil, quand le tableau de bord l'allume (réglage « nouveaute »).
   // Pas pour les tout nouveaux joueurs (écran de bienvenue) ni pour ceux qui arrivent par un lien de Bande.
   // Ensuite : badges NOUVEAU sur les deux cartes pendant 7 jours, et un seul rappel à J+2 si pas de Bande.
-  const NOUVEAUTE = 'bande';
-  const lireNouveaute = () => { const v = stock.lire('kopo-nouveaute-vue'); return v && v.id === NOUVEAUTE ? v : null; };
-  const ecrireNouveaute = (x) => stock.ecrire('kopo-nouveaute-vue', Object.assign({ id: NOUVEAUTE, le: Date.now() }, lireNouveaute() || {}, x));
-  const nouveauteAllumee = () => MODE_SERVEUR && !!(configServeur && configServeur.nouveaute === NOUVEAUTE);
+  // La nouveauté du moment : 'fleuve' dès le lancement du Fleuve (il remplace la Bande), sinon 'bande'.
+  const nouveauteId = () => (configServeur && configServeur.nouveaute) || 'bande';
+  const lireNouveaute = () => { const v = stock.lire('kopo-nouveaute-vue'); return v && v.id === nouveauteId() ? v : null; };
+  const ecrireNouveaute = (x) => stock.ecrire('kopo-nouveaute-vue', Object.assign({ id: nouveauteId(), le: Date.now() }, lireNouveaute() || {}, x));
+  const nouveauteAllumee = () => MODE_SERVEUR && !!(configServeur && configServeur.nouveaute);
+  // Le Fleuve est lancé : la Bande et le Match du jour ont disparu de l'accueil.
+  function fleuveLance() { return MODE_SERVEUR && !!(configServeur && configServeur.fleuveLance); }
   const avecGoogle = () => { const c = compteLocal(); return !!(c && c.compte && c.compte.google); };
   // Heure de Kinshasa (UTC+1) : jour de la semaine (0 = dimanche) et heure, pour les heures limites d'inscription.
   function momentKinshasa() { const d = new Date(Date.now() + 36e5); return { jour: d.getUTCDay(), heure: d.getUTCHours() }; }
@@ -11683,6 +11686,13 @@ svg .vb { transform-box: view-box; }
   }
   function annonceNouveaute() {
     if (!nouveauteAllumee() || lireNouveaute()) return false;
+    if (nouveauteId() === 'fleuve') {
+      if (configServeur.fleuve !== 'ouvert') return false;
+      ecrireNouveaute({});
+      majBadgesNouveaute();
+      apiJoueur('/fleuve').then((e) => { etatFleuve = e; }).catch(() => {}).finally(() => fenetreNouveauteFleuve(0));
+      return true;
+    }
     if (stock.lire('kopo-bande-lien')) { ecrireNouveaute({ saute: true }); return false; } // il va directement dans sa Bande
     ecrireNouveaute({});
     stock.ecrire('kopo-jour-explique', true); // remplace les 3 bulles de la première fois
@@ -11748,8 +11758,62 @@ svg .vb { transform-box: view-box; }
       if (dx < -50 && etape < 2) fenetreNouveaute(etape + 1); else if (dx > 50 && etape > 0) fenetreNouveaute(etape - 1);
     };
   }
-  // Badges NOUVEAU : 7 jours après la fenêtre, jusqu'à ce que le joueur touche la carte.
+  // Fenêtre « Nouveau » du lancement du Fleuve (fleuve.md « L'annonce ») : 3 écrans, une seule fois.
+  function fenetreNouveauteFleuve(etape) {
+    const fermer = () => { fermerFenetre(); suiteAccueil(); };
+    const points = el('div', 'nv-points'); for (let i = 0; i < 3; i++) points.append(el('i', i === etape ? 'on' : null));
+    const p = (...morceaux) => { const x = el('p'); for (const m of morceaux) x.append(Array.isArray(m) ? el('b', null, m[0]) : m); return x; };
+    let contenu;
+    if (etape === 0) {
+      const illu = el('div', 'nv-illu nv-fleuve');
+      illu.append(el('div', 'nv-cases', '🌊 🛶 ① ② ③ … 🏙️'), el('div', 'nv-petit', 'Le Congo pour le Kopo · le Niger pour l\'Inter (8)'));
+      contenu = [el('span', 'nv-badge', 'NOUVEAU'), el('h2', null, 'Le Fleuve'),
+        p(['Remonte le fleuve étape par étape.'], ' Chaque étape est une petite partie contre des robots, avec un objectif. Jusqu\'à 3 étoiles par étape.'),
+        illu, el('div', 'nv-petit', '5 pagaies par jour : réussir ne coûte rien, rater coûte 1 pagaie.')];
+    } else if (etape === 1) {
+      const pod = el('div', 'nv-podium');
+      const ligne = (e, b, t) => { const d = el('div'); d.append(el('span', 'e', e)); const s2 = el('span'); s2.append(el('b', null, b), ' ' + t); d.append(s2); pod.append(d); };
+      ligne('🛶', 'Tes amis sur la carte', ': vois où ils en sont et passe devant');
+      ligne('🏁', 'La course de la semaine', ': le plus d\'étoiles entre amis gagne 300 pièces');
+      ligne('⛵', 'Premier à une ville', ': la marque reste sur ton profil');
+      contenu = [el('span', 'nv-badge', 'NOUVEAU'), el('h2', null, 'Tes amis rament avec toi'), pod, el('div', 'nv-petit', 'Personne ne mise, personne ne perd de pièces.')];
+    } else {
+      const rendu = etatFleuve && etatFleuve.rembourse > 0 ? etatFleuve.rembourse : 0;
+      const z = [el('h2', null, 'La Bande s\'arrête')];
+      if (rendu) { const g = el('div', 'nv-score', '+' + formatPieces(rendu)); g.append(el('small', null, ' pièces')); z.push(g, p('Ta mise de la semaine ', ['t\'a été rendue'], '.')); }
+      z.push(p('La Bande et le Match du jour laissent la place au Fleuve. La Ligue reste.'));
+      if (avecGoogle()) { const go = el('button', 'btn principal large', 'Embarquer'); go.onclick = () => { ecrireNouveaute({ fleuveVu: true }); majBadgesNouveaute(); fermerFenetre(); ouvrirFleuve(); }; z.push(go); }
+      else {
+        const cfg = configServeur || {};
+        z.push(p('Connecte-toi avec Google pour embarquer.'));
+        if (cfg.google) { const g = el('button', 'btn principal large', 'Se connecter avec Google'); g.onclick = () => connexionGoogle(cfg.google); z.push(g); }
+      }
+      const tard = el('button', 'nv-lien', 'Plus tard'); tard.onclick = fermer;
+      contenu = [...z, points, tard];
+    }
+    if (etape < 2) {
+      const passer = el('button', 'nv-passer', 'Passer'); passer.onclick = fermer;
+      const go = el('button', 'btn principal large', 'Suivant'); go.onclick = () => fenetreNouveauteFleuve(etape + 1);
+      contenu = [passer, ...contenu, points, go];
+    }
+    ouvrirFenetre(contenu, 'nouveaute');
+    const f = $('fenetre'); let x0 = null;
+    f.ontouchstart = (e) => { x0 = e.touches[0].clientX; };
+    f.ontouchend = (e) => {
+      if (x0 === null || f.dataset.type !== 'nouveaute') return;
+      const dx = e.changedTouches[0].clientX - x0; x0 = null;
+      if (dx < -50 && etape < 2) fenetreNouveauteFleuve(etape + 1); else if (dx > 50 && etape > 0) fenetreNouveauteFleuve(etape - 1);
+    };
+  }
+  // Badges NOUVEAU : 7 jours après la fenêtre (le Fleuve : 7 jours après son lancement), jusqu'à ce que le joueur touche la carte.
   function majBadgesNouveaute() {
+    if (nouveauteId() === 'fleuve') {
+      const v = lireNouveaute() || {}, b = $('btnFleuve'); let x = b.querySelector('.badge-nouveau');
+      const montrer = fleuveLance() && Date.now() - Date.parse(configServeur.fleuveLance) < 7 * 864e5 && !v.fleuveVu;
+      if (montrer && !x) { x = el('span', 'badge-nouveau', 'NOUVEAU'); b.append(x); }
+      if (x) x.hidden = !montrer;
+      return;
+    }
     const v = lireNouveaute(), frais = !!(v && Date.now() - v.le < 7 * 864e5);
     for (const [id, cle] of [['btnMatchJour', 'jourVu'], ['btnBande', 'bandeVu']]) {
       const b = $(id); let x = b.querySelector('.badge-nouveau');
@@ -11758,6 +11822,7 @@ svg .vb { transform-box: view-box; }
       if (x) x.hidden = !montrer;
     }
   }
+  $('btnFleuve').addEventListener('click', () => { if (nouveauteId() === 'fleuve') { ecrireNouveaute({ fleuveVu: true }); majBadgesNouveaute(); } });
   $('btnMatchJour').addEventListener('click', () => { if (lireNouveaute()) { ecrireNouveaute({ jourVu: true }); majBadgesNouveaute(); } });
   $('btnBande').addEventListener('click', () => { if (lireNouveaute()) { ecrireNouveaute({ bandeVu: true }); majBadgesNouveaute(); } });
   // Rappel unique, deux jours après : connecté avec Google, dans aucune Bande, inscriptions encore ouvertes.
@@ -12119,6 +12184,7 @@ svg .vb { transform-box: view-box; }
     if (x) remplirRecapParcours(x);
   });
   function remplirRecapParcours(x) {
+    if (fleuveLance()) return; // remplacé par le Fleuve (les objets gagnés restent)
     if (!dernierParcours || Date.now() - dernierParcours.recu > 60000) return;
     const d = dernierParcours.detail;
     x.querySelector('.parcours-recap')?.remove();
@@ -14204,7 +14270,7 @@ svg .vb { transform-box: view-box; }
     $('btnCahier').hidden = jeu !== 'inter8';
     $('btnLigue').hidden = jeu === 'inter8' || !MODE_SERVEUR;
     // Match du jour et Bande : Kopo seulement, les cartes disparaissent avec Inter (8) (14/11).
-    $('btnMatchJour').hidden = $('btnBande').hidden = jeu === 'inter8' || !MODE_SERVEUR;
+    $('btnMatchJour').hidden = $('btnBande').hidden = jeu === 'inter8' || !MODE_SERVEUR || fleuveLance();
     if (window.majCarteFleuve) window.majCarteFleuve(false); // Le Fleuve : Congo pour Kopo, Niger pour Inter (8)
     const r = $('btnRegles'); if (r && r.lastChild) r.lastChild.textContent = jeu === 'inter8' ? 'Règles Inter' : 'Règles';
   }

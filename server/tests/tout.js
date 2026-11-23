@@ -2693,6 +2693,35 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     await srv.reglages.ecrire('fleuve', { ...DEFAUTS.fleuve });
   });
 
+  await test('Fleuve : le lancement ferme la Bande (mises rendues), arrête le Match du jour, ouvre le Fleuve, une seule fois', async () => {
+    const F = srv.fleuve;
+    const ga = await connexionG('sb-fleuve-g', { providerId: 'g-fleuve-g' }), gb = await connexionG('sb-fleuve-h', { providerId: 'g-fleuve-h' });
+    const lundi = require('../src/match-jour').lundiDe(require('../src/match-jour').jourDe(new Date()));
+    await srv.base.query("INSERT INTO bandes (id, nom, code, createur, mise) VALUES ('b-lance', 'Les Pagayeurs', 'LANCE1', $1, 700)", [ga.compte.id]);
+    await srv.base.query("INSERT INTO bande_semaines (bande_id, semaine, mise) VALUES ('b-lance', $1, 700)", [lundi]);
+    for (const g of [ga, gb]) {
+      await srv.base.query("INSERT INTO bande_inscriptions (bande_id, semaine, compte_id, mise) VALUES ('b-lance', $1, $2, 700)", [lundi, g.compte.id]);
+    }
+    const solde = async (g) => Number((await srv.comptes.statut(g.compte.id)).solde);
+    const avantA = await solde(ga);
+    assert.strictEqual((await api('/admin/api/fleuve/lancer', { methode: 'POST', jeton: adminJeton, corps: {} })).statut, 400, 'confirmation obligatoire');
+    const r = await api('/admin/api/fleuve/lancer', { methode: 'POST', jeton: adminJeton, corps: { confirmation: 'LANCER' } });
+    assert.strictEqual(r.statut, 200);
+    assert.ok(r.json.joueurs >= 2 && r.json.pieces >= 1400);
+    assert.strictEqual(await solde(ga), avantA + 700);
+    assert.strictEqual((await srv.base.query("SELECT statut FROM bande_semaines WHERE bande_id = 'b-lance'")).rows[0].statut, 'annulee');
+    assert.deepStrictEqual([srv.reglages.get('bande').actif, srv.reglages.get('matchJour').actif, srv.reglages.get('fleuve').etat], [false, false, 'ouvert']);
+    const cfg = (await api('/api/config')).json;
+    assert.deepStrictEqual([cfg.fleuve, cfg.nouveaute, !!cfg.fleuveLance], ['ouvert', 'fleuve', true]);
+    assert.strictEqual((await api('/api/fleuve', { jeton: gb.jeton })).json.rembourse, 700);
+    await attendre(200);
+    assert.ok((await srv.base.query("SELECT 1 FROM notifications WHERE compte_id = $1 AND type = 'bande' AND donnees->>'fermeture' = 'true'", [gb.compte.id])).rows.length);
+    assert.strictEqual((await api('/admin/api/fleuve/lancer', { methode: 'POST', jeton: adminJeton, corps: { confirmation: 'LANCER' } })).statut, 409, 'une seule fois');
+    // Les réglages gardent la date du lancement quand l'admin change autre chose.
+    await api('/admin/api/reglages/fleuve', { methode: 'PUT', jeton: adminJeton, corps: { valeur: { ...DEFAUTS.fleuve, etat: 'ouvert', pagaies: 6 } } });
+    assert.ok(srv.reglages.get('fleuve').lance);
+    assert.ok((await api('/admin/api/journal', { jeton: adminJeton })).json.some((x) => x.action === 'fleuve:lancer'));
+  });
   await srv.arreter();
   console.log(`\n${reussis} tests réussis, ${echecs} en échec.`);
   process.exit(echecs ? 1 : 0);
