@@ -2,7 +2,7 @@
 // Chaque étape est une petite partie contre des robots avec un objectif ; 1 à 3 étoiles ; 5 pagaies par jour,
 // communes aux deux fleuves, et une pagaie ne se perd qu'en cas d'échec. Le serveur garde tout.
 'use strict';
-const { jourDe, debutDu, ajouterJours } = require('./match-jour');
+const { jourDe, debutDu, ajouterJours, lundiDe } = require('./match-jour');
 const { texteObjectif, etoilesDe } = require('./fleuve-suivi');
 const G = require('./fleuve-generateur');
 
@@ -37,10 +37,11 @@ function publicEtape(fleuve, r, version) {
   };
 }
 
-function creerFleuve(base, reglages, comptes) {
+function creerFleuve(base, reglages, comptes, social = null) {
   const cfg = () => reglages.get('fleuve') || {};
   const recette = () => G.completerRecette(reglages.get('fleuveRecette'));
   let horloge = () => new Date(); // remplacée dans les tests
+  let coursesReglees = null; // dernière semaine réglée (évite de revérifier chaque minute)
   const travaux = new Map(); // fabrication en cours : 'congo:3' -> { fait, total, erreur, fini }
 
   // Ouvert à ce joueur ? 'ferme' : personne ; 'testeurs' : les pseudos de la liste des testeurs (Réglages > Jeux) ; 'ouvert' : tous.
@@ -76,7 +77,77 @@ function creerFleuve(base, reglages, comptes) {
     for (let n = debut; n < debut + G.ETAPES_PAR_VILLE - 1; n++) t += etoiles.get(n) || 0;
     return t;
   }
-  const seuilVille = () => Math.max(0, Number(cfg().etoilesVille) || 20);
+  const seuilVille = () => { const v = Number(cfg().etoilesVille ?? 20); return Number.isFinite(v) ? Math.max(0, v) : 20; }; // 0 permis (admin)
+  const piecesCourse = () => Math.max(0, Number(cfg().piecesCourse ?? 300) || 0);
+
+  // --- Les amis (fleuve.md « La rivalité entre amis »). Les étapes se réussissent dans l'ordre : le nombre d'étapes
+  // réussies d'un joueur dit où il est (étape courante = réussies + 1).
+  // Amis d'un joueur (ceux qu'il a ajoutés, sans les comptes bloqués, supprimés ou bannis).
+  const AMIS = `SELECT c.id, c.pseudo, c.equipes->>'avatar' AS apparence FROM amis a JOIN comptes c ON c.id = a.ami_id
+    WHERE a.compte_id = $1 AND c.statut NOT IN ('supprime', 'banni')
+      AND NOT EXISTS (SELECT 1 FROM blocages b WHERE (b.compte_id = $1 AND b.bloque_id = c.id) OR (b.compte_id = c.id AND b.bloque_id = $1))`;
+  const debutSemaine = () => debutDu(lundiDe(jourDe(horloge())));
+  async function veutAlertes(q, compteId) {
+    const r = (await q.query('SELECT push_prefs FROM comptes WHERE id = $1', [compteId])).rows[0];
+    return !!r && !(r.push_prefs && r.push_prefs.fleuve === false);
+  }
+  // Où en sont mes amis sur un fleuve, et leurs étoiles de la semaine. Seuls ceux qui ont commencé ce fleuve.
+  async function amisSurLeFleuve(compteId, fleuve, q = base) {
+    const l = (await q.query(`SELECT x.*, 
+        (SELECT count(*) FROM fleuve_etoiles e WHERE e.compte_id = x.id AND e.fleuve = $2)::int AS faites,
+        (SELECT coalesce(sum(e.etoiles), 0) FROM fleuve_etoiles e WHERE e.compte_id = x.id AND e.fleuve = $2)::int AS etoiles,
+        (SELECT coalesce(sum(s.nouvelles), 0) FROM fleuve_essais s WHERE s.compte_id = x.id AND s.fleuve = $2 AND s.statut = 'reussi' AND s.debut >= $3)::int AS semaine
+      FROM (${AMIS}) x`, [compteId, fleuve, debutSemaine()])).rows;
+    const actifs = l.filter((a) => a.faites > 0 || a.semaine > 0);
+    const marques = await marquesDe(actifs.map((a) => a.id), fleuve, q);
+    return actifs.map((a) => ({ ...a, ...(marques.get(a.id) || { premiers: [], pagayeur: false }) }));
+  }
+  // Marques en cours : « 1er à … » (pour toujours) et « Pagayeur de la semaine » (7 jours).
+  async function marquesDe(ids, fleuve, q = base) {
+    const m = new Map();
+    if (!ids.length) return m;
+    const r = await q.query('SELECT compte_id, type, cle, texte FROM fleuve_marques WHERE compte_id = ANY($1) AND fleuve = $2 AND (jusqu IS NULL OR jusqu > $3) ORDER BY cree_le', [ids, fleuve, horloge()]);
+    for (const x of r.rows) {
+      if (!m.has(x.compte_id)) m.set(x.compte_id, { premiers: [], pagayeur: false });
+      const v = m.get(x.compte_id);
+      if (x.type === 'premier') v.premiers.push(x.texte); else if (x.type === 'pagayeur') v.pagayeur = true;
+    }
+    return m;
+  }
+  // Après une première réussite : les amis restés sur cette étape sont dépassés (prévenus une fois par jour au plus),
+  // et le premier de ses amis à passer une escale garde la marque « 1er à … ».
+  async function apresReussite(q, compteId, fleuve, numero) {
+    const out = { depasses: [], premierA: null };
+    const amis = (await q.query(`SELECT x.id, x.pseudo FROM (${AMIS}) x
+      WHERE $3 > 1 AND (SELECT count(*) FROM fleuve_etoiles e WHERE e.compte_id = x.id AND e.fleuve = $2) = $3 - 1`, [compteId, fleuve, numero])).rows; // un ami qui n'a pas commencé n'est pas dépassé
+    out.depasses = amis.map((a) => ({ id: a.id, pseudo: a.pseudo }));
+    if (estEscale(numero)) {
+      const avant = (await q.query(`SELECT 1 FROM (${AMIS}) x JOIN fleuve_etoiles e ON e.compte_id = x.id AND e.fleuve = $2 AND e.numero = $3 LIMIT 1`, [compteId, fleuve, numero])).rows.length;
+      if (!avant) {
+        const ville = villeDeLEtape(fleuve, numero);
+        await q.query(`INSERT INTO fleuve_marques (compte_id, fleuve, type, cle, texte, cree_le) VALUES ($1, $2, 'premier', $3, $4, $5) ON CONFLICT DO NOTHING`, [compteId, fleuve, String(numero), '1er à ' + ville, horloge()]);
+        out.premierA = ville;
+      }
+    }
+    return out;
+  }
+  // Prévient les amis dépassés : une seule alerte « t'a dépassé » par jour et par joueur, coupable dans les paramètres.
+  async function prevenirDepasses(compteId, fleuve, numero, depasses) {
+    if (!social || !depasses.length) return;
+    const moi = (await base.query('SELECT pseudo FROM comptes WHERE id = $1', [compteId])).rows[0];
+    if (!moi) return;
+    for (const a of depasses) {
+      try {
+        if (!(await veutAlertes(base, a.id))) continue;
+        const deja = (await base.query("SELECT 1 FROM notifications WHERE compte_id = $1 AND type = 'fleuve' AND donnees->>'depasse' = 'true' AND cree_le >= $2 LIMIT 1", [a.id, debutDu(jourDe(horloge()))])).rows.length;
+        if (deja) continue;
+        const p = await pagaiesDe(a.id);
+        const texte = `${moi.pseudo} t'a dépassé sur le ${NOMS[fleuve]} (étape ${numero}).`;
+        const push = texte + (p.restantes > 0 ? ` Tu as ${p.restantes} pagaie${p.restantes > 1 ? 's' : ''} pour repasser devant.` : ' Tes pagaies reviennent à minuit.');
+        await social.notifier(a.id, 'fleuve', texte, { depasse: true, de: compteId, pseudo: moi.pseudo, fleuve, numero, push });
+      } catch (e) { console.error('Fleuve, alerte :', e.message); }
+    }
+  }
 
   // Peut-on jouer cette étape ? Renvoie null, ou la raison (texte affiché).
   function refus(etoiles, publiees, numero) {
@@ -112,10 +183,21 @@ function creerFleuve(base, reglages, comptes) {
           etapes.push(e);
         }
         let total = 0; for (const v of etoiles.values()) total += v;
+        const amis = await amisSurLeFleuve(compte.id, fleuve);
+        const mesMarques = (await marquesDe([compte.id], fleuve)).get(compte.id) || { premiers: [], pagayeur: false };
+        const maSemaine = (await base.query("SELECT coalesce(sum(nouvelles), 0)::int AS n FROM fleuve_essais WHERE compte_id = $1 AND fleuve = $2 AND statut = 'reussi' AND debut >= $3", [compte.id, fleuve, debutSemaine()])).rows[0].n;
+        // Course de la semaine : moi et mes amis, au nombre d'étoiles nouvelles gagnées depuis lundi.
+        const course = [{ id: compte.id, pseudo: compte.pseudo, apparence: (compte.equipes && compte.equipes.avatar) || null, etoiles: maSemaine, moi: true, pagayeur: mesMarques.pagayeur },
+          ...amis.filter((a) => a.semaine > 0).map((a) => ({ id: a.id, pseudo: a.pseudo, apparence: a.apparence, etoiles: a.semaine, pagayeur: a.pagayeur }))]
+          .sort((x, y) => y.etoiles - x.etoiles || (x.moi ? -1 : y.moi ? 1 : 0));
         res.fleuves[fleuve] = {
           nom: NOMS[fleuve], jeu: G.FLEUVES[fleuve], courante: c, publiees, bief: biefDe(reference), etoiles: total,
           suiteBientot: c === null || finBief === publiees && biefDe(reference) * G.ETAPES_PAR_BIEF > publiees,
           ville: villeDeLEtape(fleuve, c || reference), etapes,
+          // Mes amis sur la carte : leur étape (null : ils ont fini tout ce qui est publié).
+          amis: amis.map((a) => ({ id: a.id, pseudo: a.pseudo, apparence: a.apparence, n: a.faites >= publiees ? null : a.faites + 1, faites: a.faites, etoiles: a.etoiles, premiers: a.premiers, pagayeur: a.pagayeur })),
+          marques: mesMarques,
+          course: { lignes: course, finMs: debutDu(ajouterJours(lundiDe(jourDe(horloge())), 7)) - horloge(), pieces: piecesCourse(), amis: amis.length },
         };
       }
       return res;
@@ -208,16 +290,69 @@ function creerFleuve(base, reglages, comptes) {
           out.pieces = pieces;
           if (pieces > 0) out.solde = await comptes.mouvement(q, compteId, pieces, 'fleuve', `${e.fleuve}:${e.numero}`);
           out.nouvelles = nouvelles;
+          if (nouvelles > 0) await q.query('UPDATE fleuve_essais SET nouvelles = $2 WHERE id = $1', [e.id, nouvelles]);
           out.biefTermine = !avant && e.numero % G.ETAPES_PAR_BIEF === 0;
+          if (!avant) Object.assign(out, await apresReussite(q, compteId, e.fleuve, e.numero));
         }
         out.pagaies = await pagaiesDe(compteId, q);
+        return out;
+      }).then((out) => {
+        // Alertes envoyées après l'enregistrement, sans faire attendre le joueur.
+        if (out.depasses && out.depasses.length) prevenirDepasses(compteId, out.fleuve, out.numero, out.depasses).catch((e) => console.error('Fleuve :', e.message));
+        if (out.depasses) out.depasses = out.depasses.map((a) => a.pseudo);
         return out;
       });
     },
 
+    // --- Course de la semaine (du lundi au dimanche minuit, heure de Kinshasa), sur chaque fleuve.
+    // Chaque joueur court contre ses amis : il gagne s'il a le plus d'étoiles nouvelles de la semaine parmi eux
+    // (ex æquo : tous gagnent), avec au moins 1 étoile et au moins un ami qui a aussi gagné des étoiles cette semaine.
+    // Prix offert par le jeu (piecesCourse, 300 au départ) et marque « Pagayeur de la semaine » pendant 7 jours.
+    async reglerCourses() {
+      if ((cfg().etat || 'ferme') === 'ferme') return [];
+      const lundi = lundiDe(jourDe(horloge())), semaine = ajouterJours(lundi, -7);
+      if (coursesReglees === semaine) return [];
+      const debut = debutDu(semaine), fin = debutDu(lundi), jusqu = debutDu(ajouterJours(lundi, 7));
+      const faits = [];
+      for (const fleuve of Object.keys(G.FLEUVES)) {
+        const r = await base.transaction(async (q) => {
+          const neuf = (await q.query('INSERT INTO fleuve_courses (fleuve, semaine) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING fleuve', [fleuve, semaine])).rows.length;
+          if (!neuf) return null; // déjà réglée
+          const scores = new Map((await q.query(`SELECT compte_id, sum(nouvelles)::int AS n FROM fleuve_essais
+            WHERE fleuve = $1 AND statut = 'reussi' AND debut >= $2 AND debut < $3 GROUP BY compte_id HAVING sum(nouvelles) > 0`, [fleuve, debut, fin])).rows.map((x) => [x.compte_id, x.n]));
+          if (!scores.size) return { fleuve, gagnants: [] };
+          const liens = (await q.query(`SELECT a.compte_id, a.ami_id FROM amis a JOIN comptes c ON c.id = a.compte_id
+            WHERE a.compte_id = ANY($1) AND a.ami_id = ANY($1) AND c.statut NOT IN ('supprime', 'banni')
+              AND NOT EXISTS (SELECT 1 FROM blocages b WHERE (b.compte_id = a.compte_id AND b.bloque_id = a.ami_id) OR (b.compte_id = a.ami_id AND b.bloque_id = a.compte_id))`, [[...scores.keys()]])).rows;
+          const rivaux = new Map();
+          for (const l of liens) { if (!rivaux.has(l.compte_id)) rivaux.set(l.compte_id, []); rivaux.get(l.compte_id).push(l.ami_id); }
+          const prix = piecesCourse(), gagnants = [];
+          for (const [id, n] of scores) {
+            const autres = rivaux.get(id) || [];
+            if (!autres.length || autres.some((a) => scores.get(a) > n)) continue;
+            gagnants.push({ id, etoiles: n });
+            await q.query(`INSERT INTO fleuve_marques (compte_id, fleuve, type, cle, texte, jusqu, cree_le) VALUES ($1, $2, 'pagayeur', $3, 'Pagayeur de la semaine', $4, $5) ON CONFLICT DO NOTHING`, [id, fleuve, semaine, jusqu, horloge()]);
+            if (prix > 0) await comptes.mouvement(q, id, prix, 'fleuve', `course:${fleuve}:${semaine}`);
+          }
+          await q.query('UPDATE fleuve_courses SET gagnants = $3, pieces = $4 WHERE fleuve = $1 AND semaine = $2', [fleuve, semaine, gagnants.length, prix * gagnants.length]);
+          return { fleuve, gagnants, prix };
+        });
+        if (!r) continue;
+        faits.push(r);
+        if (social) for (const g of r.gagnants) {
+          await social.notifier(g.id, 'fleuve', `Tu es le Pagayeur de la semaine sur le ${NOMS[fleuve]} : ${g.etoiles} étoile${g.etoiles > 1 ? 's' : ''} gagnée${g.etoiles > 1 ? 's' : ''}${r.prix ? `, +${r.prix} pièces` : ''} !`, { course: true, fleuve, semaine, pieces: r.prix }).catch(() => {});
+        }
+      }
+      coursesReglees = semaine;
+      return faits;
+    },
+    // Chaque minute (index.js) : la course de la semaine passée est réglée dès lundi minuit.
+    async tic() { return api.reglerCourses(); },
+
     // --- Admin : biefs, étapes, fabrication, publication, chiffres réels.
     async resumeAdmin() {
-      const out = { reglages: cfg(), recette: recette(), fleuves: {}, travaux: Object.fromEntries(travaux) };
+      const out = { reglages: cfg(), recette: recette(), fleuves: {}, travaux: Object.fromEntries(travaux),
+        courses: (await base.query('SELECT fleuve, semaine, gagnants, pieces FROM fleuve_courses ORDER BY semaine DESC, fleuve LIMIT 8')).rows };
       for (const fleuve of Object.keys(G.FLEUVES)) {
         const biefs = (await base.query(`SELECT bief, count(*)::int AS etapes, bool_and(publie) AS publie, count(*) FILTER (WHERE publie)::int AS publiees
           FROM fleuve_etapes WHERE fleuve = $1 GROUP BY bief ORDER BY bief`, [fleuve])).rows;

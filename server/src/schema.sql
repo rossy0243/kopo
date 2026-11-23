@@ -289,7 +289,7 @@ CREATE TABLE IF NOT EXISTS parrainage_paliers (
 );
 
 ALTER TABLE notifications DROP CONSTRAINT IF EXISTS notifications_type_check;
-ALTER TABLE notifications ADD CONSTRAINT notifications_type_check CHECK (type IN ('rivalite', 'invitation', 'ami', 'parrainage', 'bande', 'cadeau')); -- bande : rappel du Match du jour, fin de semaine ; cadeau : stickers offerts par l'admin
+ALTER TABLE notifications ADD CONSTRAINT notifications_type_check CHECK (type IN ('rivalite', 'invitation', 'ami', 'parrainage', 'bande', 'cadeau', 'fleuve')); -- fleuve : un ami t'a dépassé, course de la semaine ; bande : rappel du Match du jour, fin de semaine ; cadeau : stickers offerts par l'admin
 
 -- ===== Sauvegarde du profil du téléphone (niveau, statistiques, face-à-face, collection) =====
 -- Le profil est calculé sur le téléphone ; sa copie ici le fait revenir sur un autre téléphone,
@@ -519,6 +519,30 @@ CREATE TABLE IF NOT EXISTS fleuve_essais (
 );
 CREATE INDEX IF NOT EXISTS fleuve_essais_compte ON fleuve_essais (compte_id, statut);
 CREATE INDEX IF NOT EXISTS fleuve_essais_etape ON fleuve_essais (fleuve, numero);
+-- Étoiles nouvelles gagnées par l'essai (course de la semaine entre amis).
+ALTER TABLE fleuve_essais ADD COLUMN IF NOT EXISTS nouvelles integer NOT NULL DEFAULT 0;
+CREATE INDEX IF NOT EXISTS fleuve_essais_debut ON fleuve_essais (fleuve, debut);
+-- Marques du profil : « 1er à Kinshasa » (premier de ses amis à passer l'escale, pour toujours) et
+-- « Pagayeur de la semaine » (gagnant de la course entre amis, pendant 7 jours).
+CREATE TABLE IF NOT EXISTS fleuve_marques (
+  compte_id  text NOT NULL REFERENCES comptes(id),
+  fleuve     text NOT NULL,
+  type       text NOT NULL,                        -- premier, pagayeur
+  cle        text NOT NULL,                        -- premier : numéro de l'escale ; pagayeur : lundi de la semaine gagnée
+  texte      text NOT NULL,
+  jusqu      timestamptz,                          -- null : pour toujours
+  cree_le    timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (compte_id, fleuve, type, cle)
+);
+-- Courses de la semaine déjà réglées (une fois par fleuve et par semaine).
+CREATE TABLE IF NOT EXISTS fleuve_courses (
+  fleuve     text NOT NULL,
+  semaine    date NOT NULL,                        -- lundi
+  gagnants   integer NOT NULL DEFAULT 0,
+  pieces     integer NOT NULL DEFAULT 0,
+  regle_le   timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (fleuve, semaine)
+);
 -- Pagaies perdues par jour de Kinshasa (5 par jour, communes aux deux fleuves).
 CREATE TABLE IF NOT EXISTS fleuve_pagaies (
   compte_id  text NOT NULL REFERENCES comptes(id),

@@ -622,6 +622,10 @@ class App extends ChangeNotifier {
         toast(texte);
       case 'ami':
         toast(texte, Niv.succes);
+      case 'fleuve': // un ami t'a dépassé, gagnant de la course de la semaine
+        if (d['course'] == true) Api.get('/moi').then((m) => soldeServeur(m['compte']['solde'])).catchError((_) => null);
+        majFleuve().then((_) => maj());
+        toast(texte, d['course'] == true ? Niv.succes : Niv.info);
       default:
         toast(texte); // rivalité
     }

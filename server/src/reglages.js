@@ -98,7 +98,7 @@ const DEFAUTS = {
   // Bouquets de pièces (argent réel, du moins cher au plus cher, 40 000 FC au plus) : au taux des stickers, bonus croissant.
   bouquets: { bouquets: require('./bouquets').BOUQUETS_DEFAUT },
   // Le Fleuve (fleuve.md) : fermé jusqu'au lancement (ferme, testeurs, ouvert), 5 pagaies par jour, pièces par étoile et par ville.
-  fleuve: { etat: 'ferme', pagaies: 5, piecesEtoile: 5, piecesEscale: 200, etoilesVille: 20, adoucirJours: 5 },
+  fleuve: { etat: 'ferme', pagaies: 5, piecesEtoile: 5, piecesEscale: 200, etoilesVille: 20, adoucirJours: 5, piecesCourse: 300 },
   // Recette qui fabrique les étapes du Fleuve (courbe de difficulté, étoiles, objectifs et pièges débloqués).
   fleuveRecette: require('./fleuve-generateur').RECETTE_DEFAUT,
   messagesRapides: ['👏', '😂', '😮', '🔥', '😡', '👍', '😭', '🙏', 'Bien joué !', 'Bravo !', 'Joli coup !', 'Belle carte !', 'Bien vu !', 'Trop fort !', 'Merci !', 'Désolé !', 'Oups !', 'Aïe !', 'Pas de chance !', 'Je ramasse…', 'Je t’ai eu !', 'Katapss !', 'Vite !', 'Prends ton temps', 'À toi !', 'Encore une !', 'Bonne chance !', 'Bonne partie !', 'GG !', 'Revanche ?', 'On en refait une ?', 'Je reviens', 'Salut tout le monde !', 'À la prochaine !'],
@@ -451,7 +451,7 @@ function creerReglages(base) {
       if (cle === 'bande') valeur = verifierBande(valeur);
       if (cle === 'fleuve') {
         if (!['ferme', 'testeurs', 'ouvert'].includes(valeur.etat)) throw Object.assign(new Error('Le Fleuve : fermé, testeurs ou ouvert.'), { statut: 400 });
-        valeur = { etat: valeur.etat, ...verifierBornes({ ...DEFAUTS.fleuve, ...valeur }, { pagaies: [1, 20, 'Pagaies par jour'], piecesEtoile: [0, 1000, 'Pièces par étoile'], piecesEscale: [0, 10000, 'Pièces par ville'], etoilesVille: [0, 27, 'Étoiles pour le boss'], adoucirJours: [1, 30, 'Jours avant l\'aide'] }) };
+        valeur = { etat: valeur.etat, ...verifierBornes({ ...DEFAUTS.fleuve, ...valeur }, { pagaies: [1, 20, 'Pagaies par jour'], piecesEtoile: [0, 1000, 'Pièces par étoile'], piecesEscale: [0, 10000, 'Pièces par ville'], etoilesVille: [0, 27, 'Étoiles pour le boss'], adoucirJours: [1, 30, 'Jours avant l\'aide'], piecesCourse: [0, 10000, 'Pièces du gagnant de la semaine'] }) };
       }
       if (cle === 'fleuveRecette') valeur = require('./fleuve-generateur').verifierRecette(valeur);
       if (cle === 'cahier') valeur = verifierCahier(valeur);

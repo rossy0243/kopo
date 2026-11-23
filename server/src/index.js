@@ -48,7 +48,7 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
   const matchJour = creerMatchJour(base, reglages, env);
   const bande = creerBande(base, reglages, comptes, matchJour, social);
   const stickers = creerStickers(base, reglages, comptes);
-  const fleuve = creerFleuve(base, reglages, comptes);
+  const fleuve = creerFleuve(base, reglages, comptes, social);
   await fleuve.nettoyer().catch((e) => console.error('Fleuve :', e.message)); // aucune étape n'a survécu au redémarrage
   const bouquets = creerBouquets(base, reglages, comptes);
   const abonnement = creerAbonnement(base, env);
@@ -63,6 +63,9 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
   const minuteurBande = setInterval(() => bande.tic().catch((e) => console.error('Bande :', e.message)), 60e3);
   minuteurBande.unref();
   // Chaque minute : rappel du Match du jour en push (une fois, à 19 h à Kinshasa).
+  // Chaque minute : la course de la semaine du Fleuve est réglée dès lundi minuit (Kinshasa).
+  const minuteurFleuve = setInterval(() => fleuve.tic().catch((e) => console.error('Fleuve, course :', e.message)), 60e3);
+  minuteurFleuve.unref();
   const minuteurPush = setInterval(() => push.tic().catch((e) => console.error('Push :', e.message)), 60e3);
   minuteurPush.unref();
   // Jouer en ligne ou entre amis demande un compte Google dès que la connexion Google est active.

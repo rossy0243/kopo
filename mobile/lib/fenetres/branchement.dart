@@ -49,6 +49,9 @@ void brancherFenetres() {
         ouvrirAmis();
       } else if (action == 'match' && app.ecran == 'accueil') {
         ouvrirMatchJour();
+      } else if (action == 'fleuve' && app.ecran == 'accueil') {
+        final f = d['fleuve']?.toString();
+        ouvrirFleuve(f == 'congo' || f == 'niger' ? f : null);
       }
     }
     // Au lancement, on attend que l'accueil soit prêt.
