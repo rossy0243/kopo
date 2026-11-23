@@ -30,7 +30,7 @@ async function devenirAmis(x, y) {
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Joue une partie jusqu'au bout : chaque client humain joue la première action permise.
-async function jouerPartie(joueurs, { robots = 0, jeu = 'kopo', reglages = null, options = {} } = {}) {
+async function jouerPartie(joueurs, { robots = 0, jeu = 'kopo', reglages = null, options = {}, adversaires = null } = {}) {
   const client = new Client(URL_.replace('http', 'ws'));
   const code = 'T' + Math.random().toString(36).slice(2, 5).toUpperCase().replace(/[^A-Z]/g, 'Q').padEnd(3, 'Q');
   const salles = [];
@@ -39,6 +39,7 @@ async function jouerPartie(joueurs, { robots = 0, jeu = 'kopo', reglages = null,
     const salle = salles.length ? await client.joinById(salles[0].roomId, { jeton: j.jeton }) : await client.create(jeu, Object.assign({ jeton: j.jeton, code, rapide: true }, options));
     salle.onMessage('erreur', () => {});
     salle.onMessage('solde', () => {});
+    salle.onMessage('adversaires', (m) => { if (adversaires) adversaires.set(j.compte.id, m); });
     salle.onMessage('vue', (v) => {
       if (v.etat === 'finPartie') fin = fin || v;
       const a = v.manche && v.manche.actions[0];
@@ -68,7 +69,7 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     const salle = parCode && salles.length
       ? await client.join('kopo', { jeton: j.jeton, code })
       : await client.joinOrCreate('kopo', { jeton: j.jeton, publique: true, taille, rapide: true });
-    salle.onMessage('erreur', () => {}); salle.onMessage('solde', () => {});
+    salle.onMessage('erreur', () => {}); salle.onMessage('solde', () => {}); salle.onMessage('adversaires', () => {});
     salle.onMessage('ligue', (m) => ligue.set(j.compte.id, m));
     salle.onMessage('classee', (m) => classee.set(j.compte.id, m.classee));
     salle.onMessage('vue', (v) => {
@@ -393,6 +394,23 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.deepStrictEqual(r[1].joueurs.map((j) => j.pseudo), ['Rabi'], 'un joueur qui m\'a bloqué disparaît');
     assert.deepStrictEqual((await api('/api/recents', { jeton: d.jeton })).json, [], 'aucune partie');
   });
+  await test('fin de partie : le serveur propose d\'ajouter les adversaires humains qui ne sont pas encore amis', async () => {
+    const [a, b, c, d] = [await invite('Fina'), await invite('Fibo'), await invite('Fico'), await invite('Fido')];
+    await devenirAmis(a, b);
+    await api('/api/amis', { methode: 'POST', jeton: a.jeton, corps: { cible: d.compte.id } }); // demande déjà envoyée
+    const recus = new Map();
+    await jouerPartie([a, b, c, d], { adversaires: recus });
+    assert.deepStrictEqual((recus.get(a.compte.id) || []).map((j) => j.pseudo), ['Fico'], 'ni l\'ami, ni la demande en cours');
+    const pourD = recus.get(d.compte.id) || [];
+    assert.deepStrictEqual(pourD.map((j) => j.pseudo).sort(), ['Fibo', 'Fico', 'Fina']);
+    assert.strictEqual(pourD.find((j) => j.pseudo === 'Fina').recue, true, 'Fina l\'a déjà demandé : à accepter');
+    const avecRobot = new Map();
+    await jouerPartie([c, await invite('Fiseul')], { robots: 1, adversaires: avecRobot });
+    assert.ok([...avecRobot.values()].every((l) => l.every((j) => j.id)), 'jamais de robot dans la liste');
+    const seul = new Map();
+    await jouerPartie([await invite('Fisolo')], { robots: 2, adversaires: seul });
+    assert.strictEqual(seul.size, 0, 'seul contre les robots : rien à proposer');
+  });
   await test('un joueur banni ne peut pas entrer dans une salle', async () => {
     const x = await invite('Tricheur');
     await srv.base.query("UPDATE comptes SET statut = 'banni' WHERE id = $1", [x.compte.id]);
@@ -581,7 +599,7 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     let fin = null;
     for (const j of js) {
       const salle = await client.joinOrCreate('kopo-mise', { jeton: j.jeton, publique: true, taille: 3, mise: 'bronze', rapide: true });
-      salle.onMessage('erreur', () => {}); salle.onMessage('solde', () => {}); salle.onMessage('classee', () => {});
+      salle.onMessage('erreur', () => {}); salle.onMessage('solde', () => {}); salle.onMessage('adversaires', () => {}); salle.onMessage('classee', () => {});
       salle.onMessage('mise', (m) => mises.set(j.compte.id, m));
       salle.onMessage('pot', (m) => pots.set(j.compte.id, m));
       salle.onMessage('vue', (v) => {
@@ -613,7 +631,7 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     let fin = null;
     for (const j of js) {
       const salle = await client.joinOrCreate('inter8-mise', { jeton: j.jeton, publique: true, taille: 3, mise: 'bronze', rapide: true });
-      salle.onMessage('erreur', () => {}); salle.onMessage('solde', () => {}); salle.onMessage('classee', () => {});
+      salle.onMessage('erreur', () => {}); salle.onMessage('solde', () => {}); salle.onMessage('adversaires', () => {}); salle.onMessage('classee', () => {});
       salle.onMessage('mise', (m) => mises.set(j.compte.id, m));
       salle.onMessage('pot', (m) => pots.set(j.compte.id, m));
       salle.onMessage('vue', (v) => {
@@ -1898,7 +1916,7 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
       // Kopo : 1 robot, partie jouée jusqu'au bout ; ni pièces ni ligue, mais comptée en entraînement.
       const solde = (await api('/api/moi', { jeton: x.jeton })).json.compte.solde;
       salle = await client.create('entrainement', { jeton: x.jeton, robots: 1, rapide: true });
-      salle.onMessage('erreur', () => {}); salle.onMessage('solde', () => {});
+      salle.onMessage('erreur', () => {}); salle.onMessage('solde', () => {}); salle.onMessage('adversaires', () => {});
       salle.onMessage('vue', (v) => {
         premiere = premiere || v;
         if (v.etat === 'finPartie') fin = fin || v;

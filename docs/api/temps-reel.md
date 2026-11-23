@@ -138,6 +138,7 @@ Le Fleuve (`fleuve`) : pareil, la table et la donne sont fixées par l'étape. L
 | `ligue` | `{ delta, points, division, divisionAvant, promu, relegue, protection, prochaine, saison }` | Fin d'une partie classée |
 | `parcours` | `{ xp, total, palier, nouveaux, xpPalier, paliers }` | Fin de partie entre humains : XP du parcours de saison |
 | `faceAFace` | `[{ id, pseudo, moi, lui }]` | Fin d'un duel : score du face-à-face, le même des deux côtés |
+| `adversaires` | `[{ id, pseudo, numero, avatar, apparence, niveau…, recue, moi, lui }]` | Fin d'une partie entre humains : ses adversaires qui ne sont pas encore ses amis (ni demandés). L'écran de fin propose « Ajouter » (`POST /amis`), ou « Accepter » si `recue` |
 | `matchJour` | `{ debut: true, numero, officiel }` puis `{ fin: true, numero, officiel, manches, victoire, score, parti }` | Match du jour |
 | `fleuve` | `{ debut: true, etape, adoucir }` puis `{ fin: true, fleuve, numero, reussi, parti, etoiles, score, seuils, texte, pieces, double, piecesEscale?, solde?, pagaies, biefTermine?, depasses?, premierA? }` (`depasses` : pseudos des amis que tu viens de dépasser ; `premierA` : ville où tu arrives avant tous tes amis) (ou `{ fin: true, erreur }`) | Le Fleuve |
 | `exclu` | texte (raison) | Exclu par l'admin (la connexion se ferme avec 4001) |
