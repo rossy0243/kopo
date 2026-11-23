@@ -8649,7 +8649,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   const interBientot = (e) => {
     if (jeuChoisi() !== 'inter8') return;
     const cible = e.target.closest('#modes .mode');
-    if (!cible || ['btnModeRejoindre', 'btnModeRobots', 'btnCreer', 'btnInconnus', 'btnCahier'].includes(cible.id)) return; // ouverts pour Inter (8)
+    if (!cible || ['btnModeRejoindre', 'btnModeRobots', 'btnCreer', 'btnInconnus', 'btnCahier', 'btnFleuve'].includes(cible.id)) return; // ouverts pour Inter (8), le Fleuve (Niger) compris
     e.preventDefault(); e.stopImmediatePropagation();
     toast("Ce mode arrive très bientôt pour Inter (8). En attendant : entre amis, en ligne ou contre les robots !", 'alerte');
   };
