@@ -617,7 +617,7 @@ void _guide(BuildContext context, String cle, {required GlobalKey kCourante, req
     liste.addAll([
       (kCourante, 'Chaque étape a un objectif.', "Réussis-le pour avancer. Jusqu'à 3 étoiles par étape."),
       (kPagaies, '5 pagaies par jour.', 'Réussir ne coûte rien, rater coûte 1 pagaie. Elles reviennent à minuit.'),
-      (kEscale.currentContext != null ? kEscale : kCourante, 'Les villes', '$n étoiles sur 30 pour passer chaque ville. La dernière étape de la ville est la plus dure.'),
+      (kEscale.currentContext != null ? kEscale : kCourante, 'Les villes', '$n étoiles sur 27 pour passer chaque ville. La dernière étape de la ville est la plus dure.'),
     ]);
     vu['base'] = true;
   }
@@ -738,7 +738,7 @@ void reglesFleuve() {
         li(1, 'Remonte le fleuve étape par étape.', "Chaque étape est une petite partie contre des robots, avec un objectif. Réussis-le pour avancer, jusqu'à 3 étoiles par étape."),
         li(2, ouverts.length > 2 ? '${ouverts.length} fleuves.' : 'Deux fleuves.', '${[if (kopo != null) '${kopo[0].toUpperCase()}${kopo.substring(1)} ${kopo.contains(' et ') ? 'se jouent' : 'se joue'} au Kopo', if (inter != null) "$inter à l'Inter (8)"].join(', ')}.'),
         li(3, '5 pagaies par jour.', 'Réussir ne coûte rien, rater coûte 1 pagaie. Elles reviennent à minuit.'),
-        li(4, 'Les villes : $n étoiles sur 30.', "Il les faut pour affronter le boss de la ville, la dernière étape, la plus dure. Il te manque des étoiles ? Rejoue une étape où tu n'en as pas 3."),
+        li(4, 'Les villes : $n étoiles sur 27.', "Il les faut pour affronter le boss de la ville, la dernière étape, la plus dure. Il te manque des étoiles ? Rejoue une étape où tu n'en as pas 3."),
         li(5, 'Tes amis rament avec toi.', "Vois où ils en sont et passe devant. Le plus d'étoiles de la semaine entre amis gagne la course."),
         const Ecart(4),
         Btn.principal('Compris !', large: true, onTap: app.fermerFenetre),
