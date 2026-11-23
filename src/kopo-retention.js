@@ -127,14 +127,22 @@
     { id: 'enligne', texte: 'Joue une partie en ligne', cible: 1, pieces: 40, compte: (e) => (e.publique ? 1 : 0) },
     { id: 'amis', texte: 'Joue une partie entre amis', cible: 1, pieces: 50, compte: (e) => (!e.publique && !e.avecRobots && e.nbJoueurs >= 2 ? 1 : 0) },
     { id: 'grande', texte: 'Joue une partie à 7 joueurs ou plus', cible: 1, pieces: 50, compte: (e) => (e.nbJoueurs >= 7 ? 1 : 0) },
+    // Le Fleuve (tirées seulement quand il est ouvert, voir reglerFleuve) : comptées à la fin d'une étape.
+    { id: 'fleuve2', fleuve: 'tous', texte: 'Réussis 2 étapes du Fleuve', cible: 2, pieces: 50, compte: (e) => (e.fleuveReussi ? 1 : 0) },
+    { id: 'congo3', fleuve: 'congo', texte: 'Gagne 3 étoiles sur le Congo', cible: 3, pieces: 60, compte: (e) => (e.fleuve === 'congo' ? e.etoilesNouvelles || 0 : 0) },
+    { id: 'niger3', fleuve: 'niger', texte: 'Gagne 3 étoiles sur le Niger', cible: 3, pieces: 60, compte: (e) => (e.fleuve === 'niger' ? e.etoilesNouvelles || 0 : 0) },
   ];
+  // Fleuves ouverts à ce joueur (le site et l'appli le règlent quand l'état du Fleuve arrive) : { congo: true, niger: false }.
+  let fleuvesOuverts = {};
+  function reglerFleuve(o) { fleuvesOuverts = Object.assign({}, o || {}); }
+  const tirable = (m) => !m.fleuve || (m.fleuve === 'tous' ? Object.values(fleuvesOuverts).some(Boolean) : !!fleuvesOuverts[m.fleuve]);
   const modele = (id) => MODELES.find((m) => m.id === id);
   const PAR_JOUR = 3, DUREE_MISSION = 2; // 3 missions par jour, gardées 2 jours (on peut rater un jour)
   const xpMission = (m) => Math.round(m.pieces / 10); // 4 à 10 XP (avant : la moitié des pièces)
 
   function tirerMissions(jour, exclus, n, sel) {
     const r = hasard('missions-' + jour + (sel || ''));
-    const libres = MODELES.filter((m) => !exclus.includes(m.id));
+    const libres = MODELES.filter((m) => !exclus.includes(m.id) && tirable(m));
     const choix = [];
     // Une mission « facile » (jouer) au moins, pour que chaque journée soit faisable.
     const faciles = libres.filter((m) => /^jouer/.test(m.id));
@@ -290,6 +298,24 @@
     const objets = [];
     for (let k = niveauAvant.niveau + 1; k <= niveauApres.niveau; k++) if (OBJETS_NIVEAU[k] && donnerObjet(p, OBJETS_NIVEAU[k])) objets.push(OBJETS_NIVEAU[k]);
     return { niveauAvant, niveauApres, objets };
+  }
+  // Fin d'une étape du Fleuve : fait avancer les missions qui visent le Fleuve.
+  // r : { fleuve, reussi, nouvelles }. Renvoie les missions qui ont avancé (même forme que dans le récap).
+  function compterFleuve(p, r, jour) {
+    missionsDuJour(p, jour);
+    const e = { fleuve: r.fleuve, fleuveReussi: !!r.reussi, etoilesNouvelles: r.reussi ? Math.max(0, Number(r.nouvelles) || 0) : 0 };
+    const out = [];
+    for (const m of p.missions.liste) {
+      const md = modele(m.id);
+      if (m.finie || !md.fleuve) continue;
+      const n = md.compte(e);
+      if (!n) continue;
+      const avant = m.avance;
+      m.avance = Math.min(md.cible, m.avance + n);
+      if (m.avance >= md.cible) { m.finie = true; m.finieLe = jour; m.aEncaisser = true; }
+      out.push({ texte: md.texte, avant, apres: m.avance, cible: md.cible, finie: m.finie, aEncaisser: m.finie, pieces: md.pieces });
+    }
+    return out;
   }
   // Enregistre une partie terminée. Renvoie le récap à montrer (XP, missions, défi, face-à-face).
   function enregistrerPartie(p, e, jour) {
@@ -466,7 +492,7 @@
     jourDe, decaler, ecart, semaineDe, hasard,
     XP, BAREME, xpPourNiveau, niveauDe, debutNiveau, convertirXp,
     OBJETS, OBJETS_NIVEAU, CATEGORIES, parCategorie, collection, donnerObjet, equiper,
-    MODELES, missionsDuJour, peutChanger, changerMission, encaisserMission, aEncaisser,
+    MODELES, missionsDuJour, reglerFleuve, compterFleuve, peutChanger, changerMission, encaisserMission, aEncaisser,
     DEFIS, defiSemaine,
     BIENVENUE, bienvenue, recevoirBienvenue,
     gainBonus, bonusDuJour, jokerLibre, pieces,

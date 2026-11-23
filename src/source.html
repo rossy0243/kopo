@@ -1056,6 +1056,25 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
 .fl-marque { font-size: 12px; padding: 3px 8px; border-radius: 999px; background: rgba(255,216,107,.14); color: #ffd86b; border: 1px solid rgba(255,216,107,.35); }
 .fl-passe { font: 400 22px/1.1 var(--display); color: #ffd86b; letter-spacing: 1px; }
 #pillFleuve { justify-self: center; align-self: start; background: rgba(16,35,58,.92); border: 1px solid #7fc4e8; color: var(--ink); border-radius: 999px; padding: 4px 12px; font-size: 12.5px; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
+.fl-cadenas { position: absolute; transform: translate(-50%, 0); margin-top: 30px; padding: 2px 8px; border-radius: 999px; background: #1d1606; color: #ffd86b; border: 1px solid rgba(255,216,107,.5); font-size: 12px; font-weight: 700; white-space: nowrap; z-index: 2; pointer-events: none; }
+.fl-etape.escale.fait::after { content: '🪙'; position: absolute; top: -10px; right: -10px; font-size: 16px; filter: drop-shadow(0 1px 1px rgba(0,0,0,.6)); }
+.fl-brume { position: absolute; inset: 0; z-index: 4; pointer-events: none; background: linear-gradient(rgba(220,232,238,.97), rgba(220,232,238,.85) 70%, rgba(220,232,238,0)); }
+.fl-bandeau { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); z-index: 5; pointer-events: none; text-align: center; font: 400 22px/1.15 var(--display); letter-spacing: 1px; color: #1d1606; background: var(--brass); padding: 10px 16px; border-radius: 14px; box-shadow: 0 8px 20px rgba(0,0,0,.45); width: max-content; max-width: 86%; }
+.fl-bandeau small { display: block; font: 600 13px/1.3 var(--ui, inherit); letter-spacing: 0; }
+.fl-coffre { font-size: 64px; line-height: 1; display: inline-block; }
+.fl-pagaie.tremble { animation: fl-tremble .6s ease-in-out 3; transform-origin: 50% 0; }
+@keyframes fl-tremble { 25% { transform: rotate(-14deg); } 75% { transform: rotate(14deg); } }
+/* Le guide du Fleuve : une bulle à la fois, posée sur ce dont elle parle. */
+.fl-guide-voile { position: fixed; inset: 0; z-index: 60; overflow: hidden; }
+.fl-guide-voile i { position: absolute; border-radius: 14px; box-shadow: 0 0 0 4px #ffd86b, 0 0 0 200vmax rgba(4,10,18,.6); transition: all .3s; }
+.fl-guide { position: fixed; z-index: 62; width: min(300px, calc(100vw - 32px)); background: #fff3d0; color: #1d1606; border-radius: 14px; padding: 12px 14px; box-shadow: 0 10px 28px rgba(0,0,0,.5); font-size: 14px; line-height: 1.35; display: grid; gap: 8px; }
+.fl-guide b { font-size: 15px; }
+.fl-guide::before { content: ''; position: absolute; left: var(--fleche, 50%); width: 14px; height: 14px; background: #fff3d0; transform: translateX(-50%) rotate(45deg); }
+.fl-guide.dessous::before { top: -7px; }
+.fl-guide.dessus::before { bottom: -7px; }
+.fl-guide .pied { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #6b5a2e; }
+.fl-guide button { background: #1d1606; color: #ffd86b; border: 0; border-radius: 999px; padding: 6px 14px; font: inherit; font-weight: 700; }
+.fl-astuce { background: #fff3d0; color: #1d1606; border-radius: 12px; padding: 8px 12px; font-size: 13.5px; text-align: left; }
 @media (prefers-reduced-motion: reduce) { .fl-etape.courante { animation: none; } }
 .mj-numero { color: var(--muted); font-size: 13px; letter-spacing: 1px; text-transform: uppercase; }
 .mj-hier { display: block; margin: 6px 0 2px; opacity: .85; }
@@ -5274,6 +5293,8 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   const ROBOTS_NOMS = { faciles: 'Faciles', normaux: 'Normaux', forts: 'Forts' };
   const PAR_BIEF = 50;
   let etatFleuve = null, biefVu = {};
+  // Animations à jouer au prochain affichage de la carte : la pirogue qui glisse, la brume qui se lève.
+  const glisseFleuve = {}, brumeFleuve = {}, cadenasVu = {};
   const fleuveDuJeu = () => (jeuChoisi() === 'inter8' ? 'niger' : 'congo');
   const etoilesTexte = (n) => '★'.repeat(n) + '☆'.repeat(3 - n);
   function pastilleFleuve(texte) {
@@ -5303,6 +5324,71 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     return z.childNodes.length ? z : null;
   }
   // Un ami touché sur la carte : qui c'est, où il en est, ses marques.
+  // Le guide du Fleuve (une fois par appareil) : trois bulles sur la carte, chacune pointe ce dont elle parle.
+  const GUIDE_FLEUVE = [
+    ['courante', 'Chaque étape a un objectif.', 'Réussis-le pour avancer. Jusqu\'à 3 étoiles par étape.'],
+    ['pagaies', '5 pagaies par jour.', 'Réussir ne coûte rien, rater coûte 1 pagaie. Elles reviennent à minuit.'],
+    ['escale', 'Les villes', '{N} étoiles sur 30 pour passer chaque ville. La dernière étape de la ville est la plus dure.'],
+  ];
+  function bullesGuide(liste, fin) {
+    let i = 0;
+    const voile = el('div', 'fl-guide-voile'), trou = el('i'), b = el('div', 'fl-guide');
+    voile.append(trou);
+    const finir = () => { voile.remove(); b.remove(); window.removeEventListener('resize', placer); if (fin) fin(); };
+    const suivant = () => { i++; if (i < liste.length) placer(); else finir(); };
+    function placer() {
+      const [cible, titre, texte] = liste[i];
+      // On ne fait défiler que la carte du fleuve, jamais la fenêtre : la bulle reste en face de sa cible.
+      const carte = cible && cible.closest('.fl-carte');
+      if (carte) { const rc = carte.getBoundingClientRect(), rt = cible.getBoundingClientRect(); carte.scrollTop += rt.top + rt.height / 2 - (rc.top + rc.height / 2); }
+      b.replaceChildren(el('b', null, titre), el('div', null, texte));
+      const pied = el('div', 'pied'); pied.append(el('span', null, liste.length > 1 ? `${i + 1} / ${liste.length}` : ''));
+      const ok = el('button', null, i < liste.length - 1 ? 'Suivant' : 'Compris !'); ok.onclick = suivant;
+      pied.append(ok); b.append(pied);
+      const r = cible ? cible.getBoundingClientRect() : { left: innerWidth / 2, width: 0, height: 0, top: innerHeight / 2, bottom: innerHeight / 2 };
+      Object.assign(trou.style, { left: (r.left - 6) + 'px', top: (r.top - 6) + 'px', width: (r.width + 12) + 'px', height: (r.height + 12) + 'px', opacity: cible ? 1 : 0 });
+      const L = b.offsetWidth || 300, x = Math.max(16, Math.min(innerWidth - L - 16, r.left + r.width / 2 - L / 2));
+      b.style.setProperty('--fleche', Math.max(18, Math.min(L - 18, r.left + r.width / 2 - x)) + 'px');
+      b.style.left = x + 'px';
+      const dessous = r.bottom + 14 + (b.offsetHeight || 120) < innerHeight;
+      b.classList.toggle('dessous', dessous); b.classList.toggle('dessus', !dessous);
+      if (dessous) { b.style.top = (r.bottom + 12) + 'px'; b.style.bottom = ''; } else { b.style.bottom = (innerHeight - r.top + 12) + 'px'; b.style.top = ''; }
+    }
+    voile.onclick = suivant;
+    document.body.append(voile, b); placer(); requestAnimationFrame(placer);
+    window.addEventListener('resize', placer);
+  }
+  function guideFleuve(cle, carte) {
+    const vu = stock.lire('kopo-fleuve-guide') || {};
+    const liste = [];
+    if (!vu.base) {
+      const N = String(etatFleuve.etoilesVille ?? 20);
+      const cibles = { courante: carte.querySelector('.fl-etape.courante'), pagaies: document.querySelector('#fenetre .fl-pagaies'), escale: carte.querySelector('.fl-etape.escale:not(.fait)') || carte.querySelector('.fl-etape.escale') };
+      for (const [k, t, x] of GUIDE_FLEUVE) liste.push([cibles[k], t, x.replace('{N}', N)]);
+      vu.base = true;
+    }
+    if (cle === 'niger' && !vu.niger) { liste.push([document.querySelector('#fenetre .ligue-onglets [aria-pressed="true"]'), 'Ici, on joue à l\'Inter (8).', 'Sur le Niger, chaque étape est une partie d\'Inter (8) contre des robots. Le Congo se joue au Kopo.']); vu.niger = true; }
+    if (!liste.length) return;
+    stock.ecrire('kopo-fleuve-guide', vu);
+    setTimeout(() => bullesGuide(liste), sansAnim ? 0 : 500);
+  }
+  // Règles → Le Fleuve : le guide en texte.
+  function reglesFleuve() {
+    const ul = el('ol', 'mj-bulles');
+    const li = (b, t) => { const x = el('li'); const d = el('div'); d.append(el('b', null, b), ' ' + t); x.append(d); ul.append(x); };
+    const N = (etatFleuve && etatFleuve.etoilesVille) ?? 20;
+    li('Remonte le fleuve étape par étape.', 'Chaque étape est une petite partie contre des robots, avec un objectif. Réussis-le pour avancer, jusqu\'à 3 étoiles par étape.');
+    li('Deux fleuves.', 'Le Congo se joue au Kopo, le Niger à l\'Inter (8).');
+    li('5 pagaies par jour.', 'Réussir ne coûte rien, rater coûte 1 pagaie. Elles reviennent à minuit.');
+    li(`Les villes : ${N} étoiles sur 30.`, 'Il les faut pour affronter le boss de la ville, la dernière étape, la plus dure. Il te manque des étoiles ? Rejoue une étape où tu n\'en as pas 3.');
+    li('Tes amis rament avec toi.', 'Vois où ils en sont et passe devant. Le plus d\'étoiles de la semaine entre amis gagne la course.');
+    const ok = el('button', 'btn principal large', 'Compris !'); ok.onclick = fermerFenetre;
+    const rev = el('button', 'btn large', 'Revoir le guide sur la carte');
+    rev.onclick = () => { stock.ecrire('kopo-fleuve-guide', {}); ouvrirFleuve(); };
+    ouvrirFenetre([el('h2', null, 'Le Fleuve'), ul, ok, rev]);
+  }
+  window.reglesFleuve = reglesFleuve;
+
   function ficheAmiFleuve(cle, a) {
     const F = FLEUVES[cle], z = el('div', 'mj');
     const av = avatarFleuve(a); av.style.margin = '0 auto'; av.style.width = '56px'; av.style.height = '56px'; av.style.fontSize = '30px';
@@ -5341,6 +5427,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     if (!MODE_SERVEUR || !compteLocal() || !configServeur || !configServeur.fleuve || configServeur.fleuve === 'ferme') { b.hidden = true; return; }
     if (recharger || !etatFleuve) { try { etatFleuve = await apiJoueur('/fleuve'); } catch (e) { return; } }
     b.hidden = !etatFleuve.ouvert;
+    reglerMissionsFleuve();
     const f = etatFleuve.fleuves && etatFleuve.fleuves[fleuveDuJeu()];
     if (f) {
       // L'étape du joueur en grand ; le fleuve et les étoiles en petit.
@@ -5350,6 +5437,12 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     }
   }
   window.majCarteFleuve = majCarteFleuve;
+  // Missions du jour : celles qui visent le Fleuve ne sont tirées que pour un fleuve ouvert et publié.
+  function reglerMissionsFleuve() {
+    const E = etatFleuve, o = {};
+    if (E && E.ouvert && E.google) for (const k of Object.keys(E.fleuves || {})) o[k] = (E.fleuves[k].publiees || 0) > 0;
+    R.reglerFleuve(o);
+  }
 
   async function ouvrirFleuve(fleuve) {
     if (!MODE_SERVEUR) return toast('Le Fleuve se joue en ligne.', 'alerte');
@@ -5395,6 +5488,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       ouvrirFenetre([...z, fermerBouton()], 'fleuve');
       $('fenetre').classList.toggle('fl-niger', cle === 'niger');
       dessinerCarte(carte, cle, f, etapes);
+      guideFleuve(cle, carte);
       return;
     }
     ouvrirFenetre([...z, fermerBouton()], 'fleuve');
@@ -5431,7 +5525,25 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
         if (p.x > L / 2) v.style.right = (L - p.x + 36) + 'px'; else v.style.left = (p.x + 36) + 'px';
         fond.append(v);
       }
-      if (e.n === f.courante) { courant = b; const k = el('div', 'fl-bateau', '🛶'); k.style.left = p.x + 'px'; k.style.top = p.y + 'px'; fond.append(k); }
+      if (e.n === f.courante) {
+        courant = b; const k = el('div', 'fl-bateau', '🛶'); k.style.left = p.x + 'px'; k.style.top = p.y + 'px'; fond.append(k);
+        // Étape réussie : la pirogue glisse sur le fleuve depuis l'étape d'avant.
+        const de = glisseFleuve[cle]; delete glisseFleuve[cle];
+        const j0 = de ? etapes.findIndex((x) => x.n === de) : -1;
+        if (j0 >= 0 && j0 < i && !sansAnim) {
+          const pas = []; for (let u = 0; u <= 12; u++) { const q = pos(j0 + (i - j0) * u / 12); pas.push({ transform: `translate(${q.x - p.x}px, ${q.y - p.y}px)` }); }
+          k.animate(pas, { duration: 900 + 250 * (i - j0), delay: 350, easing: 'ease-in-out', fill: 'backwards' });
+        }
+        // Ville fermée : le cadenas et le compteur d'étoiles de la ville ; il monte étoile par étoile.
+        if (e.escale && e.villeEtoiles != null && e.villeEtoiles < etatFleuve.etoilesVille) {
+          const cad = el('div', 'fl-cadenas'); cad.style.left = p.x + 'px'; cad.style.top = p.y + 'px'; fond.append(cad);
+          const seuil = etatFleuve.etoilesVille, avant = cadenasVu[cle + e.n];
+          const ecrire = (v) => { cad.textContent = `🔒 ${v} / ${seuil} ★`; };
+          if (avant != null && avant < e.villeEtoiles && !sansAnim) { let v = avant; ecrire(v); const t = setInterval(() => { v++; ecrire(v); pop(cad, 1.15); if (v >= e.villeEtoiles) clearInterval(t); }, 350); }
+          else ecrire(e.villeEtoiles);
+          cadenasVu[cle + e.n] = e.villeEtoiles;
+        }
+      }
       // Mes amis posés sur leur étape (ceux qui ont tout fini : sur la dernière). Touchés : leur fiche.
       const ici = (f.amis || []).filter((a) => (a.n === null ? f.publiees : a.n) === e.n);
       if (ici.length) {
@@ -5445,6 +5557,15 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     });
     if (HAUT > 60) { const s = el('div', 'fl-suite', 'La suite du fleuve arrive bientôt…'); s.style.top = '24px'; fond.append(s); }
     carte.append(fond);
+    // Fin d'un bief : la brume qui cachait la suite se lève.
+    const bm = brumeFleuve[cle]; delete brumeFleuve[cle];
+    if (bm && !sansAnim) {
+      const brume = el('div', 'fl-brume'); const bandeau = el('div', 'fl-bandeau', `Bief ${bm - 1} terminé !`); bandeau.append(el('small', null, `Le bief ${bm} s'ouvre`));
+      fond.append(brume); carte.append(bandeau);
+      requestAnimationFrame(() => requestAnimationFrame(() => { bandeau.style.top = (carte.scrollTop + carte.clientHeight * .4) + 'px'; })); // après le défilement vers la pirogue
+      brume.animate([{ opacity: 1 }, { opacity: 1, offset: .35 }, { opacity: 0, transform: 'translateY(-40%)' }], { duration: 2600, easing: 'ease-in', fill: 'forwards' }).onfinish = () => brume.remove();
+      bandeau.animate([{ opacity: 0, transform: 'translate(-50%, -50%) scale(.7)' }, { opacity: 1, transform: 'translate(-50%, -50%) scale(1.05)', offset: .15 }, { opacity: 1, transform: 'translate(-50%, -50%)', offset: .8 }, { opacity: 0 }], { duration: 3000, fill: 'forwards' }).onfinish = () => bandeau.remove();
+    }
     requestAnimationFrame(() => { carte.scrollTop = courant ? Math.max(0, parseFloat(courant.style.top) - carte.clientHeight / 2) : H; });
   }
 
@@ -5466,6 +5587,11 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     s.append(el('small', 'muted', `Score : à chaque manche, quand tu sors, 1 point par adversaire encore en jeu ; +10 si tu gagnes la partie.${F.jeu === 'inter8' ? ' Et 1 point toutes les 2 cartes que tu fais piocher.' : ''}`));
     z.append(s);
     if (e.escale && e.villeEtoiles !== null && !e.etoiles) z.append(el('p', null, `Pour affronter le boss de ${e.ville}, il te faut ${e.etoilesVille} étoiles dans la ville : tu en as ${e.villeEtoiles}.`));
+    // La première fois qu'on bute sur une ville : l'astuce du guide.
+    if (e.escale && e.villeEtoiles !== null && e.villeEtoiles < e.etoilesVille && !e.etoiles) {
+      const vu = stock.lire('kopo-fleuve-guide') || {};
+      if (!vu.ville) { z.append(el('div', 'fl-astuce', '💡 Rejoue une étape où il te manque des étoiles : chaque étoile gagnée compte pour la ville.')); vu.ville = true; stock.ecrire('kopo-fleuve-guide', vu); }
+    }
     const boutons = [];
     if (e.refus) z.append(el('p', 'fl-piege', e.refus));
     else if (e.pagaies.restantes <= 0) z.append(el('p', 'fl-piege', `Ta pirogue se repose. Nouvelles pagaies dans ${dureeLisible(etatFleuve ? etatFleuve.pagaies.retourMs : 0)}.`));
@@ -5493,6 +5619,12 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       if (i < r.etoiles && !sansAnim) x.animate([{ transform: 'scale(0)', opacity: 0 }, { transform: 'scale(1.4)', opacity: 1, offset: .6 }, { transform: 'none' }], { duration: 450, delay: 250 + i * 300, easing: 'ease-out', fill: 'backwards' });
       st.append(x);
     }
+    // Boss vaincu : le coffre de la ville s'ouvre.
+    if (r.reussi && r.escale && r.premiereFois) {
+      const c = el('div', 'fl-coffre', '🧰'); z.append(c);
+      if (!sansAnim) { c.animate([{ transform: 'scale(.6) rotate(0)' }, { transform: 'scale(1) rotate(-8deg)', offset: .3 }, { transform: 'scale(1) rotate(8deg)', offset: .5 }, { transform: 'scale(1.1)' }], { duration: 800, easing: 'ease-out' }); setTimeout(() => { c.textContent = '💰'; pop(c, 1.3); }, 850); }
+      else c.textContent = '💰';
+    }
     z.append(el('h2', null, r.reussi ? (r.escale && r.premiereFois ? `${r.ville} est passée !` : 'Étape réussie !') : r.parti ? 'Étape abandonnée' : 'Pas cette fois…'), st);
     z.append(el('p', null, r.texte + (r.reussi ? ' : réussi.' : ' : raté.')));
     if (r.reussi) {
@@ -5502,10 +5634,25 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       if (r.depasses && r.depasses.length) { const t = el('div', 'fl-passe', `Tu passes ${r.depasses.slice(0, 2).join(' et ')}${r.depasses.length > 2 ? ` et ${r.depasses.length - 2} autre${r.depasses.length > 3 ? 's' : ''}` : ''} !`); z.append(t); pop(t, 1.15); }
       if (r.premierA) z.append(el('p', 'fl-marque', `⛵ Premier de tes amis à ${r.premierA} : la marque « 1er à ${r.premierA} » est à toi.`));
       if (typeof r.solde === 'number' || typeof r.solde === 'string') soldeServeur(Number(r.solde));
-    } else z.append(el('small', 'muted', `Une pagaie perdue. Il t'en reste ${r.pagaies.restantes}.`));
+    } else {
+      // Étape ratée : une pagaie se vide en tremblant dans le compteur.
+      const pg = pagaiesEl(r.pagaies), perdue = pg.children[r.pagaies.restantes];
+      if (perdue && !sansAnim) { perdue.classList.remove('perdue'); perdue.classList.add('tremble'); setTimeout(() => perdue.classList.add('perdue'), 1200); }
+      z.append(pg, el('small', 'muted', `Une pagaie perdue. Il t'en reste ${r.pagaies.restantes}.`));
+    }
     const boutons = [];
     try { etatFleuve = await apiJoueur('/fleuve'); } catch (e) {}
+    // Missions du jour qui visent le Fleuve.
+    try {
+      const p = lireProfil(), ms = R.compterFleuve(p, r, jourLocal());
+      if (ms.length) { ecrireProfil(p); sauvegarderProfil(); appliquerCollection(p); }
+      const finie = ms.find((m) => m.finie && m.avant < m.cible);
+      if (finie) z.append(el('p', 'fl-marque', `✓ Mission finie : ${finie.texte} (+${finie.pieces} pièces à encaisser)`));
+      else if (ms.length) z.append(el('small', 'muted', `Mission : ${ms[0].texte} · ${ms[0].apres} / ${ms[0].cible}`));
+    } catch (e) {}
     const f = etatFleuve && etatFleuve.fleuves && etatFleuve.fleuves[r.fleuve];
+    if (r.reussi && f && f.courante && f.courante > r.numero) { glisseFleuve[r.fleuve] = r.numero; biefVu[r.fleuve] = f.bief; }
+    if (r.reussi && r.biefTermine && f) brumeFleuve[r.fleuve] = f.bief;
     if (r.reussi && f && f.courante && f.courante !== r.numero) { const b = el('button', 'btn principal large', `Étape ${f.courante}`); b.onclick = () => ouvrirEtapeFleuve(r.fleuve, f.courante); boutons.push(b); }
     if (r.pagaies.restantes > 0 && (!r.reussi || r.etoiles < 3)) { const b = el('button', 'btn' + (r.reussi ? '' : ' principal') + ' large', r.reussi ? 'Rejouer pour plus d\'étoiles' : 'Réessayer'); b.onclick = () => ouvrirEtapeFleuve(r.fleuve, r.numero); boutons.push(b); }
     const carte = el('button', 'btn large', 'Voir la carte'); carte.onclick = () => (etatFleuve ? afficherCarteFleuve(r.fleuve) : ouvrirFleuve(r.fleuve));
@@ -8072,12 +8219,15 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     if (jeuChoisi() === 'inter8') {
       const guidee = el('button', 'btn large', 'Jouer une partie guidée');
       guidee.onclick = () => lancerPartieGuidee('inter8');
-      return ouvrirFenetre([el('h2', null, 'Règles d\'Inter (8)'), $('modeleReglesInter').content.cloneNode(true), ok, guidee]);
+      const fl = [];
+      if (MODE_SERVEUR && configServeur && configServeur.fleuve && configServeur.fleuve !== 'ferme') { const b = el('button', 'btn large', 'Le Fleuve'); b.onclick = reglesFleuve; fl.push(b); }
+      return ouvrirFenetre([el('h2', null, 'Règles d\'Inter (8)'), $('modeleReglesInter').content.cloneNode(true), ok, guidee, ...fl]);
     }
     const tuto = el('button', 'btn large', 'Apprendre en jouant (1 min)');
     tuto.onclick = ouvrirTutoriel;
     const extra = [];
-    if (MODE_SERVEUR) { const nv = el('button', 'btn large', 'Match du jour et Bande'); nv.onclick = () => fenetreNouveaute(0); extra.push(nv); }
+    if (MODE_SERVEUR && configServeur && configServeur.fleuve && configServeur.fleuve !== 'ferme') { const fl = el('button', 'btn large', 'Le Fleuve'); fl.onclick = reglesFleuve; extra.push(fl); }
+    if (MODE_SERVEUR && !fleuveLance()) { const nv = el('button', 'btn large', 'Match du jour et Bande'); nv.onclick = () => fenetreNouveaute(0); extra.push(nv); }
     ouvrirFenetre([el('h2', null, 'Règles'), $('modeleRegles').content.cloneNode(true), ok, tuto, ...extra]);
   }
   $('btnRegles').onclick = montrerRegles;

@@ -375,5 +375,25 @@ test('rien à reprendre : profil vide ou absent', () => {
   assert.strictEqual(n.stats.parties, 4);
 });
 
+test('Missions du Fleuve : tirées seulement quand un fleuve est ouvert, comptées à la fin d\'une étape', () => {
+  R.reglerFleuve({});
+  for (let i = 0; i < 30; i++) assert.ok(!R.missionsDuJour(profil(), R.decaler('2026-10-01', i)).some((m) => /fleuve2|congo3|niger3/.test(m.id)));
+  R.reglerFleuve({ congo: true, niger: false });
+  let vu = false;
+  for (let i = 0; i < 60; i++) { const ids = R.missionsDuJour(profil(), R.decaler('2026-10-01', i)).map((m) => m.id); assert.ok(!ids.includes('niger3')); if (ids.includes('congo3') || ids.includes('fleuve2')) vu = true; }
+  assert.ok(vu, 'une mission du Fleuve sort de temps en temps');
+  const p = profil(), jour = '2026-10-31';
+  R.missionsDuJour(p, jour);
+  p.missions.liste = [{ id: 'congo3', jour, avance: 0, finie: false }, { id: 'fleuve2', jour, avance: 0, finie: false }];
+  let ms = R.compterFleuve(p, { fleuve: 'congo', reussi: true, nouvelles: 2 }, jour);
+  assert.deepStrictEqual(ms.map((m) => m.apres), [2, 1]);
+  ms = R.compterFleuve(p, { fleuve: 'niger', reussi: true, nouvelles: 3 }, jour);
+  assert.deepStrictEqual(ms.map((m) => [m.texte, m.finie]), [['Réussis 2 étapes du Fleuve', true]]);
+  assert.strictEqual(R.compterFleuve(p, { fleuve: 'congo', reussi: false, nouvelles: 0 }, jour).length, 0);
+  ms = R.compterFleuve(p, { fleuve: 'congo', reussi: true, nouvelles: 1 }, jour);
+  assert.ok(ms[0].finie && R.aEncaisser(p, jour) === 2);
+  R.reglerFleuve({});
+});
+
 console.log(`\n${ok} tests réussis, ${ko} en échec.`);
 process.exit(ko ? 1 : 0);
