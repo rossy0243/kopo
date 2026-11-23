@@ -89,7 +89,9 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours,
       stickers: { actif: !!(t.stickers && t.stickers.actif), vente: !!(t.stickers && t.stickers.actif && t.stickers.vente) }, // stickers animés : grisés tant que l'admin ne les allume pas
       communautes: communautesPubliques(t.communautes), // groupes à rejoindre (bouton Partager)
       fleuve: (t.fleuve && t.fleuve.etat) || 'ferme', // Le Fleuve : ferme, testeurs (GET /fleuve dit si ce joueur y a accès) ou ouvert
-      nouveaute: t.nouveaute && t.nouveaute.bande ? 'bande' : null, // fenêtre « Nouveau : Match du jour et Bande »
+      // Fenêtre « Nouveau » : le Fleuve dès son lancement (il remplace la Bande et le Match du jour), sinon la Bande.
+      nouveaute: t.fleuve && t.fleuve.lance ? 'fleuve' : t.nouveaute && t.nouveaute.bande ? 'bande' : null,
+      fleuveLance: (t.fleuve && t.fleuve.lance) || null, // date du lancement : badge NOUVEAU 7 jours, cartes Match du jour et Bande retirées
       // Connexion Google : active quand CONNEXION_GOOGLE=1 et que Google est activé dans Supabase.
       google: env.CONNEXION_GOOGLE === '1' && env.SUPABASE_URL ? origineSupabase(env.SUPABASE_URL) : null,
       // Applis mobiles : connexion Google native par le SDK Supabase (adresse + clé publique « anon », pas secrète).

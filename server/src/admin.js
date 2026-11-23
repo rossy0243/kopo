@@ -426,6 +426,13 @@ function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainag
   // --- Le Fleuve (fleuve.md) : biefs, étapes et chiffres réels ; fabrication par les robots, puis publication.
   if (fleuve) {
     r.get('/fleuve', enveloppe(async (req, res) => res.json(await fleuve.resumeAdmin())));
+    // Le lancement : Bande fermée (mises rendues), Match du jour arrêté, Fleuve ouvert à tous. Une seule fois.
+    r.post('/fleuve/lancer', enveloppe(async (req, res) => {
+      if (!req.body || req.body.confirmation !== 'LANCER') throw Object.assign(new Error('Écris LANCER pour confirmer.'), { statut: 400 });
+      const x = await fleuve.lancer();
+      await journal('fleuve:lancer', 'fleuve', { semaines: x.semaines, joueurs: x.joueurs, pieces: x.pieces });
+      res.json(x);
+    }));
     r.get('/fleuve/:fleuve/biefs/:bief', enveloppe(async (req, res) => res.json(await fleuve.etapesAdmin(req.params.fleuve, req.params.bief))));
     r.post('/fleuve/:fleuve/biefs/:bief/generer', enveloppe(async (req, res) => {
       const t = fleuve.generer(req.params.fleuve, req.params.bief);

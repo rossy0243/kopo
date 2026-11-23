@@ -7,6 +7,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../commun/apparences.dart';
+import '../commun/retention.dart';
+import '../commun/stock.dart';
 import '../commun/theme.dart';
 import '../ecrans/accueil.dart' show dureeLisible;
 import '../etat.dart';
@@ -21,24 +23,12 @@ const _fleuves = {
 const _robotsNoms = {'faciles': 'Faciles', 'normaux': 'Normaux', 'forts': 'Forts'};
 const _parBief = 50;
 final Map<String, int> _biefVu = {};
+// Animations à jouer au prochain affichage de la carte : la pirogue qui glisse, la brume qui se lève, le cadenas qui monte.
+final Map<String, int> _glisse = {}, _brume = {}, _cadenasVu = {};
 const _or = Color(0xFFFFD86B);
 
 String _etoiles(int n) => '★' * n + '☆' * (3 - n);
 int _n(Object? x) => (x as num?)?.toInt() ?? 0;
-
-/// Où est l'ami le plus proche devant moi (accueil) : « Grace est 3 étapes devant ».
-String? amiDevantFleuve(Map? f) {
-  if (f == null || f['courante'] == null) return null;
-  final c = _n(f['courante']), pub = _n(f['publiees']);
-  Map? meilleur; var n0 = 0;
-  for (final a in ((f['amis'] as List?) ?? const []).cast<Map>()) {
-    final n = a['n'] == null ? pub + 1 : _n(a['n']);
-    if (n > c && (meilleur == null || n < n0)) { meilleur = a; n0 = n; }
-  }
-  if (meilleur == null) return null;
-  final d = n0 - c;
-  return '${meilleur['pseudo']} est $d étape${d > 1 ? 's' : ''} devant';
-}
 
 Widget _avatar(Map a, double taille) => Avatar('${a['pseudo'] ?? '?'}', avatar: (a['apparence'] as String?) ?? 'av-laiton', taille: taille);
 
@@ -126,13 +116,24 @@ class PastilleFleuve extends StatelessWidget {
       );
 }
 
-Widget _pagaies(Map p) {
+Widget _pagaies(Map p, {Key? key, bool perte = false}) {
   final max = _n(p['max']), reste = _n(p['restantes']);
   return Tooltip(
+    key: key,
     message: '$reste pagaie${reste > 1 ? 's' : ''} sur $max',
     child: Row(mainAxisSize: MainAxisSize.min, children: [
       for (var i = 0; i < max; i++)
-        Padding(padding: const EdgeInsets.only(left: 3), child: Opacity(opacity: i < reste ? 1 : .22, child: CustomPaint(size: const Size(12, 28), painter: _Pagaie()))),
+        Padding(
+          padding: const EdgeInsets.only(left: 3),
+          // Étape ratée : la pagaie qu'on vient de perdre tremble puis se vide.
+          child: perte && i == reste && !app.sansAnim
+              ? TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0, end: 1), duration: const Duration(milliseconds: 1500),
+                  builder: (_, v, enfant) => Transform.rotate(angle: v < .8 ? math.sin(v / .8 * math.pi * 6) * .25 : 0, alignment: Alignment.topCenter, child: Opacity(opacity: v < .8 ? 1 : 1 - (v - .8) / .2 * .78, child: enfant)),
+                  child: CustomPaint(size: const Size(12, 28), painter: _Pagaie()),
+                )
+              : Opacity(opacity: i < reste ? 1 : .22, child: CustomPaint(size: const Size(12, 28), painter: _Pagaie())),
+        ),
     ]),
   );
 }
@@ -179,15 +180,16 @@ class _CarteFleuve extends StatefulWidget {
 
 class _CarteFleuveState extends State<_CarteFleuve> {
   late String cle = widget.cle;
+  final kPagaies = GlobalKey(), kOnglets = GlobalKey();
   @override
   Widget build(BuildContext context) {
     final E = app.etatFleuve!, f = (E['fleuves'] as Map)[cle] as Map, F = _fleuves[cle]!;
     final p = E['pagaies'] as Map;
     final etapes = ((f['etapes'] as List?) ?? []).cast<Map>();
     final enfants = <Widget>[
-      Row(children: [Expanded(child: Text('Le ${F.nom}', style: K.titre(36))), _pagaies(p)]),
+      Row(children: [Expanded(child: Text('Le ${F.nom}', style: K.titre(36))), _pagaies(p, key: kPagaies)]),
       const Ecart(8),
-      Onglets([for (final k in _fleuves.keys) (k, '${_fleuves[k]!.nom} · ${_fleuves[k]!.jeuNom}')], cle, (k) => setState(() => cle = k)),
+      KeyedSubtree(key: kOnglets, child: Onglets([for (final k in _fleuves.keys) (k, '${_fleuves[k]!.nom} · ${_fleuves[k]!.jeuNom}')], cle, (k) => setState(() => cle = k))),
       const Ecart(8),
       Row(children: [
         Text('Étoiles ', style: K.texte(13, couleur: K.muted)),
@@ -221,7 +223,7 @@ class _CarteFleuveState extends State<_CarteFleuve> {
           Expanded(child: Text('Bief $bief${villes.isEmpty ? '' : ' · ${villes.first}${villes.length > 1 ? ' → ${villes.last}' : ''}'}', textAlign: TextAlign.center, style: K.texte(13, couleur: K.muted))),
           TextButton(onPressed: bief >= biefMax ? null : () => setState(() => _biefVu[cle] = bief + 1), child: Text('Après ›', style: K.texte(13, couleur: bief >= biefMax ? K.muted : K.brass))),
         ]),
-        _Carte(key: ValueKey('$cle:$bief'), cle: cle, f: f, etapes: ici),
+        _Carte(key: ValueKey('$cle:$bief'), cle: cle, f: f, etapes: ici, kPagaies: kPagaies, kOnglets: kOnglets),
       ]);
     }
     enfants.addAll([const Ecart(10), Btn('Fermer', large: true, onTap: () { app.fermerFenetre(); app.maj(); })]);
@@ -234,17 +236,32 @@ class _Carte extends StatefulWidget {
   final String cle;
   final Map f;
   final List<Map> etapes;
-  const _Carte({super.key, required this.cle, required this.f, required this.etapes});
+  final GlobalKey kPagaies, kOnglets;
+  const _Carte({super.key, required this.cle, required this.f, required this.etapes, required this.kPagaies, required this.kOnglets});
   @override
   State<_Carte> createState() => _CarteState();
 }
 
-class _CarteState extends State<_Carte> {
+class _CarteState extends State<_Carte> with TickerProviderStateMixin {
   final defile = ScrollController();
   static const pas = 74.0, bas = 70.0;
   bool place = false;
+  final kCourante = GlobalKey(), kEscale = GlobalKey();
+  int? glisseDe, brume, cadenasAvant;
+  late final AnimationController glisse, leve;
   @override
-  void dispose() { defile.dispose(); super.dispose(); }
+  void initState() {
+    super.initState();
+    glisseDe = _glisse.remove(widget.cle);
+    brume = _brume.remove(widget.cle);
+    glisse = AnimationController(vsync: this, duration: const Duration(milliseconds: 1400));
+    leve = AnimationController(vsync: this, duration: const Duration(milliseconds: 3000));
+    if (app.sansAnim) { glisseDe = null; brume = null; }
+    if (glisseDe != null) Future.delayed(const Duration(milliseconds: 350), () { if (mounted) glisse.forward(); });
+    if (brume != null) leve.forward();
+  }
+  @override
+  void dispose() { glisse.dispose(); leve.dispose(); defile.dispose(); super.dispose(); }
 
   @override
   Widget build(BuildContext context) {
@@ -256,7 +273,7 @@ class _CarteState extends State<_Carte> {
     return LayoutBuilder(builder: (context, c) {
       final L = math.min(380.0, c.maxWidth);
       final H = bas + haut + pas * math.max(0, etapes.length - 1);
-      Offset pos(int i) => Offset(L / 2 + (L / 2 - 52) * math.sin(i * .72), H - bas - i * pas);
+      Offset pos(num i) => Offset(L / 2 + (L / 2 - 52) * math.sin(i * .72), H - bas - i * pas);
       final pts = [for (var i = 0; i < etapes.length; i++) pos(i)];
       final iCour = etapes.indexWhere((e) => e['n'] == courante);
       if (!place) {
@@ -265,6 +282,7 @@ class _CarteState extends State<_Carte> {
           if (!defile.hasClients) return;
           final cible = iCour >= 0 ? pts[iCour].dy - hautVue / 2 : H;
           defile.jumpTo(cible.clamp(0.0, defile.position.maxScrollExtent));
+          _guide(context, widget.cle, kCourante: kCourante, kEscale: kEscale, kPagaies: widget.kPagaies, kOnglets: widget.kOnglets);
         });
       }
       final enfants = <Widget>[Positioned.fill(child: CustomPaint(painter: _Lit(pts, L, H)))];
@@ -280,7 +298,9 @@ class _CarteState extends State<_Carte> {
             child: IgnorePointer(child: Text(e['ville'].toString().toUpperCase(), style: K.titre(20, couleur: const Color(0xFFFFF3D0)).copyWith(shadows: const [Shadow(color: Color(0x99000000), blurRadius: 4, offset: Offset(0, 2))]))),
           ));
         }
+        final premiereEscale = escale && et == 0 && !etapes.take(i).any((x) => x['escale'] == true && _n(x['etoiles']) == 0);
         enfants.add(Positioned(
+          key: cour ? kCourante : premiereEscale ? kEscale : null,
           left: p.dx - t / 2, top: p.dy - t / 2, width: t, height: t + 14,
           child: Semantics(
             button: true,
@@ -303,7 +323,37 @@ class _CarteState extends State<_Carte> {
             ),
           ),
         ));
-        if (cour) enfants.add(Positioned(left: p.dx - 13, top: p.dy - t / 2 - 30, child: const IgnorePointer(child: Text('🛶', style: TextStyle(fontSize: 24)))));
+        if (cour) {
+          // Étape réussie : la pirogue glisse sur le fleuve depuis l'étape d'avant.
+          final j0 = glisseDe == null ? -1 : etapes.indexWhere((x) => _n(x['n']) == glisseDe);
+          enfants.add(AnimatedBuilder(
+            animation: glisse,
+            builder: (_, enfant) {
+              final q = j0 >= 0 && j0 < i && glisse.value < 1 ? pos(j0 + (i - j0) * Curves.easeInOut.transform(glisse.value)) : p;
+              return Positioned(left: q.dx - 13, top: q.dy - t / 2 - 30, child: enfant!);
+            },
+            child: const IgnorePointer(child: Text('🛶', style: TextStyle(fontSize: 24))),
+          ));
+          // Ville fermée : le cadenas et le compteur d'étoiles de la ville ; il monte étoile par étoile.
+          final seuil = _n(app.etatFleuve?['etoilesVille'] ?? 20), v = e['villeEtoiles'];
+          if (escale && v != null && _n(v) < seuil) {
+            final cleCad = '${widget.cle}$n', avant = _cadenasVu[cleCad];
+            _cadenasVu[cleCad] = _n(v);
+            enfants.add(Positioned(
+              left: p.dx - 50, width: 100, top: p.dy + t / 2 + 4,
+              child: IgnorePointer(child: Center(child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: (avant != null && avant < _n(v) && !app.sansAnim ? avant : _n(v)).toDouble(), end: _n(v).toDouble()),
+                duration: Duration(milliseconds: 350 * (avant != null && avant < _n(v) ? _n(v) - avant : 0)),
+                builder: (_, x, _) => Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(color: const Color(0xFF1D1606), borderRadius: BorderRadius.circular(99), border: Border.all(color: const Color(0x80FFD86B))),
+                  child: Text('🔒 ${x.round()} / $seuil ★', style: K.texte(12, couleur: _or, poids: FontWeight.w700)),
+                ),
+              ))),
+            ));
+          }
+        }
+        if (escale && et > 0) enfants.add(Positioned(left: p.dx + t / 2 - 10, top: p.dy - t / 2 - 10, child: const IgnorePointer(child: Text('🪙', style: TextStyle(fontSize: 16))))); // coffre ouvert
         // Mes amis posés sur leur étape (ceux qui ont tout fini : sur la dernière). Touchés : leur fiche.
         final amisIci = ((f['amis'] as List?) ?? const []).cast<Map>().where((a) => (a['n'] == null ? _n(f['publiees']) : _n(a['n'])) == n).toList();
         if (amisIci.isNotEmpty) {
@@ -338,10 +388,34 @@ class _CarteState extends State<_Carte> {
           gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: niger ? const [Color(0xFF3B3220), Color(0xFF4A3D24), Color(0xFF3F3420)] : const [Color(0xFF1A3B2A), Color(0xFF224A33), Color(0xFF1D4130)]),
         ),
         clipBehavior: Clip.antiAlias,
-        child: SingleChildScrollView(
-          controller: defile,
-          child: Center(child: SizedBox(width: L, height: H, child: Stack(clipBehavior: Clip.none, children: enfants))),
-        ),
+        child: Stack(children: [
+          SingleChildScrollView(
+            controller: defile,
+            child: Center(child: SizedBox(width: L, height: H, child: Stack(clipBehavior: Clip.none, children: enfants))),
+          ),
+          // Fin d'un bief : la brume qui cachait la suite se lève, avec le bandeau.
+          if (brume != null) AnimatedBuilder(
+            animation: leve,
+            builder: (_, _) {
+              final v = leve.value;
+              if (v >= 1) return const SizedBox.shrink();
+              final b = v < .3 ? 1.0 : 1 - (v - .3) / .6;
+              final s = v < .12 ? Curves.easeOutBack.transform(v / .12) : 1.0;
+              final o = v < .05 ? v / .05 : v > .85 ? (1 - v) / .15 : 1.0;
+              return IgnorePointer(child: Stack(children: [
+                Positioned.fill(child: Transform.translate(offset: Offset(0, -hautVue * .4 * (1 - b.clamp(0.0, 1.0))), child: Opacity(opacity: b.clamp(0.0, 1.0), child: const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xF7DCE8EE), Color(0xD9DCE8EE), Color(0x00DCE8EE)], stops: [0, .7, 1])))))),
+                Align(alignment: const Alignment(0, -.2), child: Opacity(opacity: o.clamp(0.0, 1.0), child: Transform.scale(scale: s, child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(color: K.brass, borderRadius: BorderRadius.circular(14), boxShadow: const [BoxShadow(color: Color(0x73000000), blurRadius: 20, offset: Offset(0, 8))]),
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    Text('Bief ${brume! - 1} terminé !', style: K.titre(22, couleur: K.encre)),
+                    Text("Le bief $brume s'ouvre", style: K.texte(13, couleur: K.encre, poids: FontWeight.w600)),
+                  ]),
+                )))),
+              ]));
+            },
+          ),
+        ]),
       );
     });
   }
@@ -379,6 +453,12 @@ Future<void> ouvrirEtapeFleuve(String cle, int n) async {
   final seuils = (e['seuils'] as Map?) ?? {};
   final p = (e['pagaies'] as Map?) ?? {};
   final pieges = ((e['pieges'] as List?) ?? []).cast<Map>();
+  // La première fois qu'on bute sur une ville : l'astuce du guide.
+  var astuce = false;
+  if (e['escale'] == true && e['villeEtoiles'] != null && _n(e['villeEtoiles']) < _n(e['etoilesVille']) && et == 0) {
+    final vu = Map<String, dynamic>.from((Stock.lire('kopo-fleuve-guide') as Map?) ?? const {});
+    if (vu['ville'] != true) { astuce = true; vu['ville'] = true; Stock.ecrire('kopo-fleuve-guide', vu); }
+  }
   Widget ligne(String etoiles, String t) => Padding(
         padding: const EdgeInsets.only(bottom: 4),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [SizedBox(width: 48, child: Text(etoiles, style: K.texte(13, couleur: _or))), Expanded(child: Text(t, style: K.texte(13)))]),
@@ -403,6 +483,11 @@ Future<void> ouvrirEtapeFleuve(String cle, int n) async {
           ]),
         ),
         if (e['escale'] == true && e['villeEtoiles'] != null && et == 0) ...[const Ecart(8), Text('Pour affronter le boss de ${e['ville']}, il te faut ${e['etoilesVille']} étoiles dans la ville : tu en as ${e['villeEtoiles']}.', textAlign: TextAlign.center, style: K.texte(14, couleur: K.muted))],
+        if (astuce) ...[const Ecart(8), Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(color: const Color(0xFFFFF3D0), borderRadius: BorderRadius.circular(12)),
+          child: Text('💡 Rejoue une étape où il te manque des étoiles : chaque étoile gagnée compte pour la ville.', style: K.texte(13.5, couleur: K.encre)),
+        )],
         const Ecart(10),
         if (e['refus'] != null) Text('${e['refus']}', textAlign: TextAlign.center, style: K.texte(14, couleur: K.warn))
         else if (_n(p['restantes']) <= 0) Text('Ta pirogue se repose. Nouvelles pagaies dans ${dureeLisible(_n((app.etatFleuve?['pagaies'] as Map?)?['retourMs']))}.', textAlign: TextAlign.center, style: K.texte(14, couleur: K.warn))
@@ -428,9 +513,22 @@ Future<void> resultatFleuve(Map r) async {
   final f = (app.etatFleuve?['fleuves'] as Map?)?[cle] as Map?;
   final depasses = ((r['depasses'] as List?) ?? const []).map((x) => '$x').toList();
   final suivante = reussi && f != null && f['courante'] != null && f['courante'] != r['numero'] ? _n(f['courante']) : null;
+  // La carte, au prochain affichage : la pirogue glisse, et la brume se lève si le bief est fini.
+  if (reussi && f != null && f['courante'] != null && _n(f['courante']) > _n(r['numero'])) { _glisse[cle] = _n(r['numero']); _biefVu[cle] = _n(f['bief']); }
+  if (reussi && r['biefTermine'] == true && f != null) _brume[cle] = _n(f['bief']);
+  // Missions du jour qui visent le Fleuve.
+  LigneMission? mission;
+  try {
+    final p = app.lireProfil(), ms = R.compterFleuve(p, cle, reussi, _n(r['nouvelles']), app.jourLocal());
+    if (ms.isNotEmpty) {
+      app.ecrireProfil(p); app.sauvegarderProfil();
+      mission = ms.firstWhere((m) => m.finie && m.avant < m.cible, orElse: () => ms.first);
+    }
+  } catch (_) {}
   app.ouvrirFenetre((context) => Fenetre(enfants: [
         Text('${F.nom} · étape ${r['numero']}${r['escale'] == true ? ' · ${r['ville']}' : ''}'.toUpperCase(), textAlign: TextAlign.center, style: K.texte(13, couleur: K.muted).copyWith(letterSpacing: 1)),
         const Ecart(6),
+        if (reussi && r['escale'] == true && r['premiereFois'] == true) const Center(child: _Coffre()),
         Text(reussi ? (r['escale'] == true && r['premiereFois'] == true ? '${r['ville']} est passée !' : 'Étape réussie !') : r['parti'] == true ? 'Étape abandonnée' : 'Pas cette fois…', textAlign: TextAlign.center, style: K.titre(36)),
         const Ecart(8),
         TweenAnimationBuilder<double>(
@@ -458,8 +556,17 @@ Future<void> resultatFleuve(Map r) async {
             child: Text('Tu passes ${depasses.take(2).join(' et ')}${depasses.length > 2 ? ' et ${depasses.length - 2} autre${depasses.length > 3 ? 's' : ''}' : ''} !', textAlign: TextAlign.center, style: K.titre(24, couleur: _or)),
           )],
           if (r['premierA'] != null) ...[const Ecart(6), Text('⛵ Premier de tes amis à ${r['premierA']} : la marque « 1er à ${r['premierA']} » est à toi.', textAlign: TextAlign.center, style: K.texte(13, couleur: _or))],
-        ] else
+        ] else ...[
+          Center(child: _pagaies((r['pagaies'] as Map?) ?? const {}, perte: true)),
+          const Ecart(4),
           Muet("Une pagaie perdue. Il t'en reste $reste.", align: TextAlign.center),
+        ],
+        if (mission != null) ...[
+          const Ecart(6),
+          mission.finie && mission.avant < mission.cible
+              ? Text('✓ Mission finie : ${mission.texte} (+${mission.pieces} pièces à encaisser)', textAlign: TextAlign.center, style: K.texte(13, couleur: _or))
+              : Muet('Mission : ${mission.texte} · ${mission.apres} / ${mission.cible}', align: TextAlign.center, taille: 12),
+        ],
         const Ecart(12),
         if (suivante != null) ...[Btn.principal('Étape $suivante', large: true, onTap: () => ouvrirEtapeFleuve(cle, suivante)), const Ecart(8)],
         if (reste > 0 && (!reussi || et < 3)) ...[
@@ -469,4 +576,157 @@ Future<void> resultatFleuve(Map r) async {
         Btn('Voir la carte', large: true, onTap: () => app.etatFleuve != null ? _afficherCarte(cle) : ouvrirFleuve(cle)),
       ]));
   app.maj();
+}
+
+// ---------------------------------------------------------------- Le guide (une fois par appareil)
+/// Trois bulles posées sur la carte, chacune pointe ce dont elle parle ; plus celle du Niger la première fois.
+void _guide(BuildContext context, String cle, {required GlobalKey kCourante, required GlobalKey kEscale, required GlobalKey kPagaies, required GlobalKey kOnglets}) {
+  final vu = Map<String, dynamic>.from((Stock.lire('kopo-fleuve-guide') as Map?) ?? const {});
+  final liste = <(GlobalKey?, String, String)>[];
+  if (vu['base'] != true) {
+    final n = _n(app.etatFleuve?['etoilesVille'] ?? 20);
+    liste.addAll([
+      (kCourante, 'Chaque étape a un objectif.', "Réussis-le pour avancer. Jusqu'à 3 étoiles par étape."),
+      (kPagaies, '5 pagaies par jour.', 'Réussir ne coûte rien, rater coûte 1 pagaie. Elles reviennent à minuit.'),
+      (kEscale.currentContext != null ? kEscale : kCourante, 'Les villes', '$n étoiles sur 30 pour passer chaque ville. La dernière étape de la ville est la plus dure.'),
+    ]);
+    vu['base'] = true;
+  }
+  if (cle == 'niger' && vu['niger'] != true) {
+    liste.add((kOnglets, "Ici, on joue à l'Inter (8).", "Sur le Niger, chaque étape est une partie d'Inter (8) contre des robots. Le Congo se joue au Kopo."));
+    vu['niger'] = true;
+  }
+  if (liste.isEmpty) return;
+  Stock.ecrire('kopo-fleuve-guide', vu);
+  final overlay = Overlay.of(context, rootOverlay: true);
+  late OverlayEntry entree;
+  entree = OverlayEntry(builder: (_) => _Bulles(liste, () => entree.remove()));
+  Future.delayed(Duration(milliseconds: app.sansAnim ? 0 : 500), () => overlay.insert(entree));
+}
+
+class _Bulles extends StatefulWidget {
+  final List<(GlobalKey?, String, String)> liste;
+  final VoidCallback fin;
+  const _Bulles(this.liste, this.fin);
+  @override
+  State<_Bulles> createState() => _BullesState();
+}
+
+class _BullesState extends State<_Bulles> {
+  int i = 0;
+  Rect? r;
+  @override
+  void initState() { super.initState(); _viser(); }
+  void _viser() {
+    final c = widget.liste[i].$1?.currentContext;
+    if (c != null) Scrollable.ensureVisible(c, alignment: .5);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final o = widget.liste[i].$1?.currentContext?.findRenderObject();
+      setState(() => r = o is RenderBox && o.attached ? o.localToGlobal(Offset.zero) & o.size : null);
+    });
+  }
+  void _suivant() { if (i + 1 >= widget.liste.length) { widget.fin(); return; } setState(() { i++; r = null; }); _viser(); }
+  @override
+  Widget build(BuildContext context) {
+    final t = widget.liste[i], taille = MediaQuery.of(context).size;
+    final cible = r ?? Rect.fromCenter(center: taille.center(Offset.zero), width: 0, height: 0);
+    const larg = 300.0;
+    final l = math.min(larg, taille.width - 32);
+    final x = (cible.center.dx - l / 2).clamp(16.0, taille.width - l - 16);
+    final dessous = cible.bottom + 150 < taille.height;
+    final fleche = (cible.center.dx - x).clamp(18.0, l - 18);
+    final bulle = Container(
+      width: l,
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+      decoration: BoxDecoration(color: const Color(0xFFFFF3D0), borderRadius: BorderRadius.circular(14), boxShadow: const [BoxShadow(color: Color(0x80000000), blurRadius: 28, offset: Offset(0, 10))]),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+        Text(t.$2, style: K.texte(15, couleur: K.encre, poids: FontWeight.w700)),
+        const SizedBox(height: 4),
+        Text(t.$3, style: K.texte(14, couleur: K.encre).copyWith(height: 1.35)),
+        const SizedBox(height: 8),
+        Row(children: [
+          Text(widget.liste.length > 1 ? '${i + 1} / ${widget.liste.length}' : '', style: K.texte(12, couleur: const Color(0xFF6B5A2E))),
+          const Spacer(),
+          GestureDetector(onTap: _suivant, child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            decoration: BoxDecoration(color: K.encre, borderRadius: BorderRadius.circular(99)),
+            child: Text(i < widget.liste.length - 1 ? 'Suivant' : 'Compris !', style: K.texte(13, couleur: _or, poids: FontWeight.w700)),
+          )),
+        ]),
+      ]),
+    );
+    final pointe = Transform.rotate(angle: math.pi / 4, child: Container(width: 14, height: 14, color: const Color(0xFFFFF3D0)));
+    return Material(type: MaterialType.transparency, child: Stack(children: [
+      Positioned.fill(child: GestureDetector(onTap: _suivant, child: CustomPaint(painter: _Trou(r?.inflate(6))))),
+      Positioned(
+        left: x, top: dessous ? cible.bottom + 12 : null, bottom: dessous ? null : taille.height - cible.top + 12,
+        child: Stack(clipBehavior: Clip.none, children: [
+          bulle,
+          Positioned(left: fleche - 7, top: dessous ? -7 : null, bottom: dessous ? null : -7, child: pointe),
+        ]),
+      ),
+    ]));
+  }
+}
+
+/// Le voile sombre, percé autour de ce dont parle la bulle.
+class _Trou extends CustomPainter {
+  final Rect? r;
+  _Trou(this.r);
+  @override
+  void paint(Canvas c, Size s) {
+    final tout = Path()..addRect(Offset.zero & s);
+    final trou = r == null ? null : RRect.fromRectAndRadius(r!, const Radius.circular(14));
+    c.drawPath(trou == null ? tout : Path.combine(PathOperation.difference, tout, Path()..addRRect(trou)), Paint()..color = const Color(0x99040A12));
+    if (trou != null) c.drawRRect(trou, Paint()..color = _or..style = PaintingStyle.stroke..strokeWidth = 4);
+  }
+  @override
+  bool shouldRepaint(covariant _Trou old) => old.r != r;
+}
+
+/// Règles → Le Fleuve : le guide en texte.
+void reglesFleuve() {
+  final n = _n(app.etatFleuve?['etoilesVille'] ?? 20);
+  Widget li(int k, String b, String t) => Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(color: const Color(0x0DFFFFFF), borderRadius: BorderRadius.circular(12), border: Border.all(color: K.line)),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(width: 28, height: 28, alignment: Alignment.center, decoration: const BoxDecoration(color: K.brass, shape: BoxShape.circle), child: Text('$k', style: K.texte(14, couleur: K.encre, poids: FontWeight.w700))),
+          const SizedBox(width: 10),
+          Expanded(child: Text.rich(TextSpan(style: K.texte(14), children: [TextSpan(text: b, style: const TextStyle(fontWeight: FontWeight.w700)), TextSpan(text: ' $t')]))),
+        ]),
+      );
+  app.ouvrirFenetre((context) => Fenetre(titre: 'Le Fleuve', enfants: [
+        li(1, 'Remonte le fleuve étape par étape.', "Chaque étape est une petite partie contre des robots, avec un objectif. Réussis-le pour avancer, jusqu'à 3 étoiles par étape."),
+        li(2, 'Deux fleuves.', "Le Congo se joue au Kopo, le Niger à l'Inter (8)."),
+        li(3, '5 pagaies par jour.', 'Réussir ne coûte rien, rater coûte 1 pagaie. Elles reviennent à minuit.'),
+        li(4, 'Les villes : $n étoiles sur 30.', "Il les faut pour affronter le boss de la ville, la dernière étape, la plus dure. Il te manque des étoiles ? Rejoue une étape où tu n'en as pas 3."),
+        li(5, 'Tes amis rament avec toi.', "Vois où ils en sont et passe devant. Le plus d'étoiles de la semaine entre amis gagne la course."),
+        const Ecart(4),
+        Btn.principal('Compris !', large: true, onTap: app.fermerFenetre),
+        const Ecart(8),
+        Btn('Revoir le guide sur la carte', large: true, onTap: () { Stock.ecrire('kopo-fleuve-guide', <String, dynamic>{}); ouvrirFleuve(); }),
+      ]));
+}
+
+/// Boss vaincu : le coffre de la ville s'ouvre.
+class _Coffre extends StatefulWidget {
+  const _Coffre();
+  @override
+  State<_Coffre> createState() => _CoffreState();
+}
+
+class _CoffreState extends State<_Coffre> {
+  bool ouvert = app.sansAnim;
+  @override
+  void initState() { super.initState(); if (!ouvert) Future.delayed(const Duration(milliseconds: 850), () { if (mounted) setState(() => ouvert = true); }); }
+  @override
+  Widget build(BuildContext context) => TweenAnimationBuilder<double>(
+        key: ValueKey(ouvert),
+        tween: Tween(begin: 0, end: 1), duration: Duration(milliseconds: app.sansAnim ? 1 : ouvert ? 400 : 800),
+        builder: (_, v, enfant) => Transform.rotate(angle: ouvert ? 0 : math.sin(v * math.pi * 3) * .14, child: Transform.scale(scale: ouvert ? .7 + .3 * Curves.easeOutBack.transform(v) : .6 + .4 * v, child: enfant)),
+        child: Text(ouvert ? '💰' : '🧰', style: const TextStyle(fontSize: 60, height: 1)),
+      );
 }

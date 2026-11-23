@@ -168,7 +168,9 @@ function creerFleuve(base, reglages, comptes, social = null) {
       const ouvert = ouvertPour(compte);
       const p = await pagaiesDe(compte.id);
       const demain = debutDu(ajouterJours(jourDe(horloge()), 1));
-      const res = { ouvert, google: !!compte.auth_id, pagaies: { ...p, retourMs: demain - horloge() }, etoilesVille: seuilVille(), fleuves: {} };
+      const res = { ouvert, google: !!compte.auth_id, pagaies: { ...p, retourMs: demain - horloge() }, etoilesVille: seuilVille(), fleuves: {}, lance: cfg().lance || null };
+      // Mise de la Bande rendue au lancement (3e écran de la fenêtre « Nouveau »).
+      if (cfg().lance) res.rembourse = (await base.query("SELECT coalesce(sum(montant), 0)::int AS n FROM registre_pieces WHERE compte_id = $1 AND motif = 'fermeture_bande'", [compte.id])).rows[0].n;
       if (!ouvert) return res;
       for (const fleuve of Object.keys(G.FLEUVES)) {
         const etoiles = await etoilesDuJoueur(compte.id, fleuve);
@@ -302,6 +304,34 @@ function creerFleuve(base, reglages, comptes, social = null) {
         if (out.depasses) out.depasses = out.depasses.map((a) => a.pseudo);
         return out;
       });
+    },
+
+    // --- Le lancement (fleuve.md « La fermeture de la Bande ») : un seul bouton de l'admin, une seule fois.
+    // La semaine de Bande en cours est annulée et chaque mise rendue (« Bande fermée : mise rendue »), plus personne
+    // ne peut miser ; le Match du jour s'arrête ; le Fleuve s'ouvre à tous et la fenêtre « Nouveau » s'allume.
+    async lancer() {
+      if (cfg().lance) throw erreur('Le Fleuve est déjà lancé.', 409);
+      const quand = horloge();
+      const semaines = (await base.query("SELECT bande_id, to_char(semaine, 'YYYY-MM-DD') AS semaine FROM bande_semaines WHERE statut = 'ouverte'")).rows;
+      const rendus = new Map();
+      for (const s of semaines) {
+        const l = await base.transaction(async (q) => {
+          const x = (await q.query("SELECT 1 FROM bande_semaines WHERE bande_id = $1 AND semaine = $2 AND statut = 'ouverte' FOR UPDATE", [s.bande_id, s.semaine])).rows[0];
+          if (!x) return [];
+          const ins = (await q.query('SELECT compte_id, mise FROM bande_inscriptions WHERE bande_id = $1 AND semaine = $2', [s.bande_id, s.semaine])).rows;
+          for (const i of ins) await comptes.mouvement(q, i.compte_id, i.mise, 'fermeture_bande', `bande:${s.bande_id}:${s.semaine}`);
+          await q.query("UPDATE bande_semaines SET statut = 'annulee', cloturee_le = now(), resultat = $3 WHERE bande_id = $1 AND semaine = $2", [s.bande_id, s.semaine, JSON.stringify({ annulee: true, fermeture: true, inscrits: ins.map((i) => i.compte_id) })]);
+          return ins;
+        });
+        for (const i of l) rendus.set(i.compte_id, (rendus.get(i.compte_id) || 0) + i.mise);
+      }
+      await reglages.ecrire('bande', { ...(reglages.get('bande') || {}), actif: false });
+      await reglages.ecrire('matchJour', { ...(reglages.get('matchJour') || {}), actif: false });
+      await reglages.ecrire('fleuve', { ...cfg(), etat: 'ouvert', lance: quand.toISOString() });
+      if (social) for (const [id, n] of rendus) {
+        await social.notifier(id, 'bande', `La Bande laisse la place au Fleuve. Ta mise de la semaine t'a été rendue : +${n} pièces.`, { fermeture: true, pieces: n }).catch(() => {});
+      }
+      return { ok: true, lance: quand.toISOString(), semaines: semaines.length, joueurs: rendus.size, pieces: [...rendus.values()].reduce((a, b) => a + b, 0) };
     },
 
     // --- Course de la semaine (du lundi au dimanche minuit, heure de Kinshasa), sur chaque fleuve.

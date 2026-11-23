@@ -534,13 +534,18 @@ class App extends ChangeNotifier {
       .toList()
     ..sort((a, b) => (b['joueurs'] as num).compareTo(a['joueurs'] as num));
 
+  /// Le Fleuve est lancé : la Bande et le Match du jour ont disparu, le parcours de saison aussi.
+  bool get fleuveLance => enLigne && config?['fleuveLance'] != null;
   Future<void> majCartesCompetition() async {
     if (!enLigne) return;
-    try {
-      final e = etatJour = (await Api.get('/match-jour') as Map).cast<String, dynamic>();
-      pointJour = e['actif'] == true && !(e['moi'] is Map && e['moi']['fini'] == true);
-    } catch (_) {}
-    try { etatBandes = (await Api.get('/bandes') as Map).cast<String, dynamic>(); } catch (_) {}
+    if (fleuveLance) { etatJour = null; etatBandes = null; pointJour = false; }
+    else {
+      try {
+        final e = etatJour = (await Api.get('/match-jour') as Map).cast<String, dynamic>();
+        pointJour = e['actif'] == true && !(e['moi'] is Map && e['moi']['fini'] == true);
+      } catch (_) {}
+    }
+    if (!fleuveLance) { try { etatBandes = (await Api.get('/bandes') as Map).cast<String, dynamic>(); } catch (_) {} }
     await majFleuve();
     try { final a = await Api.get('/amis') as List; amisEnLigne = a.where((x) => x['en_ligne'] == true).length; } catch (_) {}
     maj();
@@ -550,6 +555,15 @@ class App extends ChangeNotifier {
     final f = config?['fleuve'];
     if (!enLigne || f == null || f == 'ferme') { etatFleuve = null; return; }
     try { etatFleuve = (await Api.get('/fleuve') as Map).cast<String, dynamic>(); } catch (_) {}
+    reglerMissionsFleuve();
+  }
+  /// Missions du jour : celles qui visent le Fleuve ne sont tirées que pour un fleuve ouvert et publié.
+  void reglerMissionsFleuve() {
+    final e = etatFleuve, o = <String, bool>{};
+    if (e != null && e['ouvert'] == true && e['google'] == true) {
+      for (final k in ((e['fleuves'] as Map?) ?? {}).keys) { o[k.toString()] = ((e['fleuves'][k]['publiees'] as num?) ?? 0) > 0; }
+    }
+    R.reglerFleuve(o);
   }
   Future<void> majOngletLigue() async {
     if (!enLigne) return;

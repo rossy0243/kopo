@@ -12,6 +12,7 @@ import '../etat.dart';
 import '../reseau/api.dart';
 import 'communes.dart';
 import 'compet.dart' show fenetreNouveaute;
+import 'fleuve.dart' show reglesFleuve;
 import 'progres.dart';
 
 // ---------------------------------------------------------------- Inter (8) : quelle partie ?
@@ -287,8 +288,8 @@ void montrerRegles() {
         Btn.principal("C'est compris", large: true, onTap: app.fermerFenetre),
         const Ecart(8),
         Btn('Apprendre en jouant (1 min)', large: true, onTap: ouvrirTutoriel),
-        const Ecart(8),
-        Btn('Match du jour et Bande', large: true, onTap: () => fenetreNouveaute(0)),
+        if (_fleuveOuvert) ...[const Ecart(8), Btn('Le Fleuve', large: true, onTap: reglesFleuve)],
+        if (!app.fleuveLance) ...[const Ecart(8), Btn('Match du jour et Bande', large: true, onTap: () => fenetreNouveaute(0))],
       ]), 'regles');
 }
 
@@ -328,6 +329,7 @@ void montrerReglesInter() {
         Btn.principal("C'est compris", large: true, onTap: app.fermerFenetre),
         const Ecart(8),
         Btn('Jouer une partie guidée', large: true, onTap: () => app.partieGuidee(inter: true)),
+        if (_fleuveOuvert) ...[const Ecart(8), Btn('Le Fleuve', large: true, onTap: reglesFleuve)],
       ]), 'regles');
 }
 
@@ -478,3 +480,6 @@ void fenetreJouerEnLigne() {
   fenetreGoogle('Jouer en ligne', "Pour jouer en ligne ou entre amis, connecte-toi avec Google : c'est gratuit, et tes pièces et ton niveau te suivent sur tous tes téléphones. Sans compte, tu peux jouer contre les robots.",
       extra: (_) => [Btn('Jouer contre les robots', large: true, onTap: () { app.fermerFenetre(); ouvrirRobots(); })]);
 }
+
+/// Le Fleuve ouvert (à tous ou aux testeurs) : Règles → Le Fleuve.
+bool get _fleuveOuvert => app.enLigne && app.config?['fleuve'] != null && app.config?['fleuve'] != 'ferme';

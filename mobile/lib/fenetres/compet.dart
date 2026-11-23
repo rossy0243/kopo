@@ -10,6 +10,7 @@ import '../ecrans/accueil.dart' show dureeLisible, lienBandeVu;
 import '../etat.dart';
 import '../reseau/api.dart';
 import 'communes.dart';
+import 'fleuve.dart' show ouvrirFleuve;
 import 'social.dart';
 
 const pays = [('CD', 'RD Congo'), ('CG', 'Congo-Brazzaville'), ('CI', "Côte d'Ivoire"), ('SN', 'Sénégal'), ('CM', 'Cameroun'), ('GA', 'Gabon'), ('BJ', 'Bénin'), ('TG', 'Togo'), ('BF', 'Burkina Faso'), ('ML', 'Mali'), ('NE', 'Niger'), ('GN', 'Guinée'), ('RW', 'Rwanda'), ('BI', 'Burundi'), ('MG', 'Madagascar'), ('TD', 'Tchad'), ('CF', 'Centrafrique'), ('AO', 'Angola'), ('KE', 'Kenya'), ('TZ', 'Tanzanie'), ('UG', 'Ouganda'), ('NG', 'Nigeria'), ('GH', 'Ghana'), ('ZA', 'Afrique du Sud'), ('MA', 'Maroc'), ('DZ', 'Algérie'), ('TN', 'Tunisie'), ('HT', 'Haïti'), ('FR', 'France'), ('BE', 'Belgique'), ('CH', 'Suisse'), ('CA', 'Canada'), ('US', 'États-Unis'), ('GB', 'Royaume-Uni')];
@@ -138,8 +139,7 @@ class _LigueState extends State<_Ligue> {
       const Ecart(8),
       ...liste,
       const Ecart(10),
-      Btn('Parcours de saison', large: true, onTap: ouvrirParcours),
-      const Ecart(8),
+      if (!app.fleuveLance) ...[Btn('Parcours de saison', large: true, onTap: ouvrirParcours), const Ecart(8)], // remplacé par le Fleuve
       Muet('Parties classées : seulement « En ligne », avec des inconnus. 1er +${pts['premier']}, 2e +${pts['deuxieme']}, 3e +${pts['troisieme']}, dernier ${pts['dernier']}. Fin de saison : un titre et des pièces selon la division atteinte.', taille: 12),
       const Ecart(10),
       Btn.principal('Fermer', large: true, onTap: app.fermerFenetre),
@@ -636,12 +636,25 @@ Future<void> ouvrirLienBande(Map l) async {
 }
 
 // ---------------------------------------------------------------- « Nouveau » : Match du jour et Bande (3 écrans, une fois)
-const nouveaute = 'bande';
+// La nouveauté du moment : 'fleuve' dès le lancement du Fleuve (il remplace la Bande), sinon 'bande'.
+String get nouveaute => (app.config?['nouveaute'] as String?) ?? 'bande';
 Map? lireNouveaute() { final v = Stock.lire('kopo-nouveaute-vue'); return v is Map && v['id'] == nouveaute ? v : null; }
 void ecrireNouveaute(Map x) => Stock.ecrire('kopo-nouveaute-vue', {'id': nouveaute, 'le': DateTime.now().millisecondsSinceEpoch, ...?lireNouveaute(), ...x});
+/// Badge NOUVEAU sur la carte du Fleuve : 7 jours après le lancement, tant qu'on ne l'a pas ouverte.
+bool badgeFleuve() {
+  final l = DateTime.tryParse(app.config?['fleuveLance']?.toString() ?? '');
+  return app.fleuveLance && l != null && DateTime.now().difference(l).inDays < 7 && lireNouveaute()?['fleuveVu'] != true;
+}
+void fleuveVu() { if (app.fleuveLance && nouveaute == 'fleuve') ecrireNouveaute({'fleuveVu': true}); }
 
 bool annonceNouveaute() {
-  if (!(app.enLigne && app.config?['nouveaute'] == nouveaute) || lireNouveaute() != null) return false;
+  if (!(app.enLigne && app.config?['nouveaute'] != null) || lireNouveaute() != null) return false;
+  if (nouveaute == 'fleuve') {
+    if (app.config?['fleuve'] != 'ouvert') return false;
+    ecrireNouveaute({});
+    app.majFleuve().whenComplete(() => fenetreNouveauteFleuve(0));
+    return true;
+  }
   if (Stock.lire('kopo-bande-lien') != null) { ecrireNouveaute({'saute': true}); return false; }
   ecrireNouveaute({});
   Stock.ecrire('kopo-jour-explique', true);
@@ -731,6 +744,74 @@ void fenetreNouveaute(int etape) {
         onHorizontalDragEnd: (d) {
           final v = d.primaryVelocity ?? 0;
           if (v < -200 && etape < 2) { fenetreNouveaute(etape + 1); } else if (v > 200 && etape > 0) { fenetreNouveaute(etape - 1); }
+        },
+        child: Fenetre(enfants: contenu),
+      ), 'nouveaute');
+}
+
+// ---------------------------------------------------------------- « Nouveau » : le Fleuve (3 écrans, une fois, au lancement)
+void fenetreNouveauteFleuve(int etape) {
+  void fermer() { app.fermerFenetre(); app.suiteAccueil(); }
+  Widget points() => Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+        for (var i = 0; i < 3; i++) Container(width: 8, height: 8, margin: const EdgeInsets.all(3), decoration: BoxDecoration(shape: BoxShape.circle, color: i == etape ? K.brass : K.line)),
+      ]);
+  Widget badge() => Center(child: Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3), decoration: BoxDecoration(color: K.red, borderRadius: BorderRadius.circular(99)), child: Text('NOUVEAU', style: K.texte(12, couleur: Colors.white, poids: FontWeight.w700))));
+  Widget p(List<Object> m) => Text.rich(TextSpan(style: K.texte(15), children: [for (final x in m) x is List ? TextSpan(text: x[0] as String, style: const TextStyle(fontWeight: FontWeight.w700)) : TextSpan(text: x as String)]), textAlign: TextAlign.center);
+  Widget titre(String t) => Text(t, textAlign: TextAlign.center, style: K.titre(36));
+  Widget ligne(String e, String b, String t) => Padding(padding: const EdgeInsets.only(bottom: 6), child: Row(children: [Text(e, style: const TextStyle(fontSize: 24)), const SizedBox(width: 10), Expanded(child: Text.rich(TextSpan(style: K.texte(14), children: [TextSpan(text: b, style: const TextStyle(fontWeight: FontWeight.w700)), TextSpan(text: ' $t')])))]));
+  List<Widget> contenu;
+  if (etape == 0) {
+    contenu = [
+      badge(), const Ecart(6), titre('Le Fleuve'),
+      p([['Remonte le fleuve étape par étape.'], " Chaque étape est une petite partie contre des robots, avec un objectif. Jusqu'à 3 étoiles par étape."]),
+      const Ecart(10),
+      const Center(child: Text('🌊 🛶 ① ② ③ … 🏙️', style: TextStyle(fontSize: 22))),
+      const Muet("Le Congo pour le Kopo · le Niger pour l'Inter (8)", align: TextAlign.center, taille: 12),
+      const Ecart(6),
+      const Muet('5 pagaies par jour : réussir ne coûte rien, rater coûte 1 pagaie.', align: TextAlign.center, taille: 12),
+    ];
+  } else if (etape == 1) {
+    contenu = [
+      badge(), const Ecart(6), titre('Tes amis rament avec toi'), const Ecart(8),
+      ligne('🛶', 'Tes amis sur la carte', ': vois où ils en sont et passe devant'),
+      ligne('🏁', 'La course de la semaine', ": le plus d'étoiles entre amis gagne ${_p((((app.etatFleuve?['fleuves'] as Map?)?['congo'] as Map?)?['course'] as Map?)?['pieces'] ?? 300)} pièces"),
+      ligne('⛵', 'Premier à une ville', ': la marque reste sur ton profil'),
+      const Muet('Personne ne mise, personne ne perd de pièces.', align: TextAlign.center, taille: 12),
+    ];
+  } else {
+    final rendu = (app.etatFleuve?['rembourse'] as num?)?.toInt() ?? 0;
+    final g = app.config?['google'] as String?;
+    contenu = [
+      titre("La Bande s'arrête"),
+      if (rendu > 0) ...[
+        Center(child: Text.rich(TextSpan(children: [TextSpan(text: '+${_p(rendu)}', style: K.titre(48, couleur: Colors.white)), TextSpan(text: ' pièces', style: K.texte(16, couleur: K.muted))]))),
+        p(['Ta mise de la semaine ', ["t'a été rendue"], '.']),
+      ],
+      const Ecart(6),
+      p(['La Bande et le Match du jour laissent la place au Fleuve. La Ligue reste.']),
+      const Ecart(12),
+      if (app.avecGoogle) Btn.principal('Embarquer', large: true, onTap: () { fleuveVu(); app.fermerFenetre(); app.maj(); ouvrirFleuve(); })
+      else ...[
+        p(['Connecte-toi avec Google pour embarquer.']),
+        const Ecart(8),
+        if (g != null) Btn.principal('Se connecter avec Google', large: true, onTap: () => connecterGoogle(g)),
+      ],
+      const Ecart(8), points(),
+      Btn('Plus tard', style: StyleBtn.discret, large: true, onTap: fermer),
+    ];
+  }
+  if (etape < 2) {
+    contenu = [
+      Align(alignment: Alignment.centerRight, child: Btn('Passer', style: StyleBtn.discret, onTap: fermer)),
+      ...contenu,
+      const Ecart(10), points(), const Ecart(8),
+      Btn.principal('Suivant', large: true, onTap: () => fenetreNouveauteFleuve(etape + 1)),
+    ];
+  }
+  app.ouvrirFenetre((context) => GestureDetector(
+        onHorizontalDragEnd: (d) {
+          final v = d.primaryVelocity ?? 0;
+          if (v < -200 && etape < 2) { fenetreNouveauteFleuve(etape + 1); } else if (v > 200 && etape > 0) { fenetreNouveauteFleuve(etape - 1); }
         },
         child: Fenetre(enfants: contenu),
       ), 'nouveaute');

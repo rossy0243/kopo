@@ -137,14 +137,38 @@ class R {
     Modele('enligne', 'Joue une partie en ligne', 1, 40, (e) => e.publique ? 1 : 0),
     Modele('amis', 'Joue une partie entre amis', 1, 50, (e) => !e.publique && !e.avecRobots && e.nbJoueurs >= 2 ? 1 : 0),
     Modele('grande', 'Joue une partie à 7 joueurs ou plus', 1, 50, (e) => e.nbJoueurs >= 7 ? 1 : 0),
+    // Le Fleuve (tirées seulement quand il est ouvert, voir reglerFleuve) : comptées à la fin d'une étape (compterFleuve).
+    Modele('fleuve2', 'Réussis 2 étapes du Fleuve', 2, 50, (e) => 0, fleuve: 'tous', compteFleuve: (f, r, n) => r ? 1 : 0),
+    Modele('congo3', 'Gagne 3 étoiles sur le Congo', 3, 60, (e) => 0, fleuve: 'congo', compteFleuve: (f, r, n) => f == 'congo' ? n : 0),
+    Modele('niger3', 'Gagne 3 étoiles sur le Niger', 3, 60, (e) => 0, fleuve: 'niger', compteFleuve: (f, r, n) => f == 'niger' ? n : 0),
   ];
+  // Fleuves ouverts à ce joueur (réglés quand l'état du Fleuve arrive) : {'congo': true, 'niger': false}.
+  static Map<String, bool> fleuvesOuverts = {};
+  static void reglerFleuve(Map<String, bool> o) => fleuvesOuverts = Map.of(o);
+  static bool _tirable(Modele m) => m.fleuve == null || (m.fleuve == 'tous' ? fleuvesOuverts.values.any((x) => x) : fleuvesOuverts[m.fleuve] == true);
+  /// Fin d'une étape du Fleuve : fait avancer les missions qui visent le Fleuve.
+  static List<LigneMission> compterFleuve(Profil p, String fleuve, bool reussi, int nouvelles, String jour) {
+    missionsDuJour(p, jour);
+    final out = <LigneMission>[];
+    for (final m in _ms(p)['liste'] as List) {
+      final md = modele(m['id'])!;
+      if (m['finie'] == true || md.compteFleuve == null) continue;
+      final n = md.compteFleuve!(fleuve, reussi, reussi ? math.max(0, nouvelles) : 0);
+      if (n == 0) continue;
+      final avant = _n(m['avance']);
+      m['avance'] = math.min(md.cible, avant + n);
+      if (_n(m['avance']) >= md.cible) { m['finie'] = true; m['finieLe'] = jour; m['aEncaisser'] = true; }
+      out.add(LigneMission(md.texte, avant, _n(m['avance']), md.cible, m['finie'] == true, m['finie'] == true, md.pieces));
+    }
+    return out;
+  }
   static Modele? modele(Object? id) { for (final m in modeles) { if (m.id == id) return m; } return null; }
   static const parJour = 3, dureeMission = 2;
   static int xpMission(Modele m) => (m.pieces / 10).round();
 
   static List<Map<String, dynamic>> _tirerMissions(String jour, List exclus, int n, [String sel = '']) {
     final r = hasard('missions-$jour$sel');
-    final libres = modeles.where((m) => !exclus.contains(m.id)).toList();
+    final libres = modeles.where((m) => !exclus.contains(m.id) && _tirable(m)).toList();
     final choix = <Modele>[];
     bool jouer(String id) => id.startsWith('jouer');
     final faciles = libres.where((m) => jouer(m.id)).toList();
@@ -469,7 +493,9 @@ class Modele {
   final String id, texte;
   final int cible, pieces;
   final int Function(Bilan) compte;
-  const Modele(this.id, this.texte, this.cible, this.pieces, this.compte);
+  final String? fleuve; // mission du Fleuve : 'tous', 'congo' ou 'niger'
+  final int Function(String fleuve, bool reussi, int nouvelles)? compteFleuve;
+  const Modele(this.id, this.texte, this.cible, this.pieces, this.compte, {this.fleuve, this.compteFleuve});
 }
 
 class VueMission {

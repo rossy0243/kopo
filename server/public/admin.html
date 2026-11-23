@@ -913,11 +913,21 @@ afficher.fleuve = async function fleuve(vue) {
   $('#contenu').innerHTML = `<h2>Le Fleuve</h2>
     <div class="carte"><div class="titre">Ouverture</div><div class="s">Fermé : personne ne le voit. Testeurs : seulement les pseudos de la liste des testeurs (Réglages > Accès et versions). Ouvert : tout le monde.</div>
       <div class="ligne">${ETATS_FLEUVE.map(([v, l]) => `<button class="btn${v === etat ? ' principal' : ''}" data-etat="${v}">${l}</button>`).join(' ')}</div></div>
+    <div class="carte"><div class="titre">Lancement</div>${F.reglages.lance
+      ? `<div class="s"><span class="ok">Lancé le ${esc(new Date(F.reglages.lance).toLocaleString('fr-FR'))}</span>. La Bande est fermée, le Match du jour arrêté, la fenêtre « Nouveau » s'affiche une fois à chaque joueur et le badge NOUVEAU reste 7 jours.</div>`
+      : `<div class="s">Le jour J, un seul bouton : la semaine de Bande en cours est annulée et chaque mise rendue (« Bande fermée : mise rendue »), plus personne ne peut miser, le Match du jour s'arrête, le parcours de saison disparaît (les objets gagnés restent), le Fleuve s'ouvre à tous et la fenêtre « Nouveau » s'allume. Impossible à défaire. Fabrique et publie d'abord au moins 2 biefs sur chaque fleuve.</div>
+      <div class="ligne"><button class="btn principal" id="lancerFleuve">Lancer le Fleuve</button></div>`}</div>
     <p class="muted">Chaque étape est fabriquée par les robots : un robot Fort joue l'étape à la place du joueur, jusqu'à trouver la force des robots qui donne la réussite visée ; les seuils des étoiles viennent des mêmes parties. Comptez quelques secondes par bief pour le Congo, plusieurs minutes pour le Niger. Pagaies, pièces, courbe et objectifs : <button class="lien" id="versReglagesFleuve">Réglages > Le Fleuve</button>.</p>
     ${Object.entries(F.fleuves).map(([k, f]) => bloc(k, f)).join('')}
     <div class="carte"><div class="titre">Courses de la semaine</div><div class="s">Chaque joueur court contre ses amis : celui qui gagne le plus d'étoiles nouvelles du lundi au dimanche (heure de Kinshasa) reçoit ${nb(F.reglages.piecesCourse ?? 300)} pièces et la marque « Pagayeur de la semaine » pendant 7 jours. Il faut au moins un ami qui a aussi gagné des étoiles. Ex æquo : tous gagnent. Réglée le lundi à minuit.</div>
       ${F.courses && F.courses.length ? `<table><tr><th>Semaine du</th><th>Fleuve</th><th class="n">Gagnants</th><th class="n">Pièces offertes</th></tr>${F.courses.map((c) => `<tr><td>${esc(String(c.semaine).slice(0, 10))}</td><td>${c.fleuve === 'niger' ? 'Niger' : 'Congo'}</td><td class="n">${nb(c.gagnants)}</td><td class="n">${nb(c.pieces)}</td></tr>`).join('')}</table>` : '<p class="muted">Aucune course réglée pour l\'instant.</p>'}</div>`;
   $('#versReglagesFleuve').onclick = () => aller('reglages', 'fleuve');
+  if ($('#lancerFleuve')) $('#lancerFleuve').onclick = () => {
+    const peu = Object.values(F.fleuves).filter((f) => f.biefs.filter((b) => b.publie).length < 2).map((f) => f.nom);
+    const t = prompt(`${peu.length ? `Attention : moins de 2 biefs publiés sur ${peu.join(' et ')}.\n\n` : ''}Lancer le Fleuve ferme la Bande (mises rendues) et arrête le Match du jour, pour tout le monde, sans retour possible.\n\nÉcris LANCER pour confirmer.`);
+    if (t === null) return;
+    action(async () => { const r = await api('/fleuve/lancer', { methode: 'POST', corps: { confirmation: t.trim().toUpperCase() } }); message(`Fleuve lancé : ${r.joueurs} mise(s) rendue(s), ${nb(r.pieces)} pièces.`); });
+  };
   const action = async (fn) => { try { await fn(); } catch (e) { message(e.message); } afficher.fleuve(); };
   $('#contenu').querySelectorAll('[data-etat]').forEach((b) => (b.onclick = () => {
     if (b.dataset.etat === 'ouvert' && !confirm('Ouvrir le Fleuve à tous les joueurs ?')) return;

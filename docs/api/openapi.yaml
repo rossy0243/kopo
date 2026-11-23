@@ -492,7 +492,7 @@ paths:
                 type: object
                 properties:
                   solde: { type: integer }
-                  historique: { type: array, items: { type: object, properties: { montant: { type: integer }, motif: { type: string, description: 'bienvenue, bonus_jour, manche, katapss, victoire, deuxieme, mise, pot, achat, parcours, mission, defi, bienvenue7, parrainage, bande…' }, ref: { type: [string, 'null'] }, par_admin: { type: boolean }, cree_le: { type: string, format: date-time } } } }
+                  historique: { type: array, items: { type: object, properties: { montant: { type: integer }, motif: { type: string, description: 'bienvenue, bonus_jour, manche, katapss, victoire, deuxieme, mise, pot, achat, parcours, mission, defi, bienvenue7, parrainage, bande, fermeture_bande…' }, ref: { type: [string, 'null'] }, par_admin: { type: boolean }, cree_le: { type: string, format: date-time } } } }
   /bonus-du-jour:
     post:
       tags: [Pièces]
@@ -899,6 +899,8 @@ paths:
                   google: { type: boolean }
                   pagaies: { type: object, properties: { restantes: { type: integer }, max: { type: integer }, retourMs: { type: integer } } }
                   etoilesVille: { type: integer, description: Étoiles à gagner dans une ville pour affronter son boss }
+                  lance: { type: [string, 'null'], format: date-time, description: 'Date du lancement (bouton admin « Lancer le Fleuve ») : la Bande et le Match du jour sont fermés' }
+                  rembourse: { type: integer, description: 'Pièces rendues à ce joueur à la fermeture de la Bande (motif fermeture_bande), 0 sinon' }
                   fleuves:
                     type: object
                     additionalProperties:
@@ -1369,7 +1371,8 @@ components:
         messages: { type: array, items: { type: string }, description: 'Messages du chat en partie (les seuls acceptés par le message « reaction »)' }
         stickers: { type: object, properties: { actif: { type: boolean } }, description: 'Stickers animés allumés par l\'admin (sinon grisés)' }
         communautes: { type: array, items: { type: object, properties: { reseau: { type: string }, libelle: { type: string }, url: { type: string } } } }
-        nouveaute: { type: [string, 'null'] }
+        nouveaute: { type: [string, 'null'], description: "Annonce « Nouveau » à montrer une fois : 'fleuve' dès le lancement du Fleuve, sinon 'bande' si l'admin l'allume" }
+        fleuveLance: { type: [string, 'null'], format: date-time, description: 'Date du lancement du Fleuve : badge NOUVEAU 7 jours sur sa carte ; cartes Match du jour et Bande et parcours de saison retirés' }
         google: { type: [string, 'null'], description: 'Adresse Supabase (site), null si la connexion Google est fermée' }
         supabase: { type: [object, 'null'], properties: { url: { type: string }, cleAnon: { type: [string, 'null'], description: Clé publique anon pour le SDK Supabase } } }
         googleObligatoire: { type: boolean, description: 'En ligne et entre amis : compte Google exigé (sinon : robots seulement)' }
