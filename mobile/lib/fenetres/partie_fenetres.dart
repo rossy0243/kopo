@@ -10,9 +10,10 @@ import '../commun/retention.dart';
 import '../commun/stickers.dart';
 import '../commun/theme.dart';
 import '../etat.dart';
+import '../reseau/api.dart';
 import 'cahier.dart';
 import 'communes.dart';
-import 'social.dart' show hotePeutPasser, choisirNouvelHote;
+import 'social.dart' show hotePeutPasser, choisirNouvelHote, avatarAmi, toastAjoutAmi, ouvrirAmis, messageErreur;
 
 // ---------------------------------------------------------------- chat
 // Onglet du chat ouvert la dernière fois : « Messages » (émojis et phrases) ou « Stickers ».
@@ -385,6 +386,11 @@ class _Recap extends StatelessWidget {
         if (cahierDe(v) != null) ...[Expanded(child: Btn('Classement', taille: 13, marge: _margeRangee, onTap: () => ouvrirClassementCahier(v, retour: _resultatCahier))), const SizedBox(width: 6)],
         Expanded(child: Btn('Quitter', taille: 13, marge: _margeRangee, onTap: () { app.arreterSuiteAuto(); app.quitter(); })),
       ]),
+      // « Ajoute tes adversaires en amis » (liste du serveur), entre les boutons et le classement : visible sans défiler.
+      if (app.derniersAdversaires != null && DateTime.now().difference(app.derniersAdversaires!.recu).inSeconds <= 120) ...[
+        const Ecart(8),
+        _AjoutAmis(app.derniersAdversaires!.liste, paysage: paysage),
+      ],
       const Ecart(10),
       _DeuxColonnes([
         for (var i = 0; i < classement.length; i++)
@@ -503,6 +509,118 @@ class _Recap extends StatelessWidget {
       if (D.taquinerie != null) out.add(Padding(padding: const EdgeInsets.only(top: 4), child: Text(D.taquinerie!, textAlign: TextAlign.center, style: K.texte(13, couleur: K.muted).copyWith(fontStyle: FontStyle.italic))));
     }
     return out;
+  }
+}
+
+// Fin de partie : ajouter ses adversaires humains en amis d'un toucher (personne n'a le réflexe d'aller dans Amis > Récents).
+// 3 en portrait, 4 en paysage sur deux colonnes ; au-delà, « Voir les N autres » ouvre l'onglet Récents. Comme le site.
+class _AjoutAmis extends StatefulWidget {
+  final List<Map> liste;
+  final bool paysage;
+  const _AjoutAmis(this.liste, {required this.paysage});
+  @override
+  State<_AjoutAmis> createState() => _AjoutAmisState();
+}
+
+class _AjoutAmisState extends State<_AjoutAmis> {
+  final _enCours = <Object?>{};
+
+  // Le décompte de la salle publique s'arrête dès qu'on ajoute quelqu'un : on a le temps de finir.
+  void _pause() { if (app.suiteAuto != null) { app.arreterSuiteAuto(); app.maj(); } }
+
+  Future<void> _ajouter(Map j) async {
+    _pause();
+    final cfg = app.config;
+    if (!app.avecGoogle && cfg?['google'] != null) {
+      fenetreGoogle('Amis', 'Connecte-toi pour ajouter tes adversaires en amis et les inviter à ta table. Ta progression et tes pièces sont gardées.');
+      return;
+    }
+    setState(() => _enCours.add(j['id']));
+    try {
+      final r = await Api.post('/amis', {'cible': j['id']});
+      toastAjoutAmi(r, j['pseudo'] as String?);
+      if (r is Map && r['etat'] == 'ami') {
+        j['ami'] = true;
+        if (j['recue'] == true) app.demandesAmi = math.max(0, app.demandesAmi - 1);
+      } else {
+        j['envoyee'] = true;
+      }
+      app.maj();
+    } catch (e) {
+      app.toast(messageErreur(e), Niv.echec);
+    }
+    if (mounted) setState(() => _enCours.remove(j['id']));
+  }
+
+  Widget _ligne(Map j) {
+    final p = widget.paysage;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(children: [
+        SizedBox(width: p ? 26 : 30, height: p ? 26 : 30, child: FittedBox(child: avatarAmi({...j, 'xp': 0}))),
+        SizedBox(width: p ? 6 : 8),
+        Expanded(
+          child: Text.rich(TextSpan(children: [
+            TextSpan(text: '${j['pseudo']} ', style: K.texte(p ? 13 : 14, poids: FontWeight.w600)),
+            if (!p) TextSpan(text: '#${j['numero']}', style: K.texte(12, couleur: K.muted)),
+          ]), maxLines: 1, overflow: TextOverflow.ellipsis),
+        ),
+        if (j['ami'] == true) Text('✓ Ami', style: K.texte(12, couleur: K.good, poids: FontWeight.w700))
+        else if (j['envoyee'] == true) Muet(p ? 'Envoyée' : 'Demande envoyée', taille: 12)
+        else Btn.principal(j['recue'] == true ? 'Accepter' : 'Ajouter', taille: p ? 12 : 13,
+            marge: p ? const EdgeInsets.symmetric(horizontal: 9, vertical: 4) : const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            onTap: _enCours.contains(j['id']) ? null : () => _ajouter(j)),
+      ]),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final liste = widget.liste, p = widget.paysage;
+    final max = p ? 4 : 3;
+    final vus = liste.take(max).toList();
+    final reste = liste.length - vus.length;
+    final lignes = <Widget>[];
+    if (p) {
+      for (var i = 0; i < vus.length; i += 2) {
+        lignes.add(Row(children: [
+          Expanded(child: _ligne(vus[i])),
+          const SizedBox(width: 10),
+          Expanded(child: i + 1 < vus.length ? _ligne(vus[i + 1]) : const SizedBox()),
+        ]));
+      }
+    } else {
+      lignes.addAll(vus.map(_ligne));
+    }
+    return Container(
+      padding: p ? const EdgeInsets.symmetric(horizontal: 8, vertical: 6) : const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(color: K.brass.withValues(alpha: .07), borderRadius: BorderRadius.circular(12), border: Border.all(color: K.brass.withValues(alpha: .45))),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          const Ico('amis', taille: 22, couleur: K.brass),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(liste.length > 1 ? 'Ajoute tes adversaires en amis' : 'Ajoute ${liste.first['pseudo']} en ami', style: K.texte(p ? 13 : 14, poids: FontWeight.w700)),
+              if (!p) const Muet('Pour les retrouver et les inviter à ta table.', taille: 12),
+            ]),
+          ),
+        ]),
+        SizedBox(height: p ? 4 : 6),
+        ...lignes,
+        if (reste > 0)
+          Center(
+            child: TextButton(
+              style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2), minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+              onPressed: () {
+                _pause();
+                ouvrirAmis(onglet: 'recents', retour: () { final v = app.vue; if (v != null && v['etat'] == 'finPartie') { _recapCle = null; afficherFinPartie(v, apresCahier: true); } else { app.fermerFenetre(); } });
+              },
+              child: Text(reste > 1 ? 'Voir les $reste autres' : "Voir l'autre joueur", style: K.texte(13, couleur: K.brass, poids: FontWeight.w600).copyWith(decoration: TextDecoration.underline, decorationColor: K.brass)),
+            ),
+          ),
+      ]),
+    );
   }
 }
 

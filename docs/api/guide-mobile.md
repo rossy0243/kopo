@@ -78,7 +78,7 @@ final r = await Supabase.instance.client.auth.signInWithIdToken(
 | Contre les robots | salle `entrainement` (`jeu`, `robots`, `niveau`, `niveauJoueur`, `delai`, `mode`) ; première partie guidée : `niveau: 'gentils'`, 2 robots |
 | Partie en cours | messages temps réel (temps-reel.md) ; chat : message `reaction` avec un texte de `config.messages` ; stickers : `GET /stickers` (grisés si `actif` est faux ou sans utilisations), message `sticker { sticker }`, images dans `assets/stickers/` ; signaler : `POST /signaler { cible, motif, partie }` |
 | Retour après coupure | `reconnect` (2 min) sinon `POST /reprendre { code }` |
-| Fin de partie | messages `solde`, `ligue`, `parcours`, `faceAFace`, `pot` ; revanche par `revanche` / `revancheNon` ; puis `PUT /profil` |
+| Fin de partie | messages `solde`, `ligue`, `parcours`, `faceAFace`, `adversaires`, `pot` ; revanche par `revanche` / `revancheNon` ; puis `PUT /profil` |
 | Profil | `GET /moi`, `PATCH /moi` (pseudo, avatar, pays), `GET /statistiques`, `GET /rivaux`, `GET /ligue`, `GET /collection` |
 | Amis | `GET /amis`, `GET /amis/demandes`, `GET /recents`, `POST /amis { cible: 'Kevin#1290' }`, accepter / refuser / annuler, `DELETE /amis/{id}`, `POST /bloques`, `GET/DELETE /bloques` |
 | Notifications | `GET /notifications` (`action` : `table`, `amis`, `rivaux`, `bande`, `accueil`), `POST /notifications/lues` |
