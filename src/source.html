@@ -1393,6 +1393,29 @@ body.dos-ambassadeur { --dos-motif: radial-gradient(circle at 50% 50%, #e2b04a 0
 .fenetre[data-type="recap"] .recap-tete h2 { font-size: 28px; }
 .fenetre[data-type="recap"] .recap-progres { padding: 8px 10px; gap: 6px; }
 .fenetre[data-type="recap"] .recap-progres .muted, .fenetre[data-type="recap"] .recap-progres p { font-size: 12px; }
+/* Fin de partie : « Ajoute tes adversaires en amis » (adversaires humains pas encore amis, liste du serveur). */
+.recap-amis { display: grid; gap: 6px; border: 1px solid rgba(226,176,74,.45); border-radius: 12px; padding: 8px 10px; background: rgba(226,176,74,.07); }
+.recap-amis-tete { display: flex; align-items: center; gap: 8px; }
+.recap-amis-tete .ico { width: 22px; height: 22px; color: var(--brass); flex: none; }
+.recap-amis-tete b { font-size: 14px; line-height: 1.2; }
+.recap-amis-tete small { display: block; color: var(--muted); font-size: 12px; font-weight: 400; }
+.recap-amis ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.recap-amis li { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.recap-amis .avatar { width: 30px; height: 30px; font-size: 16px; flex: none; }
+.recap-amis .avatar .niveau-pastille { display: none; }
+.recap-amis .qui { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.recap-amis .qui small { color: var(--muted); font-weight: 400; font-size: 12px; }
+.recap-amis .btn { padding: 6px 12px; font-size: 13px; flex: none; }
+.recap-amis .etat { font-size: 12px; color: var(--muted); flex: none; padding: 0 4px; }
+.recap-amis .etat.ok { color: var(--good); }
+.recap-amis .autres { justify-self: center; border: 0; background: none; color: var(--brass); font: 600 13px var(--body); text-decoration: underline; cursor: pointer; padding: 2px; }
+@media (orientation: landscape) and (max-height: 500px) {
+  .recap-amis { padding: 6px 8px; gap: 4px; } .recap-amis-tete small { display: none; } .recap-amis-tete b { font-size: 13px; }
+  .recap-amis ul { grid-template-columns: 1fr 1fr; column-gap: 10px; }
+  .recap-amis .avatar { width: 26px; height: 26px; font-size: 14px; } .recap-amis li { gap: 6px; }
+  .recap-amis .qui { font-size: 13px; } .recap-amis .qui small { display: none; }
+  .recap-amis .btn { padding: 4px 9px; font-size: 12px; }
+}
 /* Chat : 8 émojis sur une ligne, phrases plus petites, historique sur 3 lignes, Fermer en haut à droite. */
 .fenetre[data-type="chat"] { gap: 10px; position: relative; }
 .fenetre[data-type="chat"] .reactions { grid-template-columns: repeat(8, 1fr); gap: 4px; }
@@ -2522,6 +2545,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     room.onMessage('ligue', (d) => window.dispatchEvent(new CustomEvent('kopo-ligue', { detail: d })));
     room.onMessage('parcours', (d) => window.dispatchEvent(new CustomEvent('kopo-parcours', { detail: d })));
     room.onMessage('faceAFace', (d) => window.dispatchEvent(new CustomEvent('kopo-face-a-face', { detail: d })));
+    room.onMessage('adversaires', (d) => window.dispatchEvent(new CustomEvent('kopo-adversaires', { detail: d })));
     room.onMessage('reaction', (e) => window.dispatchEvent(new CustomEvent('kopo-reaction', { detail: e })));
     room.onMessage('sticker', (e) => window.dispatchEvent(new CustomEvent('kopo-sticker', { detail: e })));
     room.onMessage('stickers', (e) => window.dispatchEvent(new CustomEvent('kopo-stickers', { detail: e })));
@@ -2840,7 +2864,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     if (v.enPause) finChrono = null; // chrono figé : pas de tic-tac ni de décompte
     if (!ancienne || ancienne.etat !== v.etat || ancienne.numeroManche !== v.numeroManche) { carteChoisie = null; choixInter = []; cartesRecues.clear(); }
     if (v.jeu !== 'inter8') suivrePartie(v); // Inter (8) : l'XP et les missions viendront à l'étape de la progression
-    if (v.etat !== 'finPartie') arreterSuiteAuto();
+    if (v.etat !== 'finPartie') { arreterSuiteAuto(); derniersAdversaires = null; } // nouvelle partie : la liste de la précédente ne vaut plus
     if (v.etat === 'salon') { if (!chatOuvert() && !annonceMicroOuverte()) fermerFenetre(); return afficherSalon(v); } // le chat reste ouvert quand quelqu'un arrive ou se dit prêt
     if (v.etat === 'manche' && client && !v.joueurs.some((j) => j.id === v.moi)) { quitter(); toast('La revanche est partie sans toi.', 'alerte'); return; }
     if (v.jeu === 'inter8') {
@@ -4687,6 +4711,10 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     rangee.append(q);
     boutons.append(rangee);
     droite.append(boutons);
+    // « Ajoute tes adversaires en amis » (liste du serveur), entre les boutons et le classement : visible sans défiler.
+    const zAmis = el('div'); zAmis.id = 'recapAmis';
+    droite.append(zAmis);
+    remplirRecapAmis(zAmis);
     // Classement
     // À partir de 5 joueurs, le classement passe en deux colonnes pour tenir dans l'écran.
     const deux = classement.length >= 5;
@@ -4714,7 +4742,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       rate.hidden = !w.revancheRatee;
     };
     maj(v);
-    recapOuvert = { cle, maj };
+    recapOuvert = { cle, maj, majSuite };
     ouvrirFenetre([recap], 'recap');
   }
 
@@ -5054,6 +5082,65 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     const z = document.getElementById('recapExtra');
     if (z) remplirRecapDuel(z);
   });
+  // Fin d'une partie entre humains : le serveur donne les adversaires qui ne sont pas encore nos amis (ni demandés).
+  // L'écran de fin propose de les ajouter d'un toucher : personne n'a le réflexe d'aller dans Amis > Récents.
+  var derniersAdversaires = null; // (var : remis à zéro par afficher(), qui peut tourner avant cette ligne) { recu, liste: [{ id, pseudo, numero, recue, … }] }
+  // Au-delà : « Voir les N autres » ouvre l'onglet Récents. Paysage de téléphone : 4, sur deux colonnes.
+  const paysageBas = () => matchMedia('(orientation: landscape) and (max-height: 500px)').matches;
+  window.addEventListener('kopo-adversaires', (e) => {
+    const liste = Array.isArray(e.detail) ? e.detail.filter((j) => j && j.id) : [];
+    derniersAdversaires = liste.length ? { recu: Date.now(), liste } : null;
+    const z = document.getElementById('recapAmis');
+    if (z) remplirRecapAmis(z);
+  });
+  function remplirRecapAmis(z) {
+    z.replaceChildren();
+    const A = derniersAdversaires;
+    if (!A || Date.now() - A.recu > 120000) return;
+    const liste = A.liste, petit = paysageBas(), max = petit ? 4 : 3;
+    // Le décompte de la salle publique s'arrête dès qu'on ajoute quelqu'un : on a le temps de finir.
+    const pause = () => { if (suiteAuto) { arreterSuiteAuto(); if (recapOuvert && recapOuvert.majSuite) recapOuvert.majSuite(); } };
+    const bloc = el('div', 'recap-amis'), tete = el('div', 'recap-amis-tete'), t = el('div');
+    t.append(el('b', null, liste.length > 1 ? 'Ajoute tes adversaires en amis' : `Ajoute ${liste[0].pseudo} en ami`), el('small', null, 'Pour les retrouver et les inviter à ta table.'));
+    tete.append(icone('i-amis'), t);
+    const ul = el('ul');
+    for (const j of liste.slice(0, max)) {
+      const li = el('li'), qui = el('span', 'qui', j.pseudo + ' ');
+      qui.append(el('small', null, '#' + j.numero));
+      li.append(avatarAmi(j), qui);
+      if (j.ami) li.append(el('span', 'etat ok', '✓ Ami'));
+      else if (j.envoyee) li.append(el('span', 'etat', petit ? 'Envoyée' : 'Demande envoyée'));
+      else {
+        const aj = el('button', 'btn principal', j.recue ? 'Accepter' : 'Ajouter');
+        aj.onclick = async () => {
+          pause();
+          const cfg = await lireConfig();
+          if (!avecGoogle() && cfg && cfg.google) return fenetreGoogle('Amis', 'Connecte-toi pour ajouter tes adversaires en amis et les inviter à ta table. Ta progression et tes pièces sont gardées.');
+          aj.disabled = true;
+          try {
+            const r = await apiJoueur('/amis', 'POST', { cible: j.id });
+            toastAjoutAmi(r, j.pseudo);
+            if (r.etat === 'ami') { j.ami = true; if (j.recue) majPastilleAmis(Math.max(0, demandesAmi - 1)); } else j.envoyee = true;
+            remplirRecapAmis(z);
+          } catch (e) { aj.disabled = false; toast(e.message, 'echec'); }
+        };
+        li.append(aj);
+      }
+      ul.append(li);
+    }
+    bloc.append(tete, ul);
+    const reste = liste.length - max;
+    if (reste > 0) {
+      const b = el('button', 'autres', `Voir ${reste > 1 ? 'les ' + reste + ' autres' : 'l\'autre joueur'}`);
+      b.onclick = () => {
+        pause();
+        ongletAmis = 'recents';
+        ouvrirAmis(() => { recapOuvert = null; if (vueActuelle && vueActuelle.etat === 'finPartie') afficherFinPartie(vueActuelle, true); else fermerFenetre(); }, true);
+      };
+      bloc.append(b);
+    }
+    z.append(bloc);
+  }
   // Face-à-face et taquinerie dans #recapExtra, quand le récap ne les montre pas déjà (Inter (8), page rechargée…).
   function remplirRecapDuel(z) {
     if (!dernierDuel || Date.now() - dernierDuel.recu > 60000) return;

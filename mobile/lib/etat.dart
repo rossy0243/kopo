@@ -105,6 +105,9 @@ class App extends ChangeNotifier {
   Map<String, dynamic>? suivi;
   ({DateTime recu, Map detail})? derniereLigue, dernierParcours;
   ({DateTime recu, Map x, bool gagne, String? taquinerie})? dernierDuel;
+  /// Fin d'une partie entre humains : les adversaires qui ne sont pas encore nos amis (ni demandés), donnés par le serveur.
+  /// L'écran de fin propose de les ajouter d'un toucher (comme le site).
+  ({DateTime recu, List<Map> liste})? derniersAdversaires;
   final recapsAnimes = <String>{};
   bool robotsAComposer = false;
   List<String>? tableAComposer;
@@ -800,6 +803,10 @@ class App extends ChangeNotifier {
           if (d is Map) { dernierParcours = (recu: DateTime.now(), detail: d); maj(); }
         case 'faceAFace':
           _faceAFace(d);
+        case 'adversaires':
+          final l = d is List ? d.whereType<Map>().where((j) => j['id'] != null).toList() : <Map>[];
+          derniersAdversaires = l.isEmpty ? null : (recu: DateTime.now(), liste: l);
+          maj();
         case 'reaction':
           if (d is Map) _reaction(d);
         case 'sticker':
@@ -916,7 +923,7 @@ class App extends ChangeNotifier {
     _demarrerChrono(v);
     if (A == null || A['etat'] != v['etat'] || A['numeroManche'] != v['numeroManche']) { carteChoisie = null; choixInter = []; cartesRecues.clear(); }
     if (v['jeu'] != 'inter8') suivrePartie(v);
-    if (v['etat'] != 'finPartie') arreterSuiteAuto();
+    if (v['etat'] != 'finPartie') { arreterSuiteAuto(); derniersAdversaires = null; } // nouvelle partie : la liste de la précédente ne vaut plus
     if (v['etat'] == 'salon') {
       if (robotsAComposer) { _composerRobots(v); }
       if (!chatOuvert && fenetreType != 'annonce-micro') fenetre = null; // l'annonce du micro reste quand un joueur arrive

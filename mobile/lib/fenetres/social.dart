@@ -248,10 +248,11 @@ Future<void> repondreDemande(String id, bool accepter) async {
 
 String _ongletAmis = 'amis';
 
-void ouvrirAmis({VoidCallback? retour, bool garderOnglet = false}) {
+void ouvrirAmis({VoidCallback? retour, bool garderOnglet = false, String? onglet}) {
   final c = Api.compte;
   if (c == null) return;
-  if (!garderOnglet) _ongletAmis = app.demandesAmi > 0 ? 'demandes' : 'amis';
+  if (onglet != null) { _ongletAmis = onglet; }
+  else if (!garderOnglet) { _ongletAmis = app.demandesAmi > 0 ? 'demandes' : 'amis'; }
   final champ = TextEditingController();
   app.ouvrirFenetre((context) => _Amis(retour ?? app.fermerFenetre, champ), 'amis');
 }

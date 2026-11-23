@@ -635,6 +635,13 @@ class SalleKopo extends Room {
         if (duels.length) c.send('faceAFace', duels);
       }
       if (compte) c.send('solde', { solde: compte.solde });
+      // Ses adversaires humains de cette partie qui ne sont pas encore ses amis (ni demandés) : l'écran de fin
+      // propose de les ajouter d'un toucher. Mêmes règles que l'onglet Récents (pas de robots, ni de bloqués).
+      if (social && humains.length >= 2 && humains.includes(id)) {
+        const r = (await social.recents(id, 1).catch(() => []))[0];
+        const liste = r && r.id === p.id ? r.joueurs.filter((j) => !j.ami && !j.envoyee) : [];
+        if (liste.length) c.send('adversaires', liste);
+      }
       if (partage && p.payeurs.has(id)) c.send('pot', { pot: partage.pot, gain: partage.gains.get(id) || 0, place: place(id) });
       if (resultats.has(id)) c.send('ligue', resultats.get(id));
       if (xps.has(id)) c.send('parcours', xps.get(id));
