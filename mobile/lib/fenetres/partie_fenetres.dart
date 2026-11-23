@@ -478,7 +478,7 @@ class _Recap extends StatelessWidget {
       ));
     }
     final P = app.dernierParcours;
-    if (P != null && now.difference(P.recu).inSeconds <= 60) {
+    if (P != null && !app.fleuveLance && now.difference(P.recu).inSeconds <= 60) { // parcours de saison remplacé par le Fleuve
       final d = P.detail;
       final palier = (d['palier'] as num?)?.toInt() ?? 0, paliers = (d['paliers'] as num?)?.toInt() ?? 1;
       final xpPalier = (d['xpPalier'] as num?)?.toDouble() ?? 1, total = (d['total'] as num?)?.toDouble() ?? 0, xp = (d['xp'] as num?)?.toDouble() ?? 0;

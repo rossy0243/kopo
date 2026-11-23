@@ -108,10 +108,11 @@ class Accueil extends StatelessWidget {
     final etapeFleuve = !publie ? null : fl['courante'] != null ? ('Étape', '${fl['courante']}') : ('Tout', 'fait');
     return [
       CarteMode('creer', 'Créer une partie', creerSous, coin: '♠', creer: true, amis: app.amisEnLigne, onTap: garde(() => creer(), ouvertInter: true)),
-      if (resumeFleuve != null) CarteMode('fleuve', 'Le Fleuve', resumeFleuve, coin: '♠', ligne: true, grand: etapeFleuve, onTap: garde(() => ouvrirFleuve(inter ? 'niger' : 'congo'), ouvertInter: true)),
+      if (resumeFleuve != null) CarteMode('fleuve', 'Le Fleuve', resumeFleuve, coin: '♠', ligne: true, grand: etapeFleuve, badge: badgeFleuve(), onTap: garde(() { fleuveVu(); ouvrirFleuve(inter ? 'niger' : 'congo'); }, ouvertInter: true)),
       // Match du jour et Bande : Kopo seulement, les cartes disparaissent avec Inter (8), comme sur le site.
-      if (!inter) CarteMode('jour', 'Match du jour', resumeJour ?? 'La même partie pour tous', coin: '♦', point: app.pointJour, onTap: garde(ouvrirMatchJour)),
-      if (!inter) CarteMode('bande', 'La Bande', resumeBande ?? 'Défie tes amis', coin: '♥', onTap: garde(() => ouvrirBande())),
+      // Le Fleuve lancé : ils laissent la place au Fleuve.
+      if (!inter && !app.fleuveLance) CarteMode('jour', 'Match du jour', resumeJour ?? 'La même partie pour tous', coin: '♦', point: app.pointJour, onTap: garde(ouvrirMatchJour)),
+      if (!inter && !app.fleuveLance) CarteMode('bande', 'La Bande', resumeBande ?? 'Défie tes amis', coin: '♥', onTap: garde(() => ouvrirBande())),
       CarteMode('enligne', 'En ligne', 'Avec des inconnus', coin: '♦', enLigne: app.nbEnLigne, onTap: garde(ouvrirEnLigne, ouvertInter: true)),
       CarteMode('rejoindre', 'Rejoindre', 'Avec un code', coin: '♥', onTap: garde(ouvrirRejoindre, ouvertInter: true)),
       CarteMode('robots', 'Contre les robots', inter ? 'Pour apprendre Inter (8)' : 'Partie rapide · niveau ${(App.nomsNiveauxRobots[app.niveauRobots] ?? 'Normal').toLowerCase()}', coin: '♣', onTap: garde(ouvrirRobots, ouvertInter: true)),
@@ -132,16 +133,17 @@ class CarteMode extends StatelessWidget {
   final bool creer, point;
   final bool ligne; // sur toute une ligne (Le Fleuve), sous « Créer une partie »
   final (String, String)? grand; // à droite, en grand : (« Étape », « 10 »)
+  final bool badge; // pastille NOUVEAU
   final int amis;
   final int? enLigne;
   final VoidCallback onTap;
-  const CarteMode(this.icone, this.titre, this.sous, {super.key, required this.coin, this.creer = false, this.point = false, this.ligne = false, this.grand, this.amis = 0, this.enLigne, required this.onTap});
+  const CarteMode(this.icone, this.titre, this.sous, {super.key, required this.coin, this.creer = false, this.point = false, this.ligne = false, this.grand, this.badge = false, this.amis = 0, this.enLigne, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final encre = creer ? K.encre : K.brass;
     final coinCouleur = creer ? const Color(0x8C1D1606) : const Color(0xB3E2B04A);
-    return Material(
+    final carte = Material(
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
@@ -184,6 +186,15 @@ class CarteMode extends StatelessWidget {
         ),
       ),
     );
+    if (!badge) return carte;
+    return Stack(clipBehavior: Clip.none, children: [
+      Positioned.fill(child: carte),
+      Positioned(top: -8, right: 14, child: IgnorePointer(child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        decoration: BoxDecoration(color: K.red, borderRadius: BorderRadius.circular(99), boxShadow: const [BoxShadow(color: Color(0x73000000), blurRadius: 4, offset: Offset(0, 2))]),
+        child: Text('NOUVEAU', style: K.texte(11, couleur: Colors.white, poids: FontWeight.w700).copyWith(letterSpacing: 1.2)),
+      ))),
+    ]);
   }
 
   // Carte sur toute une ligne : icône, titre et résumé à gauche, l'étape en grand à droite.
