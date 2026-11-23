@@ -43,21 +43,18 @@ Pour une version à installer : `flutter build apk --release` (Android) ou `flut
 3. **Identifiant de l'appli** : `com.masano.masano` (Android `applicationId` et iOS bundle id).
    Pour le changer : `android/app/build.gradle.kts`, `ios/Runner.xcodeproj`, et `retourAppli` dans
    `lib/reseau/google.dart` (et l'URL de retour dans Supabase).
-4. **Publication Android (Play Store)** : la version « release » se signe avec ta clé de publication, lue dans
-   `android/key.properties` (ce fichier et la clé ne vont jamais sur GitHub, ils sont ignorés). Une seule fois :
-   ```bash
-   keytool -genkey -v -keystore ~/masano-publication.jks -keyalg RSA -keysize 2048 -validity 10000 -alias masano
-   ```
-   puis créer `mobile/android/key.properties` :
-   ```
-   storePassword=<mot de passe de la clé>
-   keyPassword=<mot de passe de la clé>
-   keyAlias=masano
-   storeFile=/chemin/vers/masano-publication.jks
-   ```
-   `flutter build appbundle --release` donne alors le fichier à envoyer au Play Store. **Garde la clé et ses mots
-   de passe en lieu sûr** : sans eux, plus de mise à jour possible de l'appli. Sans `key.properties`, la version
-   « release » est signée avec la clé de test (elle s'installe sur un téléphone, mais le Play Store la refuse).
+4. **Publication Android (Play Store)** : la clé de signature fixe de Masano (alias `masano`, empreinte SHA-256
+   `2B:1C:A9:47:…:F8:E5:2A`) est rangée dans les fichiers du projet, jamais dans le dépôt. GitHub la reçoit par deux
+   secrets (*Settings → Secrets and variables → Actions*) : `ANDROID_CLE_BASE64` (la clé en base64) et
+   `ANDROID_CLE_MOT_DE_PASSE`. Avec eux, le workflow *APK Android* signe l'APK avec cette clé et construit aussi le
+   fichier du Play Store (artefact `masano-play-aab`, à envoyer à la main dans la Play Console). Le numéro de version
+   (versionCode) est `100 + numéro du run`, il ne fait que monter. Sans les secrets, l'APK est signé avec la clé de test.
+   - **Version Play Store sans achats** : l'AAB est construit avec `--dart-define=STORE=play` (`Api.sansAchats`). Google
+     impose sa propre facturation pour les pièces et Kopo+, et le paiement externe (mobile money) n'y est pas permis en RDC :
+     cette version n'affiche ni prix en francs, ni mobile money, ni « Acheter des pièces ». L'APK du site garde tout.
+   - En local : créer `mobile/android/key.properties` (`storeFile`, `storePassword`, `keyPassword`, `keyAlias=masano`),
+     puis `flutter build appbundle --release --dart-define=STORE=play`. Garde la clé et son mot de passe en lieu sûr :
+     sans eux, plus de mise à jour possible de l'appli.
 5. **Liens des stores** : une fois l'appli publiée, coller les liens Play Store et App Store dans le tableau de bord,
    onglet *Pilotage*, « Applis mobiles » (ils servent au message « mets à jour »).
 6. **iOS** : régler l'équipe Apple dans Xcode (*Signing & Capabilities*).

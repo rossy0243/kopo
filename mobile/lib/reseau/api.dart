@@ -12,6 +12,11 @@ class Api {
   /// Pour essayer un autre serveur : flutter run --dart-define=SERVEUR=http://10.0.2.2:2567
   static const serveur = String.fromEnvironment('SERVEUR', defaultValue: serveurParDefaut);
   static const version = '1.0.0';
+  /// Version du Google Play Store : flutter build appbundle --dart-define=STORE=play (workflow apk.yml).
+  /// Google exige sa propre facturation pour les pièces et Kopo+ (le paiement externe n'ouvre pas en RDC avant 2027) :
+  /// cette version n'affiche ni prix en francs ni mobile money, les pièces se gagnent en jouant. L'APK du site n'est pas concerné.
+  static const store = String.fromEnvironment('STORE');
+  static bool get sansAchats => store == 'play';
   static String get plateforme => kIsWeb ? 'web' : (defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android');
   static Map<String, String> get entetes => {'X-Masano-Client': '$plateforme/$version'};
 

@@ -413,7 +413,7 @@ Future<void> ouvrirBoutique() async {
   app.ouvrirFenetre((context) => Fenetre(titre: 'Boutique', enfants: [
         Row(children: [
           const Piece(taille: 26), const SizedBox(width: 8), Text(App.formatPieces(solde), style: K.titre(30)), const Spacer(),
-          Btn('+ Acheter des pièces', taille: 13, onTap: () => ouvrirAchatPieces(retour: ouvrirBoutique)),
+          if (!Api.sansAchats) Btn('+ Acheter des pièces', taille: 13, onTap: () => ouvrirAchatPieces(retour: ouvrirBoutique)),
         ]),
         const Muet("Des apparences seulement : rien n'aide à gagner. Les pièces se gagnent en jouant.", taille: 12),
         for (final cat in R.parCategorie(enVente)) ...[
@@ -446,7 +446,7 @@ List<Widget> _rayonStickers(Map s, int solde) {
         decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), border: Border.all(color: K.line)),
         child: Row(children: [
           Expanded(child: Text.rich(TextSpan(style: K.texte(13, couleur: K.muted), children: [TextSpan(text: '${o['utilisations']} utilisations ', style: K.texte(13, poids: FontWeight.w700)), TextSpan(text: quoi)]))),
-          Text('${App.formatPieces(o['pieces'] as num)} pièces ou ${App.formatPieces(o['francs'] as num)} FC · Bientôt', style: K.texte(12, couleur: K.muted)),
+          Text(Api.sansAchats ? '${App.formatPieces(o['pieces'] as num)} pièces · Bientôt' : '${App.formatPieces(o['pieces'] as num)} pièces ou ${App.formatPieces(o['francs'] as num)} FC · Bientôt', style: K.texte(12, couleur: K.muted)),
         ]),
       );
   final grand = Stickers.packs.map((p) => p.$1).where((id) => Stickers.packDe.values.where((v) => v == id).length >= 6 && ((parPack[id] as List?) ?? const []).isNotEmpty).firstOrNull;
@@ -510,8 +510,7 @@ void _acheterStickers(Map s, int solde, {String? sticker, String? pack, required
           }),
           const Ecart(8),
         ],
-        const Muet('Paiement en francs congolais (mobile money) : bientôt.', taille: 12),
-        const Ecart(8),
+        if (!Api.sansAchats) ...[const Muet('Paiement en francs congolais (mobile money) : bientôt.', taille: 12), const Ecart(8)],
         Btn('Retour', large: true, onTap: ouvrirBoutique),
       ])), 'boutique');
 }
@@ -520,6 +519,7 @@ void _acheterStickers(Map s, int solde, {String? sticker, String? pack, required
 // Bouquets du moins cher (500 FC) au plus cher (40 000 FC), prix fixés par le serveur au taux des stickers
 // (200 pièces ≈ 500 FC), avec un bonus qui grandit avec le bouquet. Le paiement mobile money n'est pas encore branché.
 Future<void> ouvrirAchatPieces({VoidCallback? retour}) async {
+  if (Api.sansAchats) { app.toast('Les pièces se gagnent en jouant : missions, bonus du jour et parties en ligne.', Niv.info); return; }
   Map B;
   try {
     if (!await app.compteEnLigneOuCreer()) { app.lirePseudo(); return; }
@@ -614,8 +614,7 @@ void _confirmerAchat(Map o, int solde) {
         if (prix > solde) ...[
           Text('Il te manque ${App.formatPieces(prix - solde)} pièces pour $nomType ${o['nom']}. Missions, bonus du jour et parties en ligne en rapportent.', textAlign: TextAlign.center, style: K.texte(15)),
           const Ecart(12),
-          Btn.principal('Acheter des pièces', large: true, onTap: () => ouvrirAchatPieces(retour: ouvrirBoutique)),
-          const Ecart(8),
+          if (!Api.sansAchats) ...[Btn.principal('Acheter des pièces', large: true, onTap: () => ouvrirAchatPieces(retour: ouvrirBoutique)), const Ecart(8)],
           Btn('Retour', large: true, onTap: ouvrirBoutique),
         ] else ...[
           Text('Acheter $nomType ${o['nom']} pour ${App.formatPieces(prix)} pièces ? Il te restera ${App.formatPieces(solde - prix)} pièces.', textAlign: TextAlign.center, style: K.texte(15)),
