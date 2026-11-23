@@ -5705,8 +5705,23 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     R.reglerFleuve(o);
   }
 
+  // Ce qui se voit sur la carte, sans les comptes à rebours : on ne la redessine que si ça a changé.
+  const empreinteFleuve = (E) => JSON.stringify(E, (k, v) => (k === 'retourMs' || k === 'finMs' ? undefined : v));
+  let fleuveAffiche = null; // le fleuve montré sur la carte ouverte
+  const carteFleuveOuverte = () => $('fenetre').dataset.type === 'fleuve' && !$('voile').hidden;
   async function ouvrirFleuve(fleuve) {
     if (!MODE_SERVEUR) return toast('Le Fleuve se joue en ligne.', 'alerte');
+    // Déjà lu pour la carte de l'accueil : la carte s'ouvre tout de suite, puis se met à jour en silence.
+    const E = etatFleuve;
+    if (E && E.ouvert && E.google && compteLocal() && Object.keys(E.fleuves || {}).length) {
+      afficherCarteFleuve(fleuve && E.fleuves[fleuve] ? fleuve : fleuveDuJeu());
+      apiJoueur('/fleuve').then((n) => {
+        const change = empreinteFleuve(n) !== empreinteFleuve(etatFleuve);
+        etatFleuve = n;
+        if (change && carteFleuveOuverte() && n.ouvert && n.fleuves && n.fleuves[fleuveAffiche]) afficherCarteFleuve(fleuveAffiche);
+      }).catch(() => {});
+      return;
+    }
     try { if (!(await compteEnLigne())) return; etatFleuve = await apiJoueur('/fleuve'); } catch (x) { return toast(x.message, 'echec'); }
     if (!etatFleuve.ouvert) return toast('Le Fleuve arrive bientôt.', 'alerte');
     if (!etatFleuve.google) return fenetreGoogle('Le Fleuve', 'Remonte le Congo et le Niger, étape par étape, et gagne des étoiles. Connecte-toi avec Google pour jouer : ta progression te suit sur tous tes téléphones.');
@@ -5717,6 +5732,8 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
 
   function afficherCarteFleuve(cle) {
     const E = etatFleuve, f = E.fleuves[cle], F = FLEUVES[cle];
+    fleuveAffiche = cle;
+    if (f.courante) prechargerEtapeFleuve(cle, f.courante); // l'étape qu'on va toucher : sa fenêtre s'ouvrira sans attente
     const tete = el('div', 'fl-tete');
     tete.append(el('h2', null, LeF(F.nom)), pagaiesEl(E.pagaies));
     const onglets = el('div', 'ligue-onglets');
@@ -5833,9 +5850,24 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     requestAnimationFrame(() => { carte.scrollTop = courant ? Math.max(0, parseFloat(courant.style.top) - carte.clientHeight / 2) : H; });
   }
 
+  // Détail de l'étape courante lu d'avance pendant que la carte s'affiche (servi une fois, frais d'une minute au plus).
+  const etapesLues = new Map(); // 'cle/n' -> { quand, lecture }
+  function prechargerEtapeFleuve(cle, n) {
+    const k = `${cle}/${n}`, d = etapesLues.get(k);
+    if (d && Date.now() - d.quand < 60e3) return;
+    const lecture = apiJoueur('/fleuve/' + k);
+    lecture.catch(() => {});
+    etapesLues.set(k, { quand: Date.now(), lecture });
+  }
+  async function lireEtapeFleuve(cle, n) {
+    const k = `${cle}/${n}`, d = etapesLues.get(k);
+    etapesLues.delete(k);
+    if (d && Date.now() - d.quand < 60e3) { try { return await d.lecture; } catch (x) {} }
+    return apiJoueur('/fleuve/' + k);
+  }
   async function ouvrirEtapeFleuve(cle, n) {
     let e;
-    try { e = await apiJoueur(`/fleuve/${cle}/${n}`); } catch (x) { return toast(x.message, 'echec'); }
+    try { e = await lireEtapeFleuve(cle, n); } catch (x) { return toast(x.message, 'echec'); }
     const F = FLEUVES[cle], z = el('div', 'mj');
     z.append(el('div', 'mj-numero', `${F.nom} · étape ${e.numero}${e.escale ? ' · boss de ' + e.ville : ' · vers ' + e.ville}`));
     if (e.etoiles) { const st = el('div', 'fl-etoiles'); st.textContent = '★'.repeat(e.etoiles); if (e.etoiles < 3) st.append(el('span', 'vide', '★'.repeat(3 - e.etoiles))); z.append(st); }

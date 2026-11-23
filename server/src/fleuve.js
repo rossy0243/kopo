@@ -203,16 +203,27 @@ function creerFleuve(base, reglages, comptes, social = null) {
     // État des deux fleuves pour un joueur : pagaies, étoiles, étapes visibles (jusqu'à la fin du bief en cours).
     async etat(compte) {
       const ouvert = ouvertPour(compte);
-      const p = await pagaiesDe(compte.id);
+      // Toutes les lectures partent en même temps (et les deux fleuves aussi) : la carte s'ouvre en un aller-retour
+      // vers la base au lieu d'une quinzaine à la suite.
+      const [p, rembourse] = await Promise.all([
+        pagaiesDe(compte.id),
+        // Mise de la Bande rendue au lancement (3e écran de la fenêtre « Nouveau »).
+        cfg().lance ? base.query("SELECT coalesce(sum(montant), 0)::int AS n FROM registre_pieces WHERE compte_id = $1 AND motif = 'fermeture_bande'", [compte.id]).then((r) => r.rows[0].n) : null,
+      ]);
       const demain = debutDu(ajouterJours(jourDe(horloge()), 1));
       const res = { ouvert, google: !!compte.auth_id, pagaies: { ...p, retourMs: demain - horloge() }, etoilesVille: seuilVille(), fleuves: {}, lance: cfg().lance || null };
-      // Mise de la Bande rendue au lancement (3e écran de la fenêtre « Nouveau »).
-      if (cfg().lance) res.rembourse = (await base.query("SELECT coalesce(sum(montant), 0)::int AS n FROM registre_pieces WHERE compte_id = $1 AND motif = 'fermeture_bande'", [compte.id])).rows[0].n;
+      if (rembourse !== null) res.rembourse = rembourse;
       if (!ouvert) return res;
-      for (const fleuve of Object.keys(G.FLEUVES)) {
-        if (!fleuveOuvertPour(compte, fleuve)) continue; // interrupteur éteint : le fleuve n'apparaît pas
-        const etoiles = await etoilesDuJoueur(compte.id, fleuve);
-        const publiees = await dernierePubliee(fleuve);
+      const ouverts = Object.keys(G.FLEUVES).filter((fleuve) => fleuveOuvertPour(compte, fleuve)); // interrupteur éteint : le fleuve n'apparaît pas
+      const parFleuve = await Promise.all(ouverts.map((fleuve) => Promise.all([
+        etoilesDuJoueur(compte.id, fleuve),
+        dernierePubliee(fleuve),
+        amisSurLeFleuve(compte.id, fleuve),
+        marquesDe([compte.id], fleuve),
+        base.query("SELECT coalesce(sum(nouvelles), 0)::int AS n FROM fleuve_essais WHERE compte_id = $1 AND fleuve = $2 AND statut = 'reussi' AND debut >= $3", [compte.id, fleuve, debutSemaine()]).then((r) => r.rows[0].n),
+      ])));
+      ouverts.forEach((fleuve, i) => {
+        const [etoiles, publiees, amis, mesMarquesMap, maSemaine] = parFleuve[i];
         const c = courante(etoiles, publiees);
         const reference = c || publiees || 1;
         const finBief = Math.min(publiees, biefDe(reference) * G.ETAPES_PAR_BIEF);
@@ -223,9 +234,7 @@ function creerFleuve(base, reglages, comptes, social = null) {
           etapes.push(e);
         }
         let total = 0; for (const v of etoiles.values()) total += v;
-        const amis = await amisSurLeFleuve(compte.id, fleuve);
-        const mesMarques = (await marquesDe([compte.id], fleuve)).get(compte.id) || { premiers: [], pagayeur: false };
-        const maSemaine = (await base.query("SELECT coalesce(sum(nouvelles), 0)::int AS n FROM fleuve_essais WHERE compte_id = $1 AND fleuve = $2 AND statut = 'reussi' AND debut >= $3", [compte.id, fleuve, debutSemaine()])).rows[0].n;
+        const mesMarques = mesMarquesMap.get(compte.id) || { premiers: [], pagayeur: false };
         // Course de la semaine : moi et mes amis, au nombre d'étoiles nouvelles gagnées depuis lundi.
         const course = [{ id: compte.id, pseudo: compte.pseudo, apparence: (compte.equipes && compte.equipes.avatar) || null, etoiles: maSemaine, moi: true, pagayeur: mesMarques.pagayeur },
           ...amis.filter((a) => a.semaine > 0).map((a) => ({ id: a.id, pseudo: a.pseudo, apparence: a.apparence, etoiles: a.semaine, pagayeur: a.pagayeur }))]
@@ -239,7 +248,7 @@ function creerFleuve(base, reglages, comptes, social = null) {
           marques: mesMarques,
           course: { lignes: course, finMs: debutDu(ajouterJours(lundiDe(jourDe(horloge())), 7)) - horloge(), pieces: piecesCourse(), amis: amis.length },
         };
-      }
+      });
       return res;
     },
 
@@ -248,12 +257,17 @@ function creerFleuve(base, reglages, comptes, social = null) {
       if (!G.FLEUVES[fleuve]) throw erreur('Fleuve inconnu.');
       if (!fleuveOuvertPour(compte, fleuve)) throw erreur(ouvertPour(compte) ? `${leF(fleuve)[0].toUpperCase()}${leF(fleuve).slice(1)} ouvre bientôt.` : 'Le Fleuve arrive bientôt.', 403);
       numero = Math.trunc(Number(numero));
-      const r = (await base.query('SELECT recette, version FROM fleuve_etapes WHERE fleuve = $1 AND numero = $2 AND publie', [fleuve, numero])).rows[0];
+      // Les cinq lectures partent en même temps : la fenêtre de l'étape s'ouvre en un aller-retour vers la base.
+      const [r, etoiles, publiees, p, pc] = await Promise.all([
+        base.query('SELECT recette, version FROM fleuve_etapes WHERE fleuve = $1 AND numero = $2 AND publie', [fleuve, numero]).then((x) => x.rows[0]),
+        etoilesDuJoueur(compte.id, fleuve),
+        dernierePubliee(fleuve),
+        pagaiesDe(compte.id),
+        premierCoup(fleuve, numero),
+      ]);
       if (!r) throw erreur('Cette étape n\'est pas encore ouverte.', 404);
-      const etoiles = await etoilesDuJoueur(compte.id, fleuve);
-      const raison = refus(etoiles, await dernierePubliee(fleuve), numero);
-      const p = await pagaiesDe(compte.id);
-      return { ...publicEtape(fleuve, recetteDe(r), r.version), etoiles: etoiles.get(numero) || 0, refus: raison, pagaies: p, villeEtoiles: estEscale(numero) ? etoilesVille(etoiles, numero) : null, etoilesVille: seuilVille(), premierCoup: await premierCoup(fleuve, numero) };
+      const raison = refus(etoiles, publiees, numero);
+      return { ...publicEtape(fleuve, recetteDe(r), r.version), etoiles: etoiles.get(numero) || 0, refus: raison, pagaies: p, villeEtoiles: estEscale(numero) ? etoilesVille(etoiles, numero) : null, etoilesVille: seuilVille(), premierCoup: pc };
     },
 
     // Entrée dans la salle d'une étape : tout est vérifié ici (Google, ouverture, pagaies, ordre des étapes).

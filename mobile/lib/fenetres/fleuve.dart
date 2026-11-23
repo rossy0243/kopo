@@ -2,6 +2,7 @@
 // Chaque étape : une petite partie contre des robots avec un objectif, 1 à 3 étoiles. 5 pagaies par jour :
 // une se perd à chaque échec. Une escale (une vraie ville) toutes les 10 étapes. Le serveur décide de tout ;
 // mêmes écrans que sur le site (src/source.html, « Le Fleuve »).
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -366,7 +367,29 @@ class _Pagaie extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter old) => false;
 }
 
+// Ce qui se voit sur la carte, sans les comptes à rebours : on ne la redessine que si ça a changé.
+Object? _sansChronos(Object? v) => v is Map
+    ? {for (final x in v.entries) if (x.key != 'retourMs' && x.key != 'finMs') x.key.toString(): _sansChronos(x.value)}
+    : v is List ? [for (final x in v) _sansChronos(x)] : v;
+String _empreinte(Object? e) => jsonEncode(_sansChronos(e));
+
 Future<void> ouvrirFleuve([String? cle]) async {
+  // Déjà lu pour la carte de l'accueil : la carte s'ouvre tout de suite, puis se met à jour en silence.
+  final deja = app.etatFleuve;
+  if (deja != null && deja['ouvert'] == true && deja['google'] == true && app.enLigne && fleuvesOuverts().isNotEmpty) {
+    _afficherCarte(cle != null && fleuvesOuverts().contains(cle) ? cle : fleuveDuJeu(app.jeu == 'inter8' ? 'inter8' : 'kopo'));
+    Api.get('/fleuve').then((n) {
+      final nouveau = (n as Map).cast<String, dynamic>(), avant = app.etatFleuve;
+      if (nouveau['ouvert'] != true || nouveau['google'] != true) return;
+      // Un fleuve éteint entre-temps : on garde l'ancien état tant que sa carte est ouverte.
+      final f = (nouveau['fleuves'] as Map?) ?? const {};
+      if (!fleuvesOuverts().every(f.containsKey)) return;
+      final change = _empreinte(nouveau) != _empreinte(avant);
+      app.etatFleuve = nouveau;
+      if (change) { app.reglerMissionsFleuve(); app.maj(); }
+    }, onError: (_) {});
+    return;
+  }
   try {
     if (!await app.compteEnLigneOuCreer()) { app.lirePseudo(); return; }
     app.etatFleuve = (await Api.get('/fleuve') as Map).cast<String, dynamic>();
@@ -400,6 +423,7 @@ class _CarteFleuveState extends State<_CarteFleuve> {
     final E = app.etatFleuve!, f = (E['fleuves'] as Map)[cle] as Map, F = _fleuves[cle]!;
     _retenir(cle);
     final p = E['pagaies'] as Map;
+    if (_n(f['courante']) > 0) _prechargerEtape(cle, _n(f['courante'])); // l'étape qu'on va toucher : sa fenêtre s'ouvrira sans attente
     final etapes = ((f['etapes'] as List?) ?? []).cast<Map>();
     final enfants = <Widget>[
       Row(children: [Expanded(child: Text(_leMaj(F.nom), style: K.titre(36))), _pagaies(p, key: kPagaies)]),
@@ -693,9 +717,25 @@ Widget? preuveFleuve(Map pc, {Map? r}) {
   );
 }
 
+/// Détail de l'étape courante lu d'avance pendant que la carte s'affiche (servi une fois, frais d'une minute au plus).
+final _etapesLues = <String, (DateTime, Future<dynamic>)>{};
+bool _frais(DateTime quand) => DateTime.now().difference(quand).inSeconds < 60;
+void _prechargerEtape(String cle, int n) {
+  final k = '$cle/$n', d = _etapesLues[k];
+  if (d != null && _frais(d.$1)) return;
+  final lecture = Api.get('/fleuve/$k');
+  lecture.then((_) {}, onError: (_) {});
+  _etapesLues[k] = (DateTime.now(), lecture);
+}
+Future<dynamic> _lireEtape(String cle, int n) async {
+  final k = '$cle/$n', d = _etapesLues.remove(k);
+  if (d != null && _frais(d.$1)) { try { return await d.$2; } catch (_) {} }
+  return Api.get('/fleuve/$k');
+}
+
 Future<void> ouvrirEtapeFleuve(String cle, int n) async {
   Map e;
-  try { e = await Api.get('/fleuve/$cle/$n') as Map; } catch (x) { app.toast(messageErreur(x), Niv.echec); return; }
+  try { e = await _lireEtape(cle, n) as Map; } catch (x) { app.toast(messageErreur(x), Niv.echec); return; }
   final F = _fleuves[cle]!;
   final adv = _n(e['joueurs']) - 1, et = _n(e['etoiles']);
   final seuils = (e['seuils'] as Map?) ?? {};
