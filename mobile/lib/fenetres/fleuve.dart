@@ -26,20 +26,6 @@ const _or = Color(0xFFFFD86B);
 String _etoiles(int n) => '★' * n + '☆' * (3 - n);
 int _n(Object? x) => (x as num?)?.toInt() ?? 0;
 
-/// Où est l'ami le plus proche devant moi (accueil) : « Grace est 3 étapes devant ».
-String? amiDevantFleuve(Map? f) {
-  if (f == null || f['courante'] == null) return null;
-  final c = _n(f['courante']), pub = _n(f['publiees']);
-  Map? meilleur; var n0 = 0;
-  for (final a in ((f['amis'] as List?) ?? const []).cast<Map>()) {
-    final n = a['n'] == null ? pub + 1 : _n(a['n']);
-    if (n > c && (meilleur == null || n < n0)) { meilleur = a; n0 = n; }
-  }
-  if (meilleur == null) return null;
-  final d = n0 - c;
-  return '${meilleur['pseudo']} est $d étape${d > 1 ? 's' : ''} devant';
-}
-
 Widget _avatar(Map a, double taille) => Avatar('${a['pseudo'] ?? '?'}', avatar: (a['apparence'] as String?) ?? 'av-laiton', taille: taille);
 
 Widget? _marques(Map? m) {

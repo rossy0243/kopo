@@ -66,7 +66,7 @@ class Accueil extends StatelessWidget {
                           // Cartes étroites (Galaxy Fold fermé) : un peu plus hautes pour que leur texte tienne.
                           final h = w < 150 ? w * 1.12 : w * 3.6 / 4;
                           return Wrap(spacing: 10, runSpacing: 10, children: [
-                            for (final m in modes) SizedBox(width: m.creer ? c.maxWidth : w, height: m.creer ? 112 : h, child: m),
+                            for (final m in modes) SizedBox(width: m.creer || m.ligne ? c.maxWidth : w, height: m.creer ? 112 : m.ligne ? 96 : h, child: m),
                           ]);
                         }),
                       ),
@@ -102,11 +102,13 @@ class Accueil extends StatelessWidget {
     final ef = app.etatFleuve;
     final fleuves = ef != null && ef['ouvert'] == true ? ef['fleuves'] as Map? : null;
     final fl = fleuves == null ? null : fleuves[inter ? 'niger' : 'congo'] as Map?;
-    final devant = amiDevantFleuve(fl);
-    final resumeFleuve = fl == null ? null : (fl['publiees'] as num? ?? 0) > 0 ? "${fl['nom']} · ${fl['courante'] != null ? 'étape ${fl['courante']}' : 'tout est fait'} · ${devant ?? '★ ${fl['etoiles']}'}" : "${fl['nom']} · bientôt";
+    // L'étape du joueur en grand ; le fleuve et les étoiles en petit.
+    final publie = fl != null && (fl['publiees'] as num? ?? 0) > 0;
+    final resumeFleuve = fl == null ? null : publie ? "${fl['nom']} · ★ ${fl['etoiles']}" : "${fl['nom']} · bientôt";
+    final etapeFleuve = !publie ? null : fl['courante'] != null ? ('Étape', '${fl['courante']}') : ('Tout', 'fait');
     return [
       CarteMode('creer', 'Créer une partie', creerSous, coin: '♠', creer: true, amis: app.amisEnLigne, onTap: garde(() => creer(), ouvertInter: true)),
-      if (resumeFleuve != null) CarteMode('fleuve', 'Le Fleuve', resumeFleuve, coin: '♠', onTap: garde(() => ouvrirFleuve(inter ? 'niger' : 'congo'), ouvertInter: true)),
+      if (resumeFleuve != null) CarteMode('fleuve', 'Le Fleuve', resumeFleuve, coin: '♠', ligne: true, grand: etapeFleuve, onTap: garde(() => ouvrirFleuve(inter ? 'niger' : 'congo'), ouvertInter: true)),
       // Match du jour et Bande : Kopo seulement, les cartes disparaissent avec Inter (8), comme sur le site.
       if (!inter) CarteMode('jour', 'Match du jour', resumeJour ?? 'La même partie pour tous', coin: '♦', point: app.pointJour, onTap: garde(ouvrirMatchJour)),
       if (!inter) CarteMode('bande', 'La Bande', resumeBande ?? 'Défie tes amis', coin: '♥', onTap: garde(() => ouvrirBande())),
@@ -128,10 +130,12 @@ String dureeLisible(int ms) {
 class CarteMode extends StatelessWidget {
   final String icone, titre, sous, coin;
   final bool creer, point;
+  final bool ligne; // sur toute une ligne (Le Fleuve), sous « Créer une partie »
+  final (String, String)? grand; // à droite, en grand : (« Étape », « 10 »)
   final int amis;
   final int? enLigne;
   final VoidCallback onTap;
-  const CarteMode(this.icone, this.titre, this.sous, {super.key, required this.coin, this.creer = false, this.point = false, this.amis = 0, this.enLigne, required this.onTap});
+  const CarteMode(this.icone, this.titre, this.sous, {super.key, required this.coin, this.creer = false, this.point = false, this.ligne = false, this.grand, this.amis = 0, this.enLigne, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -157,7 +161,7 @@ class CarteMode extends StatelessWidget {
             child: Stack(children: [
               Positioned(top: 5, left: 6, child: Text(coin, style: TextStyle(fontSize: 13, color: coinCouleur))),
               Positioned(bottom: 5, right: 6, child: Transform.rotate(angle: math.pi, child: Text(coin, style: TextStyle(fontSize: 13, color: coinCouleur)))),
-              Center(
+              if (ligne) _contenuLigne() else Center(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                   // Si la carte est petite (écran étroit ou bas), tout son contenu rétrécit au lieu d'être coupé.
@@ -181,6 +185,24 @@ class CarteMode extends StatelessWidget {
       ),
     );
   }
+
+  // Carte sur toute une ligne : icône, titre et résumé à gauche, l'étape en grand à droite.
+  Widget _contenuLigne() => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 6, 18, 6),
+        child: Row(children: [
+          Ico(icone, taille: 34),
+          const SizedBox(width: 12),
+          Expanded(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(titre, style: TextStyle(fontFamily: K.display, fontSize: 19, letterSpacing: 1.2, height: 1, color: K.brass)),
+            const SizedBox(height: 4),
+            Text(sous, maxLines: 2, overflow: TextOverflow.ellipsis, style: K.texte(11, couleur: K.muted).copyWith(height: 1.2)),
+          ])),
+          if (grand != null) Column(mainAxisSize: MainAxisSize.min, children: [
+            Text(grand!.$1.toUpperCase(), style: K.texte(12, couleur: const Color(0xFF7FC4E8)).copyWith(letterSpacing: 1.5)),
+            Text(grand!.$2, style: const TextStyle(fontFamily: K.display, fontSize: 44, height: .9, color: Colors.white)),
+          ]),
+        ]),
+      );
 
   Widget _pointEnLigne(String t, Color c) => Padding(
         padding: const EdgeInsets.only(top: 2),

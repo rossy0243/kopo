@@ -638,6 +638,9 @@ ul.regles, ol.regles { margin: 0; padding-left: 20px; display: grid; gap: 6px; c
   .mode:not(.mode-creer) { aspect-ratio: 4 / 3.6; }
   .mode-creer { grid-column: 1 / -1; aspect-ratio: auto; min-height: 112px; }
   .mode-creer b { font-size: 24px; }
+  /* Le Fleuve : sur toute une ligne, sous « Créer une partie » ; les 4 autres cartes gardent leur place. */
+  .mode-fleuve { grid-column: 1 / -1; aspect-ratio: auto !important; min-height: 96px; }
+  .mode.mode-fleuve { grid-template-columns: auto 1fr auto; }
 }
 
 /* Première ouverture : Google ou invité */
@@ -997,6 +1000,9 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
 .mj { display: grid; gap: 10px; text-align: center; }
 /* Le Fleuve (fleuve.md) : la carte d'un fleuve, ses étapes, ses escales, les pagaies. */
 .mode-fleuve { border-color: #7fc4e8; }
+.fl-etape-grande { grid-column: 3; grid-row: 1 / span 2; align-self: center; display: grid; justify-items: center; font-family: var(--display); font-size: 44px; line-height: .9; color: #fff; padding: 4px 14px 0 0; }
+.fl-etape-grande small { font-family: inherit; font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; color: #7fc4e8; }
+@media (orientation: landscape) { .fl-etape-grande { font-size: 30px; } }
 .fenetre[data-type="fleuve"] { width: min(460px, 100%); padding: 14px; gap: 10px; }
 .fl-tete { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .fl-tete h2 { flex: 1; }
@@ -1626,7 +1632,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     </div>
     <div class="modes" id="modes">
       <button class="mode mode-creer" data-coin="♠" id="btnCreer"><span class="mode-icone"><svg class="ico"><use href="#i-creer"/></svg></span><b>Créer une partie</b><small>Entre amis, de 2 à 9</small></button>
-      <button class="mode mode-jour mode-fleuve" data-coin="♠" id="btnFleuve" hidden><span class="mode-icone"><svg class="ico"><use href="#i-fleuve"/></svg></span><b>Le Fleuve</b><small id="fleuveResume">Remonte le fleuve, étape par étape</small></button>
+      <button class="mode mode-jour mode-fleuve" data-coin="♠" id="btnFleuve" hidden><span class="mode-icone"><svg class="ico"><use href="#i-fleuve"/></svg></span><b>Le Fleuve</b><small id="fleuveResume">Remonte le fleuve, étape par étape</small><span class="fl-etape-grande" id="fleuveEtape" hidden></span></button>
       <button class="mode mode-jour" data-coin="♦" id="btnMatchJour" hidden><span class="mode-icone"><svg class="ico"><use href="#i-jour"/></svg><i class="point-nouveau" id="pointJour" hidden></i></span><b>Match du jour</b><small id="matchJourResume">La même partie pour tous</small></button>
       <button class="mode mode-bande" data-coin="♥" id="btnBande" hidden><span class="mode-icone"><svg class="ico"><use href="#i-bande"/></svg><i class="point-nouveau" id="pointBande" hidden></i></span><b>La Bande</b><small id="bandeResume">Défie tes amis</small></button>
       <button class="mode mode-enligne" id="btnInconnus" data-coin="♦"><span class="mode-icone"><svg class="ico"><use href="#i-enligne"/></svg></span><b>En ligne</b><small>Avec des inconnus <span id="enLigne"></span></small></button>
@@ -5123,6 +5129,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   async function majCartesCompetition() {
     majCarteFleuve();
     $('btnMatchJour').hidden = $('btnBande').hidden = !MODE_SERVEUR || jeuChoisi() === 'inter8' || fleuveLance(); // Kopo seulement, retirés au lancement du Fleuve
+    if (fleuveLance()) majBadgesNouveaute();
     if (!MODE_SERVEUR || fleuveLance()) return;
     if (!compteLocal()) return proposerLienBande(); // lien de Bande ouvert sur un téléphone sans compte
     try {
@@ -5284,12 +5291,6 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     }
     return z;
   }
-  // Où est l'ami le plus proche devant moi (accueil) : « Grace est 3 étapes devant ».
-  function amiDevant(f) {
-    if (!f || !f.amis || !f.courante) return null;
-    const devant = f.amis.map((a) => ({ a, n: a.n === null ? f.publiees + 1 : a.n })).filter((x) => x.n > f.courante).sort((x, y) => x.n - y.n)[0];
-    return devant ? `${devant.a.pseudo} est ${devant.n - f.courante} étape${devant.n - f.courante > 1 ? 's' : ''} devant` : null;
-  }
   function avatarFleuve(a, cls = 'avatar') {
     const av = el('span', cls + ' ' + (a.apparence || 'av-laiton'));
     av.append(el('b', null, (a.pseudo || '?')[0].toUpperCase()));
@@ -5341,7 +5342,12 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     if (recharger || !etatFleuve) { try { etatFleuve = await apiJoueur('/fleuve'); } catch (e) { return; } }
     b.hidden = !etatFleuve.ouvert;
     const f = etatFleuve.fleuves && etatFleuve.fleuves[fleuveDuJeu()];
-    if (f) { const d = amiDevant(f); $('fleuveResume').textContent = f.publiees ? `${f.nom} · ${f.courante ? 'étape ' + f.courante : 'tout est fait'}${d ? ' · ' + d : ' · ★ ' + f.etoiles}` : `${f.nom} · bientôt`; }
+    if (f) {
+      // L'étape du joueur en grand ; le fleuve et les étoiles en petit.
+      $('fleuveResume').textContent = f.publiees ? `${f.nom} · ★ ${f.etoiles}` : `${f.nom} · bientôt`;
+      const g = $('fleuveEtape'); g.hidden = !f.publiees;
+      g.innerHTML = f.courante ? `<small>Étape</small>${f.courante}` : '<small>Tout</small>fait';
+    }
   }
   window.majCarteFleuve = majCarteFleuve;
 
