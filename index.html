@@ -1031,6 +1031,24 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
 .fl-seuils span { color: #ffd86b; display: inline-block; min-width: 48px; }
 .fl-piege { color: var(--warn); font-size: 13px; }
 .fl-objectif { font-size: 19px; font-weight: 700; color: var(--ink); }
+/* Le Fleuve, entre amis : avatars sur la carte, course de la semaine, marques. */
+.fl-amis { position: absolute; display: flex; transform: translateY(-50%); z-index: 2; }
+.fl-amis .avatar { width: 28px; height: 28px; font-size: 15px; border: 2px solid #fff3d0; box-shadow: 0 2px 3px rgba(0,0,0,.45); margin-left: -8px; padding: 0; cursor: pointer; }
+.fl-amis .avatar:first-child { margin-left: 0; }
+.fl-amis .fl-plus { width: 28px; height: 28px; margin-left: -8px; border-radius: 50%; background: #1d1606; color: #fff3d0; font-size: 11px; display: grid; place-items: center; border: 2px solid #fff3d0; }
+.fl-actions { display: flex; gap: 8px; }
+.fl-actions .btn { flex: 1; }
+.fl-course { display: grid; gap: 6px; text-align: left; }
+.fl-course li { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 10px; background: rgba(255,255,255,.04); }
+.fl-course li.moi { background: rgba(255,216,107,.12); border: 1px solid rgba(255,216,107,.35); }
+.fl-course li .avatar { width: 30px; height: 30px; font-size: 16px; }
+.fl-course li .avatar { flex: none; }
+.fl-course li span:not(.avatar) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fl-course li b { color: #ffd86b; }
+.fl-course .rang { width: 18px; color: var(--muted); font-size: 13px; text-align: center; }
+.fl-marques { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.fl-marque { font-size: 12px; padding: 3px 8px; border-radius: 999px; background: rgba(255,216,107,.14); color: #ffd86b; border: 1px solid rgba(255,216,107,.35); }
+.fl-passe { font: 400 22px/1.1 var(--display); color: #ffd86b; letter-spacing: 1px; }
 #pillFleuve { justify-self: center; align-self: start; background: rgba(16,35,58,.92); border: 1px solid #7fc4e8; color: var(--ink); border-radius: 999px; padding: 4px 12px; font-size: 12.5px; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
 @media (prefers-reduced-motion: reduce) { .fl-etape.courante { animation: none; } }
 .mj-numero { color: var(--muted); font-size: 13px; letter-spacing: 1px; text-transform: uppercase; }
@@ -8136,7 +8154,7 @@ svg .vb { transform-box: view-box; }
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = 'f3984bd51665'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = '30cb9d7cc32d'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: true };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // La musique des menus était coupée par défaut : on l'allume une fois pour tous (le joueur peut la recouper).
@@ -8176,7 +8194,9 @@ svg .vb { transform-box: view-box; }
   // Notification push touchée, jeu fermé (?ouvrir=amis ou ?ouvrir=match) : la fenêtre s'ouvre une fois l'accueil prêt.
   let ouvrirDemande = new URLSearchParams(location.search).get('ouvrir');
   if (ouvrirDemande) {
-    const q = new URLSearchParams(location.search); q.delete('ouvrir');
+    const fl = new URLSearchParams(location.search).get('fleuve');
+    if (ouvrirDemande === 'fleuve' && fl) ouvrirDemande += '&fleuve=' + encodeURIComponent(fl);
+    const q = new URLSearchParams(location.search); q.delete('ouvrir'); q.delete('fleuve');
     history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + location.hash);
   }
   function enregistrerPrefs() { stock.ecrire('kopo-prefs', prefs); appliquerPrefs(); }
@@ -11418,6 +11438,56 @@ svg .vb { transform-box: view-box; }
     }
     return z;
   }
+  // Où est l'ami le plus proche devant moi (accueil) : « Grace est 3 étapes devant ».
+  function amiDevant(f) {
+    if (!f || !f.amis || !f.courante) return null;
+    const devant = f.amis.map((a) => ({ a, n: a.n === null ? f.publiees + 1 : a.n })).filter((x) => x.n > f.courante).sort((x, y) => x.n - y.n)[0];
+    return devant ? `${devant.a.pseudo} est ${devant.n - f.courante} étape${devant.n - f.courante > 1 ? 's' : ''} devant` : null;
+  }
+  function avatarFleuve(a, cls = 'avatar') {
+    const av = el('span', cls + ' ' + (a.apparence || 'av-laiton'));
+    av.append(el('b', null, (a.pseudo || '?')[0].toUpperCase()));
+    return av;
+  }
+  function marquesEl(m) {
+    const z = el('div', 'fl-marques');
+    if (m && m.pagayeur) z.append(el('span', 'fl-marque', '🏆 Pagayeur de la semaine'));
+    for (const t of (m && m.premiers) || []) z.append(el('span', 'fl-marque', '⛵ ' + t));
+    return z.childNodes.length ? z : null;
+  }
+  // Un ami touché sur la carte : qui c'est, où il en est, ses marques.
+  function ficheAmiFleuve(cle, a) {
+    const F = FLEUVES[cle], z = el('div', 'mj');
+    const av = avatarFleuve(a); av.style.margin = '0 auto'; av.style.width = '56px'; av.style.height = '56px'; av.style.fontSize = '30px';
+    z.append(av, el('h2', null, a.pseudo), el('p', null, a.n === null ? `A fini tout le ${F.nom} ouvert pour l'instant.` : `Étape ${a.n} du ${F.nom} · ★ ${a.etoiles}`));
+    const m = marquesEl(a); if (m) z.append(m);
+    const retour = el('button', 'btn large', 'Retour à la carte'); retour.onclick = () => afficherCarteFleuve(cle);
+    ouvrirFenetre([z, retour]);
+  }
+  // Course de la semaine : moi et mes amis, au nombre d'étoiles nouvelles depuis lundi.
+  function ouvrirCourseFleuve(cle) {
+    const F = FLEUVES[cle], f = etatFleuve.fleuves[cle], c = f.course, z = el('div', 'mj');
+    z.append(el('div', 'mj-numero', `${F.nom} · course de la semaine`), el('h2', null, 'Qui rame le plus ?'));
+    z.append(el('p', null, `Le plus d'étoiles nouvelles entre amis d'ici dimanche minuit gagne ${formatPieces(c.pieces)} pièces et la marque « Pagayeur de la semaine ». Personne ne mise.`));
+    const l = el('ol', 'fl-course');
+    c.lignes.forEach((x, i) => {
+      const li = el('li', x.moi ? 'moi' : null);
+      li.append(el('i', 'rang', String(i + 1)), avatarFleuve(x), el('span', null, (x.moi ? 'Toi' : x.pseudo) + (x.pagayeur ? ' 🏆' : '')), el('b', null, '★ ' + x.etoiles));
+      l.append(li);
+    });
+    z.append(l);
+    if (!c.amis) z.append(el('small', 'muted', 'Ajoute des amis (Paramètres → Mes amis) pour faire la course avec eux.'));
+    else if (c.lignes.length < 2) z.append(el('small', 'muted', 'Aucun de tes amis n\'a encore gagné d\'étoile cette semaine : il faut au moins un rival pour gagner.'));
+    z.append(el('small', 'muted', `Fin dans ${finCourse(c.finMs)}.`));
+    const retour = el('button', 'btn large', 'Retour à la carte'); retour.onclick = () => afficherCarteFleuve(cle);
+    ouvrirFenetre([z, retour]);
+  }
+  const finCourse = (ms) => (ms >= 2 * 864e5 ? `${Math.floor(ms / 864e5)} jours` : dureeLisible(ms));
+  function partagerFleuve(cle) {
+    const f = etatFleuve.fleuves[cle];
+    const ou = f.courante ? `je suis à ${f.ville}, étape ${f.courante}` : `j'ai fini tout le ${f.nom} ouvert`;
+    window.open('https://wa.me/?text=' + encodeURIComponent(`Masano · Le Fleuve : ${ou}, ${f.etoiles} étoiles. Tu me rattrapes ?\n${LIEN_SITE()}`), '_blank', 'noopener');
+  }
   // Carte de l'accueil : visible quand le Fleuve est ouvert pour ce joueur.
   async function majCarteFleuve(recharger = true) {
     const b = $('btnFleuve'); if (!b) return;
@@ -11425,7 +11495,7 @@ svg .vb { transform-box: view-box; }
     if (recharger || !etatFleuve) { try { etatFleuve = await apiJoueur('/fleuve'); } catch (e) { return; } }
     b.hidden = !etatFleuve.ouvert;
     const f = etatFleuve.fleuves && etatFleuve.fleuves[fleuveDuJeu()];
-    if (f) $('fleuveResume').textContent = f.publiees ? `${f.nom} · ${f.courante ? 'étape ' + f.courante : 'tout est fait'} · ★ ${f.etoiles}` : `${f.nom} · bientôt`;
+    if (f) { const d = amiDevant(f); $('fleuveResume').textContent = f.publiees ? `${f.nom} · ${f.courante ? 'étape ' + f.courante : 'tout est fait'}${d ? ' · ' + d : ' · ★ ' + f.etoiles}` : `${f.nom} · bientôt`; }
   }
   window.majCarteFleuve = majCarteFleuve;
 
@@ -11461,6 +11531,14 @@ svg .vb { transform-box: view-box; }
       const suiv = el('button', null, 'Après ›'); suiv.disabled = bief >= biefMax; suiv.onclick = () => { biefVu[cle] = bief + 1; afficherCarteFleuve(cle); };
       nav.append(prec, el('span', null, `Bief ${bief}${villes.length ? ' · ' + villes[0] + (villes.length > 1 ? ' → ' + villes[villes.length - 1] : '') : ''}`), suiv);
       const carte = el('div', 'fl-carte');
+      const actions = el('div', 'fl-actions');
+      const tete1 = f.course.lignes[0];
+      const bc = el('button', 'btn', f.course.lignes.length > 1 ? `🏁 Course : ${tete1.moi ? 'tu mènes' : tete1.pseudo + ' mène'}` : '🏁 Course de la semaine');
+      bc.onclick = () => ouvrirCourseFleuve(cle);
+      const bp = el('button', 'btn', 'Partager'); bp.onclick = () => partagerFleuve(cle);
+      actions.append(bc, bp);
+      const m = marquesEl(f.marques);
+      z.push(actions); if (m) z.push(m);
       z.push(nav, carte);
       ouvrirFenetre([...z, fermerBouton()], 'fleuve');
       $('fenetre').classList.toggle('fl-niger', cle === 'niger');
@@ -11502,6 +11580,16 @@ svg .vb { transform-box: view-box; }
         fond.append(v);
       }
       if (e.n === f.courante) { courant = b; const k = el('div', 'fl-bateau', '🛶'); k.style.left = p.x + 'px'; k.style.top = p.y + 'px'; fond.append(k); }
+      // Mes amis posés sur leur étape (ceux qui ont tout fini : sur la dernière). Touchés : leur fiche.
+      const ici = (f.amis || []).filter((a) => (a.n === null ? f.publiees : a.n) === e.n);
+      if (ici.length) {
+        const g = el('div', 'fl-amis');
+        g.style.top = (p.y - (e.escale ? 34 : 28)) + 'px';
+        if (p.x > L / 2) g.style.right = (L - p.x + 16) + 'px'; else g.style.left = (p.x + 16) + 'px'; // à côté de la pirogue, pas dessus
+        for (const a of ici.slice(0, 3)) { const av = avatarFleuve(a); av.setAttribute('role', 'button'); av.setAttribute('aria-label', a.pseudo); av.title = a.pseudo; av.onclick = () => ficheAmiFleuve(cle, a); g.append(av); }
+        if (ici.length > 3) { const plus = el('span', 'fl-plus', '+' + (ici.length - 3)); plus.onclick = () => ficheAmiFleuve(cle, ici[3]); g.append(plus); }
+        fond.append(g);
+      }
     });
     if (HAUT > 60) { const s = el('div', 'fl-suite', 'La suite du fleuve arrive bientôt…'); s.style.top = '24px'; fond.append(s); }
     carte.append(fond);
@@ -11559,6 +11647,8 @@ svg .vb { transform-box: view-box; }
       z.append(el('small', 'muted', `Score ${r.score} · ★★ à ${r.seuils.deux} · ★★★ à ${r.seuils.trois}`));
       if (r.pieces > 0) z.append(el('p', 'mj-regle', `+${formatPieces(r.pieces)} pièces${r.double ? ' (doublées : première étape réussie du jour)' : ''}${r.piecesEscale ? `, dont ${formatPieces(r.piecesEscale)} pour la ville` : ''}`));
       if (r.biefTermine) z.append(el('p', null, 'Bief terminé : un nouveau morceau du fleuve t\'attend.'));
+      if (r.depasses && r.depasses.length) { const t = el('div', 'fl-passe', `Tu passes ${r.depasses.slice(0, 2).join(' et ')}${r.depasses.length > 2 ? ` et ${r.depasses.length - 2} autre${r.depasses.length > 3 ? 's' : ''}` : ''} !`); z.append(t); pop(t, 1.15); }
+      if (r.premierA) z.append(el('p', 'fl-marque', `⛵ Premier de tes amis à ${r.premierA} : la marque « 1er à ${r.premierA} » est à toi.`));
       if (typeof r.solde === 'number' || typeof r.solde === 'string') soldeServeur(Number(r.solde));
     } else z.append(el('small', 'muted', `Une pagaie perdue. Il t'en reste ${r.pagaies.restantes}.`));
     const boutons = [];
@@ -11919,6 +12009,7 @@ svg .vb { transform-box: view-box; }
     if (a.type === 'parrainage' || a.type === 'bande') apiJoueur('/moi').then((m) => soldeServeur(m.compte.solde)).catch(() => {});
     if (a.type === 'parrainage') return toast(a.texte + (d.titre ? ' « ' + d.titre + ' »' : ''), 'succes');
     if (a.type === 'ami') return toast(a.texte, 'succes');
+    if (a.type === 'fleuve') { if (d.course) apiJoueur('/moi').then((m) => soldeServeur(m.compte.solde)).catch(() => {}); majCarteFleuve(); return toast(a.texte, d.course ? 'succes' : 'info'); }
     toast(a.texte, 'info'); // rivalité, résultat de la Bande
   }
   async function lireNotifications() {
@@ -13884,7 +13975,7 @@ svg .vb { transform-box: view-box; }
       await couperPush(); ecrirePushLocal({ coupe: true }); return false;
     });
     const prefsPush = e.prefs || {};
-    for (const [t, texte, aide] of [['invitation', 'Invitations', 'Un ami t\'invite à sa table'], ['ami', 'Demandes d\'ami', 'Reçues et acceptées'], ['match', 'Rappel du Match du jour', 'À 19 h, si tu ne l\'as pas joué'], ['annonce', 'Annonces de Masano', 'Tournois, nouveautés']]) {
+    for (const [t, texte, aide] of [['invitation', 'Invitations', 'Un ami t\'invite à sa table'], ['ami', 'Demandes d\'ami', 'Reçues et acceptées'], ['match', 'Rappel du Match du jour', 'À 19 h, si tu ne l\'as pas joué'], ['annonce', 'Annonces de Masano', 'Tournois, nouveautés'], ['fleuve', 'Le Fleuve', 'Un ami t\'a dépassé (une fois par jour au plus)']].filter(([t]) => t !== 'fleuve' || (configServeur && configServeur.fleuve && configServeur.fleuve !== 'ferme'))) {
       interrupteur(texte, aide, prefsPush[t] !== false, async (v) => { const r = await apiJoueur('/push/prefs', 'PATCH', { [t]: v }); etatPush = Object.assign(etatPush || {}, { prefs: r.prefs }); return r.prefs[t]; });
     }
   }
@@ -13897,6 +13988,7 @@ svg .vb { transform-box: view-box; }
       fermerFenetre(); $('codeRejoindre').value = code; $('voileRejoindre').hidden = false;
     } else if (o === 'amis' && $('ecranAccueil').hidden === false) { majPastilleAmis(); ouvrirAmis(); }
     else if (o === 'match' && $('ecranAccueil').hidden === false) ouvrirMatchJour();
+    else if (o === 'fleuve' && $('ecranAccueil').hidden === false) ouvrirFleuve(FLEUVES[u.searchParams.get('fleuve')] ? u.searchParams.get('fleuve') : undefined);
   }
   if (PUSH_POSSIBLE) navigator.serviceWorker.addEventListener('message', (ev) => { if (ev.data && ev.data.masano === 'ouvrir') ouvrirDepuisNotification(ev.data.url); });
   // Première ouverture depuis l'icône : le cadeau d'installation (une fois par compte, le serveur refuse les doublons).

@@ -913,6 +913,19 @@ paths:
                         suiteBientot: { type: boolean }
                         ville: { type: string }
                         etapes: { type: array, items: { type: object, properties: { n: { type: integer }, etoiles: { type: integer }, escale: { type: boolean }, ville: { type: string } } } }
+                        amis:
+                          type: array
+                          description: Mes amis qui ont commencé ce fleuve, posés sur leur étape (n null = ils ont fini tout ce qui est publié)
+                          items: { type: object, properties: { id: { type: string }, pseudo: { type: string }, apparence: { type: [string, 'null'] }, n: { type: [integer, 'null'] }, faites: { type: integer }, etoiles: { type: integer }, premiers: { type: array, items: { type: string } }, pagayeur: { type: boolean } } }
+                        marques: { type: object, description: Mes marques sur ce fleuve, properties: { premiers: { type: array, items: { type: string }, description: « 1er à Banana »… }, pagayeur: { type: boolean, description: Pagayeur de la semaine (7 jours) } } }
+                        course:
+                          type: object
+                          description: Course de la semaine (lundi à dimanche minuit, Kinshasa) entre moi et mes amis, au nombre d'étoiles nouvelles
+                          properties:
+                            lignes: { type: array, items: { type: object, properties: { id: { type: string }, pseudo: { type: string }, apparence: { type: [string, 'null'] }, etoiles: { type: integer }, moi: { type: boolean }, pagayeur: { type: boolean } } } }
+                            finMs: { type: integer }
+                            pieces: { type: integer, description: Prix offert par le jeu au gagnant }
+                            amis: { type: integer }
   /fleuve/{fleuve}/{numero}:
     get:
       tags: [Le Fleuve]
@@ -1227,12 +1240,12 @@ components:
       type: object
       properties:
         id: { type: integer }
-        type: { enum: [rivalite, invitation, ami, bande] }
+        type: { enum: [rivalite, invitation, ami, bande, parrainage, cadeau, fleuve] }
         texte: { type: string }
-        donnees: { type: [object, 'null'], description: 'invitation : { de, pseudo, code, jeu } ; ami : { de, pseudo, numero, demande | accepte } ; rivalite : { de, pseudo, toi, lui } ; bande : { bande, … }' }
+        donnees: { type: [object, 'null'], description: 'invitation : { de, pseudo, code, jeu } ; ami : { de, pseudo, numero, demande | accepte } ; rivalite : { de, pseudo, toi, lui } ; bande : { bande, … } ; fleuve : { depasse, de, pseudo, fleuve, numero } ou { course, fleuve, semaine, pieces }' }
         lue: { type: boolean }
         cree_le: { type: string, format: date-time }
-        action: { enum: [table, amis, rivaux, bande, accueil], description: Écran à ouvrir au toucher }
+        action: { enum: [table, amis, rivaux, bande, fleuve, accueil], description: Écran à ouvrir au toucher }
     PrefsPush:
       type: object
       properties:
@@ -1240,6 +1253,7 @@ components:
         ami: { type: boolean }
         match: { type: boolean }
         annonce: { type: boolean }
+        fleuve: { type: boolean, description: Un ami t'a dépassé sur le Fleuve (une fois par jour au plus), gagnant de la course de la semaine }
     Bouquet:
       type: object
       properties:

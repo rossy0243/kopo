@@ -6,6 +6,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../commun/apparences.dart';
 import '../commun/theme.dart';
 import '../ecrans/accueil.dart' show dureeLisible;
 import '../etat.dart';
@@ -24,6 +25,94 @@ const _or = Color(0xFFFFD86B);
 
 String _etoiles(int n) => '★' * n + '☆' * (3 - n);
 int _n(Object? x) => (x as num?)?.toInt() ?? 0;
+
+/// Où est l'ami le plus proche devant moi (accueil) : « Grace est 3 étapes devant ».
+String? amiDevantFleuve(Map? f) {
+  if (f == null || f['courante'] == null) return null;
+  final c = _n(f['courante']), pub = _n(f['publiees']);
+  Map? meilleur; var n0 = 0;
+  for (final a in ((f['amis'] as List?) ?? const []).cast<Map>()) {
+    final n = a['n'] == null ? pub + 1 : _n(a['n']);
+    if (n > c && (meilleur == null || n < n0)) { meilleur = a; n0 = n; }
+  }
+  if (meilleur == null) return null;
+  final d = n0 - c;
+  return '${meilleur['pseudo']} est $d étape${d > 1 ? 's' : ''} devant';
+}
+
+Widget _avatar(Map a, double taille) => Avatar('${a['pseudo'] ?? '?'}', avatar: (a['apparence'] as String?) ?? 'av-laiton', taille: taille);
+
+Widget? _marques(Map? m) {
+  if (m == null) return null;
+  final l = [if (m['pagayeur'] == true) '🏆 Pagayeur de la semaine', for (final t in ((m['premiers'] as List?) ?? const [])) '⛵ $t'];
+  if (l.isEmpty) return null;
+  return Wrap(alignment: WrapAlignment.center, spacing: 6, runSpacing: 6, children: [
+    for (final t in l)
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(color: const Color(0x24FFD86B), borderRadius: BorderRadius.circular(99), border: Border.all(color: const Color(0x59FFD86B))),
+        child: Text(t, style: K.texte(12, couleur: _or)),
+      ),
+  ]);
+}
+
+/// Un ami touché sur la carte : qui c'est, où il en est, ses marques.
+void _ficheAmi(String cle, Map a) {
+  final F = _fleuves[cle]!;
+  final m = _marques(a);
+  app.ouvrirFenetre((context) => Fenetre(enfants: [
+        Center(child: _avatar(a, 56)),
+        const Ecart(8),
+        Text('${a['pseudo']}', textAlign: TextAlign.center, style: K.titre(30)),
+        Muet(a['n'] == null ? "A fini tout le ${F.nom} ouvert pour l'instant." : 'Étape ${a['n']} du ${F.nom} · ★ ${a['etoiles']}', align: TextAlign.center, taille: 15),
+        if (m != null) ...[const Ecart(8), m],
+        const Ecart(12),
+        Btn('Retour à la carte', large: true, onTap: () => _afficherCarte(cle)),
+      ]));
+}
+
+/// Course de la semaine : moi et mes amis, au nombre d'étoiles nouvelles depuis lundi.
+void _course(String cle) {
+  final F = _fleuves[cle]!;
+  final f = (app.etatFleuve!['fleuves'] as Map)[cle] as Map, c = f['course'] as Map;
+  final lignes = ((c['lignes'] as List?) ?? const []).cast<Map>();
+  app.ouvrirFenetre((context) => Fenetre(enfants: [
+        Text('${F.nom} · course de la semaine'.toUpperCase(), textAlign: TextAlign.center, style: K.texte(13, couleur: K.muted).copyWith(letterSpacing: 1)),
+        Text('Qui rame le plus ?', textAlign: TextAlign.center, style: K.titre(32)),
+        const Ecart(6),
+        Text("Le plus d'étoiles nouvelles entre amis d'ici dimanche minuit gagne ${App.formatPieces(_n(c['pieces']))} pièces et la marque « Pagayeur de la semaine ». Personne ne mise.", textAlign: TextAlign.center, style: K.texte(14)),
+        const Ecart(10),
+        for (var i = 0; i < lignes.length; i++)
+          Container(
+            margin: const EdgeInsets.only(bottom: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            decoration: BoxDecoration(
+              color: lignes[i]['moi'] == true ? const Color(0x1FFFD86B) : const Color(0x0AFFFFFF),
+              borderRadius: BorderRadius.circular(10),
+              border: lignes[i]['moi'] == true ? Border.all(color: const Color(0x59FFD86B)) : null,
+            ),
+            child: Row(children: [
+              SizedBox(width: 18, child: Text('${i + 1}', textAlign: TextAlign.center, style: K.texte(13, couleur: K.muted))),
+              const SizedBox(width: 8),
+              _avatar(lignes[i], 30),
+              const SizedBox(width: 10),
+              Expanded(child: Text('${lignes[i]['moi'] == true ? 'Toi' : lignes[i]['pseudo']}${lignes[i]['pagayeur'] == true ? ' 🏆' : ''}', maxLines: 1, overflow: TextOverflow.ellipsis, style: K.texte(15))),
+              Text('★ ${lignes[i]['etoiles']}', style: K.texte(15, couleur: _or, poids: FontWeight.w700)),
+            ]),
+          ),
+        if (_n(c['amis']) == 0) const Muet('Ajoute des amis (Paramètres → Mes amis) pour faire la course avec eux.', align: TextAlign.center)
+        else if (lignes.length < 2) const Muet("Aucun de tes amis n'a encore gagné d'étoile cette semaine : il faut au moins un rival pour gagner.", align: TextAlign.center),
+        Muet('Fin dans ${_n(c['finMs']) >= 2 * 86400000 ? '${_n(c['finMs']) ~/ 86400000} jours' : dureeLisible(_n(c['finMs']))}.', align: TextAlign.center),
+        const Ecart(12),
+        Btn('Retour à la carte', large: true, onTap: () => _afficherCarte(cle)),
+      ]));
+}
+
+void _partager(String cle) {
+  final f = (app.etatFleuve!['fleuves'] as Map)[cle] as Map;
+  final ou = f['courante'] != null ? 'je suis à ${f['ville']}, étape ${f['courante']}' : "j'ai fini tout le ${f['nom']} ouvert";
+  ouvrirWhatsApp('Masano · Le Fleuve : $ou, ${f['etoiles']} étoiles. Tu me rattrapes ?\n$lienJeu');
+}
 
 /// L'objectif de l'étape, rappelé pendant la partie.
 class PastilleFleuve extends StatelessWidget {
@@ -117,7 +206,16 @@ class _CarteFleuveState extends State<_CarteFleuve> {
       final debut = (bief - 1) * _parBief + 1;
       final ici = etapes.where((e) => _n(e['n']) >= debut && _n(e['n']) < debut + _parBief).toList();
       final villes = ici.where((e) => e['escale'] == true).map((e) => e['ville'].toString()).toList();
+      final course = ((f['course'] as Map?)?['lignes'] as List?)?.cast<Map>() ?? const <Map>[];
+      final m = _marques(f['marques'] as Map?);
       enfants.addAll([
+        Row(children: [
+          Expanded(child: Btn(course.length > 1 ? '🏁 Course : ${course.first['moi'] == true ? 'tu mènes' : '${course.first['pseudo']} mène'}' : '🏁 Course de la semaine', onTap: () => _course(cle))),
+          const SizedBox(width: 8),
+          Expanded(child: Btn('Partager', onTap: () => _partager(cle))),
+        ]),
+        const Ecart(8),
+        if (m != null) ...[m, const Ecart(8)],
         Row(children: [
           TextButton(onPressed: bief <= 1 ? null : () => setState(() => _biefVu[cle] = bief - 1), child: Text('‹ Avant', style: K.texte(13, couleur: bief <= 1 ? K.muted : K.brass))),
           Expanded(child: Text('Bief $bief${villes.isEmpty ? '' : ' · ${villes.first}${villes.length > 1 ? ' → ${villes.last}' : ''}'}', textAlign: TextAlign.center, style: K.texte(13, couleur: K.muted))),
@@ -206,6 +304,30 @@ class _CarteState extends State<_Carte> {
           ),
         ));
         if (cour) enfants.add(Positioned(left: p.dx - 13, top: p.dy - t / 2 - 30, child: const IgnorePointer(child: Text('🛶', style: TextStyle(fontSize: 24)))));
+        // Mes amis posés sur leur étape (ceux qui ont tout fini : sur la dernière). Touchés : leur fiche.
+        final amisIci = ((f['amis'] as List?) ?? const []).cast<Map>().where((a) => (a['n'] == null ? _n(f['publiees']) : _n(a['n'])) == n).toList();
+        if (amisIci.isNotEmpty) {
+          final droite = p.dx > L / 2;
+          final vus = amisIci.take(3).toList();
+          enfants.add(Positioned(
+            top: p.dy - t / 2 - 22, left: droite ? null : p.dx + 16, right: droite ? L - p.dx + 16 : null, // à côté de la pirogue, pas dessus
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              for (var k = 0; k < vus.length; k++)
+                Transform.translate(
+                  offset: Offset(-8.0 * k, 0),
+                  child: Semantics(button: true, label: '${vus[k]['pseudo']}', child: GestureDetector(
+                    onTap: () => _ficheAmi(widget.cle, vus[k]),
+                    child: Container(decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: const Color(0xFFFFF3D0), width: 2), boxShadow: const [BoxShadow(color: Color(0x73000000), blurRadius: 3, offset: Offset(0, 2))]), child: _avatar(vus[k], 26)),
+                  )),
+                ),
+              if (amisIci.length > 3)
+                Transform.translate(offset: Offset(-8.0 * vus.length, 0), child: GestureDetector(
+                  onTap: () => _ficheAmi(widget.cle, amisIci[3]),
+                  child: Container(width: 30, height: 30, alignment: Alignment.center, decoration: BoxDecoration(shape: BoxShape.circle, color: const Color(0xFF1D1606), border: Border.all(color: const Color(0xFFFFF3D0), width: 2)), child: Text('+${amisIci.length - 3}', style: K.texte(11, couleur: const Color(0xFFFFF3D0)))),
+                )),
+            ]),
+          ));
+        }
       }
       if (suite) enfants.add(Positioned(top: 24, left: 0, right: 0, child: Text('La suite du fleuve arrive bientôt…', textAlign: TextAlign.center, style: K.texte(13, couleur: const Color(0xFFFFF3D0)))));
       return Container(
@@ -304,6 +426,7 @@ Future<void> resultatFleuve(Map r) async {
   if (r['solde'] != null) app.soldeServeur(r['solde']);
   try { app.etatFleuve = (await Api.get('/fleuve') as Map).cast<String, dynamic>(); } catch (_) {}
   final f = (app.etatFleuve?['fleuves'] as Map?)?[cle] as Map?;
+  final depasses = ((r['depasses'] as List?) ?? const []).map((x) => '$x').toList();
   final suivante = reussi && f != null && f['courante'] != null && f['courante'] != r['numero'] ? _n(f['courante']) : null;
   app.ouvrirFenetre((context) => Fenetre(enfants: [
         Text('${F.nom} · étape ${r['numero']}${r['escale'] == true ? ' · ${r['ville']}' : ''}'.toUpperCase(), textAlign: TextAlign.center, style: K.texte(13, couleur: K.muted).copyWith(letterSpacing: 1)),
@@ -329,6 +452,12 @@ Future<void> resultatFleuve(Map r) async {
           Muet('Score ${r['score']} · ★★ à ${seuils['deux']} · ★★★ à ${seuils['trois']}', align: TextAlign.center, taille: 12),
           if (_n(r['pieces']) > 0) Text('+${App.formatPieces(_n(r['pieces']))} pièces${r['double'] == true ? ' (doublées : première étape réussie du jour)' : ''}${r['piecesEscale'] != null ? ', dont ${App.formatPieces(_n(r['piecesEscale']))} pour la ville' : ''}', textAlign: TextAlign.center, style: K.texte(13, couleur: K.muted)),
           if (r['biefTermine'] == true) Text("Bief terminé : un nouveau morceau du fleuve t'attend.", textAlign: TextAlign.center, style: K.texte(14)),
+          if (depasses.isNotEmpty) ...[const Ecart(6), TweenAnimationBuilder<double>(
+            tween: Tween(begin: app.sansAnim ? 1 : .6, end: 1), duration: const Duration(milliseconds: 500), curve: Curves.easeOutBack,
+            builder: (_, v, enfant) => Transform.scale(scale: v, child: enfant),
+            child: Text('Tu passes ${depasses.take(2).join(' et ')}${depasses.length > 2 ? ' et ${depasses.length - 2} autre${depasses.length > 3 ? 's' : ''}' : ''} !', textAlign: TextAlign.center, style: K.titre(24, couleur: _or)),
+          )],
+          if (r['premierA'] != null) ...[const Ecart(6), Text('⛵ Premier de tes amis à ${r['premierA']} : la marque « 1er à ${r['premierA']} » est à toi.', textAlign: TextAlign.center, style: K.texte(13, couleur: _or))],
         ] else
           Muet("Une pagaie perdue. Il t'en reste $reste.", align: TextAlign.center),
         const Ecart(12),

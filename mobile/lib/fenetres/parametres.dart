@@ -116,7 +116,7 @@ class _ParametresState extends State<_Parametres> {
           Bascule('Sur ce téléphone', pushIci, (v) async {
             try { v ? await Push.activer() : await Push.couper(); setState(() => pushIci = v); } catch (e) { app.toast(e.toString().replaceFirst('Exception: ', ''), Niv.echec); }
           }, aide: 'Même quand Masano est fermé'),
-          for (final (t, texte, aide) in const [('invitation', 'Invitations', "Un ami t'invite à sa table"), ('ami', "Demandes d'ami", 'Reçues et acceptées'), ('match', 'Rappel du Match du jour', "À 19 h, si tu ne l'as pas joué"), ('annonce', 'Annonces de Masano', 'Tournois, nouveautés')])
+          for (final (t, texte, aide) in const [('invitation', 'Invitations', "Un ami t'invite à sa table"), ('ami', "Demandes d'ami", 'Reçues et acceptées'), ('match', 'Rappel du Match du jour', "À 19 h, si tu ne l'as pas joué"), ('annonce', 'Annonces de Masano', 'Tournois, nouveautés'), ('fleuve', 'Le Fleuve', "Un ami t'a dépassé (une fois par jour au plus)")].where((x) => x.$1 != 'fleuve' || (app.config?['fleuve'] != null && app.config?['fleuve'] != 'ferme')))
             Bascule(texte, prefsPush[t] != false, (v) async {
               try { final r = await Api.patch('/push/prefs', {t: v}); setState(() => etatPush = {...etatPush!, 'prefs': r['prefs']}); } catch (e) { app.toast(messageErreur(e), Niv.echec); }
             }, aide: aide),

@@ -3,7 +3,8 @@
 //   invitation : un ami t'invite à sa table (expire après 10 min) ;
 //   ami        : demande d'ami reçue, demande acceptée ;
 //   match      : rappel du Match du jour à 19 h (Kinshasa), si pas encore joué, pour les habitués et les Bandes ;
-//   annonce    : message envoyé depuis le tableau de bord admin.
+//   annonce    : message envoyé depuis le tableau de bord admin ;
+//   fleuve     : un ami t'a dépassé sur le Fleuve (une par jour au plus), gagnant de la course de la semaine.
 // Autres rappels du serveur, rangés sous « match » (Paramètres > Rappel du Match du jour : le joueur les coupe ensemble) :
 //   série du bonus du jour à 17 h (série de 3 jours ou plus, bonus pas encore pris), mise de la Bande le mercredi à 18 h
 //   (membre pas encore inscrit), fin de saison de la Ligue 24 h avant (joueurs classés de la saison), relance des absents
@@ -17,7 +18,7 @@ const jose = require('jose');
 const { jourDe, lundiDe, numeroDu, ajouterJours } = require('./match-jour');
 
 const HEURE = 36e5;
-const TYPES_PUSH = ['invitation', 'ami', 'match', 'annonce'];
+const TYPES_PUSH = ['invitation', 'ami', 'match', 'annonce', 'fleuve'];
 const APPAREILS_MAX = 10; // par compte : au-delà, les plus anciens sont oubliés
 const PAQUET = 50; // envois en parallèle (annonces, rappels)
 // Joueurs abonnés (site ou appli) qui n'ont pas coupé les rappels (type « match »).
@@ -48,7 +49,7 @@ function lireCompteService(v) {
 // Écran que l'appli ouvre au toucher de la notification, et données utiles (toutes en texte, comme FCM l'exige).
 function donneesNatives(message) {
   const d = { type: message.type, action: message.action || 'accueil' };
-  for (const k of ['code', 'jeu', 'de', 'bande', 'tag']) if (message[k] != null) d[k] = String(message[k]);
+  for (const k of ['code', 'jeu', 'de', 'bande', 'tag', 'fleuve']) if (message[k] != null) d[k] = String(message[k]);
   return d;
 }
 
@@ -233,6 +234,10 @@ function creerPush(base, reglages, env = process.env) {
       if (type === 'invitation' && d.code) {
         return api.envoyer(compteId, 'invitation', { titre: 'Invitation à jouer', texte: texte + ' · code ' + d.code, url: './#' + d.code, tag: 'invitation-' + d.de, action: 'table', code: d.code, jeu: d.jeu || null, de: d.de },
           { ttl: 600, urgence: 'high' });
+      }
+      if (type === 'fleuve' && (d.depasse || d.course)) {
+        return api.envoyer(compteId, 'fleuve', { titre: 'Le Fleuve', texte: d.push || texte, url: './?ouvrir=fleuve' + (d.fleuve ? '&fleuve=' + d.fleuve : ''), tag: 'fleuve-' + (d.course ? 'course' : 'depasse'), action: 'fleuve', fleuve: d.fleuve || null },
+          { ttl: 12 * HEURE / 1000 });
       }
       if (type === 'ami' && (d.demande || d.accepte)) {
         return api.envoyer(compteId, 'ami', { titre: d.demande ? 'Demande d\'ami' : 'Nouvel ami', texte, url: './?ouvrir=amis', tag: 'ami-' + d.de, action: 'amis', de: d.de }, { ttl: 24 * HEURE / 1000 });

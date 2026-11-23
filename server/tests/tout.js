@@ -1667,7 +1667,7 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.strictEqual((await api('/api/push/abonnement', { methode: 'POST', jeton: b.jeton, corps: { abonnement: { endpoint: 'https://pirate.exemple.com/x', keys: { p256dh: 'p', auth: 'a' } } } })).statut, 400, 'service de notification inconnu');
     assert.strictEqual((await api('/api/push/abonnement', { methode: 'POST', jeton: b.jeton, corps: { abonnement: abo('b1'), appareil: 'Android' } })).statut, 200);
     const e = (await api('/api/push', { jeton: b.jeton })).json;
-    assert.strictEqual(e.appareils, 1); assert.deepStrictEqual(e.prefs, { invitation: true, ami: true, match: true, annonce: true });
+    assert.strictEqual(e.appareils, 1); assert.deepStrictEqual(e.prefs, { invitation: true, ami: true, match: true, annonce: true, fleuve: true });
     await api('/api/amis', { methode: 'POST', jeton: a.jeton, corps: { cible: b.compte.pseudo + '#' + b.compte.numero } });
     await attendre(100);
     const d = pour('b1').find((x) => x.type === 'ami');
@@ -2637,6 +2637,59 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     const d = await F.commencer(c, 'congo', 1);
     assert.strictEqual(d.adoucir, 10);
     await F.annuler(c.id, d.essai);
+    await srv.reglages.ecrire('fleuve', { ...DEFAUTS.fleuve });
+  });
+  await test('Fleuve : amis sur la carte, dépassement (une alerte par jour), 1er à l\'escale, course de la semaine', async () => {
+    const F = srv.fleuve;
+    await srv.reglages.ecrire('fleuve', { ...DEFAUTS.fleuve, etat: 'ouvert', etoilesVille: 0 });
+    const maintenant = Date.now();
+    F.regler(() => new Date(maintenant));
+    const ga = await connexionG('sb-fleuve-d', { providerId: 'g-fleuve-d' }), gb = await connexionG('sb-fleuve-e', { providerId: 'g-fleuve-e' }), gc = await connexionG('sb-fleuve-f', { providerId: 'g-fleuve-f' });
+    await devenirAmis(ga, gb); await devenirAmis(ga, gc);
+    const A = await srv.comptes.statut(ga.compte.id), B = await srv.comptes.statut(gb.compte.id);
+    const jouer = async (c, n, score = 0) => { const d = await F.commencer(c, 'congo', n); return F.terminer(c.id, d.essai, { reussi: true, score }); };
+    for (let n = 1; n <= 3; n++) await jouer(B, n);
+    for (let n = 1; n <= 3; n++) assert.deepStrictEqual((await jouer(A, n)).depasses, [], 'B est devant');
+    const r4 = await jouer(A, 4);
+    assert.deepStrictEqual(r4.depasses, [B.pseudo]);
+    await attendre(300);
+    const notifsB = async () => (await srv.base.query("SELECT texte, donnees FROM notifications WHERE compte_id = $1 AND type = 'fleuve' ORDER BY id", [B.id])).rows;
+    let nb = await notifsB();
+    assert.strictEqual(nb.length, 1);
+    assert.match(nb[0].texte, new RegExp(A.pseudo + ' t\'a dépassé sur le Congo \\(étape 4\\)'));
+    await jouer(B, 4);
+    assert.deepStrictEqual((await jouer(A, 5)).depasses, [B.pseudo], 'dépassé encore');
+    await attendre(300);
+    assert.strictEqual((await notifsB()).length, 1, 'une seule alerte par jour');
+    // Ce que voit A : B sur la carte, la course de la semaine.
+    const e = (await api('/api/fleuve', { jeton: ga.jeton })).json.fleuves.congo;
+    const b = e.amis.find((x) => x.id === B.id);
+    assert.deepStrictEqual([e.amis.length, b.n, b.etoiles], [1, 5, 4], 'C n\'a pas commencé : absent');
+    assert.deepStrictEqual(e.course.lignes.map((l) => [l.pseudo, l.etoiles]), [[A.pseudo, 5], [B.pseudo, 4]]);
+    assert.strictEqual(e.course.pieces, 300);
+    // 1er à l'escale : A passe Banana avant ses amis ; B ensuite ne l'a pas.
+    for (let n = 6; n <= 9; n++) await jouer(A, n);
+    const boss = await jouer(A, 10);
+    assert.strictEqual(boss.premierA, 'Banana');
+    for (let n = 5; n <= 10; n++) await jouer(B, n);
+    assert.strictEqual((await srv.base.query("SELECT count(*)::int AS n FROM fleuve_marques WHERE compte_id = $1 AND type = 'premier'", [B.id])).rows[0].n, 0);
+    assert.deepStrictEqual((await api('/api/fleuve', { jeton: ga.jeton })).json.fleuves.congo.marques.premiers, ['1er à Banana']);
+    // Alertes coupées dans les paramètres : plus rien.
+    await api('/api/push/prefs', { methode: 'PATCH', jeton: gb.jeton, corps: { fleuve: false } });
+    // Fin de la semaine : A (10 étoiles) bat B (10 aussi : ex æquo, les deux gagnent) ; C n'a pas couru.
+    await jouer(A, 1, 999); // 3 étoiles sur l'étape 1 : 2 étoiles nouvelles de plus pour A
+    const soldeA = Number((await srv.comptes.statut(A.id)).solde), soldeB = Number((await srv.comptes.statut(B.id)).solde);
+    F.regler(() => new Date(maintenant + 7 * 864e5));
+    const faits = await F.reglerCourses();
+    const congo = faits.find((x) => x.fleuve === 'congo');
+    assert.deepStrictEqual(congo.gagnants.map((g) => g.id), [A.id]);
+    assert.strictEqual(Number((await srv.comptes.statut(A.id)).solde), soldeA + 300);
+    assert.strictEqual(Number((await srv.comptes.statut(B.id)).solde), soldeB);
+    assert.deepStrictEqual(await F.reglerCourses(), [], 'une seule fois');
+    const ea = (await api('/api/fleuve', { jeton: ga.jeton })).json.fleuves.congo;
+    assert.deepStrictEqual([ea.marques.pagayeur, ea.course.lignes.map((l) => l.etoiles)], [true, [0]], 'nouvelle semaine');
+    assert.ok((await srv.base.query("SELECT 1 FROM notifications WHERE compte_id = $1 AND type = 'fleuve' AND donnees->>'course' = 'true'", [A.id])).rows.length);
+    F.regler(() => new Date());
     await srv.reglages.ecrire('fleuve', { ...DEFAUTS.fleuve });
   });
 

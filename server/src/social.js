@@ -2,7 +2,7 @@
 // Lignes rouges (§5.6) : au plus 1 notification de rivalité par jour, chaque type peut être coupé.
 'use strict';
 
-const TYPES = ['rivalite', 'invitation', 'ami', 'bande'];
+const TYPES = ['rivalite', 'invitation', 'ami', 'bande', 'fleuve'];
 const paire = (x, y) => (x < y ? [x, y] : [y, x]);
 // Sécurité (17/11) : l'XP vient de la copie du profil envoyée par le téléphone. Le serveur la plafonne à ce qu'un
 // très gros joueur peut gagner par jour de jeu (≈ 30 parties à 9 joueurs + missions + défi), donc un niveau inventé
@@ -16,13 +16,14 @@ const COLONNES_CARTE = `c.equipes->>'avatar' AS apparence, NULL AS cadre,
   CASE WHEN jsonb_typeof(c.profil->'bareme') = 'number' THEN (c.profil->>'bareme')::int END AS bareme`;
 
 // Écran que l'appli ouvre quand on touche une notification (le site utilise des liens, l'appli ces actions).
-// 'table' (rejoindre la table : donnees.code, donnees.jeu), 'amis', 'rivaux', 'bande' (donnees.bande), 'accueil'.
+// 'table' (rejoindre la table : donnees.code, donnees.jeu), 'amis', 'rivaux', 'bande' (donnees.bande), 'fleuve' (donnees.fleuve), 'accueil'.
 function actionDe(type, d) {
   d = d || {};
   if (type === 'invitation' && d.code) return 'table';
   if (type === 'ami') return 'amis';
   if (type === 'rivalite') return 'rivaux';
   if (type === 'bande') return 'bande';
+  if (type === 'fleuve') return 'fleuve';
   return 'accueil';
 }
 

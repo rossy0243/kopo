@@ -102,7 +102,8 @@ class Accueil extends StatelessWidget {
     final ef = app.etatFleuve;
     final fleuves = ef != null && ef['ouvert'] == true ? ef['fleuves'] as Map? : null;
     final fl = fleuves == null ? null : fleuves[inter ? 'niger' : 'congo'] as Map?;
-    final resumeFleuve = fl == null ? null : (fl['publiees'] as num? ?? 0) > 0 ? "${fl['nom']} · ${fl['courante'] != null ? 'étape ${fl['courante']}' : 'tout est fait'} · ★ ${fl['etoiles']}" : "${fl['nom']} · bientôt";
+    final devant = amiDevantFleuve(fl);
+    final resumeFleuve = fl == null ? null : (fl['publiees'] as num? ?? 0) > 0 ? "${fl['nom']} · ${fl['courante'] != null ? 'étape ${fl['courante']}' : 'tout est fait'} · ${devant ?? '★ ${fl['etoiles']}'}" : "${fl['nom']} · bientôt";
     return [
       CarteMode('creer', 'Créer une partie', creerSous, coin: '♠', creer: true, amis: app.amisEnLigne, onTap: garde(() => creer(), ouvertInter: true)),
       if (resumeFleuve != null) CarteMode('fleuve', 'Le Fleuve', resumeFleuve, coin: '♠', onTap: garde(() => ouvrirFleuve(inter ? 'niger' : 'congo'), ouvertInter: true)),
