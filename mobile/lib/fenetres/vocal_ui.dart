@@ -225,16 +225,20 @@ Widget fenetreAbonnement(Map A, {bool annonce = false}) {
       const Ecart(6),
       Btn.principal('Essayer $jours jours gratuits', large: true, onTap: lancerEssai),
       const Ecart(4),
-      Muet("Sans engagement : après $jours jours, le micro s'arrête tout seul. Ou abonne-toi :", taille: 12),
+      Muet(Api.sansAchats ? "Sans engagement : après $jours jours, le micro s'arrête tout seul." : "Sans engagement : après $jours jours, le micro s'arrête tout seul. Ou abonne-toi :", taille: 12),
     ] else if (essai != null && essai['raison'] == 'google') ...[
       const Ecart(6),
       Muet('Essai gratuit de $jours jours avec un compte Google.', taille: 13),
       const Ecart(4),
       Btn('Se connecter avec Google', large: true, onTap: () { app.fermerFenetre(); connecterGoogle(); }),
     ],
+    if (Api.sansAchats) ...[
+      if (!actif) ...[const Ecart(10), const Muet("L'abonnement Kopo+ n'est pas encore en vente dans cette version de l'appli. Kopo+ ne donne jamais d'avantage pour gagner.", taille: 12)],
+    ] else ...[
     Row(children: [for (final f in formules) formule(f)]),
     const Ecart(10),
     Muet(A['paiement'] == true ? 'Paiement en francs congolais par mobile money.' : "Paiement en francs congolais (mobile money : M-Pesa, Orange Money, Airtel Money) : bientôt. Kopo+ ne donne jamais d'avantage pour gagner.", taille: 12),
+    ],
     const Ecart(10),
     if (essai != null && essai['possible'] == true)
       Btn(annonce ? 'Plus tard' : 'Fermer', large: true, onTap: app.fermerFenetre)

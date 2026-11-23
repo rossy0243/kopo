@@ -442,7 +442,7 @@ void fenetrePieces(Map? b) {
       ),
       const Ecart(12),
       Btn.principal(b != null ? 'Récupérer' : 'OK', large: true, onTap: () { app.fermerFenetre(); if (b != null) app.suiteAccueil(); }),
-      if (b == null) ...[const Ecart(8), Btn('Acheter des pièces', large: true, onTap: () => ouvrirAchatPieces(retour: () => fenetrePieces(null))), const Ecart(8), Btn('Boutique', large: true, onTap: ouvrirBoutique)],
+      if (b == null) ...[if (!Api.sansAchats) ...[const Ecart(8), Btn('Acheter des pièces', large: true, onTap: () => ouvrirAchatPieces(retour: () => fenetrePieces(null)))], const Ecart(8), Btn('Boutique', large: true, onTap: ouvrirBoutique)],
     ]);
   }, 'pieces');
 }
