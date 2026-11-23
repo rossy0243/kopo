@@ -892,6 +892,7 @@ afficher.ventes = async function ventes() {
 
 // Comptes suspects (sortis de l'onglet Pièces) : seuils réglables dans Réglages > Sécurité.
 // --- Le Fleuve (fleuve.md) : état, biefs des deux fleuves, fabrication par les robots et publication.
+const NOMS_FLEUVES = { congo: 'Congo', niger: 'Niger', kasai: 'Kasaï', oubangui: 'Oubangui', nil: 'Nil' };
 const ETATS_FLEUVE = [['ferme', 'Fermé'], ['testeurs', 'Testeurs'], ['ouvert', 'Ouvert à tous']];
 afficher.fleuve = async function fleuve(vue) {
   if (vue && vue.bief) return afficherBief(vue.fleuve, vue.bief);
@@ -901,7 +902,10 @@ afficher.fleuve = async function fleuve(vue) {
   const bloc = (cle, f) => {
     const dernier = f.biefs.length ? f.biefs[f.biefs.length - 1].bief : 0;
     const publies = f.biefs.filter((b) => b.publie).length;
-    return `<div class="carte"><div class="titre">${esc(f.nom)} <span class="muted">· ${f.jeu === 'kopo' ? 'Kopo' : 'Inter (8)'}</span></div>
+    const ef = f.etat || 'ferme';
+    return `<div class="carte"><div class="titre">${esc(f.nom)} <span class="muted">· ${f.jeu === 'kopo' ? 'Kopo' : 'Inter (8)'} · ${f.villes} villes, ${f.villes * 10} étapes pour le premier voyage</span></div>
+      <div class="s">Interrupteur ${/^[AEIOUÉ]/.test(f.nom) ? 'de l\'' : 'du '}${esc(f.nom)} : ${ef === 'ouvert' ? '<span class="ok">ouvert</span>' : ef === 'testeurs' ? 'testeurs seulement' : 'éteint, les joueurs ne le voient pas'}.${ef !== 'ouvert' && publies < 2 ? ' Publie au moins 2 biefs avant de l\'ouvrir.' : ''}</div>
+      <div class="ligne">${ETATS_FLEUVE.map(([v, l]) => `<button class="btn${v === ef ? ' principal' : ''}" data-interrupteur="${cle}:${v}">${l}</button>`).join(' ')}</div>
       <div class="tuiles" style="margin:10px 0">${tuile(publies, 'biefs publiés', publies * 50 + ' étapes')}${tuile(f.biefMeilleur || '—', 'bief du meilleur joueur', f.meilleur ? 'étape ' + f.meilleur : 'personne encore')}${tuile(nb(f.joueurs7j), 'joueurs sur 7 jours')}${tuile(f.alerte ? `<span class="ko">${f.avance}</span>` : f.avance, 'biefs d\'avance', f.alerte ? 'moins de 2 : fabrique la suite' : 'sur le meilleur joueur')}</div>
       <table><tr><th>Bief</th><th class="n">Étapes</th><th>État</th><th></th></tr>${f.biefs.map((b) => {
         const t = F.travaux[cle + ':' + b.bief];
@@ -917,13 +921,13 @@ afficher.fleuve = async function fleuve(vue) {
       ? `<div class="s"><span class="ok">Lancé le ${esc(new Date(F.reglages.lance).toLocaleString('fr-FR'))}</span>. La Bande est fermée, le Match du jour arrêté, la fenêtre « Nouveau » s'affiche une fois à chaque joueur et le badge NOUVEAU reste 7 jours.</div>`
       : `<div class="s">Le jour J, un seul bouton : la semaine de Bande en cours est annulée et chaque mise rendue (« Bande fermée : mise rendue »), plus personne ne peut miser, le Match du jour s'arrête, le parcours de saison disparaît (les objets gagnés restent), le Fleuve s'ouvre à tous et la fenêtre « Nouveau » s'allume. Impossible à défaire. Fabrique et publie d'abord au moins 2 biefs sur chaque fleuve.</div>
       <div class="ligne"><button class="btn principal" id="lancerFleuve">Lancer le Fleuve</button></div>`}</div>
-    <p class="muted">Chaque étape est fabriquée par les robots : un robot Fort joue l'étape à la place du joueur, jusqu'à trouver la force des robots qui donne la réussite visée ; les seuils des étoiles viennent des mêmes parties. Comptez quelques secondes par bief pour le Congo, plusieurs minutes pour le Niger. Pagaies, pièces, courbe et objectifs : <button class="lien" id="versReglagesFleuve">Réglages > Le Fleuve</button>.</p>
+    <p class="muted">Chaque étape est fabriquée par les robots : un robot Fort joue l'étape à la place du joueur, jusqu'à trouver la force des robots qui donne la réussite visée ; les seuils des étoiles viennent des mêmes parties. Comptez quelques secondes par bief pour un fleuve du Kopo, plusieurs minutes pour un fleuve de l'Inter (8). Chaque fleuve a son interrupteur : fabrique et publie ses biefs pendant qu'il est éteint, puis allume-le. Pagaies, pièces, courbe et objectifs : <button class="lien" id="versReglagesFleuve">Réglages > Le Fleuve</button>.</p>
     ${Object.entries(F.fleuves).map(([k, f]) => bloc(k, f)).join('')}
     <div class="carte"><div class="titre">Courses de la semaine</div><div class="s">Chaque joueur court contre ses amis : celui qui gagne le plus d'étoiles nouvelles du lundi au dimanche (heure de Kinshasa) reçoit ${nb(F.reglages.piecesCourse ?? 300)} pièces et la marque « Pagayeur de la semaine » pendant 7 jours. Il faut au moins un ami qui a aussi gagné des étoiles. Ex æquo : tous gagnent. Réglée le lundi à minuit.</div>
-      ${F.courses && F.courses.length ? `<table><tr><th>Semaine du</th><th>Fleuve</th><th class="n">Gagnants</th><th class="n">Pièces offertes</th></tr>${F.courses.map((c) => `<tr><td>${esc(String(c.semaine).slice(0, 10))}</td><td>${c.fleuve === 'niger' ? 'Niger' : 'Congo'}</td><td class="n">${nb(c.gagnants)}</td><td class="n">${nb(c.pieces)}</td></tr>`).join('')}</table>` : '<p class="muted">Aucune course réglée pour l\'instant.</p>'}</div>`;
+      ${F.courses && F.courses.length ? `<table><tr><th>Semaine du</th><th>Fleuve</th><th class="n">Gagnants</th><th class="n">Pièces offertes</th></tr>${F.courses.map((c) => `<tr><td>${esc(String(c.semaine).slice(0, 10))}</td><td>${esc((F.fleuves[c.fleuve] || {}).nom || c.fleuve)}</td><td class="n">${nb(c.gagnants)}</td><td class="n">${nb(c.pieces)}</td></tr>`).join('')}</table>` : '<p class="muted">Aucune course réglée pour l\'instant.</p>'}</div>`;
   $('#versReglagesFleuve').onclick = () => aller('reglages', 'fleuve');
   if ($('#lancerFleuve')) $('#lancerFleuve').onclick = () => {
-    const peu = Object.values(F.fleuves).filter((f) => f.biefs.filter((b) => b.publie).length < 2).map((f) => f.nom);
+    const peu = Object.values(F.fleuves).filter((f) => f.etat === 'ouvert' && f.biefs.filter((b) => b.publie).length < 2).map((f) => f.nom);
     const t = prompt(`${peu.length ? `Attention : moins de 2 biefs publiés sur ${peu.join(' et ')}.\n\n` : ''}Lancer le Fleuve ferme la Bande (mises rendues) et arrête le Match du jour, pour tout le monde, sans retour possible.\n\nÉcris LANCER pour confirmer.`);
     if (t === null) return;
     action(async () => { const r = await api('/fleuve/lancer', { methode: 'POST', corps: { confirmation: t.trim().toUpperCase() } }); message(`Fleuve lancé : ${r.joueurs} mise(s) rendue(s), ${nb(r.pieces)} pièces.`); });
@@ -932,6 +936,11 @@ afficher.fleuve = async function fleuve(vue) {
   $('#contenu').querySelectorAll('[data-etat]').forEach((b) => (b.onclick = () => {
     if (b.dataset.etat === 'ouvert' && !confirm('Ouvrir le Fleuve à tous les joueurs ?')) return;
     action(() => api('/reglages/fleuve', { methode: 'PUT', corps: { valeur: { ...F.reglages, etat: b.dataset.etat } } }));
+  }));
+  $('#contenu').querySelectorAll('[data-interrupteur]').forEach((b) => (b.onclick = () => {
+    const [f, v] = b.dataset.interrupteur.split(':'), nom = F.fleuves[f].nom;
+    if (v === 'ouvert' && !confirm(`Ouvrir ${/^[AEIOUÉ]/.test(nom) ? 'l\'' : 'le '}${nom} à tous les joueurs ?`)) return;
+    action(() => api('/reglages/fleuve', { methode: 'PUT', corps: { valeur: { ...F.reglages, fleuves: { [f]: v } } } }));
   }));
   $('#contenu').querySelectorAll('[data-voir]').forEach((b) => (b.onclick = () => { const [f, n] = b.dataset.voir.split(':'); aller('fleuve', { fleuve: f, bief: Number(n) }); }));
   $('#contenu').querySelectorAll('[data-generer]').forEach((b) => (b.onclick = () => { const [f, n] = b.dataset.generer.split(':'); action(() => api(`/fleuve/${f}/biefs/${n}/generer`, { methode: 'POST' })); }));
@@ -944,7 +953,7 @@ afficher.fleuve = async function fleuve(vue) {
 async function afficherBief(fleuve, bief) {
   const l = await api(`/fleuve/${fleuve}/biefs/${bief}`);
   const robots = { faciles: 'Faciles', normaux: 'Normaux', forts: 'Forts' };
-  $('#contenu').innerHTML = `<h2><button class="lien" id="retourFleuve">Le Fleuve</button> › ${fleuve === 'congo' ? 'Congo' : 'Niger'}, bief ${bief}</h2>
+  $('#contenu').innerHTML = `<h2><button class="lien" id="retourFleuve">Le Fleuve</button> › ${esc(NOMS_FLEUVES[fleuve] || fleuve)}, bief ${bief}</h2>
     <p class="muted">Force des robots de 1 à 60 (Faciles 1 à 20, Normaux 21 à 40, Forts 41 à 60). Réussite : visée → obtenue par le robot testeur. Chiffres réels : essais des joueurs, part des joueurs qui réussissent au premier essai. ⚠ : bien plus dur que prévu.</p>
     <div class="carte defile"><table><tr><th class="n">N°</th><th>Ville</th><th class="n">Table</th><th>Robots</th><th>Objectif</th><th class="n">Réussite</th><th class="n">Étoiles 2 · 3</th><th class="n">Essais</th><th class="n">1er essai</th><th></th></tr>
     ${l.map((e) => `<tr><td class="n">${e.numero}</td><td>${e.escale ? '<b>' + esc(e.ville) + '</b> (boss)' : '<span class="muted">' + esc(e.ville) + '</span>'}</td><td class="n">${e.joueurs}</td><td>${robots[e.robots] || esc(e.robots)} ${e.force} <span class="muted">(${e.d})</span></td><td>${esc(e.texte)}${e.pieges.length ? '<br><small class="muted">Piège : ' + e.pieges.map((p) => esc(p.texte)).join(', ') + '</small>' : ''}</td><td class="n${e.horsCible ? ' ko' : ''}">${e.vise} → ${e.taux} %</td><td class="n">${e.seuils.deux} · ${e.seuils.trois}</td><td class="n">${nb(e.chiffres.essais)}</td><td class="n">${e.chiffres.premier === null ? '—' : e.chiffres.premier + ' %'}${e.chiffres.bloque ? ' <span class="ko">⚠</span>' : ''}</td><td style="white-space:nowrap"><button class="btn" data-force="${e.numero}" data-d="${e.d}">Force</button> <button class="btn" data-refaire="${e.numero}">Refaire</button></td></tr>`).join('')}</table></div>`;

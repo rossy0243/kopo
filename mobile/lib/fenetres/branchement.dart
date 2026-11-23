@@ -51,7 +51,7 @@ void brancherFenetres() {
         ouvrirMatchJour();
       } else if (action == 'fleuve' && app.ecran == 'accueil') {
         final f = d['fleuve']?.toString();
-        ouvrirFleuve(f == 'congo' || f == 'niger' ? f : null);
+        ouvrirFleuve(f is String ? f : null);
       }
     }
     // Au lancement, on attend que l'accueil soit prêt.

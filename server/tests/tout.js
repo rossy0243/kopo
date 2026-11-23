@@ -2722,6 +2722,31 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.ok(srv.reglages.get('fleuve').lance);
     assert.ok((await api('/admin/api/journal', { jeton: adminJeton })).json.some((x) => x.action === 'fleuve:lancer'));
   });
+  await test('Fleuve : chaque fleuve a son interrupteur (Kasaï, Oubangui, Nil éteints au départ)', async () => {
+    const g = await connexionG('sb-fleuve-i', { providerId: 'g-fleuve-i' });
+    const { VILLES, NOMS } = require('../src/fleuve');
+    assert.deepStrictEqual(Object.keys(require('../src/fleuve-generateur').FLEUVES), ['congo', 'niger', 'kasai', 'oubangui', 'nil']);
+    assert.deepStrictEqual(Object.keys(NOMS), Object.keys(VILLES));
+    assert.deepStrictEqual([VILLES.kasai[0], VILLES.oubangui[6], VILLES.nil[VILLES.nil.length - 1]], ['Kwamouth', 'Bangui', 'Jinja']);
+    let e = (await api('/api/fleuve', { jeton: g.jeton })).json;
+    assert.deepStrictEqual(Object.keys(e.fleuves), ['congo', 'niger'], 'les nouveaux fleuves sont éteints');
+    let r = await api('/api/fleuve/kasai/1', { jeton: g.jeton });
+    assert.strictEqual(r.statut, 403); assert.match(r.json.erreur, /Kasaï ouvre bientôt/);
+    const reg = srv.reglages.get('fleuve');
+    assert.strictEqual((await api('/admin/api/reglages/fleuve', { methode: 'PUT', jeton: adminJeton, corps: { valeur: { ...reg, fleuves: { kasai: 'allume' } } } })).statut, 400);
+    assert.strictEqual((await api('/admin/api/reglages/fleuve', { methode: 'PUT', jeton: adminJeton, corps: { valeur: { ...reg, fleuves: { amazone: 'ouvert' } } } })).statut, 400);
+    assert.strictEqual((await api('/admin/api/reglages/fleuve', { methode: 'PUT', jeton: adminJeton, corps: { valeur: { ...reg, fleuves: { kasai: 'ouvert' } } } })).statut, 200);
+    assert.deepStrictEqual(srv.reglages.get('fleuve').fleuves, { congo: 'ouvert', niger: 'ouvert', kasai: 'ouvert', oubangui: 'ferme', nil: 'ferme' }, 'les autres gardent leur état');
+    e = (await api('/api/fleuve', { jeton: g.jeton })).json;
+    assert.deepStrictEqual(Object.keys(e.fleuves), ['congo', 'niger', 'kasai']);
+    assert.deepStrictEqual([e.fleuves.kasai.nom, e.fleuves.kasai.jeu, e.fleuves.kasai.ville], ['Kasaï', 'kopo', 'Kwamouth']);
+    // Testeurs : seulement les pseudos de la liste.
+    await api('/admin/api/reglages/fleuve', { methode: 'PUT', jeton: adminJeton, corps: { valeur: { ...srv.reglages.get('fleuve'), fleuves: { kasai: 'ferme', nil: 'testeurs' } } } });
+    assert.deepStrictEqual(Object.keys((await api('/api/fleuve', { jeton: g.jeton })).json.fleuves), ['congo', 'niger']);
+    const adm = (await api('/admin/api/fleuve', { jeton: adminJeton })).json;
+    assert.deepStrictEqual([adm.fleuves.nil.etat, adm.fleuves.nil.villes, adm.fleuves.kasai.etat], ['testeurs', 15, 'ferme']);
+    await api('/admin/api/reglages/fleuve', { methode: 'PUT', jeton: adminJeton, corps: { valeur: { ...srv.reglages.get('fleuve'), fleuves: { nil: 'ferme' } } } });
+  });
   await srv.arreter();
   console.log(`\n${reussis} tests réussis, ${echecs} en échec.`);
   process.exit(echecs ? 1 : 0);

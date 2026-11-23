@@ -19,7 +19,35 @@ import 'social.dart' show messageErreur;
 const _fleuves = {
   'congo': (nom: 'Congo', jeu: 'kopo', jeuNom: 'Kopo'),
   'niger': (nom: 'Niger', jeu: 'inter8', jeuNom: 'Inter (8)'),
+  'kasai': (nom: 'Kasaï', jeu: 'kopo', jeuNom: 'Kopo'),
+  'oubangui': (nom: 'Oubangui', jeu: 'inter8', jeuNom: 'Inter (8)'),
+  'nil': (nom: 'Nil', jeu: 'kopo', jeuNom: 'Kopo'),
 };
+// Le décor de chaque fleuve (Congo vert, Niger sable, Kasaï terre rouge, Oubangui forêt, Nil désert).
+const _decors = {
+  'congo': [Color(0xFF1A3B2A), Color(0xFF224A33), Color(0xFF1D4130)],
+  'niger': [Color(0xFF3B3220), Color(0xFF4A3D24), Color(0xFF3F3420)],
+  'kasai': [Color(0xFF3E2A1E), Color(0xFF4D3424), Color(0xFF42301F)],
+  'oubangui': [Color(0xFF123224), Color(0xFF17402C), Color(0xFF133827)],
+  'nil': [Color(0xFF4A3F26), Color(0xFF5A4C2C), Color(0xFF4D4128)],
+};
+/// Les fleuves allumés pour ce joueur (chaque fleuve a son interrupteur dans l'admin), dans l'ordre du serveur.
+List<String> fleuvesOuverts() => [for (final k in ((app.etatFleuve?['fleuves'] as Map?) ?? const {}).keys) if (_fleuves.containsKey(k)) '$k'];
+/// Le fleuve de l'accueil pour ce jeu : le dernier ouvert par le joueur (s'il est encore allumé), sinon le premier.
+String fleuveDuJeu(String jeu) {
+  final l = fleuvesOuverts().where((k) => _fleuves[k]!.jeu == jeu).toList();
+  final d = (Stock.lire('kopo-fleuve-dernier') as Map?)?[jeu];
+  return l.contains(d) ? d as String : l.isNotEmpty ? l.first : (jeu == 'inter8' ? 'niger' : 'congo');
+}
+void _retenir(String cle) {
+  final d = Map<String, dynamic>.from((Stock.lire('kopo-fleuve-dernier') as Map?) ?? const {});
+  d[_fleuves[cle]!.jeu] = cle;
+  Stock.ecrire('kopo-fleuve-dernier', d);
+}
+// « le Congo », « l'Oubangui » ; « du Congo », « de l'Oubangui ».
+String _le(String n) => RegExp('^[AEIOUÉ]').hasMatch(n) ? "l'$n" : 'le $n';
+String _du(String n) => RegExp('^[AEIOUÉ]').hasMatch(n) ? "de l'$n" : 'du $n';
+String _leMaj(String n) => '${_le(n)[0].toUpperCase()}${_le(n).substring(1)}';
 const _robotsNoms = {'faciles': 'Faciles', 'normaux': 'Normaux', 'forts': 'Forts'};
 const _parBief = 50;
 final Map<String, int> _biefVu = {};
@@ -54,7 +82,7 @@ void _ficheAmi(String cle, Map a) {
         Center(child: _avatar(a, 56)),
         const Ecart(8),
         Text('${a['pseudo']}', textAlign: TextAlign.center, style: K.titre(30)),
-        Muet(a['n'] == null ? "A fini tout le ${F.nom} ouvert pour l'instant." : 'Étape ${a['n']} du ${F.nom} · ★ ${a['etoiles']}', align: TextAlign.center, taille: 15),
+        Muet(a['n'] == null ? "A fini tout ${_le(F.nom)} ouvert pour l'instant." : 'Étape ${a['n']} ${_du(F.nom)} · ★ ${a['etoiles']}', align: TextAlign.center, taille: 15),
         if (m != null) ...[const Ecart(8), m],
         const Ecart(12),
         Btn('Retour à la carte', large: true, onTap: () => _afficherCarte(cle)),
@@ -100,7 +128,7 @@ void _course(String cle) {
 
 void _partager(String cle) {
   final f = (app.etatFleuve!['fleuves'] as Map)[cle] as Map;
-  final ou = f['courante'] != null ? 'je suis à ${f['ville']}, étape ${f['courante']}' : "j'ai fini tout le ${f['nom']} ouvert";
+  final ou = f['courante'] != null ? 'je suis à ${f['ville']}, étape ${f['courante']}' : "j'ai fini tout ${_le('${f['nom']}')} ouvert";
   ouvrirWhatsApp('Masano · Le Fleuve : $ou, ${f['etoiles']} étoiles. Tu me rattrapes ?\n$lienJeu');
 }
 
@@ -164,7 +192,8 @@ Future<void> ouvrirFleuve([String? cle]) async {
     fenetreGoogle('Le Fleuve', 'Remonte le Congo et le Niger, étape par étape, et gagne des étoiles. Connecte-toi avec Google pour jouer : ta progression te suit sur tous tes téléphones.');
     return;
   }
-  _afficherCarte(cle ?? (app.jeu == 'inter8' ? 'niger' : 'congo'));
+  if (fleuvesOuverts().isEmpty) { app.toast('Le Fleuve arrive bientôt.', Niv.alerte); return; }
+  _afficherCarte(cle != null && fleuvesOuverts().contains(cle) ? cle : fleuveDuJeu(app.jeu == 'inter8' ? 'inter8' : 'kopo'));
 }
 
 void _afficherCarte(String cle) {
@@ -184,12 +213,13 @@ class _CarteFleuveState extends State<_CarteFleuve> {
   @override
   Widget build(BuildContext context) {
     final E = app.etatFleuve!, f = (E['fleuves'] as Map)[cle] as Map, F = _fleuves[cle]!;
+    _retenir(cle);
     final p = E['pagaies'] as Map;
     final etapes = ((f['etapes'] as List?) ?? []).cast<Map>();
     final enfants = <Widget>[
-      Row(children: [Expanded(child: Text('Le ${F.nom}', style: K.titre(36))), _pagaies(p, key: kPagaies)]),
+      Row(children: [Expanded(child: Text(_leMaj(F.nom), style: K.titre(36))), _pagaies(p, key: kPagaies)]),
       const Ecart(8),
-      KeyedSubtree(key: kOnglets, child: Onglets([for (final k in _fleuves.keys) (k, '${_fleuves[k]!.nom} · ${_fleuves[k]!.jeuNom}')], cle, (k) => setState(() => cle = k))),
+      KeyedSubtree(key: kOnglets, child: Onglets([for (final k in fleuvesOuverts()) (k, '${_fleuves[k]!.nom} · ${_fleuves[k]!.jeuNom}')], cle, (k) => setState(() => cle = k))),
       const Ecart(8),
       Row(children: [
         Text('Étoiles ', style: K.texte(13, couleur: K.muted)),
@@ -200,7 +230,7 @@ class _CarteFleuveState extends State<_CarteFleuve> {
       const Ecart(8),
     ];
     if (_n(f['publiees']) == 0) {
-      enfants.add(Text('Le ${F.nom} ouvre bientôt. Reviens dans quelques jours !', style: K.texte(15)));
+      enfants.add(Text('${_leMaj(F.nom)} ouvre bientôt. Reviens dans quelques jours !', style: K.texte(15)));
     } else {
       final biefMax = math.max(1, (etapes.length / _parBief).ceil());
       final bief = math.min(biefMax, _biefVu[cle] ?? _n(f['bief']));
@@ -269,7 +299,6 @@ class _CarteState extends State<_Carte> with TickerProviderStateMixin {
     final hautVue = math.min(MediaQuery.of(context).size.height * .55, 520.0);
     final suite = f['suiteBientot'] == true && etapes.isNotEmpty && _n(etapes.last['n']) == _n(f['publiees']);
     final haut = suite ? 110.0 : 60.0;
-    final niger = widget.cle == 'niger';
     return LayoutBuilder(builder: (context, c) {
       final L = math.min(380.0, c.maxWidth);
       final H = bas + haut + pas * math.max(0, etapes.length - 1);
@@ -385,7 +414,7 @@ class _CarteState extends State<_Carte> with TickerProviderStateMixin {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: K.line),
-          gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: niger ? const [Color(0xFF3B3220), Color(0xFF4A3D24), Color(0xFF3F3420)] : const [Color(0xFF1A3B2A), Color(0xFF224A33), Color(0xFF1D4130)]),
+          gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: _decors[widget.cle] ?? _decors['congo']!),
         ),
         clipBehavior: Clip.antiAlias,
         child: Stack(children: [
@@ -592,8 +621,8 @@ void _guide(BuildContext context, String cle, {required GlobalKey kCourante, req
     ]);
     vu['base'] = true;
   }
-  if (cle == 'niger' && vu['niger'] != true) {
-    liste.add((kOnglets, "Ici, on joue à l'Inter (8).", "Sur le Niger, chaque étape est une partie d'Inter (8) contre des robots. Le Congo se joue au Kopo."));
+  if (_fleuves[cle]?.jeu == 'inter8' && vu['niger'] != true) {
+    liste.add((kOnglets, "Ici, on joue à l'Inter (8).", "Sur ${_le(_fleuves[cle]!.nom)}, chaque étape est une partie d'Inter (8) contre des robots. Le Congo se joue au Kopo."));
     vu['niger'] = true;
   }
   if (liste.isEmpty) return;
@@ -688,6 +717,13 @@ class _Trou extends CustomPainter {
 /// Règles → Le Fleuve : le guide en texte.
 void reglesFleuve() {
   final n = _n(app.etatFleuve?['etoilesVille'] ?? 20);
+  // Les fleuves ouverts à ce joueur, rangés par jeu.
+  final ouverts = fleuvesOuverts().isEmpty ? const ['congo', 'niger'] : fleuvesOuverts();
+  String? liste(String jeu) {
+    final l = [for (final k in ouverts) if (_fleuves[k]!.jeu == jeu) _le(_fleuves[k]!.nom)];
+    return l.isEmpty ? null : l.length == 1 ? l.first : '${l.sublist(0, l.length - 1).join(', ')} et ${l.last}';
+  }
+  final kopo = liste('kopo'), inter = liste('inter8');
   Widget li(int k, String b, String t) => Container(
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(10),
@@ -700,7 +736,7 @@ void reglesFleuve() {
       );
   app.ouvrirFenetre((context) => Fenetre(titre: 'Le Fleuve', enfants: [
         li(1, 'Remonte le fleuve étape par étape.', "Chaque étape est une petite partie contre des robots, avec un objectif. Réussis-le pour avancer, jusqu'à 3 étoiles par étape."),
-        li(2, 'Deux fleuves.', "Le Congo se joue au Kopo, le Niger à l'Inter (8)."),
+        li(2, ouverts.length > 2 ? '${ouverts.length} fleuves.' : 'Deux fleuves.', '${[if (kopo != null) '${kopo[0].toUpperCase()}${kopo.substring(1)} ${kopo.contains(' et ') ? 'se jouent' : 'se joue'} au Kopo', if (inter != null) "$inter à l'Inter (8)"].join(', ')}.'),
         li(3, '5 pagaies par jour.', 'Réussir ne coûte rien, rater coûte 1 pagaie. Elles reviennent à minuit.'),
         li(4, 'Les villes : $n étoiles sur 30.', "Il les faut pour affronter le boss de la ville, la dernière étape, la plus dure. Il te manque des étoiles ? Rejoue une étape où tu n'en as pas 3."),
         li(5, 'Tes amis rament avec toi.', "Vois où ils en sont et passe devant. Le plus d'étoiles de la semaine entre amis gagne la course."),

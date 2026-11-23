@@ -15,8 +15,18 @@ const EN_COURS_MAX = 45 * 60e3; // une étape restée « en cours » (serveur re
 const VILLES = {
   congo: ['Banana', 'Boma', 'Matadi', 'Luozi', 'Kinshasa', 'Lukolela', 'Mbandaka', 'Lisala', 'Bumba', 'Kisangani'],
   niger: ['Onitsha', 'Lokoja', 'Jebba', 'Gaya', 'Niamey', 'Tillabéri', 'Ayorou', 'Gao', 'Tombouctou', 'Mopti', 'Ségou', 'Bamako'],
+  // Le Kasaï : de Kwamouth (où il rejoint le Congo) aux chutes de Mai-Munene (Ilebo : le dernier grand port).
+  kasai: ['Kwamouth', 'Mushie', 'Mangai', 'Dibaya-Lubwe', 'Mapangu', 'Ilebo', 'Djokupunda', 'Tshikapa', 'Mai-Munene'],
+  // L'Oubangui : de Liranga (où il rejoint le Congo) à Yakoma (où il naît de l'Uele et du Mbomou).
+  oubangui: ['Liranga', 'Impfondo', 'Dongou', 'Bétou', 'Libenge', 'Zongo', 'Bangui', 'Kouango', 'Mobaye', 'Yakoma'],
+  // Le Nil : de la Méditerranée à sa source, le lac Victoria (Nil blanc après Khartoum).
+  nil: ['Rosette', 'Le Caire', 'Minya', 'Assiout', 'Louxor', 'Assouan', 'Wadi Halfa', 'Dongola', 'Karima', 'Atbara', 'Khartoum', 'Kosti', 'Malakal', 'Juba', 'Jinja'],
 };
-const NOMS = { congo: 'Congo', niger: 'Niger' };
+// « le Congo », « l'Oubangui ».
+const leF = (f) => (/^[AEIOUÉ]/.test(NOMS[f]) ? 'l\'' : 'le ') + NOMS[f];
+const NOMS = { congo: 'Congo', niger: 'Niger', kasai: 'Kasaï', oubangui: 'Oubangui', nil: 'Nil' };
+// Interrupteur de chaque fleuve (Réglages > Le Fleuve) : 'ouvert', 'testeurs' ou 'ferme'. Les nouveaux fleuves sont éteints au départ.
+const ETATS_DEFAUT = { congo: 'ouvert', niger: 'ouvert', kasai: 'ferme', oubangui: 'ferme', nil: 'ferme' };
 function villeDe(fleuve, k) { // k = numéro de l'escale (1 = la première)
   const l = VILLES[fleuve], n = l.length;
   const voyage = Math.floor((k - 1) / n), i = (k - 1) % n;
@@ -45,12 +55,18 @@ function creerFleuve(base, reglages, comptes, social = null) {
   const travaux = new Map(); // fabrication en cours : 'congo:3' -> { fait, total, erreur, fini }
 
   // Ouvert à ce joueur ? 'ferme' : personne ; 'testeurs' : les pseudos de la liste des testeurs (Réglages > Jeux) ; 'ouvert' : tous.
+  const estTesteur = (compte) => !!compte && ((reglages.get('jeux') || {}).testeurs || []).map((x) => String(x).toLowerCase()).includes(String(compte.pseudo || '').toLowerCase());
   function ouvertPour(compte) {
     const e = cfg().etat;
     if (e === 'ouvert') return true;
-    if (e !== 'testeurs' || !compte) return false;
-    const t = ((reglages.get('jeux') || {}).testeurs || []).map((x) => String(x).toLowerCase());
-    return t.includes(String(compte.pseudo || '').toLowerCase());
+    return e === 'testeurs' && estTesteur(compte);
+  }
+  // Ce fleuve-là, pour ce joueur : le Fleuve ouvert, et l'interrupteur du fleuve allumé (ou testeur).
+  const etatDuFleuve = (fleuve) => ({ ...ETATS_DEFAUT, ...(cfg().fleuves || {}) })[fleuve] || 'ferme';
+  function fleuveOuvertPour(compte, fleuve) {
+    if (!G.FLEUVES[fleuve] || !ouvertPour(compte)) return false;
+    const e = etatDuFleuve(fleuve);
+    return e === 'ouvert' || (e === 'testeurs' && estTesteur(compte));
   }
 
   async function pagaiesDe(compteId, q = base) {
@@ -142,7 +158,7 @@ function creerFleuve(base, reglages, comptes, social = null) {
         const deja = (await base.query("SELECT 1 FROM notifications WHERE compte_id = $1 AND type = 'fleuve' AND donnees->>'depasse' = 'true' AND cree_le >= $2 LIMIT 1", [a.id, debutDu(jourDe(horloge()))])).rows.length;
         if (deja) continue;
         const p = await pagaiesDe(a.id);
-        const texte = `${moi.pseudo} t'a dépassé sur le ${NOMS[fleuve]} (étape ${numero}).`;
+        const texte = `${moi.pseudo} t'a dépassé sur ${leF(fleuve)} (étape ${numero}).`;
         const push = texte + (p.restantes > 0 ? ` Tu as ${p.restantes} pagaie${p.restantes > 1 ? 's' : ''} pour repasser devant.` : ' Tes pagaies reviennent à minuit.');
         await social.notifier(a.id, 'fleuve', texte, { depasse: true, de: compteId, pseudo: moi.pseudo, fleuve, numero, push });
       } catch (e) { console.error('Fleuve, alerte :', e.message); }
@@ -160,7 +176,7 @@ function creerFleuve(base, reglages, comptes, social = null) {
   }
 
   const api = {
-    VILLES, villeDe, villeDeLEtape, estEscale, biefDe, ouvertPour,
+    VILLES, villeDe, villeDeLEtape, estEscale, biefDe, ouvertPour, fleuveOuvertPour,
     regler(h) { horloge = h; },
 
     // État des deux fleuves pour un joueur : pagaies, étoiles, étapes visibles (jusqu'à la fin du bief en cours).
@@ -173,6 +189,7 @@ function creerFleuve(base, reglages, comptes, social = null) {
       if (cfg().lance) res.rembourse = (await base.query("SELECT coalesce(sum(montant), 0)::int AS n FROM registre_pieces WHERE compte_id = $1 AND motif = 'fermeture_bande'", [compte.id])).rows[0].n;
       if (!ouvert) return res;
       for (const fleuve of Object.keys(G.FLEUVES)) {
+        if (!fleuveOuvertPour(compte, fleuve)) continue; // interrupteur éteint : le fleuve n'apparaît pas
         const etoiles = await etoilesDuJoueur(compte.id, fleuve);
         const publiees = await dernierePubliee(fleuve);
         const c = courante(etoiles, publiees);
@@ -208,7 +225,7 @@ function creerFleuve(base, reglages, comptes, social = null) {
     // Détail d'une étape (fenêtre avant de jouer).
     async etape(compte, fleuve, numero) {
       if (!G.FLEUVES[fleuve]) throw erreur('Fleuve inconnu.');
-      if (!ouvertPour(compte)) throw erreur('Le Fleuve arrive bientôt.', 403);
+      if (!fleuveOuvertPour(compte, fleuve)) throw erreur(ouvertPour(compte) ? `${leF(fleuve)[0].toUpperCase()}${leF(fleuve).slice(1)} ouvre bientôt.` : 'Le Fleuve arrive bientôt.', 403);
       numero = Math.trunc(Number(numero));
       const r = (await base.query('SELECT recette, version FROM fleuve_etapes WHERE fleuve = $1 AND numero = $2 AND publie', [fleuve, numero])).rows[0];
       if (!r) throw erreur('Cette étape n\'est pas encore ouverte.', 404);
@@ -222,7 +239,7 @@ function creerFleuve(base, reglages, comptes, social = null) {
     async commencer(compte, fleuve, numero) {
       if (!G.FLEUVES[fleuve]) throw erreur('Fleuve inconnu.');
       if (!compte.auth_id) throw erreur('Connecte-toi avec Google pour jouer au Fleuve.', 403);
-      if (!ouvertPour(compte)) throw erreur('Le Fleuve arrive bientôt.', 403);
+      if (!fleuveOuvertPour(compte, fleuve)) throw erreur(ouvertPour(compte) ? `${leF(fleuve)[0].toUpperCase()}${leF(fleuve).slice(1)} ouvre bientôt.` : 'Le Fleuve arrive bientôt.', 403);
       numero = Math.trunc(Number(numero));
       return base.transaction(async (q) => {
         await q.query('SELECT id FROM comptes WHERE id = $1 FOR UPDATE', [compte.id]); // une seule entrée à la fois par compte
@@ -370,7 +387,7 @@ function creerFleuve(base, reglages, comptes, social = null) {
         if (!r) continue;
         faits.push(r);
         if (social) for (const g of r.gagnants) {
-          await social.notifier(g.id, 'fleuve', `Tu es le Pagayeur de la semaine sur le ${NOMS[fleuve]} : ${g.etoiles} étoile${g.etoiles > 1 ? 's' : ''} gagnée${g.etoiles > 1 ? 's' : ''}${r.prix ? `, +${r.prix} pièces` : ''} !`, { course: true, fleuve, semaine, pieces: r.prix }).catch(() => {});
+          await social.notifier(g.id, 'fleuve', `Tu es le Pagayeur de la semaine sur ${leF(fleuve)} : ${g.etoiles} étoile${g.etoiles > 1 ? 's' : ''} gagnée${g.etoiles > 1 ? 's' : ''}${r.prix ? `, +${r.prix} pièces` : ''} !`, { course: true, fleuve, semaine, pieces: r.prix }).catch(() => {});
         }
       }
       coursesReglees = semaine;
@@ -389,7 +406,7 @@ function creerFleuve(base, reglages, comptes, social = null) {
         const meilleur = (await base.query("SELECT coalesce(max(numero), 0)::int AS n FROM fleuve_etoiles WHERE fleuve = $1", [fleuve])).rows[0].n;
         const joueurs = (await base.query("SELECT count(DISTINCT compte_id)::int AS n FROM fleuve_essais WHERE fleuve = $1 AND debut > now() - interval '7 days'", [fleuve])).rows[0].n;
         const publie = biefs.filter((b) => b.publie).length;
-        out.fleuves[fleuve] = { nom: NOMS[fleuve], jeu: G.FLEUVES[fleuve], biefs, meilleur, biefMeilleur: meilleur ? biefDe(meilleur) : 0, joueurs7j: joueurs, avance: publie - (meilleur ? biefDe(meilleur) : 0), alerte: publie - (meilleur ? biefDe(meilleur) : 0) < 2 };
+        out.fleuves[fleuve] = { nom: NOMS[fleuve], jeu: G.FLEUVES[fleuve], etat: etatDuFleuve(fleuve), villes: VILLES[fleuve].length, biefs, meilleur, biefMeilleur: meilleur ? biefDe(meilleur) : 0, joueurs7j: joueurs, avance: publie - (meilleur ? biefDe(meilleur) : 0), alerte: publie - (meilleur ? biefDe(meilleur) : 0) < 2 };
       }
       return out;
     },
@@ -499,4 +516,4 @@ function creerFleuve(base, reglages, comptes, social = null) {
   return api;
 }
 
-module.exports = { creerFleuve, VILLES, villeDe };
+module.exports = { creerFleuve, VILLES, villeDe, NOMS, ETATS_DEFAUT };
