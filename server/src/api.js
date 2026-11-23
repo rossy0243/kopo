@@ -180,9 +180,16 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours,
   r.get('/stickers', joueur, enveloppe(async (req, res) => res.json(await stickers.pourJoueur(req.compte.id))));
   r.post('/stickers/acheter', joueur, enveloppe(async (req, res) => res.json(await stickers.acheter(req.compte, req.body || {}))));
   // Bouquets de pièces (argent réel) : prix fixés ici, au taux des stickers ; le paiement mobile money n'est pas encore branché.
-  r.get('/bouquets', joueur, (req, res) => res.json({ solde: req.compte.solde, ...bouquets.pourJoueur() }));
+  // whatsapp : numéro qui reçoit les commandes tant que le mobile money n'est pas branché (null = « Bientôt »).
+  const whatsappAchat = () => ((reglages.get('achat') || {}).whatsapp) || null;
+  r.get('/bouquets', joueur, (req, res) => res.json({ solde: req.compte.solde, ...bouquets.pourJoueur(), whatsapp: whatsappAchat() }));
   // Abonnement Kopo+ (micro en salle, couronne dorée) : prix en francs congolais, l'abonnement du joueur, micro prêt ou non.
-  r.get('/abonnement', joueur, (req, res) => res.json(abonnement.pourJoueur(req.compte)));
+  r.get('/abonnement', joueur, (req, res) => res.json({ ...abonnement.pourJoueur(req.compte), whatsapp: whatsappAchat(), compte: req.compte.pseudo + '#' + req.compte.numero }));
+  // Page « Recharger » (site et APK seulement) : pièces et Kopo+ ensemble, avec le nom du compte à donner en payant.
+  r.get('/recharger', joueur, (req, res) => res.json({
+    solde: req.compte.solde, compte: req.compte.pseudo + '#' + req.compte.numero, whatsapp: whatsappAchat(),
+    pieces: bouquets.pourJoueur(), kopoPlus: abonnement.pourJoueur(req.compte),
+  }));
   // Essai de bienvenue : 7 jours de Kopo+, une seule fois, compte Google.
   r.post('/abonnement/essai', joueur, enveloppe(async (req, res) => res.json(await abonnement.essayer(req.compte))));
   r.get('/boutique', joueur, enveloppe(async (req, res) => res.json({ solde: req.compte.solde, objets: parcours.catalogue(), ...(await parcours.collection(req.compte)) })));

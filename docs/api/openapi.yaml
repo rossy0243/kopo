@@ -620,6 +620,25 @@ paths:
                   paiement: { type: boolean }
                   taux: { type: object, properties: { piecesPour500FC: { type: integer } } }
                   bouquets: { type: array, items: { $ref: '#/components/schemas/Bouquet' } }
+  /recharger:
+    get:
+      tags: [Pièces, Boutique et parcours]
+      summary: Page « Recharger » (site et APK) : bouquets de pièces et Kopo+ ensemble
+      description: "Jamais appelée par les versions Google Play et App Store (elles ne vendent rien). `compte` est le Pseudo#1234 à donner en payant. `whatsapp` : numéro (chiffres, indicatif compris) qui reçoit les commandes tant que le mobile money n'est pas branché, null sinon. Aussi présent dans /bouquets et /abonnement."
+      responses:
+        '200':
+          description: Pièces et Kopo+
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  solde: { type: integer }
+                  compte: { type: string }
+                  whatsapp: { type: [string, 'null'] }
+                  pieces: { type: object, description: 'Comme /bouquets (sans solde)' }
+                  kopoPlus: { type: object, description: 'Comme /abonnement' }
+        '401': { $ref: '#/components/responses/Erreur' }
   /abonnement:
     get:
       tags: [Pièces, Boutique et parcours]

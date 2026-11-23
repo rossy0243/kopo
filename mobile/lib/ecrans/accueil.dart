@@ -9,6 +9,7 @@ import '../commun/retention.dart';
 import '../commun/stock.dart';
 import '../commun/theme.dart';
 import '../etat.dart';
+import '../reseau/api.dart';
 import '../fenetres/accueil_fenetres.dart';
 import '../fenetres/communes.dart';
 import '../fenetres/compet.dart';
@@ -259,6 +260,15 @@ class _Haut extends StatelessWidget {
               Text(App.formatPieces(app.solde), style: K.titre(21).copyWith(height: 1)),
               if (!etroit) Text('pièces', style: K.texte(10, couleur: K.muted)),
             ]),
+            // « + » : Recharger (comme sur le site). Jamais dans les versions des stores (Api.sansAchats).
+            if (app.enLigne && !Api.sansAchats) ...[
+              const SizedBox(width: 6),
+              Container(
+                width: 18, height: 18, alignment: Alignment.center,
+                decoration: const BoxDecoration(color: K.brass, shape: BoxShape.circle),
+                child: Text('+', style: K.texte(14, couleur: K.encre, poids: FontWeight.w800).copyWith(height: 1)),
+              ),
+            ],
           ]),
         ),
       ),

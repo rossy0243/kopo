@@ -1,10 +1,13 @@
 // Micro des abonnés Kopo+ : invitation avec les prix, qui parle (pseudo ou initiale), couronne.
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:masano/commun/theme.dart';
 import 'package:masano/commun/vocal.dart';
 import 'package:masano/etat.dart';
+import 'package:masano/fenetres/progres.dart' show fenetreRecharger, texteCommande;
 import 'package:masano/fenetres/vocal_ui.dart';
+import 'package:masano/reseau/api.dart';
 
 Map<String, dynamic> vue() => {
       'moi': 'a', 'hote': 'a', 'code': 'VOIX', 'etat': 'salon',
@@ -100,5 +103,49 @@ void main() {
     await t.pumpWidget(cadre(BoutonsMicro(app.vue!), 300));
     expect(find.byType(IconButton), findsNothing);
     app.microEssai = false;
+  });
+
+  // Version App Store (iPhone) : aucun prix, aucun lien, et Kopo+ jamais montré à un non-membre (règles 3.1.1, 3.1.3(b)).
+  testWidgets('App Store : pas de prix, pas de micro verrouillé pour un non-membre', (t) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    expect(Api.sansAchats, isTrue);
+    expect(Api.sansVitrinePlus, isTrue);
+    final offre = {
+      'actif': false, 'paiement': false, 'whatsapp': '243812345678',
+      'formules': [{'id': 'mois', 'nom': '1 mois', 'francs': 2500, 'jours': 30, 'note': null}],
+      'avantages': ['Parle et entends les autres abonnés de ta table'],
+    };
+    await t.pumpWidget(MaterialApp(theme: K.theme(), home: Scaffold(body: SingleChildScrollView(child: fenetreAbonnement(offre)))));
+    expect(find.textContaining('FC'), findsNothing);
+    expect(find.textContaining('mobile money'), findsNothing);
+    expect(find.textContaining('WhatsApp'), findsNothing);
+    expect(find.textContaining('Réservé aux membres Kopo+'), findsOneWidget);
+    app.microEssai = true;
+    final v = vue();
+    v['moi'] = 'd';
+    app.vue = v;
+    await t.pumpWidget(cadre(BoutonsMicro(v), 300));
+    expect(find.byType(IconButton), findsNothing);
+    v['moi'] = 'a'; // un membre garde son micro
+    await t.pumpWidget(cadre(BoutonsMicro(v), 300));
+    expect(find.byType(IconButton), findsOneWidget);
+    app.microEssai = false;
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  // Google Play : comme une appli « de consommation », le micro reste visible avec un cadenas, sans prix ni lien.
+  testWidgets('version Android : page Recharger (pièces et Kopo+) avec la commande WhatsApp', (t) async {
+    expect(Api.sansAchats, isFalse); // APK du site (sans --dart-define=STORE=play)
+    final R = {
+      'solde': 120, 'compte': 'Rossy#0042', 'whatsapp': '243812345678',
+      'pieces': {'paiement': false, 'bouquets': [{'nom': 'Poignée', 'francs': 500, 'pieces': 200, 'bonus': 0, 'bonusPct': 0}, {'nom': 'Sac', 'francs': 5000, 'pieces': 2250, 'bonus': 250, 'bonusPct': 12}]},
+      'kopoPlus': {'actif': false, 'formules': [{'id': 'mois', 'nom': '1 mois', 'francs': 2500, 'note': null}, {'id': 'an', 'nom': '1 an', 'francs': 25000, 'note': '2 mois offerts'}], 'avantages': ['Parle et entends les autres abonnés de ta table']},
+    };
+    await t.pumpWidget(MaterialApp(theme: K.theme(), home: Scaffold(body: SingleChildScrollView(child: fenetreRecharger(R)))));
+    expect(find.text('Recharger'), findsOneWidget);
+    expect(find.text('${App.formatPieces(5000)} FC'), findsOneWidget);
+    expect(find.text('${App.formatPieces(25000)} FC'), findsOneWidget);
+    expect(find.textContaining('WhatsApp s\'ouvre'), findsOneWidget);
+    expect(texteCommande('Rossy#0042', 'Kopo+ 1 mois (2 500 FC)'), contains('Rossy#0042'));
   });
 }

@@ -572,6 +572,8 @@ body.accueil .app { max-width: none; min-height: 100vh; min-height: 100dvh; padd
 .bourse-txt { display: grid; line-height: 1.05; text-align: left; }
 .bourse-txt b { font-family: var(--display); font-weight: 400; font-size: 21px; letter-spacing: 1px; color: var(--brass); }
 .bourse-txt small { font-size: 10px; color: var(--muted); }
+.bourse-plus { display: grid; place-items: center; width: 18px; height: 18px; margin-left: -2px; border-radius: 50%; background: var(--brass); color: #1d1606; font-style: normal; font-weight: 800; font-size: 14px; line-height: 1; }
+.bourse-plus[hidden] { display: none; }
 .bonus-jour { display: grid; justify-items: center; gap: 10px; text-align: center; }
 .bonus-jour .piece { width: 72px; height: 72px; font-size: 40px; animation: entree .6s cubic-bezier(.2,1.4,.4,1) both; }
 .bonus-jour .gain { font-family: var(--display); font-size: 44px; color: var(--brass); line-height: 1; }
@@ -963,6 +965,16 @@ body.en-jeu #filChat { display: flex; }
 .bouquet .px { text-align: right; font-weight: 700; font-size: 16px; white-space: nowrap; }
 .bouquet .ruban { position: absolute; top: -9px; right: 12px; background: var(--brass); color: #1d1606; font-size: 11px; font-weight: 700; border-radius: 6px; padding: 2px 7px; }
 .boutique .acheter-pieces { margin: 2px auto 4px; display: flex; }
+.recharger .rc-compte { display: block; text-align: center; margin-bottom: 4px; }
+.recharger .rc-bloc { margin-top: 6px; }
+.manque-pieces p { text-align: center; margin: 0 0 10px; }
+.manque-pieces h3 { margin: 6px 0 8px; font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--brass); }
+.manque-pieces .ab-avantages { margin-bottom: 12px; }
+.manque-pieces li.lien { cursor: pointer; text-decoration: underline dotted rgba(226,176,74,.5); text-underline-offset: 3px; }
+.recharger .ab-actif { color: var(--good); font-weight: 600; margin: 4px 0 8px; }
+.recharger h3 .plus-ico { width: 16px; height: 16px; vertical-align: -2px; }
+.recharger .rc-comment { display: block; margin-top: 12px; }
+.recharger .ab-formules { margin-top: 12px; }
 .boutique .st-tete-pack { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 10px 0 4px; }
 .boutique button.st-case { color: inherit; font: inherit; }
 .fenetre[data-type="boutique"] .st-prix { display: inline-flex; align-items: center; gap: 4px; vertical-align: middle; }
@@ -1640,7 +1652,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   <section class="hub" id="ecranAccueil" hidden>
     <div class="hub-haut">
       <div class="logo"><img class="marque" src="icons/masano-logo.svg" alt=""><span>MASANO</span></div>
-      <button class="bourse" id="btnBourse" title="Tes pièces d'essai"><span class="piece" aria-hidden="true">M</span><span class="bourse-txt"><b id="solde">500</b><small>pièces d'essai</small></span></button>
+      <button class="bourse" id="btnBourse" title="Tes pièces d'essai"><span class="piece" aria-hidden="true">M</span><span class="bourse-txt"><b id="solde">500</b><small>pièces d'essai</small></span><i class="bourse-plus" id="boursePlus" aria-hidden="true" hidden>+</i></button>
       <button class="btn-amis" id="btnAmis" title="Amis" aria-label="Amis" hidden><svg class="ico"><use href="#i-amis"/></svg><i class="compte" id="compteAmis" hidden></i></button>
       <label class="profil" id="profil" title="Ton pseudo">
         <span class="avatar" id="avatar"><b id="avatarLettre">?</b><i class="niveau-pastille" id="niveauPastille" hidden></i></span>
@@ -8210,7 +8222,7 @@ svg .vb { transform-box: view-box; }
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = 'e60c7e23671d'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = '7ec4d49fff7b'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: true };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // La musique des menus était coupée par défaut : on l'allume une fois pour tous (le joueur peut la recouper).
@@ -10393,10 +10405,10 @@ svg .vb { transform-box: view-box; }
       b.append(el('div', 'nom', f.nom), el('div', 'px', formatPieces(f.francs) + ' FC'));
       if (f.note) b.append(el('span', 'ruban', f.note));
       b.setAttribute('aria-label', `Kopo+ ${f.nom} : ${f.francs} francs congolais`);
-      b.onclick = () => toast(`Kopo+ ${f.nom} : le paiement mobile money arrive bientôt.`, 'alerte');
+      b.onclick = () => commander(A, `Kopo+ ${f.nom} (${formatPieces(f.francs)} FC)`);
       l.append(b);
     }
-    z.append(l, el('small', 'muted', A.paiement ? 'Paiement en francs congolais par mobile money.' : 'Paiement en francs congolais (mobile money : M-Pesa, Orange Money, Airtel Money) : bientôt. Kopo+ ne donne jamais d\'avantage pour gagner.'));
+    z.append(l, el('small', 'muted', (A.whatsapp ? 'Touche une formule : WhatsApp s\'ouvre avec ta commande, tu paies par mobile money (M-Pesa, Orange Money, Airtel Money).' : 'Paiement en francs congolais (mobile money : M-Pesa, Orange Money, Airtel Money) : bientôt.') + ' Kopo+ ne donne jamais d\'avantage pour gagner.'));
     const ret = el('button', (E && E.possible) ? 'btn large' : 'btn principal large', annonce ? 'Plus tard' : 'Fermer'); ret.onclick = fermerFenetre;
     ouvrirFenetre([el('h2', null, A.actif ? 'Ton abonnement' : annonce ? 'Nouveau : le micro en partie' : 'Le micro en partie'), z, ret], 'boutique');
     if (annonce) $('fenetre').dataset.annonce = 'micro'; // reste ouverte quand un joueur arrive au salon
@@ -11815,6 +11827,7 @@ svg .vb { transform-box: view-box; }
     if (!p || p.restantes > 0 || p.prix == null) return null;
     const b = el('button', 'btn principal large', `Acheter une pagaie · ${formatPieces(p.prix)} pièces`);
     b.onclick = async () => {
+      if (soldeAffiche() < p.prix) return fenetreManquePieces(p.prix - soldeAffiche(), 'pour cette pagaie', null);
       b.disabled = true;
       try {
         const r = await apiJoueur('/fleuve/pagaie', 'POST');
@@ -12468,7 +12481,7 @@ svg .vb { transform-box: view-box; }
       liste.append(l);
     }
     z.append(voies, liste);
-    if (!P.kopoPlus) z.append(el('small', 'muted', 'Kopo+ (bientôt) : des apparences en plus sur le parcours. Jamais rien qui aide à gagner.'));
+    if (!P.kopoPlus) z.append(el('small', 'muted', 'Voie Kopo+ : des apparences en plus pour les membres Kopo+. Jamais rien qui aide à gagner.'));
     const fermer = el('button', 'btn principal large', 'Fermer');
     fermer.onclick = fermerFenetre;
     ouvrirFenetre([el('h2', null, 'Parcours de saison'), z, fermer], 'ligue');
@@ -12487,7 +12500,7 @@ svg .vb { transform-box: view-box; }
     const possedes = new Set(B.possedes.concat(['av-laiton', 'dos-laiton']));
     const z = el('div', 'boutique');
     const solde = el('div', 'boutique-solde'); solde.append(pieceEl(), formatPieces(B.solde));
-    const plus = el('button', 'btn petit acheter-pieces', '+ Acheter des pièces'); plus.onclick = () => ouvrirAchatPieces(ouvrirBoutique);
+    const plus = el('button', 'btn petit acheter-pieces', '+ Recharger'); plus.onclick = () => ouvrirAchatPieces(ouvrirBoutique);
     z.append(solde, plus, el('small', 'muted', 'Des apparences seulement : rien n\'aide à gagner. Les pièces se gagnent en jouant.'));
     const enVente = B.objets.filter((o) => o.prix != null && !o.ville).sort((a, b) => a.prix - b.prix || a.nom.localeCompare(b.nom, 'fr'));
     for (const cat of R.parCategorie(enVente)) {
@@ -12542,15 +12555,28 @@ svg .vb { transform-box: view-box; }
     await apiJoueur('/collection/equiper', 'POST', { objet: id }).catch(() => {});
     ouvrirBoutique();
   }
+  // Plus assez de pièces (23/11) : d'abord les moyens gratuits d'en gagner, puis « Recharger mes pièces ».
+  // (Dans les applis Google Play et App Store, la même fenêtre sans « Recharger » : elles ne vendent rien.)
+  function fenetreManquePieces(manque, pourQuoi, retour) {
+    const z = el('div', 'manque-pieces');
+    z.append(el('p', null, `Il te manque ${formatPieces(manque)} pièce${manque > 1 ? 's' : ''} ${pourQuoi}.`), el('h3', null, 'Gagne des pièces gratuitement'));
+    const ul = el('ul', 'ab-avantages');
+    const li = (i, t, f) => { const x = el('li'); x.append(ico(i), ' ' + t); if (f) { x.classList.add('lien'); x.tabIndex = 0; x.setAttribute('role', 'button'); x.onclick = f; x.onkeydown = (e) => { if (e.key === 'Enter') f(); }; } ul.append(x); };
+    li('cadeau', 'Bonus du jour : reviens chaque jour, ta série fait grossir le cadeau.', () => fenetrePieces(null));
+    if (fleuveLance()) li('fleuve', 'Le Fleuve : chaque étoile et chaque ville rapportent des pièces.', () => { fermerFenetre(); ouvrirFleuve(); });
+    li('missions', 'Missions du jour et défi de la semaine.', () => { fermerFenetre(); ouvrirMissions(); });
+    li('enligne', 'Parties en ligne aux tables gratuites.', null);
+    z.append(ul);
+    const ok = el('button', 'btn principal large', 'Recharger mes pièces'); ok.onclick = () => ouvrirRecharger(retour, 'pieces');
+    const ret = el('button', 'btn large', retour ? 'Retour' : 'Fermer'); ret.onclick = retour || fermerFenetre;
+    ouvrirFenetre([el('h2', null, 'Pas assez de pièces'), z, ok, ret], 'boutique');
+  }
   function confirmerAchat(o, solde) {
     const nomType = o.type === 'avatar' ? 'l\'avatar' : 'le dos de cartes';
     const corps = el('div', 'bonus-jour');
     corps.append(el('h2', null, o.nom), apercuObjet(o.id));
     if (o.prix > solde) {
-      corps.append(el('p', null, `Il te manque ${formatPieces(o.prix - solde)} pièces pour ${nomType} ${o.nom}. Missions, bonus du jour et parties en ligne en rapportent.`));
-      const ok = el('button', 'btn principal large', 'Acheter des pièces'); ok.onclick = () => ouvrirAchatPieces(ouvrirBoutique);
-      const ret = el('button', 'btn large', 'Retour'); ret.onclick = ouvrirBoutique;
-      return ouvrirFenetre([corps, ok, ret], 'boutique');
+      return fenetreManquePieces(o.prix - solde, `pour ${nomType} ${o.nom}`, ouvrirBoutique);
     }
     corps.append(el('p', null, `Acheter ${nomType} ${o.nom} pour ${formatPieces(o.prix)} pièces ? Il te restera ${formatPieces(solde - o.prix)} pièces.`));
     const oui = el('button', 'btn principal large', 'Acheter'), non = el('button', 'btn large', 'Retour');
@@ -12599,18 +12625,30 @@ svg .vb { transform-box: view-box; }
     ouvrirFenetre([corps, ...boutons, el('small', 'muted', 'Paiement en francs congolais (mobile money) : bientôt.'), non], 'boutique');
   }
 
-  // Acheter des pièces (18/11) : des bouquets du moins cher (500 FC) au plus cher (40 000 FC), prix fixés par le serveur,
-  // au même taux que les stickers (200 pièces ≈ 500 FC), avec un bonus qui grandit avec le bouquet.
-  // Le paiement mobile money n'est pas encore branché : les bouquets s'affichent avec « Bientôt ».
-  async function ouvrirAchatPieces(retour) {
-    if (!MODE_SERVEUR) return toast('L\'achat de pièces arrive avec le jeu en ligne.', 'alerte');
-    let B;
-    try { if (!compteLocal()) { const ps = lirePseudo(); if (!ps) return; await compteServeur(ps); } B = await apiJoueur('/bouquets'); } catch (e) { toast(e.message, 'echec'); return; }
-    soldeServeur(B.solde);
-    const z = el('div', 'boutique');
-    const solde = el('div', 'boutique-solde'); solde.append(pieceEl(), formatPieces(B.solde));
-    z.append(solde, el('small', 'muted', 'Plus le bouquet est gros, plus il y a de pièces offertes. Des pièces pour les tables à mise, les apparences et les stickers ; elles ne se revendent pas.'));
-    const l = el('div', 'bouquets'), meilleur = B.bouquets.reduce((m, b) => (b.bonusPct > m.bonusPct ? b : m), B.bouquets[0]);
+  // Page « Recharger » (23/11) : pièces et Kopo+ au même endroit, à partager sur WhatsApp (masano.online/recharger/,
+  // ou ?ouvrir=recharger). Bouquets du moins cher (500 FC) au plus cher (40 000 FC), prix fixés par le serveur, au même
+  // taux que les stickers (200 pièces ≈ 500 FC), avec un bonus qui grandit avec le bouquet.
+  // Tant que le mobile money n'est pas branché : si le tableau de bord donne un numéro WhatsApp (Réglages > Ventes),
+  // toucher un choix ouvre WhatsApp avec la commande toute prête (et le Pseudo#1234) ; l'admin encaisse et livre.
+  // Sans numéro : « Bientôt ». Ce qui est acheté arrive sur le compte : site et appli.
+  const texteCommande = (compte, quoi) => `Bonjour Masano ! Je veux ${quoi} pour mon compte ${compte}. Comment je paie par mobile money ?`;
+  function commander(R, quoi) {
+    if (!R || !R.whatsapp) return toast('Le paiement mobile money arrive bientôt.', 'alerte');
+    window.open('https://wa.me/' + R.whatsapp + '?text=' + encodeURIComponent(texteCommande(R.compte, quoi)), '_blank', 'noopener');
+  }
+  const lienRecharger = () => LIEN_SITE() + 'recharger/';
+  async function ouvrirRecharger(retour, enPremier) {
+    if (!MODE_SERVEUR) return toast('Recharger arrive avec le jeu en ligne.', 'alerte');
+    let R;
+    try { if (!compteLocal()) { const ps = lirePseudo(); if (!ps) return; await compteServeur(ps); } R = await apiJoueur('/recharger'); } catch (e) { toast(e.message, 'echec'); return; }
+    soldeServeur(R.solde);
+    const z = el('div', 'boutique recharger');
+    const solde = el('div', 'boutique-solde'); solde.append(pieceEl(), formatPieces(R.solde));
+    z.append(solde, el('small', 'muted rc-compte', `Compte ${R.compte} · ce que tu prends arrive sur ce compte, sur le site comme dans l'appli.`));
+    // Pièces
+    const P = el('div', 'rc-bloc');
+    P.append(el('h3', null, 'Pièces'), el('small', 'muted', 'Plus le bouquet est gros, plus il y a de pièces offertes. Pour les tables à mise, les apparences et les stickers ; elles ne se revendent pas.'));
+    const B = R.pieces, l = el('div', 'bouquets'), meilleur = B.bouquets.reduce((m, b) => (b.bonusPct > m.bonusPct ? b : m), B.bouquets[0]);
     B.bouquets.forEach((b, i) => {
       const r = el('button', 'bouquet' + (b === meilleur && b.bonus ? ' top' : ''));
       const tas = el('div', 'tas'), n = Math.min(6, i + 1);
@@ -12623,13 +12661,39 @@ svg .vb { transform-box: view-box; }
       r.append(tas, mil, px);
       if (b === meilleur && b.bonus) r.append(el('span', 'ruban', `Le plus avantageux · +${b.bonusPct} %`));
       r.setAttribute('aria-label', `${b.nom} : ${b.pieces} pièces pour ${b.francs} francs congolais`);
-      r.onclick = () => (B.paiement ? toast('Paiement mobile money : bientôt.', 'alerte') : toast(`Bouquet « ${b.nom} » : le paiement mobile money arrive bientôt.`, 'alerte'));
+      r.onclick = () => commander(R, `le bouquet « ${b.nom} » (${formatPieces(b.pieces)} pièces, ${formatPieces(b.francs)} FC)`);
       l.append(r);
     });
-    z.append(l, el('small', 'muted', B.paiement ? 'Paiement en francs congolais par mobile money.' : 'Paiement en francs congolais (mobile money : M-Pesa, Orange Money, Airtel Money) : bientôt.'));
+    P.append(l);
+    // Kopo+
+    const A = R.kopoPlus, K = el('div', 'rc-bloc');
+    const tk = el('h3'); tk.append(ico('couronne', 'plus-ico'), ' Kopo+ · le micro en partie');
+    K.append(tk);
+    if (A.actif && A.jusqu) K.append(el('p', 'ab-actif', `Tu es membre Kopo+ jusqu'au ${new Date(A.jusqu).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}. Tu peux prolonger :`));
+    const ul = el('ul', 'ab-avantages');
+    (A.avantages || []).forEach((a, i) => { const li = el('li'); li.append(ico(['micro', 'couronne', 'cadeau'][i] || 'cadeau'), ' ' + a); ul.append(li); });
+    const lf = el('div', 'ab-formules');
+    for (const f of A.formules) {
+      const b = el('button', 'ab-formule' + (f.id === 'an' ? ' top' : ''));
+      b.append(el('div', 'nom', f.nom), el('div', 'px', formatPieces(f.francs) + ' FC'));
+      if (f.note) b.append(el('span', 'ruban', f.note));
+      b.setAttribute('aria-label', `Kopo+ ${f.nom} : ${f.francs} francs congolais`);
+      b.onclick = () => commander(R, `Kopo+ ${f.nom} (${formatPieces(f.francs)} FC)`);
+      lf.append(b);
+    }
+    K.append(ul, lf, el('small', 'muted', 'Kopo+ ne donne jamais d\'avantage pour gagner.'));
+    z.append(...(enPremier === 'plus' ? [K, P] : [P, K]));
+    z.append(el('small', 'muted rc-comment', R.whatsapp
+      ? 'Touche ton choix : WhatsApp s\'ouvre avec ta commande toute prête. Tu paies par mobile money (M-Pesa, Orange Money, Airtel Money) et tout arrive sur ton compte.'
+      : 'Paiement en francs congolais (mobile money : M-Pesa, Orange Money, Airtel Money) : bientôt.'));
+    const pt = el('button', 'btn large btn-whatsapp'); pt.append(icone('i-partager'), 'Partager cette page');
+    pt.onclick = () => ouvrirWhatsApp(`🪙 Recharge tes pièces Masano et passe à Kopo+ (le micro en partie) :\n${lienRecharger()}`);
     const ret = el('button', 'btn principal large', retour ? 'Retour' : 'Fermer'); ret.onclick = retour || fermerFenetre;
-    ouvrirFenetre([el('h2', null, 'Acheter des pièces'), z, ret], 'boutique');
+    ouvrirFenetre([el('h2', null, 'Recharger'), z, pt, ret], 'boutique');
   }
+  window.ouvrirRecharger = ouvrirRecharger;
+  // Ancien nom (boutique, bourse) : la même page, pièces d'abord.
+  const ouvrirAchatPieces = (retour) => ouvrirRecharger(retour, 'pieces');
   window.ouvrirAchatPieces = ouvrirAchatPieces;
 
   // Chat en partie : messages choisis dans le tableau de bord (/api/config), sinon la liste de départ.
@@ -13426,7 +13490,7 @@ svg .vb { transform-box: view-box; }
         return;
       }
       aide.textContent = texteAide;
-      if (cfg && cfg.nouveaute === NOUVEAUTE && !lireNouveaute()) ecrireNouveaute({ saute: true }); // nouveau joueur : pas de fenêtre « Nouveau »
+      if (cfg && cfg.nouveaute && !lireNouveaute()) ecrireNouveaute({ saute: true }); // nouveau joueur : pas de fenêtre « Nouveau »
       const ok = !!(cfg && cfg.google);
       $('btnEntreeGoogle').hidden = aide.hidden = $('ouGoogle').hidden = !ok;
       if (ok) $('btnEntreeGoogle').onclick = () => connexionGoogle(cfg.google);
@@ -13928,7 +13992,7 @@ svg .vb { transform-box: view-box; }
   }
   function majSolde() {
     $('solde').textContent = formatPieces(soldeAffiche());
-    if (MODE_SERVEUR) { $('btnBourse').title = 'Tes pièces'; $('btnBourse').querySelector('small').textContent = 'pièces'; }
+    if (MODE_SERVEUR) { $('btnBourse').title = 'Tes pièces · Recharger'; $('btnBourse').querySelector('small').textContent = 'pièces'; $('boursePlus').hidden = false; }
   }
   // Message clair selon la réponse : sans réseau, serveur qui redémarre, ou serveur pas encore à jour (route inconnue).
   function erreurServeur(statut) {
@@ -13997,7 +14061,7 @@ svg .vb { transform-box: view-box; }
     if (!MODE_SERVEUR) corps.append(el('div', 'note-essai', 'Pièces d\'essai, remises à zéro au lancement officiel.'));
     const ok = el('button', 'btn principal large', b ? 'Récupérer' : 'OK');
     ok.onclick = () => { fermerFenetre(); majSolde(); if (b) { pop($('btnBourse'), 1.2); suiteAccueil(); } };
-    if (!b && MODE_SERVEUR) { const ach = el('button', 'btn large', 'Acheter des pièces'); ach.onclick = () => ouvrirAchatPieces(() => fenetrePieces(null)); const bq = el('button', 'btn large', 'Boutique'); bq.onclick = ouvrirBoutique; ouvrirFenetre([corps, ok, ach, bq]); }
+    if (!b && MODE_SERVEUR) { const ach = el('button', 'btn principal large', 'Recharger mes pièces'); ach.onclick = () => ouvrirAchatPieces(() => fenetrePieces(null)); const bq = el('button', 'btn large', 'Boutique'); bq.onclick = ouvrirBoutique; ok.className = 'btn large'; ouvrirFenetre([corps, ach, bq, ok]); }
     else ouvrirFenetre([corps, ok]);
   }
   function bonusDuJour() {
@@ -14278,6 +14342,7 @@ svg .vb { transform-box: view-box; }
       fermerFenetre(); $('codeRejoindre').value = code; $('voileRejoindre').hidden = false;
     } else if (o === 'amis' && $('ecranAccueil').hidden === false) { majPastilleAmis(); ouvrirAmis(); }
     else if (o === 'match' && $('ecranAccueil').hidden === false) ouvrirMatchJour();
+    else if (o === 'recharger' && $('ecranAccueil').hidden === false) ouvrirRecharger();
     else if (o === 'fleuve' && $('ecranAccueil').hidden === false) ouvrirFleuve(FLEUVES[u.searchParams.get('fleuve')] ? u.searchParams.get('fleuve') : undefined);
   }
   if (PUSH_POSSIBLE) navigator.serviceWorker.addEventListener('message', (ev) => { if (ev.data && ev.data.masano === 'ouvrir') ouvrirDepuisNotification(ev.data.url); });

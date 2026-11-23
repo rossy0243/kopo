@@ -42,10 +42,16 @@ const PAGES_JEU = {
     texte: 'Le 8 demande, le 2, le 10 et le Joker font piocher : vide ta main le premier ! De 2 à 8 joueurs, entre amis ou en ligne. Gratuit.',
     nom: 'Inter (8)', bouton: 'Jouer à Inter (8)', logo: 'icons/masano-logo.svg',
   },
+  // Page « Recharger » (pièces et Kopo+), à partager sur WhatsApp et Facebook : ouvre la fenêtre Recharger du site.
+  recharger: {
+    titre: 'Recharger mes pièces Masano · pièces et Kopo+',
+    texte: 'Des pièces pour les tables à mise, les apparences et les stickers, et Kopo+ pour parler au micro en partie. Paiement en francs congolais par mobile money.',
+    nom: 'Recharger', bouton: 'Recharger mes pièces', logo: 'icons/masano-logo.svg', image: 'og-masano', ouvrir: 'recharger',
+  },
 };
 const echap = (t) => t.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 for (const [jeu, p] of Object.entries(PAGES_JEU)) {
-  const url = site + jeu + '/', image = site + 'icons/og-' + jeu + '.png?v=2'; // ?v= : Facebook garde les images en cache, changer le numéro force la nouvelle
+  const url = site + jeu + '/', image = site + 'icons/' + (p.image || 'og-' + jeu) + '.png?v=2'; // ?v= : Facebook garde les images en cache, changer le numéro force la nouvelle
   const page = `<!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -73,7 +79,7 @@ for (const [jeu, p] of Object.entries(PAGES_JEU)) {
 <meta name="twitter:image" content="${image}">
 <script>
 (function () {
-  var q = new URLSearchParams(location.search); q.set('jeu', '${jeu}');
+  var q = new URLSearchParams(location.search); ${p.ouvrir ? `q.set('ouvrir', '${p.ouvrir}');` : `q.set('jeu', '${jeu}');`}
   location.replace('../?' + q.toString() + location.hash);
 })();
 </script>
@@ -90,7 +96,7 @@ a { display: inline-block; margin-top: 16px; padding: 12px 22px; border-radius: 
 <img src="../${p.logo}" alt="">
 <h1>${echap(p.nom)}</h1>
 <p>${echap(p.texte)}</p>
-<a href="../?jeu=${jeu}">${echap(p.bouton)}</a>
+<a href="../?${p.ouvrir ? 'ouvrir=' + p.ouvrir : 'jeu=' + jeu}">${echap(p.bouton)}</a>
 </main>
 </body>
 </html>

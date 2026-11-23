@@ -1972,6 +1972,23 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.strictEqual((await api('/api/v1/push', { jeton: b.jeton })).json.natifs.length, 0);
   });
   // --- Stickers animés : utilisations vendues (plus tard) ou offertes par l'admin, envoi vérifié et décompté
+  await test('page Recharger : pièces et Kopo+ ensemble, numéro WhatsApp des commandes réglé dans le tableau de bord', async () => {
+    const a = await invite('Rechargeur' + Date.now() % 1000);
+    let R = (await api('/api/v1/recharger', { jeton: a.jeton })).json;
+    assert.strictEqual(R.whatsapp, null); assert.strictEqual(R.compte, a.compte.pseudo + '#' + a.compte.numero);
+    assert.ok(R.pieces.bouquets.length >= 3 && R.kopoPlus.formules.length === 2 && R.kopoPlus.actif === false);
+    assert.strictEqual((await api('/api/v1/recharger')).statut, 401);
+    const mettre = (whatsapp) => api('/admin/api/reglages/achat', { methode: 'PUT', jeton: adminJeton, corps: { valeur: { whatsapp } } });
+    for (const faux of ['abc', '12', '0812345678', '+243 81 234 567 890 123']) assert.strictEqual((await mettre(faux)).statut, 400, faux);
+    assert.strictEqual((await mettre('+243 81-234-5678')).statut, 200);
+    R = (await api('/api/v1/recharger', { jeton: a.jeton })).json;
+    assert.strictEqual(R.whatsapp, '243812345678');
+    assert.strictEqual((await api('/api/v1/bouquets', { jeton: a.jeton })).json.whatsapp, '243812345678');
+    assert.strictEqual((await api('/api/v1/abonnement', { jeton: a.jeton })).json.whatsapp, '243812345678');
+    assert.ok(!('whatsapp' in (await api('/api/config')).json), 'jamais dans la config publique (lue par les applis des stores)');
+    assert.strictEqual((await mettre('')).statut, 200);
+    assert.strictEqual((await api('/api/v1/recharger', { jeton: a.jeton })).json.whatsapp, null);
+  });
   await test('bouquets de pièces : du moins cher au plus cher, 40 000 FC au plus, taux des stickers, livrés par l\'admin', async () => {
     const a = await invite('Acheteur' + Date.now() % 1000);
     const B = (await api('/api/v1/bouquets', { jeton: a.jeton })).json;

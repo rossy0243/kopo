@@ -61,6 +61,10 @@ const DEFAUTS = {
   pushProgrammes: [],
   // Prix de Kopo+ en francs congolais (formules « 1 mois » et « 1 an »).
   kopoPlus: { mois: 2500, an: 25000 },
+  // Paiement à la main en attendant le mobile money : numéro WhatsApp (chiffres, indicatif compris, ex. 243812345678)
+  // qui reçoit les commandes de la page « Recharger » du site et de l'APK. Vide = pas de commande, « Bientôt ».
+  // Jamais montré dans les versions Google Play et App Store (elles ne vendent rien).
+  achat: { whatsapp: '' },
   // Comptes suspects : deux comptes qui ont joué au moins `parties` parties seuls ensemble en `jours` jours,
   // gagnées à `pourcent` % ou plus par le même.
   suspects: { jours: 14, parties: 5, pourcent: 80 },
@@ -157,6 +161,13 @@ function verifierCommunautes(v) {
 }
 // Ce que voient les joueurs : les groupes visibles qui ont un lien, dans l'ordre.
 const communautesPubliques = (l) => (Array.isArray(l) ? l : []).filter((g) => g && g.visible && g.url).map((g) => ({ reseau: g.reseau, libelle: g.libelle || RESEAUX[g.reseau] || '', url: g.url }));
+
+// Numéro WhatsApp des commandes : chiffres seuls (espaces, +, tirets retirés), 8 à 15 chiffres, ou vide.
+function verifierWhatsapp(v) {
+  const n = String(v == null ? '' : v).replace(/[\s+().-]/g, '');
+  if (n && !/^[1-9]\d{7,14}$/.test(n)) throw Object.assign(new Error('Numéro WhatsApp invalide : les chiffres avec l\'indicatif du pays (exemple : 243812345678).'), { statut: 400 });
+  return n;
+}
 
 const DIVISIONS = ['bois', 'bronze', 'argent', 'or', 'diamant', 'legende'];
 const entier = (x) => Number.isInteger(Number(x)) && x !== '' && x !== null ? Number(x) : NaN;
@@ -361,7 +372,7 @@ function creerReglages(base) {
       cache = JSON.parse(JSON.stringify(DEFAUTS));
       for (const l of r.rows) if (l.cle in cache) cache[l.cle] = typeof l.valeur === 'string' ? JSON.parse(l.valeur) : l.valeur;
       // Réglages enregistrés avant l'ajout d'un champ (ex. gains.plafondJour) : le champ manquant prend sa valeur de départ.
-      for (const k of ['gains', 'annonce', 'robotsPublics', 'heuresPush', 'kopoPlus', 'suspects', 'limites', 'inscriptions', 'alertes', 'fleuve']) {
+      for (const k of ['gains', 'annonce', 'robotsPublics', 'heuresPush', 'kopoPlus', 'suspects', 'limites', 'inscriptions', 'alertes', 'fleuve', 'achat']) {
         if (cache[k] && typeof cache[k] === 'object' && !Array.isArray(cache[k])) cache[k] = { ...DEFAUTS[k], ...cache[k] };
       }
       if (cache.fleuveRecette) cache.fleuveRecette = require('./fleuve-generateur').completerRecette(cache.fleuveRecette);
@@ -384,6 +395,7 @@ function creerReglages(base) {
       }
       if (cle === 'ligue') valeur = verifierLigue(valeur);
       if (cle === 'communautes') valeur = verifierCommunautes(valeur);
+      if (cle === 'achat') valeur = { whatsapp: verifierWhatsapp(valeur.whatsapp) };
       if (cle === 'versionMin') {
         valeur = String(valeur || '').trim();
         if (!/^\d{1,3}(\.\d{1,3}){0,3}$/.test(valeur)) throw Object.assign(new Error('Version invalide (exemple : 1.1).'), { statut: 400 });
@@ -491,4 +503,4 @@ function creerReglages(base) {
   };
 }
 
-module.exports = { verifierRythme, verifierHeuresPush, heureDeSilence, verifierPushProgrammes, annonceVisible, verifierBornes, verifierTotauxCahier, totauxCahier, verifierCahier, evenementEnCours, verifierEvenement, verifierMobile, PLATEFORMES, verifierCommunautes, communautesPubliques, RESEAUX, verifierJeux, etatJeuPour, NOMS_JEUX, creerReglages, DEFAUTS, VERSION_APPLI, versionPlusRecente, verifierMessages, verifierLigue, verifierBande, DIVISIONS, MESSAGE_MAX };
+module.exports = { verifierWhatsapp, verifierRythme, verifierHeuresPush, heureDeSilence, verifierPushProgrammes, annonceVisible, verifierBornes, verifierTotauxCahier, totauxCahier, verifierCahier, evenementEnCours, verifierEvenement, verifierMobile, PLATEFORMES, verifierCommunautes, communautesPubliques, RESEAUX, verifierJeux, etatJeuPour, NOMS_JEUX, creerReglages, DEFAUTS, VERSION_APPLI, versionPlusRecente, verifierMessages, verifierLigue, verifierBande, DIVISIONS, MESSAGE_MAX };
