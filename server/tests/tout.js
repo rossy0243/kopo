@@ -2595,6 +2595,37 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     await assert.rejects(new Client(URL_.replace('http', 'ws')).create('fleuve', { jeton: gF.jeton, fleuve: 'congo', numero: n }), /repose/);
     await srv.base.query('DELETE FROM fleuve_pagaies WHERE compte_id = $1', [gF.compte.id]);
   });
+  await test('Fleuve : acheter une pagaie quand on n\'en a plus (100, 200, 400 pièces, pièces détruites)', async () => {
+    const g = await connexionG('sb-fleuve-p', { providerId: 'g-fleuve-p' });
+    const achat = () => api('/api/fleuve/pagaie', { methode: 'POST', jeton: g.jeton });
+    const e0 = (await api('/api/fleuve', { jeton: g.jeton })).json;
+    assert.deepStrictEqual([e0.pagaies.restantes, e0.pagaies.max, e0.pagaies.prix], [5, 5, 100]);
+    assert.strictEqual((await achat()).statut, 409, 'il reste des pagaies');
+    await srv.base.query('INSERT INTO fleuve_pagaies (compte_id, jour, perdues) VALUES ($1, $2, 5)', [g.compte.id, require('../src/match-jour').jourDe(new Date())]);
+    await srv.base.query('UPDATE comptes SET solde = 650 WHERE id = $1', [g.compte.id]);
+    const a1 = await achat();
+    assert.strictEqual(a1.statut, 200);
+    assert.deepStrictEqual([a1.json.paye, Number(a1.json.solde), a1.json.pagaies.restantes, a1.json.pagaies.max, a1.json.pagaies.prix], [100, 550, 1, 6, 200]);
+    assert.strictEqual((await achat()).statut, 409, 'une à la fois');
+    await srv.base.query('UPDATE fleuve_pagaies SET perdues = 6 WHERE compte_id = $1', [g.compte.id]);
+    assert.strictEqual((await achat()).json.paye, 200);
+    await srv.base.query('UPDATE fleuve_pagaies SET perdues = 7 WHERE compte_id = $1', [g.compte.id]);
+    const pauvre = await achat();
+    assert.deepStrictEqual([pauvre.statut, /400 pièces/.test(pauvre.json.erreur)], [400, true], 'solde 350 < 400');
+    await srv.base.query('UPDATE comptes SET solde = 1000 WHERE id = $1', [g.compte.id]);
+    const a3 = await achat();
+    assert.deepStrictEqual([a3.json.paye, Number(a3.json.solde), a3.json.pagaies.prix], [400, 600, null]);
+    await srv.base.query('UPDATE fleuve_pagaies SET perdues = 8 WHERE compte_id = $1', [g.compte.id]);
+    assert.strictEqual((await achat()).statut, 403, '3 par jour au plus');
+    const reg = (await srv.base.query("SELECT sum(montant)::int AS n FROM registre_pieces WHERE compte_id = $1 AND motif = 'pagaie'", [g.compte.id])).rows[0].n;
+    assert.strictEqual(reg, -700);
+    // Pas en vente (prix à 0) ; compte invité refusé.
+    await srv.reglages.ecrire('fleuve', { ...srv.reglages.get('fleuve'), prixPagaie1: 0 });
+    assert.strictEqual((await api('/api/fleuve', { jeton: g.jeton })).json.pagaies.prix, null);
+    const inv = await invite('SansGP' + Date.now() % 1000);
+    assert.strictEqual((await api('/api/fleuve/pagaie', { methode: 'POST', jeton: inv.jeton })).statut, 403);
+    await srv.reglages.ecrire('fleuve', { ...srv.reglages.get('fleuve'), prixPagaie1: 100 });
+  });
   await test('Fleuve : étoiles et pièces (doublées au premier succès du jour), escale fermée sans assez d\'étoiles', async () => {
     const F = srv.fleuve;
     const g = await connexionG('sb-fleuve-b', { providerId: 'g-fleuve-b' });

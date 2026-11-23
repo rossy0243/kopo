@@ -70,10 +70,18 @@ function creerFleuve(base, reglages, comptes, social = null) {
     return e === 'ouvert' || (e === 'testeurs' && estTesteur(compte));
   }
 
+  // Prix des pagaies qu'on peut acheter dans la journée, dans l'ordre (la 2e seulement après la 1re, etc.).
+  function prixPagaies() {
+    const c = cfg(), l = [];
+    for (const k of ['prixPagaie1', 'prixPagaie2', 'prixPagaie3']) { const n = Math.trunc(Number(c[k]) || 0); if (!(n > 0)) break; l.push(n); }
+    return l;
+  }
+  // max : pagaies du jour + pagaies achetées. prix : prix de la prochaine pagaie à acheter (null = plus rien à vendre aujourd'hui).
   async function pagaiesDe(compteId, q = base) {
-    const max = Math.max(1, Number(cfg().pagaies) || 5);
-    const r = (await q.query('SELECT perdues FROM fleuve_pagaies WHERE compte_id = $1 AND jour = $2', [compteId, jourDe(horloge())])).rows[0];
-    return { restantes: Math.max(0, max - (r ? r.perdues : 0)), max };
+    const base_ = Math.max(1, Number(cfg().pagaies) || 5);
+    const r = (await q.query('SELECT perdues, achetees FROM fleuve_pagaies WHERE compte_id = $1 AND jour = $2', [compteId, jourDe(horloge())])).rows[0];
+    const achetees = r ? r.achetees : 0, max = base_ + achetees, prix = prixPagaies();
+    return { restantes: Math.max(0, max - (r ? r.perdues : 0)), max, achetees, prix: achetees < prix.length ? prix[achetees] : null };
   }
   async function etoilesDuJoueur(compteId, fleuve, q = base) {
     const r = await q.query('SELECT numero, etoiles FROM fleuve_etoiles WHERE compte_id = $1 AND fleuve = $2', [compteId, fleuve]);
@@ -255,13 +263,32 @@ function creerFleuve(base, reglages, comptes, social = null) {
         const raison = refus(etoiles, await dernierePubliee(fleuve, q), numero);
         if (raison) throw erreur(raison, 403);
         const p = await pagaiesDe(compte.id, q);
-        if (p.restantes <= 0) throw erreur(`Ta pirogue se repose : ${p.max} nouvelles pagaies à minuit.`, 403);
+        if (p.restantes <= 0) throw erreur(`Ta pirogue se repose : ${Math.max(1, Number(cfg().pagaies) || 5)} nouvelles pagaies à minuit.`, 403);
         // Bloqué depuis N jours sur la même étape (jamais réussie) : les robots baissent d'un cran.
         const jours = Math.max(1, Number(cfg().adoucirJours) || 5);
         const bloque = etoiles.get(numero) > 0 ? 0 : (await q.query("SELECT count(DISTINCT ((debut AT TIME ZONE 'UTC') + interval '1 hour')::date)::int AS n FROM fleuve_essais WHERE compte_id = $1 AND fleuve = $2 AND numero = $3 AND statut IN ('rate', 'parti')", [compte.id, fleuve, numero])).rows[0].n;
         const adoucir = bloque >= jours ? 10 : 0;
         const e = (await q.query('INSERT INTO fleuve_essais (compte_id, fleuve, numero, version, adouci, debut) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id', [compte.id, fleuve, numero, r.version, adoucir > 0, horloge()])).rows[0];
         return { essai: Number(e.id), etape: { ...recetteDe(r), fleuve, numero }, adoucir, public: publicEtape(fleuve, recetteDe(r), r.version) };
+      });
+    },
+
+    // Acheter une pagaie quand la pirogue se repose (prix du tableau de bord, 3 par jour au plus).
+    // Les pièces sont détruites (motif « pagaie ») : elles ne vont à personne.
+    async acheterPagaie(compte) {
+      if (!compte.auth_id) throw erreur('Connecte-toi avec Google pour jouer au Fleuve.', 403);
+      if (!ouvertPour(compte)) throw erreur('Le Fleuve arrive bientôt.', 403);
+      const jour = jourDe(horloge());
+      return base.transaction(async (q) => {
+        await q.query('SELECT id FROM comptes WHERE id = $1 FOR UPDATE', [compte.id]); // pas deux achats en même temps
+        const p = await pagaiesDe(compte.id, q);
+        if (p.restantes > 0) throw erreur(`Il te reste ${p.restantes} pagaie${p.restantes > 1 ? 's' : ''} : joue-les d'abord.`, 409);
+        if (p.prix === null) throw erreur('Plus de pagaie à acheter aujourd\'hui : elles reviennent à minuit.', 403);
+        let solde;
+        try { solde = await comptes.mouvement(q, compte.id, -p.prix, 'pagaie', `${jour}:${p.achetees + 1}`); }
+        catch (e) { throw erreur(`Il te faut ${p.prix} pièces pour cette pagaie.`, 400); }
+        await q.query('INSERT INTO fleuve_pagaies (compte_id, jour, achetees) VALUES ($1, $2, 1) ON CONFLICT (compte_id, jour) DO UPDATE SET achetees = fleuve_pagaies.achetees + 1', [compte.id, jour]);
+        return { pagaies: await pagaiesDe(compte.id, q), solde, paye: p.prix };
       });
     },
 

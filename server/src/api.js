@@ -199,6 +199,7 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours,
   // --- Le Fleuve (fleuve.md) : cartes du Congo et du Niger, pagaies, étoiles. On joue dans la salle « fleuve ».
   if (fleuve) {
     r.get('/fleuve', joueur, enveloppe(async (req, res) => res.json(await fleuve.etat(req.compte))));
+    r.post('/fleuve/pagaie', joueur, enveloppe(async (req, res) => res.json(await fleuve.acheterPagaie(req.compte))));
     r.get('/fleuve/:fleuve/:numero', joueur, enveloppe(async (req, res) => res.json(await fleuve.etape(req.compte, req.params.fleuve, req.params.numero))));
   }
   r.get('/bandes', joueur, enveloppe(async (req, res) => res.json(await bande.mesBandes(req.compte))));

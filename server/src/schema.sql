@@ -550,3 +550,4 @@ CREATE TABLE IF NOT EXISTS fleuve_pagaies (
   perdues    integer NOT NULL DEFAULT 0,
   PRIMARY KEY (compte_id, jour)
 );
+ALTER TABLE fleuve_pagaies ADD COLUMN IF NOT EXISTS achetees integer NOT NULL DEFAULT 0; -- pagaies achetées ce jour-là (contre des pièces)

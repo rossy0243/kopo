@@ -519,7 +519,10 @@ Future<void> ouvrirEtapeFleuve(String cle, int n) async {
         )],
         const Ecart(10),
         if (e['refus'] != null) Text('${e['refus']}', textAlign: TextAlign.center, style: K.texte(14, couleur: K.warn))
-        else if (_n(p['restantes']) <= 0) Text('Ta pirogue se repose. Nouvelles pagaies dans ${dureeLisible(_n((app.etatFleuve?['pagaies'] as Map?)?['retourMs']))}.', textAlign: TextAlign.center, style: K.texte(14, couleur: K.warn))
+        else if (_n(p['restantes']) <= 0) ...[
+          Text('Ta pirogue se repose. Nouvelles pagaies dans ${dureeLisible(_n((app.etatFleuve?['pagaies'] as Map?)?['retourMs']))}.', textAlign: TextAlign.center, style: K.texte(14, couleur: K.warn)),
+          if (p['prix'] != null) ...[const Ecart(10), _boutonPagaie(p, () => ouvrirEtapeFleuve(cle, _n(e['numero'])))],
+        ]
         else ...[
           Muet("Si tu échoues, tu perds une pagaie (il t'en reste ${p['restantes']}).", align: TextAlign.center),
           const Ecart(10),
@@ -528,6 +531,30 @@ Future<void> ouvrirEtapeFleuve(String cle, int n) async {
         const Ecart(8),
         Btn('Retour à la carte', large: true, onTap: () => _afficherCarte(cle)),
       ]));
+}
+
+/// Plus de pagaies : en acheter une avec ses pièces (prix du tableau de bord, qui monte à chaque achat du jour).
+/// Ces pièces sont détruites. À n'afficher que si `p['prix']` n'est pas null.
+Widget _boutonPagaie(Map p, VoidCallback apres) {
+  var occupe = false;
+  return StatefulBuilder(builder: (context, maj) => Btn.principal(
+        'Acheter une pagaie · ${App.formatPieces(_n(p['prix']))} pièces',
+        large: true,
+        onTap: occupe ? null : () async {
+          maj(() => occupe = true);
+          try {
+            final r = await Api.post('/fleuve/pagaie') as Map;
+            app.soldeServeur(r['solde']);
+            try { app.etatFleuve = (await Api.get('/fleuve') as Map).cast<String, dynamic>(); } catch (_) {}
+            app.toast('Nouvelle pagaie : −${App.formatPieces(_n(r['paye']))} pièces', Niv.succes);
+            app.maj();
+            apres();
+          } catch (x) {
+            if (context.mounted) maj(() => occupe = false);
+            app.toast(messageErreur(x), Niv.echec);
+          }
+        },
+      ));
 }
 
 /// Fin d'une étape : étoiles, pièces, pagaies, et la suite.
@@ -540,6 +567,7 @@ Future<void> resultatFleuve(Map r) async {
   if (r['solde'] != null) app.soldeServeur(r['solde']);
   try { app.etatFleuve = (await Api.get('/fleuve') as Map).cast<String, dynamic>(); } catch (_) {}
   final f = (app.etatFleuve?['fleuves'] as Map?)?[cle] as Map?;
+  final achat = (app.etatFleuve?['pagaies'] as Map?) ?? (r['pagaies'] as Map?) ?? const {};
   final depasses = ((r['depasses'] as List?) ?? const []).map((x) => '$x').toList();
   final suivante = reussi && f != null && f['courante'] != null && f['courante'] != r['numero'] ? _n(f['courante']) : null;
   // La carte, au prochain affichage : la pirogue glisse, et la brume se lève si le bief est fini.
@@ -602,6 +630,7 @@ Future<void> resultatFleuve(Map r) async {
           reussi ? Btn("Rejouer pour plus d'étoiles", large: true, onTap: () => ouvrirEtapeFleuve(cle, _n(r['numero']))) : Btn.principal('Réessayer', large: true, onTap: () => ouvrirEtapeFleuve(cle, _n(r['numero']))),
           const Ecart(8),
         ],
+        if (!reussi && reste <= 0 && achat['prix'] != null) ...[_boutonPagaie(achat, () => ouvrirEtapeFleuve(cle, _n(r['numero']))), const Ecart(8)],
         Btn('Voir la carte', large: true, onTap: () => app.etatFleuve != null ? _afficherCarte(cle) : ouvrirFleuve(cle)),
       ]));
   app.maj();
