@@ -8,7 +8,9 @@ const SI = require('../../src/inter8-salle.js');
 const K = require('../../moteur/kopo-moteur.js');
 const { OBJECTIFS, creerSuivi } = require('./fleuve-suivi');
 
-const FLEUVES = { congo: 'kopo', niger: 'inter8' }; // le Congo se joue au Kopo, le Niger à l'Inter (8)
+// Le jeu de chaque fleuve : le Congo, le Kasaï et le Nil au Kopo ; le Niger et l'Oubangui à l'Inter (8).
+// Chaque fleuve a son interrupteur dans l'admin (réglage fleuve.fleuves) ; le Congo et le Niger sont ouverts au départ.
+const FLEUVES = { congo: 'kopo', niger: 'inter8', kasai: 'kopo', oubangui: 'inter8', nil: 'kopo' };
 const ETAPES_PAR_BIEF = 50;
 const ETAPES_PAR_VILLE = 10;
 const MOI = 'moi';

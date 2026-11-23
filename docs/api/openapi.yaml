@@ -884,7 +884,7 @@ paths:
       tags: [Le Fleuve]
       summary: 'Le Fleuve (Congo pour Kopo, Niger pour Inter (8)) : pagaies, étoiles, étapes visibles'
       description: |
-        Fermé tant que l'admin ne l'ouvre pas (`/config` donne `fleuve` : ferme, testeurs ou ouvert). 5 pagaies par jour (Kinshasa), communes
+        Fermé tant que l'admin ne l'ouvre pas (`/config` donne `fleuve` : ferme, testeurs ou ouvert). Cinq fleuves : congo, kasai, nil (Kopo) ; niger, oubangui (Inter (8)). Chacun a son interrupteur dans l'admin : `fleuves` ne contient que ceux ouverts à ce joueur (Kasaï, Oubangui et Nil éteints au départ). 5 pagaies par jour (Kinshasa), communes
         aux deux fleuves ; une pagaie se perd à chaque échec. Les étapes renvoyées vont jusqu'à la fin du bief en cours (50 étapes par bief,
         une escale toutes les 10). Pour jouer : salle temps réel `fleuve` (voir temps-reel.md).
       responses:
@@ -933,7 +933,7 @@ paths:
       tags: [Le Fleuve]
       summary: Une étape avant de jouer (objectif, robots, pièges, seuils des étoiles)
       parameters:
-        - { name: fleuve, in: path, required: true, schema: { enum: [congo, niger] } }
+        - { name: fleuve, in: path, required: true, schema: { enum: [congo, niger, kasai, oubangui, nil] } }
         - { name: numero, in: path, required: true, schema: { type: integer } }
       responses:
         '200':

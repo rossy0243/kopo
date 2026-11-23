@@ -101,14 +101,15 @@ class Accueil extends StatelessWidget {
     // Le Fleuve : le Congo pour Kopo, le Niger pour Inter (8). Visible quand l'admin l'ouvre (à tous ou aux testeurs).
     final ef = app.etatFleuve;
     final fleuves = ef != null && ef['ouvert'] == true ? ef['fleuves'] as Map? : null;
-    final fl = fleuves == null ? null : fleuves[inter ? 'niger' : 'congo'] as Map?;
+    final cleFleuve = fleuveDuJeu(inter ? 'inter8' : 'kopo');
+    final fl = fleuves == null ? null : fleuves[cleFleuve] as Map?;
     // L'étape du joueur en grand ; le fleuve et les étoiles en petit.
     final publie = fl != null && (fl['publiees'] as num? ?? 0) > 0;
     final resumeFleuve = fl == null ? null : publie ? "${fl['nom']} · ★ ${fl['etoiles']}" : "${fl['nom']} · bientôt";
     final etapeFleuve = !publie ? null : fl['courante'] != null ? ('Étape', '${fl['courante']}') : ('Tout', 'fait');
     return [
       CarteMode('creer', 'Créer une partie', creerSous, coin: '♠', creer: true, amis: app.amisEnLigne, onTap: garde(() => creer(), ouvertInter: true)),
-      if (resumeFleuve != null) CarteMode('fleuve', 'Le Fleuve', resumeFleuve, coin: '♠', ligne: true, grand: etapeFleuve, badge: badgeFleuve(), onTap: garde(() { fleuveVu(); ouvrirFleuve(inter ? 'niger' : 'congo'); }, ouvertInter: true)),
+      if (resumeFleuve != null) CarteMode('fleuve', 'Le Fleuve', resumeFleuve, coin: '♠', ligne: true, grand: etapeFleuve, badge: badgeFleuve(), onTap: garde(() { fleuveVu(); ouvrirFleuve(cleFleuve); }, ouvertInter: true)),
       // Match du jour et Bande : Kopo seulement, les cartes disparaissent avec Inter (8), comme sur le site.
       // Le Fleuve lancé : ils laissent la place au Fleuve.
       if (!inter && !app.fleuveLance) CarteMode('jour', 'Match du jour', resumeJour ?? 'La même partie pour tous', coin: '♦', point: app.pointJour, onTap: garde(ouvrirMatchJour)),

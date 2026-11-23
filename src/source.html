@@ -1014,6 +1014,11 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
 .fl-info b { color: var(--brass); }
 .fl-carte { position: relative; height: min(62vh, 560px); overflow-y: auto; border-radius: 14px; background: linear-gradient(#1a3b2a, #224a33 40%, #1d4130); border: 1px solid var(--line); overscroll-behavior: contain; }
 .fl-niger .fl-carte { background: linear-gradient(#3b3220, #4a3d24 40%, #3f3420); }
+.fl-kasai .fl-carte { background: linear-gradient(#3e2a1e, #4d3424 40%, #42301f); } /* terre rouge du Kasaï */
+.fl-oubangui .fl-carte { background: linear-gradient(#123224, #17402c 40%, #133827); } /* grande forêt */
+.fl-nil .fl-carte { background: linear-gradient(#4a3f26, #5a4c2c 40%, #4d4128); } /* désert */
+.fl-onglets { flex-wrap: wrap; }
+.fl-onglets button { flex: 1 1 30%; }
 .fl-fond { position: relative; margin: 0 auto; }
 .fl-fond svg { position: absolute; inset: 0; width: 100%; height: 100%; }
 .fl-eau { fill: none; stroke: #2f7fb4; stroke-width: 30; stroke-linecap: round; stroke-linejoin: round; }
@@ -5289,13 +5294,25 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   // Deux cartes à remonter étape par étape : le Congo (Kopo) et le Niger (Inter (8)). Chaque étape : une petite
   // partie contre des robots avec un objectif, 1 à 3 étoiles. 5 pagaies par jour : une se perd à chaque échec.
   // Une escale (une vraie ville) toutes les 10 étapes : son boss demande des étoiles. Le serveur décide de tout.
-  const FLEUVES = { congo: { nom: 'Congo', jeu: 'kopo', jeuNom: 'Kopo' }, niger: { nom: 'Niger', jeu: 'inter8', jeuNom: 'Inter (8)' } };
+  // Chaque fleuve a son interrupteur dans l'admin : seuls ceux que le serveur renvoie (etatFleuve.fleuves) sont montrés.
+  const FLEUVES = {
+    congo: { nom: 'Congo', jeu: 'kopo', jeuNom: 'Kopo' }, niger: { nom: 'Niger', jeu: 'inter8', jeuNom: 'Inter (8)' },
+    kasai: { nom: 'Kasaï', jeu: 'kopo', jeuNom: 'Kopo' }, oubangui: { nom: 'Oubangui', jeu: 'inter8', jeuNom: 'Inter (8)' }, nil: { nom: 'Nil', jeu: 'kopo', jeuNom: 'Kopo' },
+  };
+  // « le Congo », « l'Oubangui » ; « du Congo », « de l'Oubangui ».
+  const leF = (n) => (/^[AEIOUÉ]/.test(n) ? 'l\'' : 'le ') + n, duF = (n) => (/^[AEIOUÉ]/.test(n) ? 'de l\'' : 'du ') + n, LeF = (n) => leF(n)[0].toUpperCase() + leF(n).slice(1);
   const ROBOTS_NOMS = { faciles: 'Faciles', normaux: 'Normaux', forts: 'Forts' };
   const PAR_BIEF = 50;
   let etatFleuve = null, biefVu = {};
   // Animations à jouer au prochain affichage de la carte : la pirogue qui glisse, la brume qui se lève.
   const glisseFleuve = {}, brumeFleuve = {}, cadenasVu = {};
-  const fleuveDuJeu = () => (jeuChoisi() === 'inter8' ? 'niger' : 'congo');
+  // Le fleuve de l'accueil : pour le jeu choisi, le dernier fleuve ouvert par le joueur (s'il est encore allumé), sinon le premier.
+  function fleuveDuJeu() {
+    const jeu = jeuChoisi(), ouverts = Object.keys((etatFleuve && etatFleuve.fleuves) || {}).filter((k) => FLEUVES[k] && FLEUVES[k].jeu === jeu);
+    const dernier = (stock.lire('kopo-fleuve-dernier') || {})[jeu];
+    return ouverts.includes(dernier) ? dernier : ouverts[0] || (jeu === 'inter8' ? 'niger' : 'congo');
+  }
+  function retenirFleuve(cle) { if (!FLEUVES[cle]) return; const d = stock.lire('kopo-fleuve-dernier') || {}; d[FLEUVES[cle].jeu] = cle; stock.ecrire('kopo-fleuve-dernier', d); }
   const etoilesTexte = (n) => '★'.repeat(n) + '☆'.repeat(3 - n);
   function pastilleFleuve(texte) {
     let p = $('pillFleuve');
@@ -5367,7 +5384,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       for (const [k, t, x] of GUIDE_FLEUVE) liste.push([cibles[k], t, x.replace('{N}', N)]);
       vu.base = true;
     }
-    if (cle === 'niger' && !vu.niger) { liste.push([document.querySelector('#fenetre .ligue-onglets [aria-pressed="true"]'), 'Ici, on joue à l\'Inter (8).', 'Sur le Niger, chaque étape est une partie d\'Inter (8) contre des robots. Le Congo se joue au Kopo.']); vu.niger = true; }
+    if (FLEUVES[cle] && FLEUVES[cle].jeu === 'inter8' && !vu.niger) { liste.push([document.querySelector('#fenetre .ligue-onglets [aria-pressed="true"]'), 'Ici, on joue à l\'Inter (8).', `Sur ${leF(FLEUVES[cle].nom)}, chaque étape est une partie d'Inter (8) contre des robots. Le Congo se joue au Kopo.`]); vu.niger = true; }
     if (!liste.length) return;
     stock.ecrire('kopo-fleuve-guide', vu);
     setTimeout(() => bullesGuide(liste), sansAnim ? 0 : 500);
@@ -5378,7 +5395,11 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     const li = (b, t) => { const x = el('li'); const d = el('div'); d.append(el('b', null, b), ' ' + t); x.append(d); ul.append(x); };
     const N = (etatFleuve && etatFleuve.etoilesVille) ?? 20;
     li('Remonte le fleuve étape par étape.', 'Chaque étape est une petite partie contre des robots, avec un objectif. Réussis-le pour avancer, jusqu\'à 3 étoiles par étape.');
-    li('Deux fleuves.', 'Le Congo se joue au Kopo, le Niger à l\'Inter (8).');
+    // Les fleuves ouverts à ce joueur, rangés par jeu.
+    const ouverts = Object.keys((etatFleuve && etatFleuve.fleuves) || { congo: 1, niger: 1 }).filter((k) => FLEUVES[k]);
+    const liste = (jeu) => { const n = ouverts.filter((k) => FLEUVES[k].jeu === jeu).map((k) => leF(FLEUVES[k].nom)); return n.length > 1 ? n.slice(0, -1).join(', ') + ' et ' + n[n.length - 1] : n[0]; };
+    const kopo = liste('kopo'), inter = liste('inter8');
+    li(ouverts.length > 2 ? `${ouverts.length} fleuves.` : 'Deux fleuves.', [kopo && `${kopo[0].toUpperCase() + kopo.slice(1)} ${kopo.includes(' et ') ? 'se jouent' : 'se joue'} au Kopo`, inter && `${inter} à l'Inter (8)`].filter(Boolean).join(', ') + '.');
     li('5 pagaies par jour.', 'Réussir ne coûte rien, rater coûte 1 pagaie. Elles reviennent à minuit.');
     li(`Les villes : ${N} étoiles sur 30.`, 'Il les faut pour affronter le boss de la ville, la dernière étape, la plus dure. Il te manque des étoiles ? Rejoue une étape où tu n\'en as pas 3.');
     li('Tes amis rament avec toi.', 'Vois où ils en sont et passe devant. Le plus d\'étoiles de la semaine entre amis gagne la course.');
@@ -5392,7 +5413,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   function ficheAmiFleuve(cle, a) {
     const F = FLEUVES[cle], z = el('div', 'mj');
     const av = avatarFleuve(a); av.style.margin = '0 auto'; av.style.width = '56px'; av.style.height = '56px'; av.style.fontSize = '30px';
-    z.append(av, el('h2', null, a.pseudo), el('p', null, a.n === null ? `A fini tout le ${F.nom} ouvert pour l'instant.` : `Étape ${a.n} du ${F.nom} · ★ ${a.etoiles}`));
+    z.append(av, el('h2', null, a.pseudo), el('p', null, a.n === null ? `A fini tout ${leF(F.nom)} ouvert pour l'instant.` : `Étape ${a.n} ${duF(F.nom)} · ★ ${a.etoiles}`));
     const m = marquesEl(a); if (m) z.append(m);
     const retour = el('button', 'btn large', 'Retour à la carte'); retour.onclick = () => afficherCarteFleuve(cle);
     ouvrirFenetre([z, retour]);
@@ -5418,7 +5439,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   const finCourse = (ms) => (ms >= 2 * 864e5 ? `${Math.floor(ms / 864e5)} jours` : dureeLisible(ms));
   function partagerFleuve(cle) {
     const f = etatFleuve.fleuves[cle];
-    const ou = f.courante ? `je suis à ${f.ville}, étape ${f.courante}` : `j'ai fini tout le ${f.nom} ouvert`;
+    const ou = f.courante ? `je suis à ${f.ville}, étape ${f.courante}` : `j'ai fini tout ${leF(f.nom)} ouvert`;
     window.open('https://wa.me/?text=' + encodeURIComponent(`Masano · Le Fleuve : ${ou}, ${f.etoiles} étoiles. Tu me rattrapes ?\n${LIEN_SITE()}`), '_blank', 'noopener');
   }
   // Carte de l'accueil : visible quand le Fleuve est ouvert pour ce joueur.
@@ -5449,22 +5470,25 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     try { if (!(await compteEnLigne())) return; etatFleuve = await apiJoueur('/fleuve'); } catch (x) { return toast(x.message, 'echec'); }
     if (!etatFleuve.ouvert) return toast('Le Fleuve arrive bientôt.', 'alerte');
     if (!etatFleuve.google) return fenetreGoogle('Le Fleuve', 'Remonte le Congo et le Niger, étape par étape, et gagne des étoiles. Connecte-toi avec Google pour jouer : ta progression te suit sur tous tes téléphones.');
-    afficherCarteFleuve(fleuve || fleuveDuJeu());
+    if (!Object.keys(etatFleuve.fleuves || {}).length) return toast('Le Fleuve arrive bientôt.', 'alerte');
+    afficherCarteFleuve(fleuve && etatFleuve.fleuves[fleuve] ? fleuve : fleuveDuJeu());
   }
   window.ouvrirFleuve = ouvrirFleuve;
 
   function afficherCarteFleuve(cle) {
     const E = etatFleuve, f = E.fleuves[cle], F = FLEUVES[cle];
     const tete = el('div', 'fl-tete');
-    tete.append(el('h2', null, 'Le ' + F.nom), pagaiesEl(E.pagaies));
+    tete.append(el('h2', null, LeF(F.nom)), pagaiesEl(E.pagaies));
     const onglets = el('div', 'ligue-onglets');
-    for (const k of Object.keys(FLEUVES)) { const b = el('button', null, `${FLEUVES[k].nom} · ${FLEUVES[k].jeuNom}`); b.setAttribute('aria-pressed', String(k === cle)); b.onclick = () => afficherCarteFleuve(k); onglets.append(b); }
+    onglets.classList.add('fl-onglets');
+    for (const k of Object.keys(E.fleuves).filter((x) => FLEUVES[x])) { const b = el('button', null, `${FLEUVES[k].nom} · ${FLEUVES[k].jeuNom}`); b.setAttribute('aria-pressed', String(k === cle)); b.onclick = () => afficherCarteFleuve(k); onglets.append(b); }
+    retenirFleuve(cle);
     const info = el('div', 'fl-info');
     const gauche = el('span'); gauche.append('Étoiles ', el('b', null, '★ ' + f.etoiles));
     info.append(gauche, el('span', null, E.pagaies.restantes < E.pagaies.max ? `Nouvelles pagaies dans ${dureeLisible(E.pagaies.retourMs)}` : 'Une pagaie se perd à chaque échec'));
     const z = [tete, onglets, info];
     if (!f.publiees) {
-      z.push(el('p', null, `Le ${F.nom} ouvre bientôt. Reviens dans quelques jours !`));
+      z.push(el('p', null, `${LeF(F.nom)} ouvre bientôt. Reviens dans quelques jours !`));
     } else {
       const biefMax = Math.max(1, Math.ceil(f.etapes.length / PAR_BIEF));
       const bief = Math.min(biefMax, biefVu[cle] || f.bief);
@@ -5486,14 +5510,14 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       z.push(actions); if (m) z.push(m);
       z.push(nav, carte);
       ouvrirFenetre([...z, fermerBouton()], 'fleuve');
-      $('fenetre').classList.toggle('fl-niger', cle === 'niger');
+      for (const k of Object.keys(FLEUVES)) $('fenetre').classList.toggle('fl-' + k, k === cle && k !== 'congo');
       dessinerCarte(carte, cle, f, etapes);
       guideFleuve(cle, carte);
       return;
     }
     ouvrirFenetre([...z, fermerBouton()], 'fleuve');
   }
-  function fermerBouton() { const b = el('button', 'btn large', 'Fermer'); b.onclick = () => { fermerFenetre(); $('fenetre').classList.remove('fl-niger'); majCarteFleuve(false); }; return b; }
+  function fermerBouton() { const b = el('button', 'btn large', 'Fermer'); b.onclick = () => { fermerFenetre(); for (const k of Object.keys(FLEUVES)) $('fenetre').classList.remove('fl-' + k); majCarteFleuve(false); }; return b; }
 
   // La carte : le fleuve serpente de bas en haut (on le remonte depuis la mer), une étape tous les 74 px.
   function dessinerCarte(carte, cle, f, etapes) {
