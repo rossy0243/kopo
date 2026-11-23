@@ -14,6 +14,7 @@ import '../ecrans/accueil.dart' show dureeLisible;
 import '../etat.dart';
 import '../reseau/api.dart';
 import 'communes.dart';
+import 'progres.dart' show fenetreManquePieces;
 import 'social.dart' show messageErreur;
 
 const _fleuves = {
@@ -541,6 +542,8 @@ Widget _boutonPagaie(Map p, VoidCallback apres) {
         'Acheter une pagaie · ${App.formatPieces(_n(p['prix']))} pièces',
         large: true,
         onTap: occupe ? null : () async {
+          final prix = _n(p['prix']);
+          if (app.solde < prix) { fenetreManquePieces(prix - app.solde, 'pour cette pagaie'); return; }
           maj(() => occupe = true);
           try {
             final r = await Api.post('/fleuve/pagaie') as Map;

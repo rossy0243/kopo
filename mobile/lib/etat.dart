@@ -189,7 +189,7 @@ class App extends ChangeNotifier {
   static const annoncesMicro = 10;
   bool _annoncerMicro = false;
   void annoncerMicro() {
-    if (vue == null || fenetre != null) return; // pas par-dessus une autre fenêtre (elle ne compte pas)
+    if (vue == null || fenetre != null || Api.sansVitrinePlus) return; // pas par-dessus une autre fenêtre ; jamais dans la version App Store
     final n = (Stock.lire('kopo-annonce-micro') as num?)?.toInt() ?? 0;
     if (n >= annoncesMicro) return;
     Stock.ecrire('kopo-annonce-micro', n + 1);

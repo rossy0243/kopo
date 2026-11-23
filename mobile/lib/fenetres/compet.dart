@@ -188,6 +188,7 @@ Future<void> ouvrirParcours() async {
   final fini = (P['palier'] as num) >= (P['paliersMax'] as num);
   final xp = (P['xp'] as num).toInt(), xpPalier = (P['xpPalier'] as num).toInt();
   final plus = P['kopoPlus'] == true;
+  final voiePlus = plus || !Api.sansVitrinePlus;
   Widget caseRec(Map? r, int n, String voie, bool atteint) {
     if (r == null) return const SizedBox();
     final fait = r['recupere'] == true;
@@ -215,7 +216,8 @@ Future<void> ouvrirParcours() async {
           Muet(fini ? 'Terminé !' : '${xp % xpPalier}/$xpPalier XP', taille: 12),
         ]),
         const Ecart(10),
-        Row(children: [const SizedBox(width: 30), Expanded(child: Center(child: Muet('Gratuit'))), const SizedBox(width: 6), Expanded(child: Center(child: Muet(plus ? 'Kopo+ ✓' : 'Kopo+')))]),
+        // Version App Store : pas de voie Kopo+ verrouillée sous les yeux d'un non-membre (voir Api.sansVitrinePlus).
+        Row(children: [const SizedBox(width: 30), Expanded(child: Center(child: Muet('Gratuit'))), if (voiePlus) ...[const SizedBox(width: 6), Expanded(child: Center(child: Muet(plus ? 'Kopo+ ✓' : 'Kopo+')))]]),
         const Ecart(4),
         for (final x in ((P['paliers'] as List).cast<Map>()))
           Padding(
@@ -225,12 +227,14 @@ Future<void> ouvrirParcours() async {
               child: Row(children: [
                 SizedBox(width: 30, child: Text('${x['n']}', style: K.texte(14, couleur: x['atteint'] == true ? K.brass : K.muted, poids: FontWeight.w700))),
                 Expanded(child: caseRec(x['gratuit'] as Map?, (x['n'] as num).toInt(), 'gratuit', x['atteint'] == true)),
-                const SizedBox(width: 6),
-                Expanded(child: caseRec(x['plus'] as Map?, (x['n'] as num).toInt(), 'plus', x['atteint'] == true)),
+                if (voiePlus) ...[
+                  const SizedBox(width: 6),
+                  Expanded(child: caseRec(x['plus'] as Map?, (x['n'] as num).toInt(), 'plus', x['atteint'] == true)),
+                ],
               ]),
             ),
           ),
-        if (!plus) const Muet('Kopo+ (bientôt) : des apparences en plus sur le parcours. Jamais rien qui aide à gagner.', taille: 12),
+        if (!plus && voiePlus) const Muet('Voie Kopo+ : des apparences en plus pour les membres Kopo+. Jamais rien qui aide à gagner.', taille: 12),
         const Ecart(10),
         Btn.principal('Fermer', large: true, onTap: app.fermerFenetre),
       ]), 'ligue');

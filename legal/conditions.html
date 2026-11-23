@@ -4,7 +4,7 @@
 <body><main>
 <a class="logo" href="../"><img src="../icons/masano-logo.svg" alt="">MASANO</a>
 <h1>Conditions d'utilisation</h1>
-<p class="muted">Version du 9 novembre 2026</p>
+<p class="muted">Version du 23 novembre 2026</p>
 
 <h2>1. Qui édite Masano</h2>
 <p>Masano est une application de jeux de cartes en ligne (Kopo et Inter (8)) éditée à titre personnel par Rossy Mundyo Busyo, Kinshasa, République démocratique du Congo. Contact : <a href="mailto:contact@masano.online">contact@masano.online</a>.</p>
@@ -17,7 +17,7 @@
 <h2>3. Âge</h2>
 <ul>
 <li>Il faut avoir au moins <b>13 ans</b> pour jouer.</li>
-<li>Les achats (quand ils existeront) sont réservés aux personnes majeures, ou aux mineurs avec l'accord d'un parent.</li>
+<li>Les achats sont réservés aux personnes majeures, ou aux mineurs avec l'accord d'un parent.</li>
 </ul>
 
 <h2>4. Ton compte</h2>
@@ -42,10 +42,10 @@
 <li><b>Parrainage :</b> si un ami que tu invites crée un compte Google neuf avec ton lien et joue 5 parties entre humains dans le délai indiqué, vous recevez tous les deux des pièces. Le parrainage est limité par mois, et ne compte pas pour un compte déjà connu (par exemple supprimé puis recréé). Les parrainages obtenus par de faux comptes sont annulés.</li>
 </ul>
 
-<h2>6. Les achats (quand ils existeront)</h2>
+<h2>6. Les achats</h2>
 <ul>
-<li>Les achats porteront sur des pièces ou des objets précis, à <b>prix affiché toutes taxes comprises</b> avant de payer, sans tirage au hasard payant.</li>
-<li>Le paiement passe par la boutique de ton appareil (par exemple Google Play). Ses règles de paiement et de remboursement s'appliquent en plus des nôtres.</li>
+<li>Les achats sont facultatifs : tout le jeu se joue sans payer. Ils portent sur des bouquets de pièces ou sur l'abonnement Kopo+, à <b>prix affiché en francs congolais, toutes taxes comprises</b>, avant de payer, sans tirage au hasard payant.</li>
+<li>Le paiement se fait par mobile money. Kopo+ ne se renouvelle pas tout seul : il s'arrête à la fin de la durée payée (1 mois ou 1 an), sans rien à résilier.</li>
 <li>Ce que tu achètes est livré tout de suite dans ton compte. Si la loi de ton pays te donne un délai de rétractation, tu acceptes, en confirmant l'achat, que la livraison commence immédiatement et tu renonces ainsi à ce délai, dans la mesure où la loi le permet.</li>
 <li>Si un achat n'est pas arrivé ou a été débité deux fois, écris-nous avec la preuve de paiement : nous livrerons ce qui manque ou t'aiderons à obtenir le remboursement.</li>
 <li>Si tu supprimes ton compte, ou s'il est banni pour une faute grave (voir l'article 7), les pièces et objets qu'il contient sont perdus, même achetés, sauf si la loi en décide autrement.</li>
@@ -71,7 +71,7 @@
 <p>Si nous décidons d'arrêter Masano ou l'un de ses jeux, nous te prévenons dans le jeu au moins 30 jours avant, et nous arrêtons les ventes dès cette annonce. Si un seul jeu s'arrête, ton compte, tes pièces et tes objets restent utilisables dans les autres jeux de Masano.</p>
 
 <h2>10. Responsabilité</h2>
-<p>Masano est gratuit (les achats seront facultatifs), fourni « tel quel ». Dans la limite permise par la loi, l'éditeur n'est pas responsable des pertes indirectes (perte de pièces virtuelles à la suite d'une panne, coût de ta connexion, problèmes de ton appareil ou de ton réseau), ni des propos ou du comportement des autres joueurs.</p>
+<p>Masano est gratuit (les achats sont facultatifs), fourni « tel quel ». Dans la limite permise par la loi, l'éditeur n'est pas responsable des pertes indirectes (perte de pièces virtuelles à la suite d'une panne, coût de ta connexion, problèmes de ton appareil ou de ton réseau), ni des propos ou du comportement des autres joueurs.</p>
 <p>Rien dans ces conditions ne te prive des droits que la loi de ton pays t'accorde et auxquels on ne peut pas renoncer.</p>
 
 <h2>11. Propriété</h2>
@@ -88,4 +88,11 @@
 
 <h2>15. Divers</h2>
 <p>Si une partie de ces conditions est jugée non valable, le reste continue de s'appliquer. Le fait de ne pas appliquer une règle une fois ne nous empêche pas de l'appliquer plus tard. La version française de ces conditions fait foi.</p>
-</main></body></html>
+</main><script>
+// Ouverte depuis une appli des stores (?appli=1) : pas de lien vers le reste du site, seulement entre les pages légales.
+if (/[?&]appli=1/.test(location.search)) {
+  var logo = document.querySelector('a.logo'); if (logo) logo.removeAttribute('href');
+  document.querySelectorAll('a[href*=".html"]').forEach(function (a) { a.setAttribute('href', a.getAttribute('href').replace('.html', '.html?appli=1')); });
+}
+</script>
+</body></html>

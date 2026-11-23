@@ -2,6 +2,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../commun/apparences.dart';
 import '../commun/cartes.dart';
@@ -12,9 +13,10 @@ import '../commun/stock.dart';
 import '../commun/theme.dart';
 import '../etat.dart';
 import '../reseau/api.dart';
-import 'accueil_fenetres.dart' show montrerRegles;
+import 'accueil_fenetres.dart' show montrerRegles, fenetrePieces;
 import 'communes.dart';
 import 'compet.dart';
+import 'fleuve.dart' show ouvrirFleuve;
 import 'parametres.dart';
 import 'social.dart';
 import 'vocal_ui.dart';
@@ -322,7 +324,7 @@ class _ProfilState extends State<_Profil> {
           Text(titre ?? 'Petit nouveau', style: K.texte(14, couleur: K.brass).copyWith(fontStyle: FontStyle.italic)),
           Muet(depuis, taille: 12),
           // Kopo+ : la couronne et le micro ; un toucher ouvre l'abonnement (prix, date de fin).
-          if (app.enLigne)
+          if (app.enLigne && (plus || !Api.sansVitrinePlus))
             Padding(
               padding: const EdgeInsets.only(top: 6),
               child: GestureDetector(
@@ -333,7 +335,7 @@ class _ProfilState extends State<_Profil> {
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
                     CouronnePlus(taille: 14, couleur: plus ? K.encre : K.brass),
                     const SizedBox(width: 6),
-                    Flexible(child: Text(plus ? 'Kopo+ actif' : 'Passe à Kopo+ : le micro en partie', overflow: TextOverflow.ellipsis, style: K.texte(13, couleur: plus ? K.encre : K.brass, poids: FontWeight.w600))),
+                    Flexible(child: Text(plus ? 'Kopo+ actif' : Api.sansAchats ? 'Kopo+ : le micro en partie' : 'Passe à Kopo+ : le micro en partie', overflow: TextOverflow.ellipsis, style: K.texte(13, couleur: plus ? K.encre : K.brass, poids: FontWeight.w600))),
                   ]),
                 ),
               ),
@@ -413,7 +415,7 @@ Future<void> ouvrirBoutique() async {
   app.ouvrirFenetre((context) => Fenetre(titre: 'Boutique', enfants: [
         Row(children: [
           const Piece(taille: 26), const SizedBox(width: 8), Text(App.formatPieces(solde), style: K.titre(30)), const Spacer(),
-          if (!Api.sansAchats) Btn('+ Acheter des pièces', taille: 13, onTap: () => ouvrirAchatPieces(retour: ouvrirBoutique)),
+          if (!Api.sansAchats) Btn('+ Recharger', taille: 13, onTap: () => ouvrirAchatPieces(retour: ouvrirBoutique)),
         ]),
         const Muet("Des apparences seulement : rien n'aide à gagner. Les pièces se gagnent en jouant.", taille: 12),
         for (final cat in R.parCategorie(enVente)) ...[
@@ -515,24 +517,38 @@ void _acheterStickers(Map s, int solde, {String? sticker, String? pack, required
       ])), 'boutique');
 }
 
-// ---------------------------------------------------------------- acheter des pièces
-// Bouquets du moins cher (500 FC) au plus cher (40 000 FC), prix fixés par le serveur au taux des stickers
-// (200 pièces ≈ 500 FC), avec un bonus qui grandit avec le bouquet. Le paiement mobile money n'est pas encore branché.
-Future<void> ouvrirAchatPieces({VoidCallback? retour}) async {
-  if (Api.sansAchats) { app.toast('Les pièces se gagnent en jouant : missions, bonus du jour et parties en ligne.', Niv.info); return; }
-  Map B;
+// ---------------------------------------------------------------- Recharger (pièces et Kopo+)
+// Page « Recharger » (23/11), comme sur le site : bouquets de pièces du moins cher (500 FC) au plus cher (40 000 FC),
+// prix fixés par le serveur au taux des stickers (200 pièces ≈ 500 FC), et Kopo+. APK du site seulement : les versions
+// Google Play et App Store (Api.sansAchats) ne vendent rien et n'y mènent jamais.
+// Tant que le mobile money n'est pas branché : si le tableau de bord donne un numéro WhatsApp, toucher un choix ouvre
+// WhatsApp avec la commande toute prête (et le Pseudo#1234) ; l'admin encaisse et livre. Sinon « Bientôt ».
+Future<void> ouvrirAchatPieces({VoidCallback? retour}) => ouvrirRecharger(retour: retour);
+
+Future<void> ouvrirRecharger({VoidCallback? retour, bool plusDabord = false}) async {
+  if (Api.sansAchats) return;
+  Map R;
   try {
     if (!await app.compteEnLigneOuCreer()) { app.lirePseudo(); return; }
-    B = await Api.get('/bouquets') as Map;
+    R = await Api.get('/recharger') as Map;
   } catch (e) { app.toast(messageErreur(e), Niv.echec); return; }
-  app.soldeServeur(B['solde']);
-  app.ouvrirFenetre((context) => fenetreAchatPieces(B, retour: retour), 'boutique');
+  app.soldeServeur(R['solde']);
+  app.ouvrirFenetre((context) => fenetreRecharger(R, retour: retour, plusDabord: plusDabord), 'boutique');
+}
+
+String texteCommande(String compte, String quoi) => 'Bonjour Masano ! Je veux $quoi pour mon compte $compte. Comment je paie par mobile money ?';
+Future<void> commander(Map R, String quoi) async {
+  final n = R['whatsapp'];
+  if (Api.sansAchats || n is! String || n.isEmpty) { app.toast('Le paiement mobile money arrive bientôt.', Niv.alerte); return; }
+  final u = Uri.parse('https://wa.me/$n?text=${Uri.encodeComponent(texteCommande('${R['compte']}', quoi))}');
+  if (!await launchUrl(u, mode: LaunchMode.externalApplication)) app.toast("Impossible d'ouvrir WhatsApp.", Niv.echec);
 }
 
 /// La fenêtre elle-même (séparée pour les captures d'écran).
-Widget fenetreAchatPieces(Map B, {VoidCallback? retour}) {
+Widget fenetreRecharger(Map R, {VoidCallback? retour, bool plusDabord = false}) {
+  final B = (R['pieces'] as Map?) ?? const {};
+  final A = (R['kopoPlus'] as Map?) ?? const {};
   final liste = ((B['bouquets'] as List?) ?? const []).cast<Map>();
-  final paiement = B['paiement'] == true;
   final meilleur = liste.isEmpty ? null : liste.reduce((m, b) => (b['bonusPct'] as num) > (m['bonusPct'] as num) ? b : m);
   Widget tas(int n) => SizedBox(width: 50, height: 40, child: Stack(children: [
         for (var k = 0; k < n; k++) Positioned(left: k < 3 ? k * 12.0 : (k - 3) * 12.0 + 6, top: k < 3 ? 14 : 0, child: const Piece(taille: 24)),
@@ -569,7 +585,7 @@ Widget fenetreAchatPieces(Map B, {VoidCallback? retour}) {
         button: true,
         label: '${b['nom']} : ${b['pieces']} pièces pour ${b['francs']} francs congolais',
         child: GestureDetector(
-          onTap: () => app.toast(paiement ? 'Paiement mobile money : bientôt.' : 'Bouquet « ${b['nom']} » : le paiement mobile money arrive bientôt.', Niv.alerte),
+          onTap: () => commander(R, 'le bouquet « ${b['nom']} » (${App.formatPieces(b['pieces'] as num)} pièces, ${App.formatPieces(b['francs'] as num)} FC)'),
           child: Stack(clipBehavior: Clip.none, children: [
             carte,
             if (top)
@@ -583,15 +599,71 @@ Widget fenetreAchatPieces(Map B, {VoidCallback? retour}) {
       ),
     );
   }
-  return Fenetre(titre: 'Acheter des pièces', enfants: [
-    Row(mainAxisAlignment: MainAxisAlignment.center, children: [const Piece(taille: 26), const SizedBox(width: 8), Text(App.formatPieces((B['solde'] as num?) ?? app.solde), style: K.titre(30))]),
-    const Muet('Plus le bouquet est gros, plus il y a de pièces offertes. Des pièces pour les tables à mise, les apparences et les stickers ; elles ne se revendent pas.', taille: 12),
+  Widget titre(String t, {bool couronne = false}) => Padding(
+        padding: const EdgeInsets.only(top: 14, bottom: 6),
+        child: Row(children: [
+          if (couronne) ...[const CouronnePlus(taille: 16), const SizedBox(width: 6)],
+          Flexible(child: Text(t.toUpperCase(), style: K.texte(13, couleur: K.brass, poids: FontWeight.w700).copyWith(letterSpacing: 1.5))),
+        ]),
+      );
+  final pieces = <Widget>[
+    titre('Pièces'),
+    const Muet('Plus le bouquet est gros, plus il y a de pièces offertes. Pour les tables à mise, les apparences et les stickers ; elles ne se revendent pas.', taille: 12),
     for (final (i, b) in liste.indexed) ligne(i, b),
+  ];
+  final formules = ((A['formules'] as List?) ?? const []).cast<Map>();
+  final avantages = ((A['avantages'] as List?) ?? const []).map((e) => e.toString()).toList();
+  const icones = ['micro', 'couronne', 'cadeau'];
+  final plus = <Widget>[
+    titre('Kopo+ · le micro en partie', couronne: true),
+    if (A['actif'] == true && A['jusqu'] != null)
+      Padding(padding: const EdgeInsets.only(bottom: 6), child: Text("Tu es membre Kopo+ jusqu'au ${dateKopoPlus(A['jusqu'].toString())}. Tu peux prolonger :", style: K.texte(14, couleur: K.good, poids: FontWeight.w600))),
+    for (final (i, a) in avantages.indexed)
+      Padding(padding: const EdgeInsets.symmetric(vertical: 3), child: Row(children: [Ico(i < icones.length ? icones[i] : 'cadeau', taille: 18), const SizedBox(width: 8), Expanded(child: Text(a, style: K.texte(14)))])),
+    const Ecart(4),
+    Row(children: [for (final f in formules) carteFormule(f, onTap: () => commander(R, 'Kopo+ ${f['nom']} (${App.formatPieces(f['francs'] as num)} FC)'))]),
     const Ecart(8),
-    Muet(paiement ? 'Paiement en francs congolais par mobile money.' : 'Paiement en francs congolais (mobile money : M-Pesa, Orange Money, Airtel Money) : bientôt.', taille: 12),
+    const Muet("Kopo+ ne donne jamais d'avantage pour gagner.", taille: 12),
+  ];
+  final wa = R['whatsapp'] is String && (R['whatsapp'] as String).isNotEmpty;
+  return Fenetre(titre: 'Recharger', enfants: [
+    Row(mainAxisAlignment: MainAxisAlignment.center, children: [const Piece(taille: 26), const SizedBox(width: 8), Text(App.formatPieces((R['solde'] as num?) ?? app.solde), style: K.titre(30))]),
+    Muet("Compte ${R['compte'] ?? ''} · ce que tu prends arrive sur ce compte, sur le site comme dans l'appli.", taille: 12, align: TextAlign.center),
+    ...(plusDabord ? [...plus, ...pieces] : [...pieces, ...plus]),
+    const Ecart(12),
+    Muet(wa
+        ? "Touche ton choix : WhatsApp s'ouvre avec ta commande toute prête. Tu paies par mobile money (M-Pesa, Orange Money, Airtel Money) et tout arrive sur ton compte."
+        : 'Paiement en francs congolais (mobile money : M-Pesa, Orange Money, Airtel Money) : bientôt.', taille: 12),
     const Ecart(10),
+    Btn('Partager cette page', icone: 'partager', large: true, onTap: () => ouvrirWhatsApp('🪙 Recharge tes pièces Masano et passe à Kopo+ (le micro en partie) :\n${lienJeu.replaceAll(RegExp(r'#.*$'), '')}recharger/')),
+    const Ecart(8),
     Btn.principal(retour != null ? 'Retour' : 'Fermer', large: true, onTap: retour ?? app.fermerFenetre),
   ]);
+}
+
+// Plus assez de pièces (23/11), comme sur le site : d'abord les moyens gratuits d'en gagner, puis « Recharger mes
+// pièces » (APK du site). Dans les versions Google Play et App Store, la même fenêtre sans rien à acheter.
+void fenetreManquePieces(int manque, String pourQuoi, {VoidCallback? retour}) {
+  Widget ligne(String icone, String texte, VoidCallback? f) => InkWell(
+        onTap: f,
+        child: Padding(padding: const EdgeInsets.symmetric(vertical: 5), child: Row(children: [
+          Ico(icone, taille: 18), const SizedBox(width: 8),
+          Expanded(child: Text(texte, style: K.texte(14).copyWith(decoration: f != null ? TextDecoration.underline : null, decorationStyle: TextDecorationStyle.dotted, decorationColor: K.brass))),
+        ])),
+      );
+  app.ouvrirFenetre((context) => Fenetre(titre: 'Pas assez de pièces', enfants: [
+        Text('Il te manque ${App.formatPieces(manque)} pièce${manque > 1 ? 's' : ''} $pourQuoi.', textAlign: TextAlign.center, style: K.texte(15)),
+        const Ecart(10),
+        Text('GAGNE DES PIÈCES GRATUITEMENT', style: K.texte(13, couleur: K.brass, poids: FontWeight.w700).copyWith(letterSpacing: 1.5)),
+        const Ecart(4),
+        ligne('cadeau', 'Bonus du jour : reviens chaque jour, ta série fait grossir le cadeau.', () => fenetrePieces(null)),
+        if (app.fleuveLance) ligne('fleuve', 'Le Fleuve : chaque étoile et chaque ville rapportent des pièces.', () { app.fermerFenetre(); ouvrirFleuve(); }),
+        ligne('missions', 'Missions du jour et défi de la semaine.', () { app.fermerFenetre(); ouvrirMissions(); }),
+        ligne('enligne', 'Parties en ligne aux tables gratuites.', null),
+        const Ecart(12),
+        if (!Api.sansAchats) ...[Btn.principal('Recharger mes pièces', large: true, onTap: () => ouvrirRecharger(retour: retour)), const Ecart(8)],
+        Btn(retour != null ? 'Retour' : 'Fermer', large: true, onTap: retour ?? app.fermerFenetre),
+      ]), 'boutique');
 }
 
 Future<void> _equiperDepuisBoutique(String id) async {
@@ -612,9 +684,10 @@ void _confirmerAchat(Map o, int solde) {
         Center(child: apercuObjet(o['id'] as String, taille: 64)),
         const Ecart(10),
         if (prix > solde) ...[
-          Text('Il te manque ${App.formatPieces(prix - solde)} pièces pour $nomType ${o['nom']}. Missions, bonus du jour et parties en ligne en rapportent.', textAlign: TextAlign.center, style: K.texte(15)),
+          Text('Il te manque ${App.formatPieces(prix - solde)} pièces pour $nomType ${o['nom']}.', textAlign: TextAlign.center, style: K.texte(15)),
           const Ecart(12),
-          if (!Api.sansAchats) ...[Btn.principal('Acheter des pièces', large: true, onTap: () => ouvrirAchatPieces(retour: ouvrirBoutique)), const Ecart(8)],
+          Btn.principal('Gagner des pièces', large: true, onTap: () => fenetreManquePieces(prix - solde, 'pour $nomType ${o['nom']}', retour: ouvrirBoutique)),
+          const Ecart(8),
           Btn('Retour', large: true, onTap: ouvrirBoutique),
         ] else ...[
           Text('Acheter $nomType ${o['nom']} pour ${App.formatPieces(prix)} pièces ? Il te restera ${App.formatPieces(solde - prix)} pièces.', textAlign: TextAlign.center, style: K.texte(15)),

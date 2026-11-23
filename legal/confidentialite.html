@@ -83,4 +83,11 @@
 
 <h2>11. Changements</h2>
 <p>La date en haut de la page indique la dernière version. Si cette politique change de façon importante, nous te prévenons dans le jeu.</p>
-</main></body></html>
+</main><script>
+// Ouverte depuis une appli des stores (?appli=1) : pas de lien vers le reste du site, seulement entre les pages légales.
+if (/[?&]appli=1/.test(location.search)) {
+  var logo = document.querySelector('a.logo'); if (logo) logo.removeAttribute('href');
+  document.querySelectorAll('a[href*=".html"]').forEach(function (a) { a.setAttribute('href', a.getAttribute('href').replace('.html', '.html?appli=1')); });
+}
+</script>
+</body></html>

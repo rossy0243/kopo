@@ -19,6 +19,11 @@ class Api {
   /// est donc sans achats, même construite sans --dart-define=STORE=appstore (workflow ios.yml).
   static const store = String.fromEnvironment('STORE');
   static bool get sansAchats => store == 'play' || store == 'appstore' || (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS);
+  /// Version App Store : Kopo+ n'est jamais montré à un non-membre (ni micro verrouillé, ni invitation, ni voie Kopo+ du
+  /// parcours). Apple veut que ce qui se débloque dans une appli iPhone soit aussi en vente par l'App Store (règles 3.1.1
+  /// et 3.1.3(b)) : sans vitrine, l'appli ne fait que reconnaître ce que le compte a déjà (couronne, micro des membres).
+  /// Google Play accepte une appli « de consommation » : le micro reste visible avec un cadenas, sans prix ni lien.
+  static bool get sansVitrinePlus => store == 'appstore' || (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS);
   static String get plateforme => kIsWeb ? 'web' : (defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android');
   static Map<String, String> get entetes => {'X-Masano-Client': '$plateforme/$version'};
 

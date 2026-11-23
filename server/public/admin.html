@@ -1070,6 +1070,8 @@ const ONGLETS_REGLAGES = [
       { c: 'pot.maison', l: 'Maison (pièces détruites)', t: 'n', u: '%', min: 0, max: 100 }] },
   ] },
   { id: 'ventes', titre: 'Ventes', sections: [
+    { titre: 'Commandes par WhatsApp', aide: 'En attendant le mobile money : sur la page « Recharger » du site et de l\'APK, le joueur choisit un bouquet ou Kopo+ et t\'envoie un message WhatsApp tout prêt (avec son Pseudo#1234). Tu encaisses, puis tu livres dans Ventes et paiements. Vide : « Bientôt ». Jamais montré dans les applis Google Play et App Store.', champs: [
+      { c: 'achat.whatsapp', l: 'Numéro WhatsApp', a: 'Chiffres avec l\'indicatif, ex. 243812345678.', t: 'texte', nouveau: true }] },
     { titre: 'Kopo+ (micro, couronne)', champs: [
       { c: 'kopoPlus.mois', l: 'Prix d\'un mois', t: 'n', u: 'FC', min: 100, nouveau: true },
       { c: 'kopoPlus.an', l: 'Prix d\'un an', a: '« X mois offerts » se calcule tout seul.', t: 'n', u: 'FC', min: 100, nouveau: true }] },
