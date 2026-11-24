@@ -20,6 +20,7 @@ const AVANTAGES = [
   'Voie Kopo+ du parcours de saison (apparences en plus)',
 ];
 const ESSAI_JOURS = 7; // essai de bienvenue (19/11) : une fois par compte Google, lancé par le joueur
+const CADEAU_JOURS_MAX = 366; // Kopo+ offert par l'admin, en une fois
 const DUREE_JETON = 6 * 3600; // un jeton vocal tient 6 heures (une longue soirée de jeu)
 
 const erreur = (m, statut = 400) => Object.assign(new Error(m), { statut });
@@ -96,7 +97,7 @@ function creerAbonnement(base_, env = process.env) {
         await q.query("INSERT INTO abonnements (compte_id, formule, francs, jours, ref, jusqu) VALUES ($1, 'essai', 0, $2, 'Essai de bienvenue', $3)", [compte.id, ESSAI_JOURS, fin]);
         const date = new Date(fin).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', timeZone: 'Africa/Kinshasa' });
         await q.query("INSERT INTO notifications (compte_id, type, texte, donnees) VALUES ($1, 'cadeau', $2, $3)",
-          [compte.id, `Ton essai Kopo+ commence : micro et couronne dorée jusqu'au ${date}. Parle avec les autres abonnés de ta table !`, JSON.stringify({ abonnement: 'essai', jusqu: fin })]);
+          [compte.id, `Ton essai Kopo+ commence : micro et couronne dorée jusqu'au ${date}. Parle avec les autres abonnés de ta table !`, JSON.stringify({ abonnement: 'essai', jusqu: fin, message: `Essai Kopo+ jusqu'au ${date}` })]);
         return fin;
       });
       api.majSalles(compte.id, jusqu);
@@ -112,7 +113,7 @@ function creerAbonnement(base_, env = process.env) {
         const essai = c.kopo_plus_essai && new Date(c.kopo_plus_jusqu) - new Date(c.kopo_plus_essai) <= (ESSAI_JOURS + 1) * 864e5;
         const texte = (essai ? 'Ton essai Kopo+ se termine demain.' : 'Ton abonnement Kopo+ se termine demain.')
           + ` Pour garder le micro et la couronne : 2 500 FC le mois, ou 25 000 FC l'année (2 mois offerts).`;
-        await notifier(c.id, 'cadeau', texte, { abonnement: 'rappel', jusqu: c.kopo_plus_jusqu }).catch(() => {});
+        await notifier(c.id, 'cadeau', texte, { abonnement: 'rappel', jusqu: c.kopo_plus_jusqu, message: texte }).catch(() => {});
       }
       return l.length;
     },
@@ -141,10 +142,34 @@ function creerAbonnement(base_, env = process.env) {
         await q.query('INSERT INTO abonnements (compte_id, formule, francs, jours, ref, jusqu) VALUES ($1,$2,$3,$4,$5,$6)', [c.id, f.id, f.francs, f.jours, msg, fin]);
         const date = new Date(fin).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Africa/Kinshasa' });
         await q.query("INSERT INTO notifications (compte_id, type, texte, donnees) VALUES ($1, 'cadeau', $2, $3)",
-          [c.id, `Merci ! Ton abonnement Kopo+ (${f.nom}) est actif jusqu'au ${date}. Le micro est à toi.`, JSON.stringify({ abonnement: f.id, jusqu: fin })]);
+          [c.id, `Merci ! Ton abonnement Kopo+ (${f.nom}) est actif jusqu'au ${date}. Le micro est à toi.`, JSON.stringify({ abonnement: f.id, jusqu: fin, message: `Kopo+ (${f.nom}) actif jusqu'au ${date}. Le micro est à toi.` })]);
         return fin;
       });
       return { ok: true, jusqu, joueur: { id: c.id, nom: `${c.pseudo}#${c.numero}` }, formule: f };
+    },
+
+    // Tableau de bord : Kopo+ offert à un joueur, à tous ou à un groupe (mêmes cibles que les cadeaux de stickers),
+    // avec un message obligatoire qui s'affiche dans le jeu (site et appli : « Cadeau de l'équipe Masano : … »).
+    // Les jours s'ajoutent à ce qui reste (sinon à partir de maintenant). Une ligne 'cadeau' à 0 FC par joueur dans
+    // abonnements : elle s'annule comme une activation, sans compter dans les ventes. Tout ou rien.
+    async offrir({ cible, jours, message }, conditionCible) {
+      const n = Math.trunc(Number(jours));
+      if (!(n >= 1 && n <= CADEAU_JOURS_MAX)) throw erreur(`Entre 1 et ${CADEAU_JOURS_MAX} jours.`);
+      const msg = String(message || '').replace(/[<>]/g, '').replace(/\s+/g, ' ').trim();
+      if (msg.length < 5 || msg.length > 200) throw erreur('Écris aux joueurs pourquoi tu leur offres Kopo+ (5 à 200 caractères).');
+      const c = await conditionCible(base_, cible);
+      const lignes = await base_.transaction(async (q) => {
+        const r = (await q.query(`UPDATE comptes c SET kopo_plus_jusqu = GREATEST(COALESCE(c.kopo_plus_jusqu, now()), now()) + make_interval(days => ${n})
+          WHERE ${c.sql} RETURNING c.id, c.kopo_plus_jusqu`, c.params)).rows;
+        if (!r.length) throw erreur('Aucun joueur dans cette cible.');
+        const ids = r.map((l) => l.id), fins = r.map((l) => l.kopo_plus_jusqu);
+        await q.query("INSERT INTO abonnements (compte_id, formule, francs, jours, ref, jusqu) SELECT x, 'cadeau', 0, $3, $4, y FROM unnest($1::text[], $2::timestamptz[]) AS t(x, y)", [ids, fins, n, msg]);
+        await q.query("INSERT INTO notifications (compte_id, type, texte, donnees) SELECT x, 'cadeau', '🎁 ' || $3 || ' Kopo+ prolongé de ' || $4::int || ' jours, jusqu''au ' || to_char(y AT TIME ZONE 'Africa/Kinshasa', 'DD/MM/YYYY') || '.', json_build_object('abonnement', 'cadeau', 'jours', $4::int, 'jusqu', y, 'message', $3 || ' (+' || $4::int || ' jours de Kopo+)')::jsonb FROM unnest($1::text[], $2::timestamptz[]) AS t(x, y)",
+          [ids, fins, msg, n]);
+        return r;
+      });
+      for (const l of lignes) api.majSalles(l.id, l.kopo_plus_jusqu);
+      return { ok: true, joueurs: lignes.length, jours: n, ids: lignes.map((l) => l.id), cible: c.resume, message: msg };
     },
 
     // Tableau de bord : annuler une activation (essai, erreur). Ses jours sont retirés de la date de fin (plus d'abonnement
@@ -190,11 +215,12 @@ function creerAbonnement(base_, env = process.env) {
     // Tableau de bord : formules, abonnés en cours, francs encaissés sur 30 jours, dernières activations.
     async resumeAdmin() {
       const actifs = (await base_.query("SELECT count(*)::int AS n FROM comptes WHERE kopo_plus_jusqu > now() AND statut = 'actif'")).rows[0].n;
-      const mois = (await base_.query("SELECT COALESCE(sum(francs), 0)::int AS f, count(*)::int AS n FROM abonnements WHERE cree_le > now() - interval '30 days' AND annule_le IS NULL AND formule <> 'essai'")).rows[0];
-      const activations = (await base_.query(`SELECT a.id::int AS id, a.formule, a.francs, a.ref, a.jusqu, a.cree_le, a.annule_le, c.id AS compte, c.pseudo, c.numero
+      const mois = (await base_.query("SELECT COALESCE(sum(francs), 0)::int AS f, count(*)::int AS n FROM abonnements WHERE cree_le > now() - interval '30 days' AND annule_le IS NULL AND formule NOT IN ('essai', 'cadeau')")).rows[0];
+      const activations = (await base_.query(`SELECT a.id::int AS id, a.formule, a.francs, a.jours, a.ref, a.jusqu, a.cree_le, a.annule_le, c.id AS compte, c.pseudo, c.numero
         FROM abonnements a JOIN comptes c ON c.id = a.compte_id ORDER BY a.id DESC LIMIT 30`)).rows;
       const essais30j = (await base_.query("SELECT count(*)::int AS n FROM abonnements WHERE formule = 'essai' AND cree_le > now() - interval '30 days'")).rows[0].n;
-      return { ...offre(), essaiJours: ESSAI_JOURS, actifs, francs30j: mois.f, activations30j: mois.n, essais30j, activations };
+      const cadeaux30j = (await base_.query("SELECT count(*)::int AS n FROM abonnements WHERE formule = 'cadeau' AND annule_le IS NULL AND cree_le > now() - interval '30 days'")).rows[0].n;
+      return { ...offre(), essaiJours: ESSAI_JOURS, actifs, francs30j: mois.f, activations30j: mois.n, essais30j, cadeaux30j, cadeauJoursMax: CADEAU_JOURS_MAX, activations };
     },
 
     // Tableau de bord : LiveKit accepte-t-il nos réglages ? Un jeton d'essai est présenté à /rtc/validate du serveur vocal.

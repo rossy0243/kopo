@@ -231,7 +231,7 @@ async function bouquetsAdmin() {
       ${B.bouquets.map((b) => `<tr><td>${esc(b.nom)}</td><td class="n">${nb(b.francs)} FC</td><td class="n">${nb(b.pieces)}</td><td class="n">${b.bonus ? `+${nb(b.bonus)} <span class="muted">(${b.bonusPct} %)</span>` : '<span class="muted">—</span>'}</td></tr>`).join('')}</table>
       <p class="muted" style="margin:8px 0 0">Même taux que les stickers : 200 pièces ≈ 500 FC. Plus le bouquet est gros, plus le bonus monte. Les joueurs voient ces bouquets dans « Acheter des pièces » ; le paiement mobile money n'est pas encore branché (« Bientôt »).</p></div>
     <div class="carte"><b>Livrer un bouquet</b> <span class="muted">(paiement mobile money reçu à la main)</span>
-      <div class="ligne"><input id="bqJoueur" placeholder="Pseudo#1234" style="width:180px"><select id="bqQuoi">${B.bouquets.map((b) => `<option value="${b.id}">${esc(b.nom)} · ${nb(b.francs)} FC → ${nb(b.pieces)} pièces</option>`).join('')}</select>
+      <div class="ligne"><input id="bqJoueur" data-joueurs autocomplete="off" placeholder="Pseudo#1234" style="width:180px"><select id="bqQuoi">${B.bouquets.map((b) => `<option value="${b.id}">${esc(b.nom)} · ${nb(b.francs)} FC → ${nb(b.pieces)} pièces</option>`).join('')}</select>
         <input id="bqRef" placeholder="Référence (ex. n° de transaction)" style="flex:1;min-width:200px"><button class="btn principal" id="bqLivrer">Livrer</button></div>
       <p class="muted" style="margin:6px 0 0">Le joueur reçoit les pièces et une notification « Merci ! Ton bouquet est arrivé ». Noté au Journal.</p></div>
     <div class="carte"><table><tr><th>Date</th><th>Joueur</th><th class="n">Pièces</th><th>Référence</th></tr>
@@ -250,11 +250,22 @@ async function abonnementsAdmin() {
       <table><tr><th>Formule</th><th class="n">Prix</th><th class="n">Durée</th></tr>${A.formules.map((f) => `<tr><td>${esc(f.nom)}${f.note ? ` <span class="muted">(${esc(f.note)})</span>` : ''}</td><td class="n">${nb(f.francs)} FC</td><td class="n">${nb(f.jours)} jours</td></tr>`).join('')}</table>
       <p class="muted" style="margin:8px 0 0">Kopo+ donne le micro en salle (seuls les abonnés parlent et s'entendent), la couronne dorée et la voie Kopo+ du parcours. <span id="abLivekit">${A.micro ? 'Serveur vocal LiveKit : vérification…' : '<b>Micro éteint</b> : LIVEKIT_URL, LIVEKIT_API_KEY et LIVEKIT_API_SECRET absents sur Render.'}</span> Paiement mobile money pas encore branché.</p></div>
     <div class="carte"><b>Activer un abonnement</b> <span class="muted">(paiement mobile money reçu à la main)</span>
-      <div class="ligne"><input id="abJoueur" placeholder="Pseudo#1234" style="width:180px"><select id="abQuoi">${A.formules.map((f) => `<option value="${esc(f.id)}">${esc(f.nom)} · ${nb(f.francs)} FC</option>`).join('')}</select>
+      <div class="ligne"><input id="abJoueur" data-joueurs autocomplete="off" placeholder="Pseudo#1234" style="width:180px"><select id="abQuoi">${A.formules.map((f) => `<option value="${esc(f.id)}">${esc(f.nom)} · ${nb(f.francs)} FC</option>`).join('')}</select>
       <input id="abRef" placeholder="Référence du paiement" style="width:200px"><button class="btn" id="abActiver">Activer</button></div>
       <p class="muted" style="margin:6px 0 0">S'il reste des jours, la nouvelle période s'ajoute à la fin. Le joueur reçoit une notification ; la couronne apparaît tout de suite à sa table. Noté au Journal.</p></div>
+    <div class="carte"><b>Offrir ou prolonger Kopo+</b> <span class="muted">(gratuit : remerciement, excuses après une panne, cadeau de lancement…)</span>
+      <div class="ligne"><b style="width:90px">À qui</b><select id="kpCible"><option value="joueur">Un joueur</option><option value="tous">Tous les joueurs</option><option value="groupe">Un groupe de joueurs</option></select>
+        <input id="kpJoueur" data-joueurs autocomplete="off" placeholder="Pseudo#1234" style="min-width:200px"></div>
+      <div id="kpGroupe" hidden><p class="muted" style="margin:4px 0">Coche un ou plusieurs critères : le groupe, ce sont les joueurs qui les remplissent tous. « Abonnés Kopo+ » seul = prolonger les abonnés actuels.</p>
+        ${A.criteres.map((x) => `<div class="ligne" style="margin:4px 0"><label style="display:flex;gap:8px;align-items:center;min-width:330px"><input type="checkbox" data-kp-critere="${x.id}">${esc(x.texte)}</label>${x.n ? `<input type="number" data-kp-n="${x.id}" min="${x.n[0]}" max="${x.n[1]}" value="${{ anciennete: 30, nouveaux: 7, actifs: 7, absents: 14, parties: 10, parrains: 1 }[x.id] || x.n[0]}" style="width:90px"> <span class="muted">${x.id === 'parties' ? 'parties' : x.id === 'parrains' ? 'amis' : 'jours'}</span>` : x.pays ? `<input data-kp-pays="${x.id}" value="CD" maxlength="2" style="width:60px">` : ''}</div>`).join('')}</div>
+      <div class="ligne"><b style="width:90px">Combien</b><input id="kpJoursOff" type="number" min="1" max="${A.cadeauJoursMax}" value="7" style="width:90px"> <span class="muted">jours, ajoutés à ce qui reste à chacun</span></div>
+      <div class="ligne"><b style="width:90px">Pourquoi</b><textarea id="kpMessage" rows="2" maxlength="200" placeholder="Message montré aux joueurs (obligatoire), ex. Merci pour votre patience pendant la panne !" style="flex:1;min-width:280px"></textarea></div>
+      <div class="ligne"><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="kpPush" checked>Envoyer aussi une notification sur le téléphone (joueurs qui ont gardé « Annonces de Masano »)</label></div>
+      <p class="muted" id="kpApercu" style="margin:6px 0"></p>
+      <div class="ligne"><button class="btn" id="kpCompter">Compter les joueurs</button><span id="kpCompte" class="muted"></span><span style="flex:1"></span><button class="btn principal" id="kpOffrir">Offrir Kopo+</button></div>
+      <p class="muted" style="margin:6px 0 0">Rien à mettre à jour dans l'appli : le micro et la couronne arrivent tout de suite. Chaque joueur a une ligne « Offert » ci-dessous (0 FC, hors des ventes), annulable une par une.${A.cadeaux30j ? ` ${nb(A.cadeaux30j)} offert${A.cadeaux30j > 1 ? 's' : ''} sur 30 jours.` : ''}</p></div>
     <div class="carte"><table><tr><th>Date</th><th>Joueur</th><th>Formule</th><th class="n">Prix</th><th>Jusqu'au</th><th>Référence</th><th></th></tr>
-      ${lignes('abActivations', A.activations, (l) => `<tr${l.annule_le ? ' class="muted"' : ''}><td>${date(l.cree_le)}</td><td><button class="lien" data-joueur="${esc(l.compte)}">${esc(l.pseudo)}#${esc(l.numero)}</button></td><td>${l.formule === 'an' ? '1 an' : l.formule === 'essai' ? 'Essai gratuit' : '1 mois'}</td><td class="n">${l.annule_le ? `<s>${nb(l.francs)} FC</s>` : nb(l.francs) + ' FC'}</td><td>${date(l.jusqu)}</td><td>${esc(l.ref || '')}</td><td>${l.annule_le ? 'Annulée le ' + date(l.annule_le) : `<button class="btn" data-ab-annuler="${l.id}" data-ab-nom="${esc(l.pseudo)}#${esc(l.numero)}" data-ab-jours="${l.formule === 'an' ? 365 : l.formule === 'essai' ? A.essaiJours : 30}">Annuler</button>`}</td></tr>`, { par: 10, colonnes: 7, vide: '<tr><td class="muted" colspan="7">Aucun abonnement activé pour l\'instant.</td></tr>' })}</table></div>`;
+      ${lignes('abActivations', A.activations, (l) => `<tr${l.annule_le ? ' class="muted"' : ''}><td>${date(l.cree_le)}</td><td><button class="lien" data-joueur="${esc(l.compte)}">${esc(l.pseudo)}#${esc(l.numero)}</button></td><td>${l.formule === 'an' ? '1 an' : l.formule === 'essai' ? 'Essai gratuit' : l.formule === 'cadeau' ? `Offert (${nb(l.jours)} j)` : '1 mois'}</td><td class="n">${l.annule_le ? `<s>${nb(l.francs)} FC</s>` : nb(l.francs) + ' FC'}</td><td>${date(l.jusqu)}</td><td>${esc(l.ref || '')}</td><td>${l.annule_le ? 'Annulée le ' + date(l.annule_le) : `<button class="btn" data-ab-annuler="${l.id}" data-ab-nom="${esc(l.pseudo)}#${esc(l.numero)}" data-ab-jours="${l.jours || (l.formule === 'an' ? 365 : l.formule === 'essai' ? A.essaiJours : 30)}">Annuler</button>`}</td></tr>`, { par: 10, colonnes: 7, vide: '<tr><td class="muted" colspan="7">Aucun abonnement activé pour l\'instant.</td></tr>' })}</table></div>`;
   $('#abonnements').onclick = async (ev) => {
     const b = ev.target.closest('[data-ab-annuler]');
     if (!b) return;
@@ -262,6 +273,41 @@ async function abonnementsAdmin() {
     try { const r = await api(`/abonnements/${b.dataset.abAnnuler}/annuler`, { methode: 'POST' }); message(r.jusqu ? `Activation annulée. ${r.joueur} garde Kopo+ jusqu'au ${date(r.jusqu)}.` : `Activation annulée. ${r.joueur} n'a plus Kopo+.`); aller('ventes'); } catch (e) { message(e.message); }
   };
   if (A.micro) api('/abonnements/livekit').then((v) => { const e = $('#abLivekit'); if (e) e.innerHTML = v.ok ? `<b class="ok">Serveur vocal LiveKit joignable, clé acceptée</b> (${esc(v.url)}).` : `<b class="ko">Micro en panne</b> : ${esc(v.raison)}`; }).catch(() => {});
+  const kpCible = () => {
+    const t = $('#kpCible').value;
+    if (t === 'joueur') return { type: 'joueur', joueur: $('#kpJoueur').value.trim() };
+    if (t === 'tous') return { type: 'tous' };
+    const criteres = {};
+    $('#abonnements').querySelectorAll('[data-kp-critere]').forEach((b) => {
+      if (!b.checked) return;
+      const k = b.dataset.kpCritere, n = $(`[data-kp-n="${k}"]`), p = $(`[data-kp-pays="${k}"]`);
+      criteres[k] = n ? Number(n.value) : p ? p.value.trim() : true;
+    });
+    return { type: 'groupe', criteres };
+  };
+  const kpApercu = () => {
+    $('#kpJoueur').hidden = $('#kpCible').value !== 'joueur';
+    $('#kpGroupe').hidden = $('#kpCible').value !== 'groupe';
+    const n = Number($('#kpJoursOff').value) || 0, m = $('#kpMessage').value.trim();
+    $('#kpApercu').textContent = `Les joueurs verront : Cadeau de l'équipe Masano : ${m || '(ton message)'} (+${n} jours de Kopo+)`;
+    $('#kpCompte').textContent = '';
+  };
+  $('#abonnements').querySelectorAll('#kpCible, #kpJoueur, #kpJoursOff, #kpMessage, [data-kp-critere], [data-kp-n], [data-kp-pays]').forEach((x) => (x.oninput = x.onchange = kpApercu));
+  kpApercu();
+  const kpCompter = () => api('/abonnements/compter', { methode: 'POST', corps: { cible: kpCible() } });
+  $('#kpCompter').onclick = async () => { try { const r = await kpCompter(); $('#kpCompte').textContent = !r.joueurs ? 'Aucun joueur dans cette cible.' : r.joueurs === 1 ? '1 joueur recevra Kopo+.' : `${nb(r.joueurs)} joueurs recevront Kopo+.`; } catch (e) { message(e.message); } };
+  $('#kpOffrir').onclick = async () => {
+    try {
+      if ($('#kpMessage').value.trim().length < 5) return message('Écris aux joueurs pourquoi tu leur offres Kopo+.');
+      const n = Number($('#kpJoursOff').value);
+      const k = await kpCompter();
+      if (!k.joueurs) return message('Aucun joueur dans cette cible.');
+      if (!confirm(`Offrir ${nb(n)} jour${n > 1 ? 's' : ''} de Kopo+ à ${nb(k.joueurs)} joueur${k.joueurs > 1 ? 's' : ''} ?`)) return;
+      const r = await api('/abonnements/offrir', { methode: 'POST', corps: { cible: kpCible(), jours: n, message: $('#kpMessage').value, push: $('#kpPush').checked } });
+      const p = r.push ? (r.push.erreur ? ` Notification : ${r.push.erreur}` : ` Notification envoyée à ${nb(r.push.joueurs)} joueur${r.push.joueurs > 1 ? 's' : ''}.`) : '';
+      message(`Kopo+ offert à ${nb(r.joueurs)} joueur${r.joueurs > 1 ? 's' : ''} (+${nb(r.jours)} jours).${p}`); aller('ventes');
+    } catch (e) { message(e.message); }
+  };
   $('#abActiver').onclick = async () => {
     const f = A.formules.find((x) => x.id === $('#abQuoi').value), j = $('#abJoueur').value.trim();
     if (!/#\d{4}$/.test(j)) return message('Écris le joueur sous la forme Pseudo#1234.');
@@ -488,7 +534,7 @@ const afficher = {
   },
 
   async joueurs(q = '', filtre = 'tous') {
-    $('#contenu').innerHTML = `<h2>Joueurs</h2><div id="comptage"></div><div class="ligne"><input id="recherche" placeholder="Pseudo, Pseudo#1234, e-mail ou identifiant" value="${esc(q)}" style="min-width:300px"><select id="filtre">${[['tous', 'Tous les joueurs'], ['google', 'Connectés avec Google'], ['invite', 'Invités (non connectés)']].map(([v, t]) => `<option value="${v}"${v === filtre ? ' selected' : ''}>${t}</option>`).join('')}</select><button class="btn principal" id="btnRecherche">Chercher</button></div><div id="resultats"></div>`;
+    $('#contenu').innerHTML = `<h2>Joueurs</h2><div id="comptage"></div><div class="ligne"><input id="recherche" data-joueurs autocomplete="off" placeholder="Pseudo, Pseudo#1234, e-mail ou identifiant" value="${esc(q)}" style="min-width:300px"><select id="filtre">${[['tous', 'Tous les joueurs'], ['google', 'Connectés avec Google'], ['invite', 'Invités (non connectés)']].map(([v, t]) => `<option value="${v}"${v === filtre ? ' selected' : ''}>${t}</option>`).join('')}</select><button class="btn principal" id="btnRecherche">Chercher</button></div><div id="resultats"></div>`;
     const go = async () => {
       const r = await api('/joueurs?q=' + encodeURIComponent($('#recherche').value) + '&filtre=' + encodeURIComponent($('#filtre').value));
       const k = r.comptage, l = r.joueurs;
@@ -591,7 +637,7 @@ const afficher = {
       <h3>Offrir des stickers</h3>
       <div class="carte">
         <div class="ligne"><b style="width:90px">À qui</b><select id="stCible"><option value="joueur">Un joueur</option><option value="tous">Tous les joueurs</option><option value="groupe">Un groupe de joueurs</option></select>
-          <input id="stJoueur" placeholder="Pseudo#1234" value="${esc(joueur)}" style="min-width:200px"></div>
+          <input id="stJoueur" data-joueurs autocomplete="off" placeholder="Pseudo#1234" value="${esc(joueur)}" style="min-width:200px"></div>
         <div id="stGroupe" hidden><p class="muted" style="margin:4px 0">Coche un ou plusieurs critères : le groupe, ce sont les joueurs qui les remplissent tous.</p>
           ${S.criteres.map((x) => `<div class="ligne" style="margin:4px 0"><label style="display:flex;gap:8px;align-items:center;min-width:330px"><input type="checkbox" data-critere="${x.id}">${esc(x.texte)}</label>${x.n ? `<input type="number" data-n="${x.id}" min="${x.n[0]}" max="${x.n[1]}" value="${{ anciennete: 30, nouveaux: 7, actifs: 7, absents: 14, parties: 10, parrains: 1 }[x.id] || x.n[0]}" style="width:90px"> <span class="muted">${x.id === 'parties' ? 'parties' : x.id === 'parrains' ? 'amis' : 'jours'}</span>` : x.pays ? `<input data-pays="${x.id}" value="CD" maxlength="2" style="width:60px">` : ''}</div>`).join('')}</div>
         <div class="ligne"><b style="width:90px">Quoi</b><select id="stQuoi">${S.packs.map((p) => `<option value="pack:${p.id}">Pack ${esc(p.nom)} (${p.stickers.length} sticker${p.stickers.length > 1 ? 's' : ''})</option>`).join('')}${S.stickers.map((x) => `<option value="sticker:${x.id}">${esc(x.nom)} (${esc(nomPack[x.pack])})</option>`).join('')}</select>
@@ -682,7 +728,7 @@ const afficher = {
         <div class="ligne"><input id="pushTitre" maxlength="60" placeholder="Titre (ex. Tournoi ce soir)" style="flex:1;min-width:220px"></div>
         <div class="ligne"><textarea id="pushTexte" maxlength="200" rows="3" placeholder="Texte (200 caractères au plus)" style="flex:1;min-width:220px;font-size:16px"></textarea></div>
         <div class="ligne"><label>Public <input id="pushPays" maxlength="2" placeholder="Pays (CD, CI…), vide = tous" style="width:220px"></label><button class="btn" id="btnPushCompter">Combien de joueurs ?</button><span id="pushCompte" class="muted"></span></div>
-        <div class="ligne"><input id="pushEssai" placeholder="Ton identifiant (Pseudo#1234)" style="width:240px"><button class="btn" id="btnPushEssai">M'envoyer un essai</button></div>
+        <div class="ligne"><input id="pushEssai" data-joueurs autocomplete="off" placeholder="Ton identifiant (Pseudo#1234)" style="width:240px"><button class="btn" id="btnPushEssai">M'envoyer un essai</button></div>
         <div class="ligne"><button class="btn principal" id="btnPushEnvoyer">Envoyer maintenant</button><span class="muted">ou</span><input type="datetime-local" id="pushQuand" aria-label="Date d'envoi (heure de Kinshasa)"><button class="btn" id="btnPushProgrammer">Programmer</button><span class="muted">heure de Kinshasa</span></div></div>
       <div class="carte"><h3>Programmées</h3><div id="programmees"></div></div>
       <div class="carte"><h3>Annonces envoyées</h3><div class="defile"><table><tr><th>Date</th><th>Titre</th><th>Texte</th><th>Public</th><th class="n">Joueurs</th><th class="n">Reçues</th></tr>
@@ -1419,6 +1465,35 @@ function suggestionsTesteurs(inp) {
     }, 250);
   });
 }
+// Suggestions de joueurs dans tous les champs qui attendent un joueur (attribut data-joueurs) : dès 2 lettres, les
+// comptes qui ressemblent (pseudo, e-mail, identifiant), à choisir sous la forme Pseudo#1234.
+(() => {
+  let minuteur = null, n = 0;
+  document.addEventListener('input', (ev) => {
+    const inp = ev.target;
+    if (!(inp instanceof HTMLInputElement) || !inp.hasAttribute('data-joueurs')) return;
+    if (!inp.list) {
+      const l = document.createElement('datalist');
+      l.id = 'suggestionsJoueurs' + (++n);
+      inp.after(l); inp.setAttribute('list', l.id);
+    }
+    const liste = inp.list, mot = inp.value.trim();
+    clearTimeout(minuteur);
+    if (mot.length < 2 || /#\d{4}$/.test(mot)) return liste.replaceChildren();
+    minuteur = setTimeout(async () => {
+      try {
+        const r = await api('/joueurs?q=' + encodeURIComponent(mot.replace(/#\d{0,3}$/, '')));
+        if (inp.value.trim() !== mot) return;
+        liste.replaceChildren(...r.joueurs.filter((j) => j.statut !== 'supprime').slice(0, 10).map((j) => {
+          const o = document.createElement('option');
+          o.value = `${j.pseudo}#${j.numero}`;
+          o.label = [j.kopoPlus ? 'Kopo+' : '', j.lie ? 'Google' : 'invité', j.email || '', j.statut !== 'actif' ? j.statut : ''].filter(Boolean).join(' · ');
+          return o;
+        }));
+      } catch (e) {}
+    }, 250);
+  });
+})();
 // Groupes de la communauté : une ligne par groupe (réseau, nom, lien, visible), qu'on monte, descend ou supprime.
 function groupesCommunaute(liste) {
   const RESEAUX = [['whatsapp', 'WhatsApp'], ['telegram', 'Telegram'], ['facebook', 'Facebook'], ['instagram', 'Instagram'], ['tiktok', 'TikTok'], ['youtube', 'YouTube'], ['x', 'X'], ['discord', 'Discord'], ['autre', 'Autre']];
