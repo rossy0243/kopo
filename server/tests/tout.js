@@ -2534,6 +2534,16 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     const bon = [...Array(50)].map((_, i) => ({ reussi: i >= 25, score: i }));
     assert.deepStrictEqual(FG.seuilsDe(bon), FG.seuilsDe(bon.map((r) => ({ score: r.score }))));
     assert.strictEqual(FS.texteObjectif({ type: 'manches', n: 3 }), 'Qualifie-toi pour 3 manches');
+    // Vrai joueur : il sort le premier du duel final pendant son coup ; l'étape (2 manches au plus) s'arrête avant
+    // que la salle close la partie. La victoire compte quand même (+10).
+    const sv = FS.creerSuivi('moi', { jeu: 'kopo', objectif: { type: 'premier', m: 2 } });
+    const m1 = { sieges: ['moi', 'a', 'b'], qualifies: ['a', 'moi'], phase: 'terminee' };
+    sv.observer({ joueurs: [1, 2, 3], restants: ['moi', 'a'], manche: m1, elimines: ['b'], etat: 'finManche' });
+    assert.strictEqual(sv.fini(), false);
+    sv.observer({ joueurs: [1, 2, 3], restants: ['moi', 'a'], manche: { sieges: ['a', 'moi'], qualifies: ['moi'], phase: 'jeu' }, elimines: ['b'], etat: 'manche' });
+    assert.strictEqual(sv.fini(), true);
+    const rv = sv.resultat();
+    assert.deepStrictEqual([rv.reussi, rv.gagne, rv.place, rv.score], [true, true, 1, 12], 'sorti 2e puis finale gagnée : 1 + 1 + 10');
   });
   await test('Fleuve : dur dès le bief 1, puis de plus en plus dur', () => {
     const vise = (n) => FG.tauxVise(FG.noteVisee(n));

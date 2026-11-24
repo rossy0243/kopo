@@ -95,6 +95,9 @@ function creerSuivi(moi, etape) {
       for (const [mm, e] of manches) if (mm !== m && e.rang === null && !e.nulle && mm.phase !== 'nulle') e.rang = rangDans(mm);
       elimine = (s.elimines || []).includes(moi);
       gagne = s.etat === 'finPartie' && s.vainqueur === moi;
+      // Sorti le premier du duel final : la partie est gagnée, même si la salle ne l'a pas encore close. Un vrai
+      // joueur sort pendant son coup, et l'étape peut s'arrêter là (limite de manches atteinte) avant la fin de partie.
+      if (!gagne && [...manches.values()].some((e) => e.joueurs === 2 && e.rang === 0 && !e.nulle)) gagne = true;
       if (elimine) place = (totalJoueurs || s.joueurs.length) - s.elimines.indexOf(moi);
       if (gagne) place = 1;
       if (elimine || gagne || s.etat === 'finPartie' || passees() >= limite) fin = true;
