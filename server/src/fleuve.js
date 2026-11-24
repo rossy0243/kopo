@@ -544,8 +544,32 @@ function creerFleuve(base, reglages, comptes, social = null) {
       const e = { ...recetteDe(x), d, testeur: rec.testeur };
       const l = await G.essais(e, rec.simulations, (e.graine ^ 0x27d4eb2d) >>> 0);
       const taux = Math.round((100 * l.filter((r) => r.reussi).length) / Math.max(1, l.length));
-      await ecrireEtape(fleuve, { ...e, ...G.niveauDe(d), taux, seuils: G.seuilsDe(l, rec), horsCible: Math.abs(taux - (e.vise || taux)) > rec.tolerance, modifie: true }, x.publie);
+      await ecrireEtape(fleuve, { ...e, ...G.niveauDe(d), taux, seuils: G.seuilsDe(l, rec), seuilsV: G.SEUILS_VERSION, horsCible: Math.abs(taux - (e.vise || taux)) > rec.tolerance, modifie: true }, x.publie);
       return (await api.etapesAdmin(fleuve, biefDe(numero))).find((y) => y.numero === numero);
+    },
+
+    // Au démarrage (index.js), une fois : les étapes fabriquées avec l'ancien calcul des seuils d'étoiles sont
+    // recalculées (seuils plafonnés par les essais réussis, jamais relevés). La version de l'étape ne change pas :
+    // c'est la même étape. Les joueurs qui l'ont déjà réussie avec un score assez haut gagnent les étoiles qui manquaient.
+    async recalculerSeuils() {
+      const rec = recette();
+      const l = (await base.query('SELECT fleuve, numero, recette, version FROM fleuve_etapes ORDER BY fleuve, numero')).rows
+        .filter((x) => G.FLEUVES[x.fleuve] && !((recetteDe(x).seuilsV || 0) >= G.SEUILS_VERSION));
+      let faites = 0, etoiles = 0;
+      for (const x of l) {
+        const e = recetteDe(x);
+        const seuils = await G.recalculerSeuils(e, rec);
+        // Seulement si l'étape n'a pas été refaite entre-temps.
+        const m = await base.query('UPDATE fleuve_etapes SET recette = $4 WHERE fleuve = $1 AND numero = $2 AND version = $3 RETURNING numero',
+          [x.fleuve, x.numero, x.version, JSON.stringify({ ...e, seuils, seuilsV: G.SEUILS_VERSION })]);
+        if (!m.rows.length) continue;
+        faites++;
+        const u = await base.query(`UPDATE fleuve_etoiles SET etoiles = 1 + (score >= $3)::int + (score >= $4)::int, maj_le = now()
+          WHERE fleuve = $1 AND numero = $2 AND etoiles > 0 AND 1 + (score >= $3)::int + (score >= $4)::int > etoiles RETURNING compte_id`, [x.fleuve, x.numero, seuils.deux, seuils.trois]);
+        etoiles += u.rows.length;
+      }
+      if (faites) console.log(`Fleuve : seuils d'étoiles recalculés sur ${faites} étape(s), ${etoiles} joueur(s) gagnent des étoiles.`);
+      return { faites, etoiles };
     },
 
     // Publie un bief complet (50 étapes), après le bief d'avant.
