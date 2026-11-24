@@ -375,11 +375,12 @@ String _empreinte(Object? e) => jsonEncode(_sansChronos(e));
 
 Future<void> ouvrirFleuve([String? cle]) async {
   // Déjà lu pour la carte de l'accueil : la carte s'ouvre tout de suite, puis se met à jour en silence.
-  final deja = app.etatFleuve;
+  final deja = app.etatFleuve ?? (app.enLigne ? app.etatFleuveGarde() : null);
+  if (app.etatFleuve == null && deja != null) app.etatFleuve = deja; // gardé du lancement d'avant
   if (deja != null && deja['ouvert'] == true && deja['google'] == true && app.enLigne && fleuvesOuverts().isNotEmpty) {
     _afficherCarte(cle != null && fleuvesOuverts().contains(cle) ? cle : fleuveDuJeu(app.jeu == 'inter8' ? 'inter8' : 'kopo'));
-    Api.get('/fleuve').then((n) {
-      final nouveau = (n as Map).cast<String, dynamic>(), avant = app.etatFleuve;
+    app.lireEtatFleuve().then((nouveau) {
+      final avant = app.etatFleuve;
       if (nouveau['ouvert'] != true || nouveau['google'] != true) return;
       // Un fleuve éteint entre-temps : on garde l'ancien état tant que sa carte est ouverte.
       final f = (nouveau['fleuves'] as Map?) ?? const {};
@@ -392,7 +393,7 @@ Future<void> ouvrirFleuve([String? cle]) async {
   }
   try {
     if (!await app.compteEnLigneOuCreer()) { app.lirePseudo(); return; }
-    app.etatFleuve = (await Api.get('/fleuve') as Map).cast<String, dynamic>();
+    app.etatFleuve = await app.lireEtatFleuve();
   } catch (x) { app.toast(messageErreur(x), Niv.echec); return; }
   final e = app.etatFleuve!;
   if (e['ouvert'] != true) { app.toast('Le Fleuve arrive bientôt.', Niv.alerte); return; }
@@ -807,7 +808,7 @@ Widget _boutonPagaie(Map p, VoidCallback apres) {
           try {
             final r = await Api.post('/fleuve/pagaie') as Map;
             app.soldeServeur(r['solde']);
-            try { app.etatFleuve = (await Api.get('/fleuve') as Map).cast<String, dynamic>(); } catch (_) {}
+            try { app.etatFleuve = await app.lireEtatFleuve(neuf: true); } catch (_) {}
             app.toast('Nouvelle pagaie : −${App.formatPieces(_n(r['paye']))} pièces', Niv.succes);
             app.maj();
             apres();
@@ -827,7 +828,7 @@ Future<void> resultatFleuve(Map r) async {
   final seuils = (r['seuils'] as Map?) ?? {};
   final reste = _n((r['pagaies'] as Map?)?['restantes']);
   if (r['solde'] != null) app.soldeServeur(r['solde']);
-  try { app.etatFleuve = (await Api.get('/fleuve') as Map).cast<String, dynamic>(); } catch (_) {}
+  try { app.etatFleuve = await app.lireEtatFleuve(neuf: true); } catch (_) {}
   final f = (app.etatFleuve?['fleuves'] as Map?)?[cle] as Map?;
   final achat = (app.etatFleuve?['pagaies'] as Map?) ?? (r['pagaies'] as Map?) ?? const {};
   final depasses = ((r['depasses'] as List?) ?? const []).map((x) => '$x').toList();

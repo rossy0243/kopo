@@ -8291,7 +8291,7 @@ svg .vb { transform-box: view-box; }
   // Version de l'application, affichée dans Paramètres. À augmenter quand le serveur exige la nouvelle page
   // (« Version minimale » du tableau de bord).
   const VERSION = '1.1';
-  const BUILD = '324072d2acd4'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
+  const BUILD = '362463968338'; // empreinte de index.html, posée par build.js (sert à voir qu'une nouvelle version est en ligne)
   const PREFS_DEFAUT = { vibrations: true, animations: 'normales', tri: 'couleur', confirmerToutPoser: false, quatreCouleurs: false, sonAutresCoupe: false, effetsSonores: true, musique: true };
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // La musique des menus était coupée par défaut : on l'allume une fois pour tous (le joueur peut la recouper).
@@ -11631,6 +11631,27 @@ svg .vb { transform-box: view-box; }
   const ROBOTS_NOMS = { faciles: 'Faciles', normaux: 'Normaux', forts: 'Forts' };
   const PAR_BIEF = 50;
   let etatFleuve = null, biefVu = {};
+  // Le dernier état du Fleuve reste sur l'appareil : au lancement suivant, la carte de l'accueil et la carte du
+  // Fleuve s'affichent sans attendre le serveur, puis se mettent à jour. Une lecture en cours sert à tous.
+  let lectureFleuve = null;
+  function lireEtatFleuve(neuf = false) { // neuf : après un achat ou une étape jouée, on relit toujours
+    if (!neuf && lectureFleuve && Date.now() - lectureFleuve.quand < 2000) return lectureFleuve.p;
+    const p = apiJoueur('/fleuve').then((E) => { garderEtatFleuve(E); return E; });
+    lectureFleuve = { quand: Date.now(), p };
+    return p;
+  }
+  const idCompteLocal = () => { const c = compteLocal(); return c && c.compte && c.compte.id ? c.compte.id : null; };
+  function garderEtatFleuve(E) { const id = idCompteLocal(); if (id && E) stock.ecrire('kopo-fleuve-etat', { id, lu: Date.now(), etat: E }); }
+  function etatFleuveGarde() {
+    const g = stock.lire('kopo-fleuve-etat'), id = idCompteLocal();
+    if (!g || !id || g.id !== id || !g.etat || !g.etat.pagaies) return null;
+    const passe = Date.now() - g.lu;
+    if (!(passe >= 0) || passe >= g.etat.pagaies.retourMs) return null; // minuit passé : les pagaies sont revenues, on relit
+    const E = g.etat;
+    E.pagaies.retourMs -= passe;
+    for (const f of Object.values(E.fleuves || {})) if (f && f.course) f.course.finMs -= passe;
+    return E;
+  }
   // Animations à jouer au prochain affichage de la carte : la pirogue qui glisse, la brume qui se lève.
   const glisseFleuve = {}, brumeFleuve = {}, cadenasVu = {};
   // Le fleuve de l'accueil : pour le jeu choisi, le dernier fleuve ouvert par le joueur (s'il est encore allumé), sinon le premier.
@@ -11866,7 +11887,12 @@ svg .vb { transform-box: view-box; }
   async function majCarteFleuve(recharger = true) {
     const b = $('btnFleuve'); if (!b) return;
     if (!MODE_SERVEUR || !compteLocal() || !configServeur || !configServeur.fleuve || configServeur.fleuve === 'ferme') { b.hidden = true; return; }
-    if (recharger || !etatFleuve) { try { etatFleuve = await apiJoueur('/fleuve'); } catch (e) { return; } }
+    if (!etatFleuve && (etatFleuve = etatFleuveGarde())) montrerCarteAccueilFleuve(); // tout de suite, avant le serveur
+    if (recharger || !etatFleuve) { try { etatFleuve = await lireEtatFleuve(); } catch (e) { return; } }
+    montrerCarteAccueilFleuve();
+  }
+  function montrerCarteAccueilFleuve() {
+    const b = $('btnFleuve'); if (!b || !etatFleuve) return;
     b.hidden = !etatFleuve.ouvert;
     reglerMissionsFleuve();
     const f = etatFleuve.fleuves && etatFleuve.fleuves[fleuveDuJeu()];
@@ -11891,18 +11917,19 @@ svg .vb { transform-box: view-box; }
   const carteFleuveOuverte = () => $('fenetre').dataset.type === 'fleuve' && !$('voile').hidden;
   async function ouvrirFleuve(fleuve) {
     if (!MODE_SERVEUR) return toast('Le Fleuve se joue en ligne.', 'alerte');
-    // Déjà lu pour la carte de l'accueil : la carte s'ouvre tout de suite, puis se met à jour en silence.
-    const E = etatFleuve;
+    // Déjà lu pour la carte de l'accueil (ou gardé du lancement d'avant) : la carte s'ouvre tout de suite,
+    // puis se met à jour en silence.
+    const E = etatFleuve || (etatFleuve = etatFleuveGarde());
     if (E && E.ouvert && E.google && compteLocal() && Object.keys(E.fleuves || {}).length) {
       afficherCarteFleuve(fleuve && E.fleuves[fleuve] ? fleuve : fleuveDuJeu());
-      apiJoueur('/fleuve').then((n) => {
+      lireEtatFleuve().then((n) => {
         const change = empreinteFleuve(n) !== empreinteFleuve(etatFleuve);
         etatFleuve = n;
         if (change && carteFleuveOuverte() && n.ouvert && n.fleuves && n.fleuves[fleuveAffiche]) afficherCarteFleuve(fleuveAffiche);
       }).catch(() => {});
       return;
     }
-    try { if (!(await compteEnLigne())) return; etatFleuve = await apiJoueur('/fleuve'); } catch (x) { return toast(x.message, 'echec'); }
+    try { if (!(await compteEnLigne())) return; etatFleuve = await lireEtatFleuve(); } catch (x) { return toast(x.message, 'echec'); }
     if (!etatFleuve.ouvert) return toast('Le Fleuve arrive bientôt.', 'alerte');
     if (!etatFleuve.google) return fenetreGoogle('Le Fleuve', 'Remonte le Congo et le Niger, étape par étape, et gagne des étoiles. Connecte-toi avec Google pour jouer : ta progression te suit sur tous tes téléphones.');
     if (!Object.keys(etatFleuve.fleuves || {}).length) return toast('Le Fleuve arrive bientôt.', 'alerte');
@@ -12093,7 +12120,7 @@ svg .vb { transform-box: view-box; }
       try {
         const r = await apiJoueur('/fleuve/pagaie', 'POST');
         soldeServeur(Number(r.solde));
-        try { etatFleuve = await apiJoueur('/fleuve'); } catch (x) {}
+        try { etatFleuve = await lireEtatFleuve(true); } catch (x) {}
         toast(`Nouvelle pagaie : −${formatPieces(r.paye)} pièces`, 'succes');
         apres();
       } catch (x) { b.disabled = false; toast(x.message, 'echec'); }
@@ -12159,7 +12186,7 @@ svg .vb { transform-box: view-box; }
       z.append(pg, el('small', 'muted', `Une pagaie perdue. Il t'en reste ${r.pagaies.restantes}.`));
     }
     const boutons = [];
-    try { etatFleuve = await apiJoueur('/fleuve'); } catch (e) {}
+    try { etatFleuve = await lireEtatFleuve(true); } catch (e) {}
     // Missions du jour qui visent le Fleuve.
     try {
       const p = lireProfil(), ms = R.compterFleuve(p, r, jourLocal());
@@ -12208,7 +12235,7 @@ svg .vb { transform-box: view-box; }
       if (configServeur.fleuve !== 'ouvert') return false;
       ecrireNouveaute({});
       majBadgesNouveaute();
-      apiJoueur('/fleuve').then((e) => { etatFleuve = e; }).catch(() => {}).finally(() => fenetreNouveauteFleuve(0));
+      lireEtatFleuve().then((e) => { etatFleuve = e; }).catch(() => {}).finally(() => fenetreNouveauteFleuve(0));
       return true;
     }
     if (stock.lire('kopo-bande-lien')) { ecrireNouveaute({ saute: true }); return false; } // il va directement dans sa Bande
@@ -13564,7 +13591,8 @@ svg .vb { transform-box: view-box; }
     try { configServeur = await (await fetch(SERVEUR + '/api/config', { headers: enteteConfig() })).json(); } catch (e) {}
     return configServeur;
   }
-  if (MODE_SERVEUR) lireConfig().then((c) => { messagesServeur(c); setTimeout(verifierRemiseAFlot, 2500); }); // messages du chat, connexion Google, annonce, maintenance…
+  // Dès que la configuration arrive, le Fleuve se lit déjà : la carte de l'accueil et la carte du Fleuve sont prêtes plus tôt.
+  if (MODE_SERVEUR) lireConfig().then((c) => { messagesServeur(c); setTimeout(verifierRemiseAFlot, 2500); if (window.majCarteFleuve) window.majCarteFleuve(); }); // messages du chat, connexion Google, annonce, maintenance…
 
   // Annonce à tous les joueurs (tableau de bord) : une fenêtre au démarrage, une seule fois par texte.
   // Maintenance : fenêtre bloquante sans bouton pour fermer ; le jeu revérifie toutes les 30 s

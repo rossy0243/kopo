@@ -120,7 +120,40 @@ class App extends ChangeNotifier {
   List<Map<String, dynamic>> sallesOuvertes = [];
   Map<String, dynamic>? etatJour, etatBandes;
   /// Le Fleuve : état des deux cartes (GET /fleuve), et l'objectif de l'étape en cours (affiché pendant la partie).
-  Map<String, dynamic>? etatFleuve;
+  /// Gardé sur le téléphone : au lancement suivant, l'accueil et la carte du Fleuve s'affichent sans attendre le serveur.
+  Map<String, dynamic>? _etatFleuve;
+  Map<String, dynamic>? get etatFleuve => _etatFleuve;
+  set etatFleuve(Map<String, dynamic>? e) {
+    _etatFleuve = e;
+    final id = _idCompte;
+    if (e == null) { Stock.effacer('kopo-fleuve-etat'); }
+    else if (id != null) { Stock.ecrire('kopo-fleuve-etat', {'id': id, 'lu': DateTime.now().millisecondsSinceEpoch, 'etat': e}); }
+  }
+  static String? get _idCompte { final c = Api.compte?['compte']; return c is Map && c['id'] != null ? '${c['id']}' : null; }
+  /// L'état gardé du lancement d'avant (mêmes comptes à rebours, recalés), ou null s'il n'est plus bon.
+  Map<String, dynamic>? etatFleuveGarde() {
+    final g = Stock.lire('kopo-fleuve-etat'), id = _idCompte;
+    if (g is! Map || id == null || g['id'] != id || g['etat'] is! Map || g['lu'] is! num) return null;
+    final e = (g['etat'] as Map).cast<String, dynamic>(), p = e['pagaies'];
+    final passe = DateTime.now().millisecondsSinceEpoch - (g['lu'] as num).toInt();
+    if (p is! Map || p['retourMs'] is! num || passe < 0 || passe >= (p['retourMs'] as num)) return null; // minuit passé : pagaies revenues
+    p['retourMs'] = (p['retourMs'] as num) - passe;
+    for (final f in ((e['fleuves'] as Map?) ?? const {}).values) {
+      final c = f is Map ? f['course'] : null;
+      if (c is Map && c['finMs'] is num) c['finMs'] = (c['finMs'] as num) - passe;
+    }
+    return e;
+  }
+  /// Une seule lecture de GET /fleuve à la fois : un second appel dans les 2 s reprend la même.
+  (DateTime, Future<Map<String, dynamic>>)? _lectureFleuve;
+  /// neuf : après un achat ou une étape jouée, on relit toujours.
+  Future<Map<String, dynamic>> lireEtatFleuve({bool neuf = false}) {
+    final l = _lectureFleuve;
+    if (!neuf && l != null && DateTime.now().difference(l.$1).inMilliseconds < 2000) return l.$2;
+    final f = Api.get('/fleuve').then((x) => (x as Map).cast<String, dynamic>());
+    _lectureFleuve = (DateTime.now(), f);
+    return f;
+  }
   String? objectifFleuve;
   /// La jauge des étoiles en direct : l'étape en cours, sa dernière avancée et l'effet à jouer (commun/jauge.dart).
   Map? etapeFleuve, directFleuve;
@@ -435,7 +468,11 @@ class App extends ChangeNotifier {
     _splash(74, 'Préparation de la table…');
     final debut = DateTime.now();
     final pret = Completer<bool>();
-    relireConfig().then((_) { if (!pret.isCompleted) pret.complete(true); });
+    relireConfig().then((_) {
+      if (!pret.isCompleted) pret.complete(true);
+      // Pendant la fin du splash, l'accueil se prépare déjà (le Fleuve, les amis) : il s'affiche rempli.
+      if (enLigne) majCartesCompetition();
+    });
     _splash(82, 'Connexion au serveur…');
     var ok = await Future.any([pret.future, Future.delayed(const Duration(milliseconds: 2500), () => false)]);
     if (!ok && ecran == 'splash') {
@@ -545,25 +582,31 @@ class App extends ChangeNotifier {
 
   /// Le Fleuve est lancé : la Bande et le Match du jour ont disparu, le parcours de saison aussi.
   bool get fleuveLance => enLigne && config?['fleuveLance'] != null;
-  Future<void> majCartesCompetition() async {
+  /// Cartes de l'accueil. Les lectures partent en même temps ; un second appel pendant une lecture la reprend.
+  Future<void>? _competEnCours;
+  Future<void> majCartesCompetition() => _competEnCours ??= _majCartesCompetition().whenComplete(() => _competEnCours = null);
+  Future<void> _majCartesCompetition() async {
     if (!enLigne) return;
     if (fleuveLance) { etatJour = null; etatBandes = null; pointJour = false; }
-    else {
-      try {
-        final e = etatJour = (await Api.get('/match-jour') as Map).cast<String, dynamic>();
-        pointJour = e['actif'] == true && !(e['moi'] is Map && e['moi']['fini'] == true);
-      } catch (_) {}
-    }
-    if (!fleuveLance) { try { etatBandes = (await Api.get('/bandes') as Map).cast<String, dynamic>(); } catch (_) {} }
-    await majFleuve();
-    try { final a = await Api.get('/amis') as List; amisEnLigne = a.where((x) => x['en_ligne'] == true).length; } catch (_) {}
+    await Future.wait([
+      if (!fleuveLance) () async {
+        try {
+          final e = etatJour = (await Api.get('/match-jour') as Map).cast<String, dynamic>();
+          pointJour = e['actif'] == true && !(e['moi'] is Map && e['moi']['fini'] == true);
+        } catch (_) {}
+      }(),
+      if (!fleuveLance) () async { try { etatBandes = (await Api.get('/bandes') as Map).cast<String, dynamic>(); } catch (_) {} }(),
+      majFleuve(),
+      () async { try { final a = await Api.get('/amis') as List; amisEnLigne = a.where((x) => x['en_ligne'] == true).length; } catch (_) {} }(),
+    ]);
     maj();
   }
   /// Le Fleuve : on ne demande l'état que s'il n'est pas fermé à tous (réglage de l'admin, dans /config).
   Future<void> majFleuve() async {
     final f = config?['fleuve'];
-    if (!enLigne || f == null || f == 'ferme') { etatFleuve = null; return; }
-    try { etatFleuve = (await Api.get('/fleuve') as Map).cast<String, dynamic>(); } catch (_) {}
+    if (!enLigne || f == null || f == 'ferme') { if (_etatFleuve != null) etatFleuve = null; return; }
+    if (_etatFleuve == null) { final g = etatFleuveGarde(); if (g != null) { etatFleuve = g; reglerMissionsFleuve(); maj(); } } // tout de suite, avant le serveur
+    try { etatFleuve = await lireEtatFleuve(); } catch (_) {}
     reglerMissionsFleuve();
   }
   /// Missions du jour : celles qui visent le Fleuve ne sont tirées que pour un fleuve ouvert et publié.
