@@ -127,19 +127,43 @@ function seuil(scores, pct) {
   for (let v = tries[0]; v <= max; v++) if (tries.filter((x) => x >= v).length / n <= pct / 100) return Math.max(1, v);
   return Math.max(1, max);
 }
-function seuilsDe(l, recette) {
-  const e = (recette || RECETTE_DEFAUT).etoiles;
-  const scores = l.map((r) => r.score);
-  let deux = seuil(scores, e.deux), trois = seuil(scores, e.trois);
-  // Toujours atteignables, et la 3e plus dure que la 2e quand les scores le permettent.
+// Version du calcul des seuils (2 : plafonnés par les essais réussis). Les étapes d'avant sont recalculées au démarrage.
+const SEUILS_VERSION = 2;
+// Remet la 3e étoile au-dessus de la 2e quand les scores le permettent (scores : ceux des essais). rare : nombre
+// d'essais qu'il faut au moins au-dessus pour monter la 3e étoile ; sinon c'est la 2e qui descend.
+function ordonner(deux, trois, scores, rare = 1) {
   const valeurs = [...new Set(scores)].sort((a, b) => a - b);
   if (trois <= deux) {
-    const dessus = valeurs.find((v) => v > deux), dessous = valeurs.filter((v) => v < deux).pop();
+    const dessus = valeurs.find((v) => v > deux && scores.filter((x) => x >= v).length >= rare), dessous = valeurs.filter((v) => v < deux).pop();
     if (dessus !== undefined) trois = dessus;
     else if (dessous !== undefined && dessous >= 1) { trois = deux; deux = dessous; }
     else { trois = deux; deux = Math.max(1, deux - 1); } // tous les essais ont le même score : la 3e étoile demande ce score parfait
   }
   return { deux, trois };
+}
+function seuilsDe(l, recette) {
+  const e = (recette || RECETTE_DEFAUT).etoiles;
+  // Un seuil atteint par moins de « rare » essais descend au meilleur score que « rare » essais atteignent.
+  const atteint = (scores, v, rare) => (scores.filter((x) => x >= v).length >= rare ? v : Math.max(1, ...scores.filter((x) => scores.filter((y) => y >= x).length >= rare)));
+  const parts = (scores, rare = 1) => ordonner(atteint(scores, seuil(scores, e.deux), rare), atteint(scores, seuil(scores, e.trois), rare), scores, rare);
+  // Seuils sur tous les essais, réussis ou non.
+  const tous = parts(l.map((r) => r.score));
+  // Mais une étoile ne compte que si l'objectif est réussi : quand les gros scores viennent des essais ratés
+  // (à l'Inter (8), « pioche peu » ou « sors le premier » : celui qui attaque beaucoup rate souvent l'objectif),
+  // le seuil est abaissé au score qu'atteignent les mêmes parts (50 %, 15 %) des essais réussis. Jamais relevé.
+  // Et chaque seuil doit être atteint par au moins 5 % des essais réussis.
+  const ok = l.filter((r) => r.reussi).map((r) => r.score);
+  if (!ok.length) return tous;
+  const reussis = parts(ok, Math.max(1, Math.ceil(ok.length * 0.05)));
+  return { deux: Math.min(tous.deux, reussis.deux), trois: Math.min(tous.trois, reussis.trois) };
+}
+// Seuils recalculés d'une étape déjà fabriquée : jamais plus hauts qu'avant (les joueurs ne perdent rien).
+async function recalculerSeuils(etape, recette) {
+  const r = recette || RECETTE_DEFAUT;
+  const l = await essais({ ...etape, testeur: r.testeur }, r.simulations, (etape.graine ^ 0x27d4eb2d) >>> 0);
+  const n = seuilsDe(l, r), a = etape.seuils || {};
+  const deux = Math.min(n.deux, a.deux || Infinity), trois = Math.min(n.trois, a.trois || Infinity);
+  return trois > deux || trois <= 1 ? { deux, trois } : { deux: Math.max(1, trois - 1), trois };
 }
 
 // Une étape candidate pour la place « numero » : table, robots, objectif, pièges, donne.
@@ -216,7 +240,7 @@ async function fabriquerEtape(fleuve, numero, { recette = RECETTE_DEFAUT, graine
   const etape = { ...meilleure.e, d: meilleure.cal.d };
   const l = await essais(etape, recette.simulations, (etape.graine ^ 0x27d4eb2d) >>> 0);
   const taux = Math.round(tauxDe(l));
-  return { ...etape, ...niveauDe(etape.d), note, vise: Math.round(cible), taux, seuils: seuilsDe(l, recette), horsCible: Math.abs(taux - cible) > recette.tolerance };
+  return { ...etape, ...niveauDe(etape.d), note, vise: Math.round(cible), taux, seuils: seuilsDe(l, recette), seuilsV: SEUILS_VERSION, horsCible: Math.abs(taux - cible) > recette.tolerance };
 }
 
 // Recette enregistrée avant l'ajout d'un champ : le champ manquant prend sa valeur de départ.
@@ -249,4 +273,4 @@ function verifierRecette(v) {
   return out;
 }
 
-module.exports = { completerRecette, verifierRecette, FLEUVES, ETAPES_PAR_BIEF, ETAPES_PAR_VILLE, PIEGES, RECETTE_DEFAUT, TYPES, niveauDe, noteVisee, tauxVise, placerRobots, essai, essais, seuilsDe, candidat, calibrer, fabriquerEtape, sallePour, DELAI, DELAI_PIEGE };
+module.exports = { completerRecette, verifierRecette, FLEUVES, ETAPES_PAR_BIEF, ETAPES_PAR_VILLE, PIEGES, RECETTE_DEFAUT, TYPES, niveauDe, noteVisee, tauxVise, placerRobots, essai, essais, seuilsDe, recalculerSeuils, SEUILS_VERSION, candidat, calibrer, fabriquerEtape, sallePour, DELAI, DELAI_PIEGE };

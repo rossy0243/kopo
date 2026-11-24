@@ -50,6 +50,7 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
   const stickers = creerStickers(base, reglages, comptes);
   const fleuve = creerFleuve(base, reglages, comptes, social);
   await fleuve.nettoyer().catch((e) => console.error('Fleuve :', e.message)); // aucune étape n'a survécu au redémarrage
+  fleuve.recalculerSeuils().catch((e) => console.error('Fleuve, seuils :', e.message)); // en tâche de fond, une seule fois
   const bouquets = creerBouquets(base, reglages, comptes);
   const abonnement = creerAbonnement(base, env);
   abonnement.prix = () => reglages.get('kopoPlus');

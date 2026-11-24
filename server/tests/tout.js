@@ -2525,6 +2525,14 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.strictEqual(FS.etoilesDe({ reussi: true, score: 9 }, { deux: 6, trois: 9 }), 3);
     const s = FG.seuilsDe([3, 3, 3, 3].map((score) => ({ score })));
     assert.ok(s.deux <= 3 && s.trois <= 3, 'jamais au-dessus du meilleur essai');
+    // Les gros scores viennent des essais ratés : les seuils sont abaissés à ce qu'atteignent les essais réussis.
+    const mix = [...Array(80)].map((_, i) => ({ reussi: false, score: 10 + (i % 30) })).concat([...Array(20)].map((_, i) => ({ reussi: true, score: 2 + (i % 6) })));
+    const sm = FG.seuilsDe(mix);
+    assert.ok(sm.trois <= 7 && sm.deux < sm.trois, 'seuils atteignables en réussissant : ' + JSON.stringify(sm));
+    assert.ok(mix.filter((r) => r.reussi && r.score >= sm.trois).length >= 2, 'des essais réussis ont la 3e étoile');
+    // Quand les essais réussis font les meilleurs scores (cas courant au Kopo), rien ne change.
+    const bon = [...Array(50)].map((_, i) => ({ reussi: i >= 25, score: i }));
+    assert.deepStrictEqual(FG.seuilsDe(bon), FG.seuilsDe(bon.map((r) => ({ score: r.score }))));
     assert.strictEqual(FS.texteObjectif({ type: 'manches', n: 3 }), 'Qualifie-toi pour 3 manches');
   });
   await test('Fleuve : dur dès le bief 1, puis de plus en plus dur', () => {
@@ -2562,6 +2570,25 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     const m = await api('/admin/api/fleuve/congo/etapes/3/modifier', { methode: 'POST', jeton: adminJeton, corps: { d: 2 } });
     assert.deepStrictEqual([m.statut, m.json.d, m.json.publie], [200, 2, true]);
     assert.ok((await api('/admin/api/journal', { jeton: adminJeton })).json.some((x) => x.action === 'fleuve:publier'));
+  });
+  await test('Fleuve : les seuils d\'étoiles d\'avant sont recalculés une fois, jamais relevés', async () => {
+    const lire = async (n) => { const r = (await srv.base.query("SELECT recette, version FROM fleuve_etapes WHERE fleuve = 'congo' AND numero = $1", [n])).rows[0]; return { ...r, recette: typeof r.recette === 'string' ? JSON.parse(r.recette) : r.recette }; };
+    const avant = await lire(5);
+    assert.strictEqual(avant.recette.seuilsV, FG.SEUILS_VERSION, 'nouvelle étape : déjà au bon calcul');
+    // Une étape « d'avant » avec des seuils impossibles, et un joueur qui l'a réussie avec 1 étoile.
+    const { seuilsV, ...vieille } = avant.recette;
+    await srv.base.query("UPDATE fleuve_etapes SET recette = $1 WHERE fleuve = 'congo' AND numero = 5", [JSON.stringify({ ...vieille, seuils: { deux: 900, trois: 999 } })]);
+    const id = (await srv.base.query('SELECT id FROM comptes ORDER BY id LIMIT 1')).rows[0].id;
+    await srv.base.query("INSERT INTO fleuve_etoiles (compte_id, fleuve, numero, etoiles, score) VALUES ($1, 'congo', 5, 1, 500)", [id]);
+    const r = await srv.fleuve.recalculerSeuils();
+    assert.deepStrictEqual(r, { faites: 1, etoiles: 1 });
+    const apres = await lire(5);
+    assert.strictEqual(apres.version, avant.version, 'même étape, même version');
+    assert.strictEqual(apres.recette.seuilsV, FG.SEUILS_VERSION);
+    assert.ok(apres.recette.seuils.trois < 999 && apres.recette.seuils.deux < apres.recette.seuils.trois, JSON.stringify(apres.recette.seuils));
+    assert.strictEqual((await srv.base.query("SELECT etoiles FROM fleuve_etoiles WHERE compte_id = $1 AND fleuve = 'congo' AND numero = 5", [id])).rows[0].etoiles, 3);
+    assert.deepStrictEqual(await srv.fleuve.recalculerSeuils(), { faites: 0, etoiles: 0 }, 'une seule fois');
+    await srv.base.query("DELETE FROM fleuve_etoiles WHERE compte_id = $1 AND fleuve = 'congo' AND numero = 5", [id]);
   });
   await test('Fleuve : fermé aux joueurs, puis aux testeurs, puis ouvert', async () => {
     gF = await connexionG('sb-fleuve-a', { providerId: 'g-fleuve-a' });
