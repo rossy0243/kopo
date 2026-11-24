@@ -5706,6 +5706,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   // Carte de l'accueil : visible quand le Fleuve est ouvert pour ce joueur.
   async function majCarteFleuve(recharger = true) {
     const b = $('btnFleuve'); if (!b) return;
+    if (MODE_SERVEUR && compteLocal() && !configServeur) { if (!etatFleuve) etatFleuve = etatFleuveGarde(); montrerCarteAccueilFleuve(); return; } // configuration pas encore là : on garde la carte d'avant
     if (!MODE_SERVEUR || !compteLocal() || !configServeur || !configServeur.fleuve || configServeur.fleuve === 'ferme') { b.hidden = true; return; }
     if (!etatFleuve && (etatFleuve = etatFleuveGarde())) montrerCarteAccueilFleuve(); // tout de suite, avant le serveur
     if (recharger || !etatFleuve) { try { etatFleuve = await lireEtatFleuve(); } catch (e) { return; } }
@@ -6038,7 +6039,9 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   const ecrireNouveaute = (x) => stock.ecrire('kopo-nouveaute-vue', Object.assign({ id: nouveauteId(), le: Date.now() }, lireNouveaute() || {}, x));
   const nouveauteAllumee = () => MODE_SERVEUR && !!(configServeur && configServeur.nouveaute);
   // Le Fleuve est lancé : la Bande et le Match du jour ont disparu de l'accueil.
-  function fleuveLance() { return MODE_SERVEUR && !!(configServeur && configServeur.fleuveLance); }
+  // Tant que la configuration n'est pas arrivée (serveur lent ou qui redémarre), on garde ce que le serveur a dit
+  // la dernière fois : sinon les anciennes cartes reviennent et le Fleuve disparaît.
+  function fleuveLance() { return MODE_SERVEUR && !!(configServeur ? configServeur.fleuveLance : stock.lire('kopo-fleuve-lance')); }
   const avecGoogle = () => { const c = compteLocal(); return !!(c && c.compte && c.compte.google); };
   // Heure de Kinshasa (UTC+1) : jour de la semaine (0 = dimanche) et heure, pour les heures limites d'inscription.
   function momentKinshasa() { const d = new Date(Date.now() + 36e5); return { jour: d.getUTCDay(), heure: d.getUTCHours() }; }
@@ -7408,11 +7411,23 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   function enteteConfig() { const c = stock.lire('kopo-compte-serveur'); return c && c.jeton && c.serveur === SERVEUR ? { authorization: 'Bearer ' + c.jeton } : {}; }
   async function lireConfig() {
     if (configServeur || typeof SERVEUR === 'undefined' || !SERVEUR) return configServeur;
-    try { configServeur = await (await fetch(SERVEUR + '/api/config', { headers: enteteConfig() })).json(); } catch (e) {}
+    try { configServeur = await (await fetch(SERVEUR + '/api/config', { headers: enteteConfig() })).json(); garderConfig(configServeur); } catch (e) {}
     return configServeur;
   }
+  // Ce qui décide des cartes de l'accueil reste sur l'appareil, pour le prochain démarrage si le serveur tarde.
+  function garderConfig(c) { if (c && typeof c === 'object' && 'fleuveLance' in c) stock.ecrire('kopo-fleuve-lance', c.fleuveLance || null); }
+  // Configuration pas reçue (serveur qui redémarre) : on réessaie toutes les 10 s jusqu'à l'avoir, puis l'accueil se remet à jour.
+  let reessaiConfig = null;
+  function reessayerConfig() {
+    if (configServeur || reessaiConfig || !MODE_SERVEUR) return;
+    reessaiConfig = setTimeout(async () => {
+      reessaiConfig = null;
+      await relireConfig();
+      if (configServeur) majCartesCompetition(); else reessayerConfig();
+    }, 10e3);
+  }
   // Dès que la configuration arrive, le Fleuve se lit déjà : la carte de l'accueil et la carte du Fleuve sont prêtes plus tôt.
-  if (MODE_SERVEUR) lireConfig().then((c) => { messagesServeur(c); setTimeout(verifierRemiseAFlot, 2500); if (window.majCarteFleuve) window.majCarteFleuve(); }); // messages du chat, connexion Google, annonce, maintenance…
+  if (MODE_SERVEUR) lireConfig().then((c) => { if (!c) reessayerConfig(); messagesServeur(c); setTimeout(verifierRemiseAFlot, 2500); if (window.majCarteFleuve) window.majCarteFleuve(); }); // messages du chat, connexion Google, annonce, maintenance…
 
   // Annonce à tous les joueurs (tableau de bord) : une fenêtre au démarrage, une seule fois par texte.
   // Maintenance : fenêtre bloquante sans bouton pour fermer ; le jeu revérifie toutes les 30 s
@@ -7442,7 +7457,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   }
   async function relireConfig() {
     if (!MODE_SERVEUR) return;
-    try { const c = await (await fetch(SERVEUR + '/api/config', { cache: 'no-store', headers: enteteConfig() })).json(); configServeur = c; messagesServeur(c); } catch (e) {}
+    try { const c = await (await fetch(SERVEUR + '/api/config', { cache: 'no-store', headers: enteteConfig() })).json(); configServeur = c; garderConfig(c); messagesServeur(c); } catch (e) {}
   }
   $('btnAnnonceOk').onclick = () => { stock.ecrire('kopo-annonce-vue', $('texteAnnonce').textContent); $('voileAnnonce').hidden = true; };
   $('btnMaintenanceReessayer').onclick = relireConfig;
