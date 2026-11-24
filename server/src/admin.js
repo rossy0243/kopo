@@ -1,5 +1,6 @@
 // API du tableau de bord du super admin. Tout est réservé au jeton admin, et chaque action est tracée.
 'use strict';
+const { conditionCible } = require('./stickers');
 const express = require('express');
 const { enveloppe, publicCompte } = require('./api');
 const { emailSupabase } = require('./comptes');
@@ -357,13 +358,27 @@ function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainag
   }));
 
   // --- Abonnement Kopo+ (micro) : formules, abonnés, et un abonnement activé à la main (paiement mobile money reçu).
-  r.get('/abonnements', enveloppe(async (req, res) => res.json(n2(await abonnement.resumeAdmin()))));
+  r.get('/abonnements', enveloppe(async (req, res) => res.json(n2({ ...(await abonnement.resumeAdmin()),
+    criteres: Object.entries(stickers.CRITERES).map(([id, d]) => ({ id, texte: d.texte, n: d.n || null, pays: !!d.pays })) }))));
   r.get('/abonnements/livekit', enveloppe(async (req, res) => res.json(await abonnement.verifierLiveKit())));
   r.post('/abonnements/:id/annuler', enveloppe(async (req, res) => {
     const x = await abonnement.annuler(req.params.id);
     await journal('abonnement:annule', x.compte, { activation: Number(req.params.id), formule: x.formule, francs: x.francs, jusqu: x.jusqu });
     for (const s of salles) if (s.majAbonne) s.majAbonne(x.compte, x.jusqu);
     res.json(x);
+  }));
+  // Kopo+ offert (à un joueur, à tous ou à un groupe) : jours ajoutés, message dans le jeu, push en option.
+  r.post('/abonnements/compter', enveloppe(async (req, res) => res.json(await stickers.compter(req.body.cible))));
+  r.post('/abonnements/offrir', enveloppe(async (req, res) => {
+    const b = req.body || {};
+    const x = await abonnement.offrir(b, conditionCible);
+    let envoi = null;
+    if (b.push) {
+      envoi = await push.annonceA(x.ids, { titre: 'Kopo+ offert', texte: `${x.message} +${x.jours} jours de Kopo+ : micro et couronne dorée.` })
+        .catch((e) => ({ erreur: e.message }));
+    }
+    await journal('abonnement:offert', x.cible.type === 'joueur' ? x.cible.id : null, { cible: x.cible, jours: x.jours, joueurs: x.joueurs, message: x.message, push: envoi });
+    res.json({ ok: true, joueurs: x.joueurs, jours: x.jours, cible: x.cible, push: envoi });
   }));
   r.post('/abonnements/activer', enveloppe(async (req, res) => {
     const x = await abonnement.activer(req.body || {});

@@ -271,4 +271,4 @@ function creerStickers(base, reglages, comptes) {
   };
 }
 
-module.exports = { BIENVENUE_DEFAUT, creerStickers, verifierReglage, offresPack, STICKERS, PACKS, CRITERES, OFFRES_DEFAUT, REMISE_PACK, ATTENTE_MS };
+module.exports = { conditionCible, BIENVENUE_DEFAUT, creerStickers, verifierReglage, offresPack, STICKERS, PACKS, CRITERES, OFFRES_DEFAUT, REMISE_PACK, ATTENTE_MS };

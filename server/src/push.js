@@ -406,6 +406,16 @@ function creerPush(base, reglages, env = process.env) {
       await base.query('UPDATE push_annonces SET envoyees = $2 WHERE id = $1', [id, envoyees]);
       return { ok: true, joueurs, appareils: web.length + natifs.length, envoyees };
     },
+    // Annonce à une liste de joueurs (ex. Kopo+ offert à un groupe) : ceux qui n'ont pas coupé les annonces, sans la limite
+    // des 10 minutes (ce n'est pas une annonce à tous). Rend le nombre d'envois réussis (0 si les push sont éteints).
+    async annonceA(ids, { titre, texte }) {
+      if ((!actif && !fcmActif) || !ids || !ids.length) return { joueurs: 0, envoyees: 0 };
+      const l = (await base.query(`SELECT id FROM comptes WHERE id = ANY($1) AND statut NOT IN ('supprime', 'banni')
+        AND coalesce(push_prefs->>'annonce', 'true') <> 'false'`, [ids])).rows.map((x) => x.id);
+      if (!l.length) return { joueurs: 0, envoyees: 0 };
+      const message = { type: 'annonce', titre: texteCourt(titre, 60) || 'Masano', texte: texteCourt(texte, 200), url: './', tag: 'annonce-kopoplus', action: 'accueil' };
+      return { joueurs: l.length, envoyees: await envoyerAComptes(l, message, { ttl: 24 * 3600 }) };
+    },
     // Essai : à un seul joueur (le sien, en général), sans tenir compte de ses réglages ni de la limite.
     async essai(compteId, { titre, texte }) {
       if (!actif && !fcmActif) throw erreur('Notifications push éteintes : ajoute les clés VAPID (site) ou FCM_COMPTE_SERVICE (applis) dans Render.', 503);

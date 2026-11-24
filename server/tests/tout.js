@@ -2075,6 +2075,41 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.strictEqual((await api('/api/moi', { jeton: a.jeton })).json.compte.kopoPlus, false);
     assert.ok((await api('/admin/api/journal', { jeton: adminJeton })).json.some((l) => l.action === 'abonnement:annule'));
   });
+  await test('Kopo+ offert par l\'admin : à un joueur ou un groupe, jours ajoutés, message dans le jeu, annulable', async () => {
+    const a = await invite('KpOffA'), b = await invite('KpOffB');
+    const nomA = a.compte.pseudo + '#' + a.compte.numero;
+    const avant = (await api('/admin/api/abonnements', { jeton: adminJeton })).json;
+    assert.ok(avant.criteres.some((c) => c.id === 'kopoPlus'));
+    // Refus : pas de message, jours hors limites, pas admin.
+    assert.strictEqual((await api('/admin/api/abonnements/offrir', { methode: 'POST', jeton: adminJeton, corps: { cible: { type: 'joueur', joueur: nomA }, jours: 7, message: '' } })).statut, 400);
+    assert.strictEqual((await api('/admin/api/abonnements/offrir', { methode: 'POST', jeton: adminJeton, corps: { cible: { type: 'joueur', joueur: nomA }, jours: 0, message: 'Merci beaucoup' } })).statut, 400);
+    assert.strictEqual((await api('/admin/api/abonnements/offrir', { methode: 'POST', jeton: a.jeton, corps: { cible: { type: 'tous' }, jours: 7, message: 'Merci beaucoup' } })).statut, 401);
+    // Un joueur : 7 jours à partir de maintenant, puis un mois payé s'ajoute.
+    const r = await api('/admin/api/abonnements/offrir', { methode: 'POST', jeton: adminJeton, corps: { cible: { type: 'joueur', joueur: nomA }, jours: 7, message: 'Merci pour ta patience !', push: true } });
+    assert.strictEqual(r.statut, 200); assert.strictEqual(r.json.joueurs, 1);
+    let moi = (await api('/api/moi', { jeton: a.jeton })).json.compte;
+    assert.strictEqual(moi.kopoPlus, true);
+    assert.ok(Math.abs(new Date(moi.kopoPlusJusqu) - (Date.now() + 7 * 864e5)) < 120e3);
+    const n = (await api('/api/notifications', { jeton: a.jeton })).json.liste.find((x) => x.donnees && x.donnees.abonnement === 'cadeau');
+    assert.strictEqual(n.type, 'cadeau');
+    assert.strictEqual(n.donnees.message, 'Merci pour ta patience ! (+7 jours de Kopo+)');
+    // Le groupe « Abonnés Kopo+ » : A est prolongé (jours ajoutés à ce qui reste), B (pas abonné) non.
+    const k = await api('/admin/api/abonnements/compter', { methode: 'POST', jeton: adminJeton, corps: { cible: { type: 'groupe', criteres: { kopoPlus: true } } } });
+    assert.ok(k.json.joueurs >= 1);
+    const g = await api('/admin/api/abonnements/offrir', { methode: 'POST', jeton: adminJeton, corps: { cible: { type: 'groupe', criteres: { kopoPlus: true } }, jours: 3, message: 'Trois jours de plus pour vous' } });
+    assert.strictEqual(g.json.joueurs, k.json.joueurs);
+    moi = (await api('/api/moi', { jeton: a.jeton })).json.compte;
+    assert.ok(Math.abs(new Date(moi.kopoPlusJusqu) - (Date.now() + 10 * 864e5)) < 120e3);
+    assert.strictEqual((await api('/api/moi', { jeton: b.jeton })).json.compte.kopoPlus, false);
+    // Hors des ventes, et chaque ligne s'annule (ses jours seulement).
+    const liste = (await api('/admin/api/abonnements', { jeton: adminJeton })).json;
+    assert.strictEqual(liste.francs30j, avant.francs30j);
+    assert.strictEqual(liste.activations30j, avant.activations30j);
+    const ligne = liste.activations.find((l) => l.compte === a.compte.id && l.formule === 'cadeau' && l.jours === 3);
+    const x = await api(`/admin/api/abonnements/${ligne.id}/annuler`, { methode: 'POST', jeton: adminJeton });
+    assert.ok(Math.abs(new Date(x.json.jusqu) - (Date.now() + 7 * 864e5)) < 120e3);
+    assert.ok((await api('/admin/api/journal', { jeton: adminJeton })).json.some((l) => l.action === 'abonnement:offert'));
+  });
   await test('bienvenue : essai Kopo+ de 7 jours (une fois, compte Google) et rappel la veille de la fin', async () => {
     const inv = await invite('EssaiInvite');
     const o = (await api('/api/v1/abonnement', { jeton: inv.jeton })).json;
