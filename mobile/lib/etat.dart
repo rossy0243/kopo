@@ -1,6 +1,7 @@
 // Le cœur de l'appli : compte, config du serveur, salle de jeu en cours, fenêtres, toasts et effets.
 // Reprend la logique de la page du site (src/source.html) : afficher(v), entrerServeur(), quitter(), suivrePartie()…
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -134,7 +135,7 @@ class App extends ChangeNotifier {
   Map<String, dynamic>? etatFleuveGarde() {
     final g = Stock.lire('kopo-fleuve-etat'), id = _idCompte;
     if (g is! Map || id == null || g['id'] != id || g['etat'] is! Map || g['lu'] is! num) return null;
-    final e = (g['etat'] as Map).cast<String, dynamic>(), p = e['pagaies'];
+    final e = (jsonDecode(jsonEncode(g['etat'])) as Map).cast<String, dynamic>(), p = e['pagaies']; // copie : la valeur gardée ne bouge pas
     final passe = DateTime.now().millisecondsSinceEpoch - (g['lu'] as num).toInt();
     if (p is! Map || p['retourMs'] is! num || passe < 0 || passe >= (p['retourMs'] as num)) return null; // minuit passé : pagaies revenues
     p['retourMs'] = (p['retourMs'] as num) - passe;
@@ -389,8 +390,23 @@ class App extends ChangeNotifier {
   Future<void> relireConfig() async {
     try {
       final c = await Api.appel('/config', sansJeton: true, delai: const Duration(seconds: 70));
-      if (c is Map) { config = c.cast<String, dynamic>(); messagesServeur(); }
+      if (c is Map) {
+        config = c.cast<String, dynamic>();
+        if (c.containsKey('fleuveLance')) Stock.ecrire('kopo-fleuve-lance', c['fleuveLance']);
+        messagesServeur();
+        maj();
+      }
     } catch (_) {}
+    if (config == null) _reessayerConfig();
+  }
+  /// Configuration pas reçue (serveur qui redémarre) : on réessaie toutes les 10 s jusqu'à l'avoir, puis l'accueil se remet à jour.
+  Timer? _tReessaiConfig;
+  void _reessayerConfig() {
+    _tReessaiConfig ??= Timer(const Duration(seconds: 10), () async {
+      _tReessaiConfig = null;
+      await relireConfig();
+      if (config != null && enLigne) majCartesCompetition();
+    });
   }
   bool annonceOuverte = false;
   void messagesServeur() {
@@ -581,7 +597,9 @@ class App extends ChangeNotifier {
     ..sort((a, b) => (b['joueurs'] as num).compareTo(a['joueurs'] as num));
 
   /// Le Fleuve est lancé : la Bande et le Match du jour ont disparu, le parcours de saison aussi.
-  bool get fleuveLance => enLigne && config?['fleuveLance'] != null;
+  /// Tant que la configuration n'est pas arrivée (serveur lent ou qui redémarre), on garde ce que le serveur a dit
+  /// la dernière fois : sinon les anciennes cartes reviennent et le Fleuve disparaît.
+  bool get fleuveLance => (config != null ? config!['fleuveLance'] : Stock.lire('kopo-fleuve-lance')) != null;
   /// Cartes de l'accueil. Les lectures partent en même temps ; un second appel pendant une lecture la reprend.
   Future<void>? _competEnCours;
   Future<void> majCartesCompetition() => _competEnCours ??= _majCartesCompetition().whenComplete(() => _competEnCours = null);
@@ -604,6 +622,10 @@ class App extends ChangeNotifier {
   /// Le Fleuve : on ne demande l'état que s'il n'est pas fermé à tous (réglage de l'admin, dans /config).
   Future<void> majFleuve() async {
     final f = config?['fleuve'];
+    if (enLigne && config == null) { // configuration pas encore là : on garde la carte d'avant, sans l'effacer
+      if (_etatFleuve == null) { final g = etatFleuveGarde(); if (g != null) { _etatFleuve = g; maj(); } }
+      return;
+    }
     if (!enLigne || f == null || f == 'ferme') { if (_etatFleuve != null) etatFleuve = null; return; }
     if (_etatFleuve == null) { final g = etatFleuveGarde(); if (g != null) { etatFleuve = g; reglerMissionsFleuve(); maj(); } } // tout de suite, avant le serveur
     try { etatFleuve = await lireEtatFleuve(); } catch (_) {}
