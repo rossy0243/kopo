@@ -1171,7 +1171,7 @@ const ONGLETS_REGLAGES = [
       { c: 'fleuveRecette.tolerance', l: 'Écart accepté', t: 'n', u: 'points', min: 1, max: 50 }] },
     { titre: 'Étoiles', aide: 'Seuils calculés sur les parties d\'essai de chaque étape (1 étoile = objectif réussi).', champs: [
       { c: 'fleuveRecette.etoiles.deux', l: '2e étoile : atteinte par', t: 'n', u: '% des essais', min: 5, max: 95 },
-      { c: 'fleuveRecette.etoiles.trois', l: '3e étoile : atteinte par', t: 'n', u: '% des essais', min: 1, max: 90 }] },
+      { c: 'fleuveRecette.etoiles.trois', l: '3e étoile : atteinte par', a: 'Toujours à portée : au moins 25 % des essais réussis ont la 3e étoile (et 50 % la 2e), quel que soit ce réglage.', t: 'n', u: '% des essais', min: 1, max: 90 }] },
     { titre: 'Objectifs et pièges débloqués', aide: 'Bief à partir duquel chaque objectif ou piège peut sortir dans les étapes fabriquées.', champs: [
       ...[['manches', 'Se qualifier pour N manches'], ['finale', 'Atteindre la finale'], ['gagner', 'Gagner la partie'], ['premier', 'Sortir le premier'], ['top', 'Finir parmi les premiers (Inter)'], ['ramasser', 'Ramasser peu (Kopo)'], ['attaque', 'Faire piocher (Inter)'], ['pioche', 'Piocher peu (Inter)'], ['katapss', 'Faire un Katapss (Kopo)']].map(([k, l]) => ({ c: 'fleuveRecette.des.objectif_' + k, l: 'Objectif : ' + l, t: 'n', u: 'bief', min: 1, max: 999 })),
       ...[['dernier', 'Jouer en dernier'], ['chrono', 'Chrono plus court'], ['delire', 'Deux paquets (Inter)'], ['jretour', 'J retour (Inter)']].map(([k, l]) => ({ c: 'fleuveRecette.des.piege_' + k, l: 'Piège : ' + l, t: 'n', u: 'bief', min: 1, max: 999 })),

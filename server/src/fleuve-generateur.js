@@ -127,8 +127,9 @@ function seuil(scores, pct) {
   for (let v = tries[0]; v <= max; v++) if (tries.filter((x) => x >= v).length / n <= pct / 100) return Math.max(1, v);
   return Math.max(1, max);
 }
-// Version du calcul des seuils (2 : plafonnés par les essais réussis). Les étapes d'avant sont recalculées au démarrage.
-const SEUILS_VERSION = 2;
+// Version du calcul des seuils (2 : plafonnés par les essais réussis ; 3 : plancher, la 3e étoile atteinte par au
+// moins un quart des essais réussis). Les étapes d'avant sont recalculées au démarrage.
+const SEUILS_VERSION = 3;
 // Remet la 3e étoile au-dessus de la 2e quand les scores le permettent (scores : ceux des essais). rare : nombre
 // d'essais qu'il faut au moins au-dessus pour monter la 3e étoile ; sinon c'est la 2e qui descend.
 function ordonner(deux, trois, scores, rare = 1) {
@@ -155,12 +156,31 @@ function seuilsDe(l, recette) {
   const ok = l.filter((r) => r.reussi).map((r) => r.score);
   if (!ok.length) return tous;
   const reussis = parts(ok, Math.max(1, Math.ceil(ok.length * 0.05)));
-  return { deux: Math.min(tous.deux, reussis.deux), trois: Math.min(tous.trois, reussis.trois) };
+  // Plancher (version 3) : chaque étoile doit rester à la portée d'un bon joueur, pas d'un coup de chance. Parmi
+  // les essais réussis, au moins PLANCHER.deux % ont la 2e étoile et PLANCHER.trois % la 3e : un perfectionniste
+  // qui réussit l'étape décroche les 3 étoiles environ une fois sur quatre, jamais une fois sur cent.
+  const plafond = (pct) => { const t = ok.slice().sort((a, b) => b - a); return t[Math.max(0, Math.ceil((t.length * pct) / 100) - 1)]; };
+  let trois = Math.max(1, Math.min(tous.trois, reussis.trois, plafond(PLANCHER.trois)));
+  let deux = Math.max(1, Math.min(tous.deux, reussis.deux, plafond(PLANCHER.deux)));
+  if (deux >= trois) { // la 2e étoile reste sous la 3e quand un score plus bas existe
+    const dessous = ok.filter((x) => x < trois).sort((a, b) => b - a)[0];
+    deux = dessous !== undefined ? Math.max(1, dessous) : Math.max(1, trois - 1);
+    if (deux > trois) deux = trois;
+  }
+  return { deux, trois };
+}
+// Part des essais réussis qui doit atteindre chaque étoile (voir seuilsDe).
+const PLANCHER = { deux: 50, trois: 25 };
+// Les essais qui fixent les seuils : deux séries indépendantes (robots différents), pour qu'une série chanceuse ne
+// place pas la 3e étoile hors de portée.
+async function essaisEtoiles(etape, recette) {
+  const r = recette || RECETTE_DEFAUT, g = (etape.graine ^ 0x27d4eb2d) >>> 0;
+  return (await essais(etape, r.simulations, g)).concat(await essais(etape, r.simulations, (g ^ 0x5bd1e995) >>> 0));
 }
 // Seuils recalculés d'une étape déjà fabriquée : jamais plus hauts qu'avant (les joueurs ne perdent rien).
 async function recalculerSeuils(etape, recette) {
   const r = recette || RECETTE_DEFAUT;
-  const l = await essais({ ...etape, testeur: r.testeur }, r.simulations, (etape.graine ^ 0x27d4eb2d) >>> 0);
+  const l = await essaisEtoiles({ ...etape, testeur: r.testeur }, r);
   const n = seuilsDe(l, r), a = etape.seuils || {};
   const deux = Math.min(n.deux, a.deux || Infinity), trois = Math.min(n.trois, a.trois || Infinity);
   return trois > deux || trois <= 1 ? { deux, trois } : { deux: Math.max(1, trois - 1), trois };
@@ -238,7 +258,7 @@ async function fabriquerEtape(fleuve, numero, { recette = RECETTE_DEFAUT, graine
     meilleure = { e: { ...e, testeur: recette.testeur }, cal: { d: 1, taux: 0 }, ecart: 100 };
   }
   const etape = { ...meilleure.e, d: meilleure.cal.d };
-  const l = await essais(etape, recette.simulations, (etape.graine ^ 0x27d4eb2d) >>> 0);
+  const l = await essaisEtoiles(etape, recette);
   const taux = Math.round(tauxDe(l));
   return { ...etape, ...niveauDe(etape.d), note, vise: Math.round(cible), taux, seuils: seuilsDe(l, recette), seuilsV: SEUILS_VERSION, horsCible: Math.abs(taux - cible) > recette.tolerance };
 }
@@ -273,4 +293,4 @@ function verifierRecette(v) {
   return out;
 }
 
-module.exports = { completerRecette, verifierRecette, FLEUVES, ETAPES_PAR_BIEF, ETAPES_PAR_VILLE, PIEGES, RECETTE_DEFAUT, TYPES, niveauDe, noteVisee, tauxVise, placerRobots, essai, essais, seuilsDe, recalculerSeuils, SEUILS_VERSION, candidat, calibrer, fabriquerEtape, sallePour, DELAI, DELAI_PIEGE };
+module.exports = { completerRecette, verifierRecette, FLEUVES, ETAPES_PAR_BIEF, ETAPES_PAR_VILLE, PIEGES, RECETTE_DEFAUT, TYPES, niveauDe, noteVisee, tauxVise, placerRobots, essai, essais, seuilsDe, essaisEtoiles, PLANCHER, recalculerSeuils, SEUILS_VERSION, candidat, calibrer, fabriquerEtape, sallePour, DELAI, DELAI_PIEGE };
