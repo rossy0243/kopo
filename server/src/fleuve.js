@@ -572,6 +572,27 @@ function creerFleuve(base, reglages, comptes, social = null) {
       return { faites, etoiles };
     },
 
+    // Au démarrage (index.js) : une étape de Kopo dont la finale est perdue d'avance (donne fixe où un adversaire qui
+    // joue bien sort toujours le premier) reçoit une nouvelle donne gagnable, des robots recalibrés et de nouveaux
+    // seuils. Sa version monte (c'est une autre donne) ; les étoiles déjà gagnées restent.
+    async reparerFinales() {
+      const rec = recette();
+      const l = (await base.query('SELECT fleuve, numero, recette, version FROM fleuve_etapes ORDER BY fleuve, numero')).rows
+        .filter((x) => G.FLEUVES[x.fleuve] === 'kopo');
+      let faites = 0;
+      for (const x of l) {
+        const e = recetteDe(x);
+        const n = await G.reparerFinale({ ...e, numero: x.numero }, rec);
+        if (!n) continue;
+        // Seulement si l'étape n'a pas été refaite entre-temps.
+        const m = await base.query('UPDATE fleuve_etapes SET recette = $4, version = version + 1, maj_le = now() WHERE fleuve = $1 AND numero = $2 AND version = $3 RETURNING numero',
+          [x.fleuve, x.numero, x.version, JSON.stringify({ ...n, finaleReparee: true })]);
+        if (m.rows.length) faites++;
+      }
+      if (faites) console.log(`Fleuve : ${faites} étape(s) avec une finale perdue d'avance ont reçu une donne gagnable.`);
+      return { faites };
+    },
+
     // Publie un bief complet (50 étapes), après le bief d'avant.
     async publier(fleuve, bief) {
       if (!G.FLEUVES[fleuve]) throw erreur('Fleuve inconnu.');
