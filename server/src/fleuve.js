@@ -542,14 +542,14 @@ function creerFleuve(base, reglages, comptes, social = null) {
       if (!(d >= 1 && d <= 60)) throw erreur('Force des robots entre 1 et 60.');
       const rec = recette();
       const e = { ...recetteDe(x), d, testeur: rec.testeur };
-      const l = await G.essais(e, rec.simulations, (e.graine ^ 0x27d4eb2d) >>> 0);
+      const l = await G.essaisEtoiles(e, rec);
       const taux = Math.round((100 * l.filter((r) => r.reussi).length) / Math.max(1, l.length));
       await ecrireEtape(fleuve, { ...e, ...G.niveauDe(d), taux, seuils: G.seuilsDe(l, rec), seuilsV: G.SEUILS_VERSION, horsCible: Math.abs(taux - (e.vise || taux)) > rec.tolerance, modifie: true }, x.publie);
       return (await api.etapesAdmin(fleuve, biefDe(numero))).find((y) => y.numero === numero);
     },
 
     // Au démarrage (index.js), une fois : les étapes fabriquées avec l'ancien calcul des seuils d'étoiles sont
-    // recalculées (seuils plafonnés par les essais réussis, jamais relevés). La version de l'étape ne change pas :
+    // recalculées (seuils plafonnés par les essais réussis, 3e étoile à la portée d'un quart des réussites, jamais relevés). La version de l'étape ne change pas :
     // c'est la même étape. Les joueurs qui l'ont déjà réussie avec un score assez haut gagnent les étoiles qui manquaient.
     async recalculerSeuils() {
       const rec = recette();

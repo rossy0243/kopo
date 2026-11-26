@@ -2565,6 +2565,11 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     const sm = FG.seuilsDe(mix);
     assert.ok(sm.trois <= 7 && sm.deux < sm.trois, 'seuils atteignables en réussissant : ' + JSON.stringify(sm));
     assert.ok(mix.filter((r) => r.reussi && r.score >= sm.trois).length >= 2, 'des essais réussis ont la 3e étoile');
+    // 3e étoile jamais réservée à la chance : sortir premier ou gagner la finale arrive 6 fois sur 100 réussites,
+    // les seuils descendent pour qu'au moins un quart des réussites ait la 3e étoile, et la moitié la 2e.
+    const rare = [...Array(100)].map((_, i) => ({ reussi: true, score: i < 6 ? 13 : i < 30 ? 2 : 1 })).concat([...Array(100)].map(() => ({ reussi: false, score: 0 })));
+    const sr = FG.seuilsDe(rare), part = (v) => rare.filter((r) => r.reussi && r.score >= v).length;
+    assert.ok(part(sr.trois) >= 25 && part(sr.deux) >= 50 && sr.deux <= sr.trois, 'plancher des étoiles : ' + JSON.stringify(sr));
     // Quand les essais réussis font les meilleurs scores (cas courant au Kopo), rien ne change.
     const bon = [...Array(50)].map((_, i) => ({ reussi: i >= 25, score: i }));
     assert.deepStrictEqual(FG.seuilsDe(bon), FG.seuilsDe(bon.map((r) => ({ score: r.score }))));
