@@ -149,12 +149,13 @@ class BoutonTete extends StatelessWidget {
           child: InkWell(
             borderRadius: BorderRadius.circular(10),
             onTap: onTap,
-            child: Padding(
+            // Assez grand pour le doigt, même en petit (téléphone couché).
+            child: ConstrainedBox(constraints: const BoxConstraints(minWidth: 38, minHeight: 38), child: Center(widthFactor: 1, heightFactor: 1, child: Padding(
               padding: icone != null
                   ? EdgeInsets.symmetric(horizontal: petit ? 5 : 9, vertical: petit ? 4 : 7)
                   : EdgeInsets.symmetric(horizontal: petit ? 7 : 10, vertical: petit ? 6 : 7),
               child: icone != null ? Ico(icone!, taille: petit ? 20 : 24) : Text(texte!, style: K.texte(petit ? 12 : 13, poids: FontWeight.w600)),
-            ),
+            ))),
           ),
         ),
       );

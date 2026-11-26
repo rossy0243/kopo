@@ -189,7 +189,7 @@ class Choix<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Wrap(spacing: 6, runSpacing: 6, children: [
         for (final (v, t) in options)
-          Btn(t, style: v == valeur ? StyleBtn.principal : StyleBtn.normal, marge: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), taille: 14, onTap: onChange == null ? null : () => onChange!(v)),
+          ConstrainedBox(constraints: const BoxConstraints(minHeight: 40), child: Btn(t, style: v == valeur ? StyleBtn.principal : StyleBtn.normal, marge: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), taille: 14, onTap: onChange == null ? null : () => onChange!(v))), // assez haut pour le doigt
       ]);
 }
 
@@ -200,13 +200,27 @@ class Fenetre extends StatelessWidget {
   final VoidCallback? onFermer;
   final double largeur;
   const Fenetre({super.key, this.titre, required this.enfants, this.onFermer, this.largeur = 440});
+
+  /// Les boutons qui ferment la fenêtre (Jouer, Fermer, Compris…) : les grands boutons à la fin de la liste.
+  /// Ils restent en bas, toujours visibles, même quand le reste défile (comme .fen-pied sur le site).
+  static int debutPied(List<Widget> l) {
+    var i = l.length;
+    while (i > 0 && (l[i - 1] is Ecart || (l[i - 1] is Btn && (l[i - 1] as Btn).large))) { i--; }
+    while (i < l.length && l[i] is Ecart) { i++; } // l'écart avant le pied reste au-dessus
+    return l.sublist(i).any((w) => w is Btn) && i > 0 ? i : l.length;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final taille = MediaQuery.of(context).size;
+    final couche = taille.width > taille.height && taille.height < 600;
+    final i = debutPied(enfants);
+    final pied = enfants.sublist(i).whereType<Btn>().toList();
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: largeur, maxHeight: MediaQuery.of(context).size.height * .92),
+          constraints: BoxConstraints(maxWidth: largeur, maxHeight: taille.height * .92),
           // Ombre du site : 0 20px 50px rgba(0,0,0,.5).
           child: DecoratedBox(
             decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), boxShadow: const [BoxShadow(color: Color(0x80000000), blurRadius: 50, offset: Offset(0, 20))]),
@@ -214,13 +228,23 @@ class Fenetre extends StatelessWidget {
             color: K.table2,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: K.line)),
             child: Stack(children: [
-              SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  if (titre != null) Padding(padding: const EdgeInsets.only(bottom: 10, right: 30), child: Text(titre!, style: K.titre(36))),
-                  ...enfants,
-                ]),
-              ),
+              Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Flexible(child: SingleChildScrollView(
+                  padding: EdgeInsets.fromLTRB(20, 20, 20, pied.isEmpty ? 20 : 8),
+                  child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    if (titre != null) Padding(padding: const EdgeInsets.only(bottom: 10, right: 30), child: Text(titre!, style: K.titre(36))),
+                    ...enfants.sublist(0, i),
+                  ]),
+                )),
+                if (pied.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+                    // Téléphone couché : côte à côte, pour garder la place au contenu.
+                    child: couche && pied.length > 1
+                        ? Row(children: [for (var k = 0; k < pied.length; k++) ...[if (k > 0) const SizedBox(width: 8), Expanded(child: pied[k].copie(marge: const EdgeInsets.symmetric(horizontal: 12, vertical: 10)))]])
+                        : Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [for (var k = 0; k < pied.length; k++) ...[if (k > 0) const SizedBox(height: 8), pied[k]]]),
+                  ),
+              ]),
               if (onFermer != null)
                 Positioned(right: 4, top: 4, child: IconButton(onPressed: onFermer, icon: const Icon(Icons.close, color: K.muted), tooltip: 'Fermer')),
             ]),

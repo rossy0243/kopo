@@ -419,6 +419,7 @@ class _CarteFleuve extends StatefulWidget {
 class _CarteFleuveState extends State<_CarteFleuve> {
   late String cle = widget.cle;
   final kPagaies = GlobalKey(), kOnglets = GlobalKey();
+  void _fermer() { app.fermerFenetre(); app.maj(); }
   @override
   Widget build(BuildContext context) {
     final E = app.etatFleuve!, f = (E['fleuves'] as Map)[cle] as Map, F = _fleuves[cle]!;
@@ -426,49 +427,150 @@ class _CarteFleuveState extends State<_CarteFleuve> {
     final p = E['pagaies'] as Map;
     if (_n(f['courante']) > 0) _prechargerEtape(cle, _n(f['courante'])); // l'étape qu'on va toucher : sa fenêtre s'ouvrira sans attente
     final etapes = ((f['etapes'] as List?) ?? []).cast<Map>();
-    final enfants = <Widget>[
-      Row(children: [Expanded(child: Text(_leMaj(F.nom), style: K.titre(36))), _pagaies(p, key: kPagaies)]),
+    final publie = _n(f['publiees']) > 0;
+    final haut = <Widget>[
+      Row(children: [
+        Expanded(child: Text(_leMaj(F.nom), style: K.titre(publie ? 30 : 36))),
+        _pagaies(p, key: kPagaies),
+        // Un seul défilement : la fenêtre tient dans l'écran ; la croix remplace « Fermer » en bas.
+        if (publie) ...[const SizedBox(width: 8), _Croix(_fermer)],
+      ]),
       const Ecart(8),
-      KeyedSubtree(key: kOnglets, child: Onglets([for (final k in fleuvesOuverts()) (k, '${_fleuves[k]!.nom} · ${_fleuves[k]!.jeuNom}')], cle, (k) => setState(() => cle = k))),
+      // Le nom seul sur l'onglet (une seule ligne) ; le jeu du fleuve est écrit juste dessous.
+      KeyedSubtree(key: kOnglets, child: _OngletsFleuves(cle, (k) => setState(() => cle = k))),
       const Ecart(8),
       Row(children: [
-        Text('Étoiles ', style: K.texte(13, couleur: K.muted)),
         Text('★ ${f['etoiles']}', style: K.texte(13, couleur: K.brass, poids: FontWeight.w700)),
-        const Spacer(),
-        Flexible(child: Muet(_n(p['restantes']) < _n(p['max']) ? 'Nouvelles pagaies dans ${dureeLisible(_n(p['retourMs']))}' : 'Une pagaie se perd à chaque échec', taille: 13, align: TextAlign.right)),
+        Text(' · ', style: K.texte(13, couleur: K.muted)),
+        Text(F.jeuNom, style: K.texte(13, couleur: K.ink.withValues(alpha: .75))),
+        const SizedBox(width: 8),
+        Expanded(child: Muet(_n(p['restantes']) < _n(p['max']) ? 'Nouvelles pagaies dans ${dureeLisible(_n(p['retourMs']))}' : 'Une pagaie se perd à chaque échec', taille: 13, align: TextAlign.right)),
       ]),
       const Ecart(8),
     ];
-    if (_n(f['publiees']) == 0) {
-      enfants.add(Text('${_leMaj(F.nom)} ouvre bientôt. Reviens dans quelques jours !', style: K.texte(15)));
-    } else {
-      final biefMax = math.max(1, (etapes.length / _parBief).ceil());
-      final bief = math.min(biefMax, _biefVu[cle] ?? _n(f['bief']));
-      _biefVu[cle] = bief;
-      final debut = (bief - 1) * _parBief + 1;
-      final ici = etapes.where((e) => _n(e['n']) >= debut && _n(e['n']) < debut + _parBief).toList();
-      final villes = ici.where((e) => e['escale'] == true).map((e) => e['ville'].toString()).toList();
-      final course = ((f['course'] as Map?)?['lignes'] as List?)?.cast<Map>() ?? const <Map>[];
-      final m = _marques(f['marques'] as Map?);
-      enfants.addAll([
-        Row(children: [
-          Expanded(child: Btn(course.length > 1 ? '🏁 Course : ${course.first['moi'] == true ? 'tu mènes' : '${course.first['pseudo']} mène'}' : '🏁 Course de la semaine', onTap: () => _course(cle))),
-          const SizedBox(width: 8),
-          Expanded(child: Btn('Partager', onTap: () => _partager(cle))),
-        ]),
-        const Ecart(8),
-        if (m != null) ...[m, const Ecart(8)],
-        Row(children: [
-          TextButton(onPressed: bief <= 1 ? null : () => setState(() => _biefVu[cle] = bief - 1), child: Text('‹ Avant', style: K.texte(13, couleur: bief <= 1 ? K.muted : K.brass))),
-          Expanded(child: Text('Bief $bief${villes.isEmpty ? '' : ' · ${villes.first}${villes.length > 1 ? ' → ${villes.last}' : ''}'}', textAlign: TextAlign.center, style: K.texte(13, couleur: K.muted))),
-          TextButton(onPressed: bief >= biefMax ? null : () => setState(() => _biefVu[cle] = bief + 1), child: Text('Après ›', style: K.texte(13, couleur: bief >= biefMax ? K.muted : K.brass))),
-        ]),
-        _Carte(key: ValueKey('$cle:$bief'), cle: cle, f: f, etapes: ici, kPagaies: kPagaies, kOnglets: kOnglets),
+    if (!publie) {
+      return Fenetre(largeur: 460, enfants: [
+        ...haut,
+        Text('${_leMaj(F.nom)} ouvre bientôt. Reviens dans quelques jours !', style: K.texte(15)),
+        const Ecart(10), Btn('Fermer', large: true, onTap: _fermer),
       ]);
     }
-    enfants.addAll([const Ecart(10), Btn('Fermer', large: true, onTap: () { app.fermerFenetre(); app.maj(); })]);
-    return Fenetre(largeur: 460, enfants: enfants);
+    final biefMax = math.max(1, (etapes.length / _parBief).ceil());
+    final bief = math.min(biefMax, _biefVu[cle] ?? _n(f['bief']));
+    _biefVu[cle] = bief;
+    final debut = (bief - 1) * _parBief + 1;
+    final ici = etapes.where((e) => _n(e['n']) >= debut && _n(e['n']) < debut + _parBief).toList();
+    final villes = ici.where((e) => e['escale'] == true).map((e) => e['ville'].toString()).toList();
+    final course = ((f['course'] as Map?)?['lignes'] as List?)?.cast<Map>() ?? const <Map>[];
+    final m = _marques(f['marques'] as Map?);
+    final biefCourant = _n(f['courante']) > 0 ? (_n(f['courante']) / _parBief).ceil() : null;
+    Text uneLigne(String t) => Text(t, maxLines: 1, overflow: TextOverflow.ellipsis, style: K.texte(14, couleur: K.ink, poids: FontWeight.w600));
+    const marge = EdgeInsets.symmetric(horizontal: 10, vertical: 8);
+    haut.addAll([
+      Row(children: [
+        Expanded(child: Btn(null, marge: marge, enfant: uneLigne(course.length > 1 ? '🏁 Course : ${course.first['moi'] == true ? 'tu mènes' : '${course.first['pseudo']} mène'}' : '🏁 Course de la semaine'), onTap: () => _course(cle))),
+        const SizedBox(width: 8),
+        Btn(null, marge: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), enfant: uneLigne('Partager'), onTap: () => _partager(cle)), // juste sa place, la course prend le reste
+      ]),
+      const Ecart(4),
+      if (m != null) ...[m, const Ecart(4)],
+      Row(children: [
+        TextButton(onPressed: bief <= 1 ? null : () => setState(() => _biefVu[cle] = bief - 1), style: TextButton.styleFrom(visualDensity: VisualDensity.compact), child: Text('‹ Avant', style: K.texte(13, couleur: bief <= 1 ? K.muted : K.brass))),
+        Expanded(child: Text('Bief $bief${villes.isEmpty ? '' : ' · ${villes.first}${villes.length > 1 ? ' → ${villes.last}' : ''}'}', textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: K.texte(13, couleur: K.muted))),
+        TextButton(onPressed: bief >= biefMax ? null : () => setState(() => _biefVu[cle] = bief + 1), style: TextButton.styleFrom(visualDensity: VisualDensity.compact), child: Text('Après ›', style: K.texte(13, couleur: bief >= biefMax ? K.muted : K.brass))),
+      ]),
+    ]);
+    final carte = _Carte(
+      key: ValueKey('$cle:$bief'), cle: cle, f: f, etapes: ici, kPagaies: kPagaies, kOnglets: kOnglets,
+      // Mon étape est sur un autre bief : le bouton « Mon étape » y ramène.
+      autreBief: biefCourant != null && biefCourant != bief ? () => setState(() => _biefVu[cle] = biefCourant) : null,
+    );
+    // La fenêtre prend la hauteur de l'écran et ne défile plus : seule la carte défile.
+    // Téléphone couché : les infos à gauche, la carte à droite sur toute la hauteur.
+    final taille = MediaQuery.of(context).size;
+    final couche = taille.width > taille.height && taille.height < 600;
+    final colonne = Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: haut);
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.all(couche ? 8 : 14),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: couche ? 880 : 460),
+          child: SizedBox(
+            height: couche ? taille.height - 16 : math.min(taille.height * .9, 880.0),
+            child: DecoratedBox(
+              decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), boxShadow: const [BoxShadow(color: Color(0x80000000), blurRadius: 50, offset: Offset(0, 20))]),
+              child: Material(
+                color: K.table2,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: K.line)),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: couche
+                      ? Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                          SizedBox(width: math.min(380.0, (taille.width - 16) * .46), child: SingleChildScrollView(child: colonne)),
+                          const SizedBox(width: 12),
+                          Expanded(child: carte),
+                        ])
+                      : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [colonne, Expanded(child: carte)]),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
+}
+
+/// La croix de la carte du Fleuve (comme sur le site).
+class _Croix extends StatelessWidget {
+  final VoidCallback onTap;
+  const _Croix(this.onTap);
+  @override
+  Widget build(BuildContext context) => Semantics(
+        button: true, label: 'Fermer',
+        child: Material(
+          color: const Color(0x12FFFFFF),
+          shape: const CircleBorder(side: BorderSide(color: K.line)),
+          child: InkWell(customBorder: const CircleBorder(), onTap: onTap, child: const SizedBox(width: 36, height: 36, child: Icon(Icons.close, size: 20, color: K.muted))),
+        ),
+      );
+}
+
+/// Les fleuves sur une seule ligne, leur nom seul ; trop nombreux pour la largeur : la ligne glisse.
+class _OngletsFleuves extends StatelessWidget {
+  final String actif;
+  final ValueChanged<String> onChange;
+  const _OngletsFleuves(this.actif, this.onChange);
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(color: const Color(0x40000000), borderRadius: BorderRadius.circular(12)),
+        child: LayoutBuilder(builder: (context, c) {
+          // Comme sur le site (flex: 1 0 auto) : chaque onglet a la largeur de son nom, et la place qui reste est partagée.
+          final style = K.texte(14, poids: FontWeight.w600), liste = fleuvesOuverts();
+          final larg = [for (final k in liste) (TextPainter(text: TextSpan(text: _fleuves[k]!.nom, style: style), textDirection: TextDirection.ltr, textScaler: MediaQuery.textScalerOf(context))..layout()).width + 21];
+          final reste = math.max(0.0, c.maxWidth - larg.fold(0.0, (a, b) => a + b)) / math.max(1, liste.length);
+          return SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(children: [
+              for (var i = 0; i < liste.length; i++)
+                Semantics(
+                  button: true, selected: liste[i] == actif, label: '${_fleuves[liste[i]]!.nom}, ${_fleuves[liste[i]]!.jeuNom}',
+                  child: GestureDetector(
+                    onTap: () => onChange(liste[i]),
+                    child: Container(
+                      width: larg[i] + reste,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(color: liste[i] == actif ? K.brass : Colors.transparent, borderRadius: BorderRadius.circular(9)),
+                      alignment: Alignment.center,
+                      child: ExcludeSemantics(child: Text(_fleuves[liste[i]]!.nom, maxLines: 1, softWrap: false, style: style.copyWith(color: liste[i] == actif ? K.encre : K.muted))),
+                    ),
+                  ),
+                ),
+            ]),
+          );
+        }),
+      );
 }
 
 /// La carte : le fleuve serpente de bas en haut (on le remonte depuis la mer), une étape tous les 74 px.
@@ -477,7 +579,9 @@ class _Carte extends StatefulWidget {
   final Map f;
   final List<Map> etapes;
   final GlobalKey kPagaies, kOnglets;
-  const _Carte({super.key, required this.cle, required this.f, required this.etapes, required this.kPagaies, required this.kOnglets});
+  /// Mon étape est sur un autre bief : « Mon étape » y ramène.
+  final VoidCallback? autreBief;
+  const _Carte({super.key, required this.cle, required this.f, required this.etapes, required this.kPagaies, required this.kOnglets, this.autreBief});
   @override
   State<_Carte> createState() => _CarteState();
 }
@@ -489,9 +593,19 @@ class _CarteState extends State<_Carte> with TickerProviderStateMixin {
   final kCourante = GlobalKey(), kEscale = GlobalKey();
   int? glisseDe, brume, cadenasAvant;
   late final AnimationController glisse, leve;
+  /// Mon étape est hors de vue (on a fait défiler) : le bouton « Mon étape » apparaît.
+  final horsVue = ValueNotifier(false);
+  double? yCourante;
+  void _voir() {
+    final y = yCourante;
+    if (y == null || !defile.hasClients) return;
+    final o = defile.offset, v = defile.position.viewportDimension;
+    horsVue.value = y < o - 20 || y > o + v + 20;
+  }
   @override
   void initState() {
     super.initState();
+    defile.addListener(_voir);
     glisseDe = _glisse.remove(widget.cle);
     brume = _brume.remove(widget.cle);
     glisse = AnimationController(vsync: this, duration: const Duration(milliseconds: 1400));
@@ -501,20 +615,22 @@ class _CarteState extends State<_Carte> with TickerProviderStateMixin {
     if (brume != null) leve.forward();
   }
   @override
-  void dispose() { glisse.dispose(); leve.dispose(); defile.dispose(); super.dispose(); }
+  void dispose() { glisse.dispose(); leve.dispose(); defile.dispose(); horsVue.dispose(); super.dispose(); }
 
   @override
   Widget build(BuildContext context) {
     final f = widget.f, etapes = widget.etapes, courante = f['courante'];
-    final hautVue = math.min(MediaQuery.of(context).size.height * .55, 520.0);
     final suite = f['suiteBientot'] == true && etapes.isNotEmpty && _n(etapes.last['n']) == _n(f['publiees']);
     final haut = suite ? 110.0 : 60.0;
     return LayoutBuilder(builder: (context, c) {
+      // La carte prend toute la place qu'on lui laisse (la fenêtre tient dans l'écran).
+      final hautVue = c.maxHeight.isFinite ? c.maxHeight : math.min(MediaQuery.of(context).size.height * .55, 520.0);
       final L = math.min(380.0, c.maxWidth);
       final H = bas + haut + pas * math.max(0, etapes.length - 1);
       Offset pos(num i) => Offset(L / 2 + (L / 2 - 52) * math.sin(i * .72), H - bas - i * pas);
       final pts = [for (var i = 0; i < etapes.length; i++) pos(i)];
       final iCour = etapes.indexWhere((e) => e['n'] == courante);
+      yCourante = iCour >= 0 ? pts[iCour].dy : null;
       if (!place) {
         place = true;
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -620,7 +736,7 @@ class _CarteState extends State<_Carte> with TickerProviderStateMixin {
       }
       if (suite) enfants.add(Positioned(top: 24, left: 0, right: 0, child: Text('La suite du fleuve arrive bientôt…', textAlign: TextAlign.center, style: K.texte(13, couleur: const Color(0xFFFFF3D0)))));
       return Container(
-        height: hautVue,
+        height: c.maxHeight.isFinite ? null : hautVue,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: K.line),
@@ -652,6 +768,31 @@ class _CarteState extends State<_Carte> with TickerProviderStateMixin {
                   ]),
                 )))),
               ]));
+            },
+          ),
+          // « Mon étape » : revient sur la pirogue (ou sur son bief) quand elle n'est plus à l'écran.
+          ValueListenableBuilder<bool>(
+            valueListenable: horsVue,
+            builder: (_, hors, _) {
+              final ailleurs = widget.autreBief != null;
+              if (!hors && !ailleurs) return const SizedBox.shrink();
+              return Positioned(right: 10, bottom: 10, child: Material(
+                color: const Color(0xEB10233A),
+                shape: const StadiumBorder(side: BorderSide(color: Color(0xFFF3E7C9))),
+                elevation: 3, shadowColor: const Color(0x66000000),
+                child: InkWell(
+                  customBorder: const StadiumBorder(),
+                  onTap: ailleurs ? widget.autreBief : () {
+                    final y = yCourante; if (y == null || !defile.hasClients) return;
+                    final cible = (y - defile.position.viewportDimension / 2).clamp(0.0, defile.position.maxScrollExtent);
+                    if (app.sansAnim) { defile.jumpTo(cible); } else { defile.animateTo(cible, duration: const Duration(milliseconds: 450), curve: Curves.easeInOut); }
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    child: Text(ailleurs ? '🛶 Mon étape (${_n(widget.f['courante'])})' : '🛶 Mon étape', style: K.texte(13.5, couleur: const Color(0xFFFFF3D0), poids: FontWeight.w600)),
+                  ),
+                ),
+              ));
             },
           ),
         ]),
