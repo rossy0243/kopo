@@ -7,6 +7,7 @@ const SK = require('../../src/kopo-salle.js');
 const SI = require('../../src/inter8-salle.js');
 const K = require('../../moteur/kopo-moteur.js');
 const { OBJECTIFS, creerSuivi } = require('./fleuve-suivi');
+const { finaleOk } = require('./fleuve-donne');
 
 // Le jeu de chaque fleuve : le Congo, le Kasaï et le Nil au Kopo ; le Niger et l'Oubangui à l'Inter (8).
 // Chaque fleuve a son interrupteur dans l'admin (réglage fleuve.fleuves) ; le Congo et le Niger sont ouverts au départ.
@@ -217,7 +218,39 @@ function candidat(fleuve, numero, recette, rng, familles) {
   const pieges = [];
   const dispo = Object.keys(PIEGES).filter((k) => PIEGES[k].jeux.includes(jeu) && bief >= des('piege_' + k, PIEGES[k].des));
   if (dispo.length && rng() * 100 < (escale ? recette.piege.escale : recette.piege.autre)) pieges.push(choisir(rng, dispo));
-  return { fleuve, numero, bief, jeu, joueurs, objectif: o, famille: OBJECTIFS[type].famille, pieges, graine: Math.floor(rng() * 4294967296) >>> 0, escale };
+  const e = { fleuve, numero, bief, jeu, joueurs, objectif: o, famille: OBJECTIFS[type].famille, pieges, escale };
+  return { ...e, graine: graineJouable(e, rng) };
+}
+// Une donne où la finale peut se gagner (Kopo : fleuve-donne.js) : sans elle, gagner la partie, et la 3e étoile qui
+// en dépend, ne viendraient que d'une erreur des robots. Environ 4 donnes sur 10 conviennent : 200 tirages suffisent.
+function graineJouable(e, rng) {
+  let g = 0;
+  for (let k = 0; k < 200; k++) { g = Math.floor(rng() * 4294967296) >>> 0; if (finaleOk({ ...e, graine: g })) return g; }
+  return g;
+}
+
+// Étape déjà fabriquée dont la finale est perdue d'avance : nouvelle donne gagnable, robots recalibrés sur la même
+// réussite visée, seuils d'étoiles refaits. Le reste (objectif, table, pièges) ne change pas. null : rien à faire.
+async function reparerFinale(etape, recette) {
+  const r = recette || RECETTE_DEFAUT;
+  if (finaleOk(etape)) return null;
+  const rng = hasard((etape.graine ^ 0x9e3779b9) >>> 0);
+  const cible = etape.vise || tauxVise(etape.note || noteVisee(etape.numero, r), r);
+  let meilleure = null;
+  for (let k = 0; k < Math.max(1, r.essais); k++) {
+    const e = { ...etape, graine: graineJouable(etape, rng), testeur: r.testeur };
+    if (!finaleOk(e)) continue;
+    const cal = await calibrer(e, cible, r, e.graine);
+    if (cal.infaisable) continue;
+    const ecart = Math.abs(cal.taux - cible);
+    if (!meilleure || ecart < meilleure.ecart) meilleure = { e, cal, ecart };
+    if (ecart <= r.tolerance) break;
+  }
+  if (!meilleure) return null;
+  const { testeur, ...e } = { ...meilleure.e, d: meilleure.cal.d };
+  const l = await essaisEtoiles({ ...e, testeur: r.testeur }, r);
+  const taux = Math.round(tauxDe(l));
+  return { ...e, ...niveauDe(e.d), taux, seuils: seuilsDe(l, r), seuilsV: SEUILS_VERSION, horsCible: Math.abs(taux - cible) > r.tolerance };
 }
 
 // Cherche la force des robots qui donne la réussite visée. Renvoie { d, taux } ou null si l'objectif est
@@ -293,4 +326,4 @@ function verifierRecette(v) {
   return out;
 }
 
-module.exports = { completerRecette, verifierRecette, FLEUVES, ETAPES_PAR_BIEF, ETAPES_PAR_VILLE, PIEGES, RECETTE_DEFAUT, TYPES, niveauDe, noteVisee, tauxVise, placerRobots, essai, essais, seuilsDe, essaisEtoiles, PLANCHER, recalculerSeuils, SEUILS_VERSION, candidat, calibrer, fabriquerEtape, sallePour, DELAI, DELAI_PIEGE };
+module.exports = { completerRecette, verifierRecette, FLEUVES, ETAPES_PAR_BIEF, ETAPES_PAR_VILLE, PIEGES, RECETTE_DEFAUT, TYPES, niveauDe, noteVisee, tauxVise, placerRobots, essai, essais, seuilsDe, essaisEtoiles, PLANCHER, recalculerSeuils, SEUILS_VERSION, candidat, calibrer, fabriquerEtape, reparerFinale, graineJouable, sallePour, DELAI, DELAI_PIEGE };

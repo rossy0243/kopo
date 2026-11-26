@@ -2570,6 +2570,12 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     const rare = [...Array(100)].map((_, i) => ({ reussi: true, score: i < 6 ? 13 : i < 30 ? 2 : 1 })).concat([...Array(100)].map(() => ({ reussi: false, score: 0 })));
     const sr = FG.seuilsDe(rare), part = (v) => rare.filter((r) => r.reussi && r.score >= v).length;
     assert.ok(part(sr.trois) >= 25 && part(sr.deux) >= 50 && sr.deux <= sr.trois, 'plancher des étoiles : ' + JSON.stringify(sr));
+    // Finale perdue d'avance : petites cartes contre grosses cartes des mêmes couleurs. Fabrication : toujours gagnable.
+    const FD = require('../src/fleuve-donne');
+    assert.strictEqual(FD.finaleGagnable({ moi: ['2P', '3P', '2C', '3C'], adv: ['10P', '9P', '10C', '9C'] }, 'moi'), false);
+    assert.strictEqual(FD.finaleGagnable({ moi: ['10P', '9P', '10C', '9C'], adv: ['2P', '3P', '2C', '3C'] }, 'adv'), true);
+    assert.strictEqual(FD.finaleGagnable({ moi: ['2P', '3P', '4P', '5P'], adv: ['10P', '9P', '10C', '9C'] }, 'adv'), true, 'Katapss');
+    for (let n = 1; n <= 20; n++) assert.ok(FD.finaleOk(FG.candidat('congo', n, FG.RECETTE_DEFAUT, require('../../moteur/kopo-moteur.js').hasard(n), [])), 'finale gagnable, étape ' + n);
     // Quand les essais réussis font les meilleurs scores (cas courant au Kopo), rien ne change.
     const bon = [...Array(50)].map((_, i) => ({ reussi: i >= 25, score: i }));
     assert.deepStrictEqual(FG.seuilsDe(bon), FG.seuilsDe(bon.map((r) => ({ score: r.score }))));
@@ -2635,10 +2641,24 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     const apres = await lire(5);
     assert.strictEqual(apres.version, avant.version, 'même étape, même version');
     assert.strictEqual(apres.recette.seuilsV, FG.SEUILS_VERSION);
-    assert.ok(apres.recette.seuils.trois < 999 && apres.recette.seuils.deux < apres.recette.seuils.trois, JSON.stringify(apres.recette.seuils));
+    assert.ok(apres.recette.seuils.trois < 999 && apres.recette.seuils.deux <= apres.recette.seuils.trois, JSON.stringify(apres.recette.seuils));
     assert.strictEqual((await srv.base.query("SELECT etoiles FROM fleuve_etoiles WHERE compte_id = $1 AND fleuve = 'congo' AND numero = 5", [id])).rows[0].etoiles, 3);
     assert.deepStrictEqual(await srv.fleuve.recalculerSeuils(), { faites: 0, etoiles: 0 }, 'une seule fois');
     await srv.base.query("DELETE FROM fleuve_etoiles WHERE compte_id = $1 AND fleuve = 'congo' AND numero = 5", [id]);
+  });
+  await test('Fleuve : une finale perdue d\'avance reçoit une donne gagnable au démarrage', async () => {
+    const FD = require('../src/fleuve-donne');
+    const lire = async (n) => { const r = (await srv.base.query("SELECT recette, version FROM fleuve_etapes WHERE fleuve = 'congo' AND numero = $1", [n])).rows[0]; return { ...r, recette: typeof r.recette === 'string' ? JSON.parse(r.recette) : r.recette }; };
+    const avant = await lire(6);
+    let g = 1;
+    while (FD.finaleOk({ ...avant.recette, graine: g })) g++;
+    await srv.base.query("UPDATE fleuve_etapes SET recette = $1 WHERE fleuve = 'congo' AND numero = 6", [JSON.stringify({ ...avant.recette, graine: g })]);
+    assert.deepStrictEqual(await srv.fleuve.reparerFinales(), { faites: 1 });
+    const apres = await lire(6);
+    assert.ok(FD.finaleOk(apres.recette) && apres.recette.graine !== g, 'nouvelle donne gagnable');
+    assert.strictEqual(apres.version, avant.version + 1);
+    assert.strictEqual(apres.recette.objectif.type, avant.recette.objectif.type, 'même objectif');
+    assert.deepStrictEqual(await srv.fleuve.reparerFinales(), { faites: 0 }, 'rien à refaire');
   });
   await test('Fleuve : fermé aux joueurs, puis aux testeurs, puis ouvert', async () => {
     gF = await connexionG('sb-fleuve-a', { providerId: 'g-fleuve-a' });
