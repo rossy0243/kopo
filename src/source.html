@@ -192,7 +192,7 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
 .bilan { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .bilan li { display: flex; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--line); padding: 5px 0; }
 .chrono { height: 4px; border-radius: 2px; background: rgba(255,255,255,.12); overflow: hidden; }
-.chrono span { display: block; height: 100%; background: var(--brass); width: 100%; }
+.chrono span { display: block; height: 100%; background: var(--brass); width: 100%; transform-origin: left center; will-change: transform; }
 .chrono.urgent span { background: var(--bad); }
 .secondes { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--brass); }
 .secondes.urgent { color: var(--bad); }
@@ -2047,13 +2047,9 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
 </div>
 <div id="filChat" role="log" aria-live="polite" aria-label="Chat de la partie"></div>
 
-<script>kopoChargement(5, 0, 34)</script>
-<script>/*MQTT*/</script>
-<script>kopoChargement(34, 0, 44)</script>
+<script>kopoChargement(5, 0, 44)</script>
 <script>/*COLYSEUS*/</script>
-<script>kopoChargement(44, 0, 52)</script>
-<script>/*PEERJS*/</script>
-<script>kopoChargement(52, 0, 57)</script>
+<script>kopoChargement(44, 0, 57)</script>
 <script>/*QRCODE*/</script>
 <script>kopoChargement(57, 0, 59)</script>
 <script>/*MOTEUR*/</script>
@@ -2254,6 +2250,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       setTimeout(cb.pret, 0);
       return { envoyer: envoyerA, fermer: () => bc.close() };
     }
+    if (typeof mqtt === 'undefined') { setTimeout(() => cb.erreur("La bibliothèque réseau n'a pas pu se charger."), 0); return { envoyer() {}, fermer() {} }; }
     let pret = false, nbOk = 0;
     const clients = RELAIS.map((url) => {
       const c = mqtt.connect(url, { clientId: idClientMqtt(), keepalive: 20, reconnectPeriod: 2000, connectTimeout: 6000, clean: true });
@@ -2284,6 +2281,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       setTimeout(cb.ouvert, 0);
       return { envoyer: (msg) => bc.postMessage({ sujet: sujetHote(code), texte: emballer(msg) }), fermer: () => bc.close(), changerRelais() {} };
     }
+    if (typeof mqtt === 'undefined') { setTimeout(() => cb.erreur("La bibliothèque réseau n'a pas pu se charger."), 0); return { envoyer() {}, changerRelais() {}, fermer() {} }; }
     let i = 0, c = null, ferme = false, repondu = false, essais = 0, minuteur = null;
     function connecter() {
       if (ferme) return;
@@ -2901,6 +2899,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     const finAvant = finChrono;
     demarrerChrono(v);
     if (v.enPause) finChrono = null; // chrono figé : pas de tic-tac ni de décompte
+    lancerChrono();
     if (!ancienne || ancienne.etat !== v.etat || ancienne.numeroManche !== v.numeroManche) { carteChoisie = null; choixInter = []; cartesRecues.clear(); }
     if (v.jeu !== 'inter8') suivrePartie(v); // Inter (8) : l'XP et les missions viendront à l'étape de la progression
     if (v.etat !== 'finPartie') { arreterSuiteAuto(); derniersAdversaires = null; } // nouvelle partie : la liste de la précédente ne vaut plus
@@ -3445,6 +3444,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   }
 
   function afficherPartie(v) {
+    lancerChrono(); // redessin direct (carte choisie…) : le chrono se remet à jour à la prochaine image
     montrerEcran('ecranPartie');
     if (!(v.manche && v.manche.joueurCourant === v.moi)) inviterPaysage();
     const m = v.manche;
@@ -3669,6 +3669,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     return r;
   }
   function afficherPartieInter(v) {
+    lancerChrono();
     montrerEcran('ecranPartie');
     if (!(v.manche && v.manche.joueurCourant === v.moi)) inviterPaysage();
     const m = v.manche;
@@ -4115,9 +4116,23 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     if (v && v.chrono && m && !m.pause && m.joueurCourant === v.moi && sec <= 3 && sec > 0 && sec !== dernierTic) Sons.jouer('tic');
     dernierTic = sec;
     document.querySelectorAll('.secondes').forEach((e) => { e.textContent = sec + ' s'; e.classList.toggle('urgent', urgent); });
-    document.querySelectorAll('.chrono').forEach((c) => { if (c.classList.contains('barre-pause')) { c.firstChild.style.width = (100 * reste / (totalChrono || 1)) + '%'; return; } c.firstChild.style.width = (100 * reste / (totalChrono || 1)) + '%'; c.classList.toggle('urgent', urgent); });
+    // La barre rétrécit avec transform (pas de recalcul de la mise en page à chaque image, contrairement à width).
+    const k = 'scaleX(' + (reste / (totalChrono || 1)).toFixed(4) + ')';
+    document.querySelectorAll('.chrono').forEach((c) => { if (c.firstChild) c.firstChild.style.transform = k; if (!c.classList.contains('barre-pause')) c.classList.toggle('urgent', urgent); });
   }
-  (function boucle() { majChrono(); requestAnimationFrame(boucle); })();
+  // La boucle ne tourne que pendant un décompte (tour, pause, compte à rebours) : rien sur l'accueil, le salon
+  // ou quand le chrono est arrivé à zéro. Chaque nouvel affichage la relance pour au moins une image,
+  // pour que les éléments tout juste redessinés montrent le bon temps.
+  let boucleChrono = false;
+  function lancerChrono() {
+    if (boucleChrono) return;
+    boucleChrono = true;
+    requestAnimationFrame(function boucle() {
+      majChrono();
+      if (finChrono != null && performance.now() < finChrono) requestAnimationFrame(boucle);
+      else boucleChrono = false;
+    });
+  }
 
   // ------------------------------------------------------------------ micro (abonnés Kopo+)
   // Seuls les abonnés Kopo+ parlent et s'entendent : la voix passe par un serveur LiveKit, et le serveur du jeu
@@ -9042,8 +9057,14 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       fermer(!pret);
     })();
   })();
-  if (typeof mqtt === 'undefined' && !LOCAL && !MODE_SERVEUR) montrerBandeau("La bibliothèque réseau n'a pas pu se charger.", 'echec');
-  lobby.demarrer();
+  // Mode relais (sans serveur de jeu, cas de secours) : la bibliothèque MQTT (≈ 340 Ko) n'est plus dans la page,
+  // on ne la télécharge que dans ce cas. Avec le serveur (le cas normal), elle n'est jamais chargée.
+  if (!LOCAL && !MODE_SERVEUR) {
+    const s = document.createElement('script'); s.src = SERVEUR + '/vendor/mqtt.js'; s.async = true;
+    s.onload = () => lobby.demarrer();
+    s.onerror = () => { montrerBandeau("La bibliothèque réseau n'a pas pu se charger.", 'echec'); lobby.demarrer(); };
+    document.head.append(s);
+  } else lobby.demarrer();
   const codeLien = location.hash.slice(1).toUpperCase();
   if (session && (!/^[A-Z]{4}$/.test(codeLien) || codeLien === session.code)) {
     if (session.role === 'serveur' && MODE_SERVEUR) entrerServeur(session.nom, { reconnexion: session.jetonReco, code: session.code, taille: session.taille });

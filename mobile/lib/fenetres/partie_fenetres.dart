@@ -226,14 +226,25 @@ class _Decompte extends StatefulWidget {
 }
 
 class _DecompteState extends State<_Decompte> {
-  late final Timer _t = Timer.periodic(const Duration(milliseconds: 250), (_) { if (mounted) setState(() {}); });
+  // Comme la boucle du chrono du site : on ne redessine que quand la seconde change, et on s'arrête à zéro
+  // (relancé au prochain affichage s'il reste du temps).
+  Timer? _t;
+  int _s = -1;
+  int get _ms => widget.fin != null ? math.max(0, widget.fin!.difference(DateTime.now()).inMilliseconds) : app.resteChrono;
+  void _tic(Timer t) {
+    if (!mounted) return;
+    final ms = _ms;
+    if (ms <= 0) t.cancel();
+    if ((ms / 1000).ceil() != _s) setState(() {});
+  }
   @override
-  void dispose() { _t.cancel(); super.dispose(); }
+  void dispose() { _t?.cancel(); super.dispose(); }
   @override
   Widget build(BuildContext context) {
-    _t.isActive;
-    final ms = widget.fin != null ? math.max(0, widget.fin!.difference(DateTime.now()).inMilliseconds) : app.resteChrono;
-    return widget.builder((ms / 1000).ceil());
+    final ms = _ms;
+    if (ms > 0 && !(_t?.isActive ?? false)) _t = Timer.periodic(const Duration(milliseconds: 250), _tic);
+    _s = (ms / 1000).ceil();
+    return widget.builder(_s);
   }
 }
 

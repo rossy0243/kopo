@@ -7,7 +7,7 @@ Ce dépôt est public pour que le jeu puisse être mis en ligne. Cela ne donne a
 droit de copier, modifier, publier, distribuer, vendre ou réutiliser tout ou partie
 de son contenu, sans autorisation écrite de l'auteur.
 
-Les bibliothèques libres du dossier vendor/ (MQTT.js, colyseus.js, PeerJS,
+Les bibliothèques libres du dossier vendor/ (MQTT.js, colyseus.js,
 qrcode-generator) et les dépendances du serveur restent soumises à leur propre
 licence.
 
