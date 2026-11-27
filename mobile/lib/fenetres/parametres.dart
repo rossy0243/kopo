@@ -20,6 +20,25 @@ Map<String, dynamic> _quotaLocal() {
   final r = (2 - l.length).clamp(0, 2);
   return {'restants': r, 'prochain': r > 0 ? null : DateTime.parse(l[l.length - 2]).add(const Duration(days: 365)).toIso8601String()};
 }
+/// Liens légaux de Paramètres : `liens.pages` de /config (modifiables dans le tableau de bord sans mise à jour),
+/// sinon les conditions et la confidentialité. Chaque entrée : (titre, adresse).
+List<(String, String)> _pagesLegales() {
+  final l = app.config?['liens'] is Map ? app.config!['liens']['pages'] : null;
+  final pages = [
+    if (l is List)
+      for (final p in l)
+        if (p is Map && p['lien'] is String && p['titre'] is String) (p['cle'] == 'confidentialite' ? 'Confidentialité' : p['titre'] as String, p['lien'] as String),
+  ];
+  if (pages.isNotEmpty) return pages;
+  return [("Conditions d'utilisation", '${lienMasano}legal/conditions.html'), ('Confidentialité', '${lienMasano}legal/confidentialite.html')];
+}
+/// Versions des stores : la page s'ouvre sans lien vers le reste du site (?appli=1).
+String _lienAppli(String lien) {
+  if (!Api.sansAchats) return lien;
+  final i = lien.indexOf('#');
+  final (base, ancre) = i < 0 ? (lien, '') : (lien.substring(0, i), lien.substring(i));
+  return '$base${base.contains('?') ? '&' : '?'}appli=1$ancre';
+}
 const _mois = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 
 void ouvrirParametres() => app.ouvrirFenetre((context) => const _Parametres(), 'parametres');
@@ -174,11 +193,13 @@ class _ParametresState extends State<_Parametres> {
       const Titre3('Aide'),
       Btn('Apprendre à jouer', large: true, onTap: ouvrirTutoriel),
       const Ecart(8),
-      // Wrap : sur un écran étroit, les deux liens passent l'un sous l'autre au lieu de sortir de la fenêtre.
+      // Pages légales : la liste vient du serveur (tableau de bord, « Pages légales »), sinon les deux pages de départ.
+      // Wrap : sur un écran étroit, les liens passent l'un sous l'autre au lieu de sortir de la fenêtre.
       Wrap(alignment: WrapAlignment.center, crossAxisAlignment: WrapCrossAlignment.center, children: [
-        TextButton(onPressed: () => ouvrirLien('${lienJeu.replaceAll(RegExp(r'#.*$'), '')}legal/conditions.html${Api.sansAchats ? '?appli=1' : ''}'), child: Text("Conditions d'utilisation", style: K.texte(13, couleur: K.brass))),
-        Text('·', style: K.texte(13, couleur: K.muted)),
-        TextButton(onPressed: () => ouvrirLien('${lienJeu.replaceAll(RegExp(r'#.*$'), '')}legal/confidentialite.html${Api.sansAchats ? '?appli=1' : ''}'), child: Text('Confidentialité', style: K.texte(13, couleur: K.brass))),
+        for (final (i, p) in _pagesLegales().indexed) ...[
+          if (i > 0) Text('·', style: K.texte(13, couleur: K.muted)),
+          TextButton(onPressed: () => ouvrirLien(_lienAppli(p.$2)), child: Text(p.$1, style: K.texte(13, couleur: K.brass))),
+        ],
       ]),
       Btn('Remettre les réglages par défaut', large: true, onTap: () { app.prefs = Map.of(App.prefsDefaut); app.enregistrerPrefs(); setState(() {}); }),
       const Ecart(6),

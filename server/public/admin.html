@@ -168,6 +168,18 @@ input:focus, select:focus, textarea:focus { outline: 2px solid rgba(226,176,74,.
 .diff td { font-size: 13.5px; }
 .journal-diff { font-size: 12.5px; color: var(--muted); }
 .journal-diff b { color: var(--encre); font-weight: 500; }
+/* Pages légales : l'éditeur reprend les couleurs des pages du site (legal/_style.css) */
+.tete .sous a { color: var(--laiton); }
+.lg-outils { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0; }
+.lg-outils .btn { padding: 5px 10px; font-size: 13px; }
+.lg-page { background: #10233a; color: #f4ecd8; border: 1px solid var(--ligne); border-radius: 10px; padding: 8px 22px 22px; min-height: 360px; max-height: 70vh; overflow: auto; font: 15.5px/1.6 "Outfit", "Segoe UI", system-ui, sans-serif; }
+.lg-page:focus { outline: 2px solid rgba(226,176,74,.45); }
+.lg-page h2 { font-size: 18px; color: #e2b04a; margin: 24px 0 8px; } .lg-page h3 { font-size: 16px; color: #e2b04a; }
+.lg-page a { color: #e2b04a; } .lg-page table { border-collapse: collapse; width: 100%; } .lg-page th, .lg-page td { text-align: left; padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,.08); vertical-align: top; } .lg-page th { color: #9fb2c8; font-weight: 500; }
+.lg-source { width: 100%; min-height: 420px; font: 13px/1.5 ui-monospace, Menlo, Consolas, monospace; }
+.lg-champs { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 10px 14px; }
+.lg-champs label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+@media (max-width: 700px) { .lg-champs { grid-template-columns: minmax(0, 1fr); } .lg-page { padding: 6px 14px 16px; } }
 </style>
 </head>
 <body>
@@ -189,6 +201,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid rgba(226,176,74,.
   <symbol id="d-fleuve" viewBox="0 0 32 32"><rect x="8" y="4" width="16" height="24" rx="2.5"/><path d="M11 12c2-1.5 3.5 1.5 5 0s3-1.5 5 0M11 17c2-1.5 3.5 1.5 5 0s3-1.5 5 0M11 22c2-1.5 3.5 1.5 5 0s3-1.5 5 0"/><circle cx="21" cy="8.5" r="1.5" class="acc"/></symbol>
   <symbol id="d-annonce" viewBox="0 0 32 32"><path d="M6 13v6h4l9 5V8l-9 5z"/><path d="M23 12a5 5 0 0 1 0 8"/><circle cx="25.5" cy="9" r="1.6" class="acc"/></symbol>
   <symbol id="d-plus" viewBox="0 0 32 32"><circle cx="9" cy="16" r="1.8"/><circle cx="16" cy="16" r="1.8"/><circle cx="23" cy="16" r="1.8"/></symbol>
+  <symbol id="d-legal" viewBox="0 0 32 32"><rect x="8" y="4" width="16" height="24" rx="2.5"/><path d="M12 10h8M12 14h8M12 18h4"/><path d="M18 20l2 2 3.5-4" class="acc"/></symbol>
   <symbol id="d-journal" viewBox="0 0 32 32"><rect x="8" y="4" width="16" height="24" rx="2.5"/><path d="M12 10h8M12 14h8M12 18h5"/></symbol>
 </svg>
 
@@ -352,11 +365,11 @@ const RUBRIQUES = [
   ['Audience et argent', [['audience', 'Audience', 'd-audience'], ['ventes', 'Ventes et paiements', 'd-argent'], ['economie', 'Économie des pièces', 'd-pieces'], ['stickers', 'Stickers', 'd-sticker']]],
   ['Compétition', [['ligue', 'Ligue et saisons', 'd-ligue'], ['bandes', 'Bandes et Match du jour', 'd-bande'], ['fleuve', 'Le Fleuve', 'd-fleuve']]],
   ['Communication', [['notifications', 'Notifications push', 'd-notif'], ['annonces', 'Annonces et événements', 'd-annonce']]],
-  ['Administration', [['reglages', 'Réglages du jeu', 'd-pilotage'], ['journal', 'Journal', 'd-journal']]],
+  ['Administration', [['reglages', 'Réglages du jeu', 'd-pilotage'], ['legal', 'Pages légales', 'd-legal'], ['journal', 'Journal', 'd-journal']]],
 ];
 const ONGLETS_BAS = [['tableau', 'Accueil', 'd-tableau'], ['direct', 'Direct', 'd-direct'], ['joueurs', 'Joueurs', 'd-joueurs'], ['ventes', 'Argent', 'd-argent'], ['plus', 'Plus', 'd-plus']];
 // Page affichée → entrée du menu allumée (la fiche d'un joueur reste sous « Joueurs »).
-const MENU_DE = { fiche: 'joueurs', pilotage: 'reglages' };
+const MENU_DE = { fiche: 'joueurs', pilotage: 'reglages', legalPage: 'legal' };
 const badges = { signalements: 0, suspects: 0, direct: 0 };
 function badge(id) {
   const n = badges[id];
@@ -1442,6 +1455,103 @@ afficher.reglages = async function reglages(onglet) {
     };
   }
   dessiner();
+};
+// --- Pages légales (CGU, confidentialité, pages ajoutées) : gardées sur le serveur, en ligne dès l'enregistrement
+// sur masano.online et dans les applis (elles ouvrent ces pages), sans redéployer le site ni mettre à jour les applis.
+afficher.legal = async function legal() {
+  const { pages } = await api('/legal');
+  $('#contenu').innerHTML = `<div class="tete"><h2>Pages légales</h2><div class="sous">Conditions d'utilisation, politique de confidentialité et autres pages. Un changement enregistré est en ligne tout de suite, sur le site et dans les applis.</div></div>
+    <p class="note">Google Play et l'App Store demandent que la politique de confidentialité reste en ligne, à la même adresse, et qu'elle corresponde à ce que l'appli fait vraiment. Après un changement important, change la date de version et préviens les joueurs avec une annonce (Annonces et événements).</p>
+    <div class="carte"><table><thead><tr><th>Page</th><th>Version du</th><th>Modifiée le</th><th>Dans Paramètres</th><th></th></tr></thead><tbody>
+    ${pages.map((p) => `<tr><td><b>${esc(p.titre)}</b><br><span class="muted">${esc(p.lien)}</span></td><td>${esc(p.versionTexte)}</td><td>${date(p.majLe)}</td><td>${p.visible ? '<span class="ok">oui</span>' : '<span class="muted">non</span>'}</td><td><button class="btn" data-cle="${esc(p.cle)}">Modifier</button></td></tr>`).join('')}
+    </tbody></table></div>
+    <button class="btn" id="lgAjouter">Ajouter une page</button>`;
+  $('#contenu').querySelectorAll('[data-cle]').forEach((b) => (b.onclick = () => aller('legalPage', b.dataset.cle)));
+  $('#lgAjouter').onclick = () => aller('legalPage', null);
+};
+
+afficher.legalPage = async function legalPage(cle) {
+  const auj = new Date(Date.now() + 36e5).toISOString().slice(0, 10); // date de Kinshasa
+  const p = cle ? await api('/legal/' + encodeURIComponent(cle)) : { cle: '', titre: '', version: auj, html: '<h2>1. Titre de la section</h2><p>Texte…</p>', visible: true, fixe: false, historique: [], nouvelle: true };
+  const site = 'https://masano.online/';
+  $('#contenu').innerHTML = `<div class="tete"><h2>${p.nouvelle ? 'Nouvelle page légale' : esc(p.titre)}</h2>
+      <div class="sous"><a href="#" id="lgRetour">← Pages légales</a>${p.nouvelle ? '' : ` · <a href="${site + esc(p.lien)}" target="_blank" rel="noopener">Voir sur le site</a>`}</div></div>
+    <div class="carte"><div class="lg-champs">
+      <label>Titre<input id="lgTitre" value="${esc(p.titre)}" maxlength="120"></label>
+      <label>Version du<span style="display:flex;gap:6px"><input type="date" id="lgVersion" value="${esc(p.version)}"><button class="btn" id="lgAuj" type="button">Aujourd'hui</button></span></label>
+      ${p.nouvelle ? `<label>Adresse de la page<input id="lgCle" placeholder="mentions-legales" maxlength="40"><small>masano.online/legal/page.html?p=<b id="lgCleVue">…</b></small></label>` : ''}
+      <label style="grid-template-columns:auto 1fr;align-items:center;gap:10px"><span class="bascule"><input type="checkbox" id="lgVisible" ${p.visible ? 'checked' : ''} ${p.fixe ? 'disabled' : ''}><span></span></span>Lien dans Paramètres (site et applis)${p.fixe ? ' · toujours visible' : ''}</label>
+    </div>
+    <div class="lg-outils" role="toolbar">
+      <button class="btn" data-cmd="formatBlock" data-v="h2" title="Titre de section">Titre</button>
+      <button class="btn" data-cmd="formatBlock" data-v="h3" title="Sous-titre">Sous-titre</button>
+      <button class="btn" data-cmd="formatBlock" data-v="p">Paragraphe</button>
+      <button class="btn" data-cmd="bold"><b>G</b></button>
+      <button class="btn" data-cmd="italic"><i>I</i></button>
+      <button class="btn" data-cmd="insertUnorderedList">• Liste</button>
+      <button class="btn" data-cmd="insertOrderedList">1. Liste</button>
+      <button class="btn" data-cmd="lien">Lien</button>
+      <button class="btn" data-cmd="unlink">Retirer le lien</button>
+      <button class="btn" data-cmd="removeFormat">Effacer la mise en forme</button>
+      <span style="flex:1"></span>
+      <button class="btn" id="lgMode">Voir le HTML</button>
+    </div>
+    <div class="lg-page" id="lgPage" contenteditable="true"></div>
+    <textarea class="lg-source" id="lgSource" hidden spellcheck="false"></textarea>
+    <p class="muted" style="font-size:12.5px">Titres, paragraphes, gras, listes, liens et tableaux. Les scripts et styles sont retirés à l'enregistrement. Lien vers l'autre page : <code>conditions.html</code> ou <code>confidentialite.html#suppression</code>.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn principal" id="lgEnregistrer">Enregistrer et mettre en ligne</button>${!p.nouvelle && !p.fixe ? '<button class="btn danger" id="lgSupprimer">Supprimer la page</button>' : ''}</div>
+    </div>
+    ${p.historique && p.historique.length ? `<div class="carte"><h3>Versions précédentes</h3><p class="s">Charger une version la met dans l'éditeur : enregistre pour la remettre en ligne.</p><table><thead><tr><th>Remplacée le</th><th>Version du</th><th>Titre</th><th></th></tr></thead><tbody>
+      ${p.historique.map((h) => `<tr><td>${date(h.le)}</td><td>${esc(h.version)}</td><td>${esc(h.titre)}</td><td><button class="btn" data-version="${h.id}">Charger</button></td></tr>`).join('')}</tbody></table></div>` : ''}`;
+  const ed = $('#lgPage'), src = $('#lgSource');
+  ed.innerHTML = p.html;
+  try { document.execCommand('defaultParagraphSeparator', false, 'p'); } catch (e) {}
+  let source = false;
+  const html = () => (source ? src.value : ed.innerHTML);
+  const etat = () => JSON.stringify([$('#lgTitre').value, $('#lgVersion').value, $('#lgVisible').checked, html()]);
+  let origine = etat();
+  reglagesEnCours = { modifs: () => (etat() !== origine ? [1] : []) }; // garde-fou : quitter sans enregistrer demande confirmation
+  $('#lgRetour').onclick = (e) => { e.preventDefault(); aller('legal'); };
+  $('#lgAuj').onclick = () => ($('#lgVersion').value = auj);
+  if ($('#lgCle')) $('#lgCle').oninput = () => { $('#lgCle').value = $('#lgCle').value.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9-]+/g, '-').replace(/^-+/, ''); $('#lgCleVue').textContent = $('#lgCle').value || '…'; };
+  $('#lgMode').onclick = () => {
+    if (source) ed.innerHTML = src.value; else src.value = ed.innerHTML.replace(/(<\/(h2|h3|p|ul|ol|li|table|tr)>)/g, '$1\n');
+    source = !source; ed.hidden = source; src.hidden = !source;
+    $('#lgMode').textContent = source ? 'Voir la page' : 'Voir le HTML';
+    $('#contenu').querySelectorAll('[data-cmd]').forEach((b) => (b.disabled = source));
+  };
+  $('#contenu').querySelectorAll('[data-cmd]').forEach((b) => (b.onmousedown = (e) => e.preventDefault(), b.onclick = () => {
+    ed.focus();
+    if (b.dataset.cmd === 'lien') {
+      const u = prompt('Adresse du lien (https://…, mailto:…, ou conditions.html) :', 'https://');
+      if (u && u !== 'https://') document.execCommand('createLink', false, u.trim());
+      return;
+    }
+    document.execCommand(b.dataset.cmd, false, b.dataset.v || null);
+  }));
+  $('#contenu').querySelectorAll('[data-version]').forEach((b) => (b.onclick = async () => {
+    try {
+      const v = await api(`/legal/${encodeURIComponent(p.cle)}/versions/${b.dataset.version}`);
+      $('#lgTitre').value = v.titre; $('#lgVersion').value = v.version;
+      if (source) src.value = v.html; else ed.innerHTML = v.html;
+      message('Version chargée dans l\'éditeur. Enregistre pour la remettre en ligne.'); window.scrollTo(0, 0);
+    } catch (e) { message(e.message); }
+  }));
+  $('#lgEnregistrer').onclick = async () => {
+    const c = p.nouvelle ? $('#lgCle').value.replace(/-+$/, '') : p.cle;
+    if (p.nouvelle && !/^[a-z0-9][a-z0-9-]{1,39}$/.test(c)) return message('Choisis l\'adresse de la page : lettres, chiffres et tirets.');
+    if (!p.nouvelle && $('#lgVersion').value === p.version && !confirm('La date de version n\'a pas changé. Enregistrer quand même (petite correction) ?')) return;
+    try {
+      const r = await api('/legal/' + encodeURIComponent(c), { methode: 'PUT', corps: { titre: $('#lgTitre').value, version: $('#lgVersion').value, html: html(), visible: $('#lgVisible').checked } });
+      origine = etat(); reglagesEnCours = null;
+      message('Page enregistrée : elle est en ligne sur le site et dans les applis.');
+      aller('legalPage', r.page.cle);
+    } catch (e) { message(e.message); }
+  };
+  if ($('#lgSupprimer')) $('#lgSupprimer').onclick = async () => {
+    if (!confirm(`Supprimer la page « ${p.titre} » ? Son lien ne marchera plus.`)) return;
+    try { await api('/legal/' + encodeURIComponent(p.cle), { methode: 'DELETE' }); reglagesEnCours = null; message('Page supprimée.'); aller('legal'); } catch (e) { message(e.message); }
+  };
 };
 afficher.pilotage = afficher.reglages; // ancien nom de la page
 afficher.annonces = () => afficher.reglages('annonces');

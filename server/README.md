@@ -49,6 +49,7 @@ Toutes les routes ci-dessous existent sous `/api` (site) et `/api/v1` (applis). 
 | Route | Rôle |
 |---|---|
 | `GET /api/config` | Annonce (ou, sans annonce de l'admin, celle de l'événement en cours), `evenement` (`{ nom, fin, pieces, bonus }` ou null : gains des tables gratuites et bonus du jour multipliés, réglé dans Pilotage), maintenance, version minimale, mises des tables, messages du chat ; pour les applis : `supabase` (adresse et clé publique), `mobile` (versions minimales et stores), `miseAJour`, `liens` (CGU, confidentialité, support), `push` |
+| `GET /api/legal`, `GET /api/legal/:cle` | Pages légales (CGU, confidentialité, pages ajoutées) : liste, et une page `{ titre, version, versionTexte, html, autres }`. Lues par `legal/*.html` du site, que les applis ouvrent. Modifiées dans le tableau de bord (« Pages légales »), sans redéploiement ni mise à jour |
 | `POST /api/jeton` | Renouveler son jeton (90 jours de plus) |
 | `GET /api/salles/:code` | Quelle table porte ce code : `{ jeu, salle, etat, joueurs, places… }` (pour rejoindre sans essayer Kopo puis Inter (8)) |
 | `POST/DELETE /api/push/natif` | Applis : enregistrer ou oublier le jeton FCM de l'appareil `{ jeton, plateforme: 'android'\|'ios', appareil }` |

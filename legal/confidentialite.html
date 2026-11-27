@@ -3,8 +3,9 @@
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Masano — Confidentialité</title><link rel="icon" href="../icons/masano-logo.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="../icons/apple-touch-icon.png"><link rel="stylesheet" href="_style.css"></head>
 <body><main>
 <a class="logo" href="../"><img src="../icons/masano-logo.svg" alt="">MASANO</a>
-<h1>Politique de confidentialité</h1>
-<p class="muted">Version du 23 novembre 2026</p>
+<h1 id="titre">Politique de confidentialité</h1>
+<p class="muted" id="version">Version du 27 novembre 2026</p>
+<div id="contenu">
 
 <p>Cette page explique quelles données Masano utilise, pourquoi, et comment les supprimer. Elle vaut pour tous les jeux de Masano (aujourd'hui le Kopo et Inter (8)), sur le site masano.online comme dans l'appli Masano pour Android et iPhone : un seul compte sert pour tous les jeux, et les données ci-dessous sont communes. Responsable : Rossy Mundyo Busyo, Kinshasa, République démocratique du Congo, contact : <a href="mailto:contact@masano.online">contact@masano.online</a>.</p>
 
@@ -13,13 +14,14 @@
 <tr><th>Donnée</th><th>Pourquoi</th></tr>
 <tr><td>Pseudo, numéro (#1234), avatar</td><td>T'afficher aux autres joueurs</td></tr>
 <tr><td>Si tu relies ton compte à Google : ton identifiant Google, ton adresse e-mail, ton nom et ta photo Google</td><td>Retrouver ton compte sur un autre appareil, éviter les comptes multiples. Ton nom et ta photo Google ne sont <b>jamais montrés</b> aux autres joueurs.</td></tr>
-<tr><td>Solde et historique des pièces (et plus tard, des achats)</td><td>Tenir ton solde à jour, corriger une erreur, prouver un achat</td></tr>
+<tr><td>Solde et historique des pièces, achats (bouquets de pièces, Kopo+)</td><td>Tenir ton solde à jour, corriger une erreur, prouver un achat</td></tr>
+<tr><td>Si tu commandes des pièces ou Kopo+ sur le site : ton numéro WhatsApp, ton message et la référence de ton paiement mobile money</td><td>Vérifier ton paiement et livrer ta commande sur ton compte</td></tr>
 <tr><td>Parties jouées (et à quel jeu : Kopo ou Inter (8)), places, statistiques</td><td>Ton profil, tes trophées, l'équilibre de chaque jeu</td></tr>
 <tr><td>Points de ligue, classements, objets de ta collection, parrainages</td><td>Les classements visibles par les autres joueurs (pseudo, numéro, points), la saison, les récompenses, et éviter les abus du parrainage</td></tr>
 <tr><td>Amis, joueurs bloqués, signalements et sanctions</td><td>Les fonctions entre joueurs et la modération</td></tr>
 <tr><td>Adresse IP</td><td>Bloquer les abus (trop de comptes créés depuis la même connexion) et déduire ton pays</td></tr>
-<tr><td>Jours où tu as ouvert le jeu, pays</td><td>Mesurer la fréquentation de Masano et de chacun de ses jeux (chiffres globaux)</td></tr>
-<tr><td>Jeton de notifications du téléphone (si tu acceptes les notifications)</td><td>T'envoyer les invitations, demandes d'ami et rappels que tu as choisis. Il est effacé quand tu supprimes ton compte ou refuses les notifications.</td></tr>
+<tr><td>Jours où tu as ouvert le jeu, pays, type d'appareil (site, Android ou iPhone) et version de l'appli</td><td>Mesurer la fréquentation de Masano et de chacun de ses jeux (chiffres globaux)</td></tr>
+<tr><td>Jeton de notifications du téléphone et type d'appareil (Android, iPhone ou ordinateur) (si tu acceptes les notifications)</td><td>T'envoyer les invitations, demandes d'ami et rappels que tu as choisis. Il est effacé quand tu supprimes ton compte ou refuses les notifications.</td></tr>
 <tr><td>Réglages (son, vibrations…)</td><td>Gardés sur ton téléphone uniquement</td></tr>
 </table>
 <p>Nous ne demandons ni ton adresse, ni tes contacts, ni ta position précise. Le son du micro (abonnés Kopo+) n'est <b>ni enregistré ni conservé</b> : il passe en direct par un serveur vocal (LiveKit) jusqu'aux autres abonnés de la table, et seulement quand tu as activé le micro. Le téléphone ne demande l'accès au micro qu'au premier toucher du bouton micro.</p>
@@ -28,6 +30,7 @@
 <ul>
 <li><b>Pour te fournir le jeu</b> (compte, pièces, parties, amis) : c'est nécessaire pour exécuter les conditions d'utilisation que tu acceptes.</li>
 <li><b>Pour la sécurité et la modération</b> (adresse IP, signalements, sanctions, lutte contre la triche) et les <b>statistiques globales</b> : c'est notre intérêt légitime à garder un jeu sain et à l'améliorer.</li>
+<li><b>Pour les achats</b> : pour livrer ce que tu commandes, et garder la preuve de paiement parce que la loi comptable nous y oblige.</li>
 <li><b>Pour la connexion Google et le micro</b> : parce que tu choisis de les activer. Tu peux arrêter à tout moment.</li>
 </ul>
 
@@ -41,12 +44,14 @@
 <h2>4. Qui y a accès et où</h2>
 <p>Les données du jeu sont hébergées dans l'Union européenne (Francfort). Seuls l'éditeur et nos prestataires techniques y ont accès, et ces prestataires seulement pour faire fonctionner le service :</p>
 <ul>
-<li><b>Render</b> (Render Services, Inc., États-Unis) : serveur du jeu ;</li>
+<li><b>Render</b> (Render Services, Inc., États-Unis) : serveur du jeu et page du jeu (masano.online) ;</li>
 <li><b>Supabase</b> (Supabase, Inc., États-Unis) : base de données et connexion Google ;</li>
-<li><b>GitHub Pages</b> (GitHub, Inc., États-Unis) : page du jeu ;</li>
+<li><b>GitHub</b> (GitHub, Inc., États-Unis) : téléchargement de l'appli Android depuis le site (APK) ;</li>
 <li><b>Google</b> (Google LLC, États-Unis) : si tu choisis de te connecter avec Google ;</li>
 <li><b>LiveKit</b> (LiveKit, Inc., États-Unis) : serveur vocal du micro, qui ne garde pas le son ;</li>
 <li><b>Firebase Cloud Messaging</b> (Google LLC, États-Unis) : envoi des notifications sur le téléphone ;</li>
+<li><b>WhatsApp</b> (WhatsApp LLC, groupe Meta) : seulement si tu nous écris pour commander des pièces ou Kopo+ ;</li>
+<li><b>Google Play</b> et <b>l'App Store</b> d'Apple : si tu installes l'appli depuis ces stores, ils appliquent leurs propres règles de confidentialité au téléchargement ;</li>
 <li>relais publics de messages (EMQX, HiveMQ, Mosquitto), utilisés seulement pour les parties entre amis lancées sans le serveur : ils transmettent les coups de la partie et les pseudos, sans les garder.</li>
 </ul>
 <p>Ces sociétés sont établies aux États-Unis : certaines données peuvent donc y être consultées. Elles s'engagent par contrat à les protéger (clauses contractuelles types de la Commission européenne ou cadre de protection des données UE–États-Unis). Nous pouvons aussi transmettre des données à une autorité si la loi nous y oblige.</p>
@@ -58,7 +63,7 @@
 <li>Quand tu supprimes ton compte, ton pseudo, ta liste d'amis, tes blocages, la copie de ton profil (niveau, statistiques, rivaux) et ta connexion Google (identifiant, e-mail, nom, photo) sont effacés ; il ne reste que des lignes anonymes (parties, mouvements de pièces) pour les statistiques.</li>
 <li>Pour empêcher les abus du parrainage (se faire inviter plusieurs fois en supprimant son compte), nous gardons une <b>empreinte</b> de ton compte Google : un code calculé à partir de ton identifiant Google et de ton adresse, qui ne permet pas de les retrouver. Elle sert seulement à savoir qu'un compte Google a déjà été utilisé sur Masano.</li>
 <li>Les signalements et sanctions sont gardés jusqu'à 1 an pour la sécurité des joueurs.</li>
-<li>Les preuves d'achat (quand les achats existeront) sont gardées le temps exigé par la loi comptable.</li>
+<li>Les preuves d'achat (commande, montant, référence du paiement, compte livré) sont gardées le temps exigé par la loi comptable, même après la suppression du compte.</li>
 </ul>
 
 <h2 id="suppression">6. Supprimer ton compte</h2>
@@ -83,11 +88,9 @@
 
 <h2>11. Changements</h2>
 <p>La date en haut de la page indique la dernière version. Si cette politique change de façon importante, nous te prévenons dans le jeu.</p>
-</main><script>
-// Ouverte depuis une appli des stores (?appli=1) : pas de lien vers le reste du site, seulement entre les pages légales.
-if (/[?&]appli=1/.test(location.search)) {
-  var logo = document.querySelector('a.logo'); if (logo) logo.removeAttribute('href');
-  document.querySelectorAll('a[href*=".html"]').forEach(function (a) { a.setAttribute('href', a.getAttribute('href').replace('.html', '.html?appli=1')); });
-}
-</script>
+</div>
+<nav id="autres" class="muted"></nav>
+</main>
+<!-- Le texte ci-dessus est la copie de secours : la version à jour vient du serveur (tableau de bord, « Pages légales »). -->
+<script src="_page.js" data-cle="confidentialite"></script>
 </body></html>
