@@ -3,7 +3,8 @@
 //   invitation : un ami t'invite à sa table (expire après 10 min) ;
 //   ami        : demande d'ami reçue, demande acceptée ;
 //   match      : rappel du Match du jour à 19 h (Kinshasa), si pas encore joué, pour les habitués et les Bandes ;
-//   annonce    : message envoyé depuis le tableau de bord admin.
+//   annonce    : message envoyé depuis le tableau de bord admin ;
+//   fleuve     : un ami t'a dépassé sur le Fleuve (une par jour au plus), gagnant de la course de la semaine.
 // Autres rappels du serveur, rangés sous « match » (Paramètres > Rappel du Match du jour : le joueur les coupe ensemble) :
 //   série du bonus du jour à 17 h (série de 3 jours ou plus, bonus pas encore pris), mise de la Bande le mercredi à 18 h
 //   (membre pas encore inscrit), fin de saison de la Ligue 24 h avant (joueurs classés de la saison), relance des absents
@@ -17,14 +18,15 @@ const jose = require('jose');
 const { jourDe, lundiDe, numeroDu, ajouterJours } = require('./match-jour');
 
 const HEURE = 36e5;
-const TYPES_PUSH = ['invitation', 'ami', 'match', 'annonce'];
+const TYPES_PUSH = ['invitation', 'ami', 'match', 'annonce', 'fleuve'];
 const APPAREILS_MAX = 10; // par compte : au-delà, les plus anciens sont oubliés
 const PAQUET = 50; // envois en parallèle (annonces, rappels)
 // Joueurs abonnés (site ou appli) qui n'ont pas coupé les rappels (type « match »).
 const ABONNES_RAPPELS = `(SELECT compte_id FROM push_abonnements UNION SELECT compte_id FROM push_natifs) a JOIN comptes c ON c.id = a.compte_id
   WHERE c.statut NOT IN ('supprime', 'banni') AND coalesce(c.push_prefs->>'match', 'true') <> 'false'`;
 const heureKinshasa = (d) => new Date(d.getTime() + HEURE).getUTCHours();
-const nuit = (d) => { const h = heureKinshasa(d); return h >= 22 || h < 8; };
+// Heures de silence (réglage heuresPush, 22 h à 8 h au départ) : aucun rappel automatique.
+const nuit = (d, hp) => require('./reglages').heureDeSilence(heureKinshasa(d), hp);
 const erreur = (m, statut = 400) => Object.assign(new Error(m), { statut });
 const texteCourt = (t, max) => String(t == null ? '' : t).replace(/\s+/g, ' ').trim().slice(0, max);
 const PLATEFORMES_NATIVES = ['android', 'ios'];
@@ -47,7 +49,7 @@ function lireCompteService(v) {
 // Écran que l'appli ouvre au toucher de la notification, et données utiles (toutes en texte, comme FCM l'exige).
 function donneesNatives(message) {
   const d = { type: message.type, action: message.action || 'accueil' };
-  for (const k of ['code', 'jeu', 'de', 'bande', 'tag']) if (message[k] != null) d[k] = String(message[k]);
+  for (const k of ['code', 'jeu', 'de', 'bande', 'tag', 'fleuve']) if (message[k] != null) d[k] = String(message[k]);
   return d;
 }
 
@@ -222,7 +224,7 @@ function creerPush(base, reglages, env = process.env) {
       if (!(actif || fcmActif) || !TYPES_PUSH.includes(type)) return 0;
       const p = await prefsDe(compteId);
       if (!p || p.statut === 'supprime' || p.statut === 'banni' || !p.prefs[type]) return 0;
-      if (nuit(horloge()) && type !== 'invitation' && type !== 'annonce') return 0;
+      if (nuit(horloge(), reglages.get('heuresPush')) && type !== 'invitation' && type !== 'annonce') return 0;
       return envoyerAComptes([compteId], { type, ...message }, options);
     },
 
@@ -232,6 +234,10 @@ function creerPush(base, reglages, env = process.env) {
       if (type === 'invitation' && d.code) {
         return api.envoyer(compteId, 'invitation', { titre: 'Invitation à jouer', texte: texte + ' · code ' + d.code, url: './#' + d.code, tag: 'invitation-' + d.de, action: 'table', code: d.code, jeu: d.jeu || null, de: d.de },
           { ttl: 600, urgence: 'high' });
+      }
+      if (type === 'fleuve' && (d.depasse || d.course)) {
+        return api.envoyer(compteId, 'fleuve', { titre: 'Le Fleuve', texte: d.push || texte, url: './?ouvrir=fleuve' + (d.fleuve ? '&fleuve=' + d.fleuve : ''), tag: 'fleuve-' + (d.course ? 'course' : 'depasse'), action: 'fleuve', fleuve: d.fleuve || null },
+          { ttl: 12 * HEURE / 1000 });
       }
       if (type === 'ami' && (d.demande || d.accepte)) {
         return api.envoyer(compteId, 'ami', { titre: d.demande ? 'Demande d\'ami' : 'Nouvel ami', texte, url: './?ouvrir=amis', tag: 'ami-' + d.de, action: 'amis', de: d.de }, { ttl: 24 * HEURE / 1000 });
@@ -334,14 +340,37 @@ function creerPush(base, reglages, env = process.env) {
     // Bande le mercredi à 18 h, fin de saison dès qu'il reste 24 h (jamais la nuit).
     async tic() {
       const maintenant = horloge(), jour = jourDe(maintenant), h = heureKinshasa(maintenant);
-      let n = 0;
-      if (!nuit(maintenant)) n += await api.rappelSaison();
-      if (h === 17 && !rappelsFaits.has('serie-' + jour)) { rappelsFaits.add('serie-' + jour); n += await api.rappelSerie(); }
-      if (h === 18 && !rappelsFaits.has('absent-' + jour)) { rappelsFaits.add('absent-' + jour); n += await api.rappelAbsents(); }
-      if (h === 18 && jour === ajouterJours(lundiDe(jour), 2) && !rappelsFaits.has('bande-' + jour)) { rappelsFaits.add('bande-' + jour); n += await api.rappelBande(); }
-      if (h !== 19 || rappelsFaits.has(jour)) return n;
+      const hp = { ...require('./reglages').DEFAUTS.heuresPush, ...(reglages.get('heuresPush') || {}) }; // heures réglées dans le tableau de bord
+      let n = await api.envoyerProgrammes().catch((e) => { console.error('Push programmés :', e.message); return 0; });
+      if (!nuit(maintenant, hp)) n += await api.rappelSaison();
+      if (h === hp.serie && !rappelsFaits.has('serie-' + jour)) { rappelsFaits.add('serie-' + jour); n += await api.rappelSerie(); }
+      if (h === hp.relance && !rappelsFaits.has('absent-' + jour)) { rappelsFaits.add('absent-' + jour); n += await api.rappelAbsents(); }
+      if (h === hp.bande && jour === ajouterJours(lundiDe(jour), 2) && !rappelsFaits.has('bande-' + jour)) { rappelsFaits.add('bande-' + jour); n += await api.rappelBande(); }
+      if (h !== hp.matchJour || rappelsFaits.has(jour)) return n;
       rappelsFaits.add(jour);
       return n + await api.rappelMatchJour();
+    },
+
+    // Notifications programmées dans le tableau de bord : celles dont l'heure est passée (moins de 6 h) partent une fois.
+    // Plus vieilles de 6 h (serveur arrêté entre-temps) : marquées « manquées », jamais envoyées en retard.
+    async envoyerProgrammes() {
+      const l = reglages.get('pushProgrammes');
+      if (!Array.isArray(l) || !l.length) return 0;
+      const t = horloge().getTime();
+      const dues = l.filter((x) => !x.envoye && Date.parse(x.quand) <= t);
+      if (!dues.length) return 0;
+      let n = 0;
+      const maj = l.map((x) => ({ ...x }));
+      for (const x of dues) {
+        const m = maj.find((y) => y.id === x.id);
+        if (t - Date.parse(x.quand) > 6 * HEURE) { m.envoye = new Date(t).toISOString(); m.resultat = 'manquée'; continue; }
+        m.envoye = new Date(t).toISOString(); // noté avant l'envoi : jamais deux fois
+        await reglages.ecrire('pushProgrammes', maj);
+        try { const r = await api.annonce({ titre: x.titre, texte: x.texte, public: x.pays ? { pays: x.pays } : {} }); m.resultat = `${r.envoyees} envoyée(s)`; n += r.envoyees; }
+        catch (e) { m.resultat = 'échec : ' + e.message; }
+      }
+      await reglages.ecrire('pushProgrammes', maj);
+      return n;
     },
 
     // --- Annonces de l'admin
@@ -376,6 +405,16 @@ function creerPush(base, reglages, env = process.env) {
       const envoyees = (await envoyerA(web, message, { ttl: 24 * 3600 })) + (await envoyerNatifs(natifs, message, { ttl: 24 * 3600 }));
       await base.query('UPDATE push_annonces SET envoyees = $2 WHERE id = $1', [id, envoyees]);
       return { ok: true, joueurs, appareils: web.length + natifs.length, envoyees };
+    },
+    // Annonce à une liste de joueurs (ex. Kopo+ offert à un groupe) : ceux qui n'ont pas coupé les annonces, sans la limite
+    // des 10 minutes (ce n'est pas une annonce à tous). Rend le nombre d'envois réussis (0 si les push sont éteints).
+    async annonceA(ids, { titre, texte }) {
+      if ((!actif && !fcmActif) || !ids || !ids.length) return { joueurs: 0, envoyees: 0 };
+      const l = (await base.query(`SELECT id FROM comptes WHERE id = ANY($1) AND statut NOT IN ('supprime', 'banni')
+        AND coalesce(push_prefs->>'annonce', 'true') <> 'false'`, [ids])).rows.map((x) => x.id);
+      if (!l.length) return { joueurs: 0, envoyees: 0 };
+      const message = { type: 'annonce', titre: texteCourt(titre, 60) || 'Masano', texte: texteCourt(texte, 200), url: './', tag: 'annonce-kopoplus', action: 'accueil' };
+      return { joueurs: l.length, envoyees: await envoyerAComptes(l, message, { ttl: 24 * 3600 }) };
     },
     // Essai : à un seul joueur (le sien, en général), sans tenir compte de ses réglages ni de la limite.
     async essai(compteId, { titre, texte }) {

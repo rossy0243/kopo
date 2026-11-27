@@ -1,6 +1,7 @@
 // Le cœur de l'appli : compte, config du serveur, salle de jeu en cours, fenêtres, toasts et effets.
 // Reprend la logique de la page du site (src/source.html) : afficher(v), entrerServeur(), quitter(), suivrePartie()…
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -8,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 import 'commun/cartes.dart';
+import 'commun/jauge.dart';
 import 'commun/retention.dart';
 import 'commun/sons.dart';
 import 'commun/stickers.dart';
@@ -104,6 +106,9 @@ class App extends ChangeNotifier {
   Map<String, dynamic>? suivi;
   ({DateTime recu, Map detail})? derniereLigue, dernierParcours;
   ({DateTime recu, Map x, bool gagne, String? taquinerie})? dernierDuel;
+  /// Fin d'une partie entre humains : les adversaires qui ne sont pas encore nos amis (ni demandés), donnés par le serveur.
+  /// L'écran de fin propose de les ajouter d'un toucher (comme le site).
+  ({DateTime recu, List<Map> liste})? derniersAdversaires;
   final recapsAnimes = <String>{};
   bool robotsAComposer = false;
   List<String>? tableAComposer;
@@ -115,6 +120,47 @@ class App extends ChangeNotifier {
   int joueursEnLigne = 0;
   List<Map<String, dynamic>> sallesOuvertes = [];
   Map<String, dynamic>? etatJour, etatBandes;
+  /// Le Fleuve : état des deux cartes (GET /fleuve), et l'objectif de l'étape en cours (affiché pendant la partie).
+  /// Gardé sur le téléphone : au lancement suivant, l'accueil et la carte du Fleuve s'affichent sans attendre le serveur.
+  Map<String, dynamic>? _etatFleuve;
+  Map<String, dynamic>? get etatFleuve => _etatFleuve;
+  set etatFleuve(Map<String, dynamic>? e) {
+    _etatFleuve = e;
+    final id = _idCompte;
+    if (e == null) { Stock.effacer('kopo-fleuve-etat'); }
+    else if (id != null) { Stock.ecrire('kopo-fleuve-etat', {'id': id, 'lu': DateTime.now().millisecondsSinceEpoch, 'etat': e}); }
+  }
+  static String? get _idCompte { final c = Api.compte?['compte']; return c is Map && c['id'] != null ? '${c['id']}' : null; }
+  /// L'état gardé du lancement d'avant (mêmes comptes à rebours, recalés), ou null s'il n'est plus bon.
+  Map<String, dynamic>? etatFleuveGarde() {
+    final g = Stock.lire('kopo-fleuve-etat'), id = _idCompte;
+    if (g is! Map || id == null || g['id'] != id || g['etat'] is! Map || g['lu'] is! num) return null;
+    final e = (jsonDecode(jsonEncode(g['etat'])) as Map).cast<String, dynamic>(), p = e['pagaies']; // copie : la valeur gardée ne bouge pas
+    final passe = DateTime.now().millisecondsSinceEpoch - (g['lu'] as num).toInt();
+    if (p is! Map || p['retourMs'] is! num || passe < 0 || passe >= (p['retourMs'] as num)) return null; // minuit passé : pagaies revenues
+    p['retourMs'] = (p['retourMs'] as num) - passe;
+    for (final f in ((e['fleuves'] as Map?) ?? const {}).values) {
+      final c = f is Map ? f['course'] : null;
+      if (c is Map && c['finMs'] is num) c['finMs'] = (c['finMs'] as num) - passe;
+    }
+    return e;
+  }
+  /// Une seule lecture de GET /fleuve à la fois : un second appel dans les 2 s reprend la même.
+  (DateTime, Future<Map<String, dynamic>>)? _lectureFleuve;
+  /// neuf : après un achat ou une étape jouée, on relit toujours.
+  Future<Map<String, dynamic>> lireEtatFleuve({bool neuf = false}) {
+    final l = _lectureFleuve;
+    if (!neuf && l != null && DateTime.now().difference(l.$1).inMilliseconds < 2000) return l.$2;
+    final f = Api.get('/fleuve').then((x) => (x as Map).cast<String, dynamic>());
+    _lectureFleuve = (DateTime.now(), f);
+    return f;
+  }
+  String? objectifFleuve;
+  /// La jauge des étoiles en direct : l'étape en cours, sa dernière avancée et l'effet à jouer (commun/jauge.dart).
+  Map? etapeFleuve, directFleuve;
+  EffetJauge? effetFleuve;
+  int _idEffet = 0;
+  DateTime _effetQuand = DateTime(2000);
   int amisEnLigne = 0, demandesAmi = 0;
   String? ligueResume;
   bool pointLigue = false, pointJour = false;
@@ -160,6 +206,15 @@ class App extends ChangeNotifier {
   String nouveauCode() { final r = math.Random(); return List.generate(4, (_) => lettresCode[r.nextInt(lettresCode.length)]).join(); }
 
   // Une pastille en bas de l'écran (en haut pendant une partie) : succès = vert, alerte = ambre, échec = rouge, info = neutre.
+  /// L'hôte éliminé a laissé la main : toute la table le sait (comme sur le site).
+  void _toastNouvelHote(Vue? avant, Vue v) {
+    if (avant == null || avant['code'] != v['code'] || avant['hote'] == v['hote'] || v['etat'] == 'salon') return;
+    if (!((v['elimines'] as List?) ?? const []).contains(avant['hote'])) return;
+    if (v['hote'] == v['moi']) { toast("${nomDe(v, avant['hote'])} te passe la main : tu es l'hôte.", Niv.succes); }
+    else if (avant['hote'] == v['moi']) { toast("${nomDe(v, v['hote'])} est maintenant l'hôte."); }
+    else { toast('${nomDe(v, avant['hote'])} passe la main à ${nomDe(v, v['hote'])}.'); }
+  }
+
   void toast(String t, [Niv niveau = Niv.info]) {
     toastTexte = t;
     toastNiveau = niveau;
@@ -177,7 +232,7 @@ class App extends ChangeNotifier {
   static const annoncesMicro = 10;
   bool _annoncerMicro = false;
   void annoncerMicro() {
-    if (vue == null || fenetre != null) return; // pas par-dessus une autre fenêtre (elle ne compte pas)
+    if (vue == null || fenetre != null || Api.sansVitrinePlus) return; // pas par-dessus une autre fenêtre ; jamais dans la version App Store
     final n = (Stock.lire('kopo-annonce-micro') as num?)?.toInt() ?? 0;
     if (n >= annoncesMicro) return;
     Stock.ecrire('kopo-annonce-micro', n + 1);
@@ -335,8 +390,23 @@ class App extends ChangeNotifier {
   Future<void> relireConfig() async {
     try {
       final c = await Api.appel('/config', sansJeton: true, delai: const Duration(seconds: 70));
-      if (c is Map) { config = c.cast<String, dynamic>(); messagesServeur(); }
+      if (c is Map) {
+        config = c.cast<String, dynamic>();
+        if (c.containsKey('fleuveLance')) Stock.ecrire('kopo-fleuve-lance', c['fleuveLance']);
+        messagesServeur();
+        maj();
+      }
     } catch (_) {}
+    if (config == null) _reessayerConfig();
+  }
+  /// Configuration pas reçue (serveur qui redémarre) : on réessaie toutes les 10 s jusqu'à l'avoir, puis l'accueil se remet à jour.
+  Timer? _tReessaiConfig;
+  void _reessayerConfig() {
+    _tReessaiConfig ??= Timer(const Duration(seconds: 10), () async {
+      _tReessaiConfig = null;
+      await relireConfig();
+      if (config != null && enLigne) majCartesCompetition();
+    });
   }
   bool annonceOuverte = false;
   void messagesServeur() {
@@ -414,7 +484,11 @@ class App extends ChangeNotifier {
     _splash(74, 'Préparation de la table…');
     final debut = DateTime.now();
     final pret = Completer<bool>();
-    relireConfig().then((_) { if (!pret.isCompleted) pret.complete(true); });
+    relireConfig().then((_) {
+      if (!pret.isCompleted) pret.complete(true);
+      // Pendant la fin du splash, l'accueil se prépare déjà (le Fleuve, les amis) : il s'affiche rempli.
+      if (enLigne) majCartesCompetition();
+    });
     _splash(82, 'Connexion au serveur…');
     var ok = await Future.any([pret.future, Future.delayed(const Duration(milliseconds: 2500), () => false)]);
     if (!ok && ecran == 'splash') {
@@ -522,15 +596,48 @@ class App extends ChangeNotifier {
       .toList()
     ..sort((a, b) => (b['joueurs'] as num).compareTo(a['joueurs'] as num));
 
-  Future<void> majCartesCompetition() async {
+  /// Le Fleuve est lancé : la Bande et le Match du jour ont disparu, le parcours de saison aussi.
+  /// Tant que la configuration n'est pas arrivée (serveur lent ou qui redémarre), on garde ce que le serveur a dit
+  /// la dernière fois : sinon les anciennes cartes reviennent et le Fleuve disparaît.
+  bool get fleuveLance => (config != null ? config!['fleuveLance'] : Stock.lire('kopo-fleuve-lance')) != null;
+  /// Cartes de l'accueil. Les lectures partent en même temps ; un second appel pendant une lecture la reprend.
+  Future<void>? _competEnCours;
+  Future<void> majCartesCompetition() => _competEnCours ??= _majCartesCompetition().whenComplete(() => _competEnCours = null);
+  Future<void> _majCartesCompetition() async {
     if (!enLigne) return;
-    try {
-      final e = etatJour = (await Api.get('/match-jour') as Map).cast<String, dynamic>();
-      pointJour = e['actif'] == true && !(e['moi'] is Map && e['moi']['fini'] == true);
-    } catch (_) {}
-    try { etatBandes = (await Api.get('/bandes') as Map).cast<String, dynamic>(); } catch (_) {}
-    try { final a = await Api.get('/amis') as List; amisEnLigne = a.where((x) => x['en_ligne'] == true).length; } catch (_) {}
+    if (fleuveLance) { etatJour = null; etatBandes = null; pointJour = false; }
+    await Future.wait([
+      if (!fleuveLance) () async {
+        try {
+          final e = etatJour = (await Api.get('/match-jour') as Map).cast<String, dynamic>();
+          pointJour = e['actif'] == true && !(e['moi'] is Map && e['moi']['fini'] == true);
+        } catch (_) {}
+      }(),
+      if (!fleuveLance) () async { try { etatBandes = (await Api.get('/bandes') as Map).cast<String, dynamic>(); } catch (_) {} }(),
+      majFleuve(),
+      () async { try { final a = await Api.get('/amis') as List; amisEnLigne = a.where((x) => x['en_ligne'] == true).length; } catch (_) {} }(),
+    ]);
     maj();
+  }
+  /// Le Fleuve : on ne demande l'état que s'il n'est pas fermé à tous (réglage de l'admin, dans /config).
+  Future<void> majFleuve() async {
+    final f = config?['fleuve'];
+    if (enLigne && config == null) { // configuration pas encore là : on garde la carte d'avant, sans l'effacer
+      if (_etatFleuve == null) { final g = etatFleuveGarde(); if (g != null) { _etatFleuve = g; maj(); } }
+      return;
+    }
+    if (!enLigne || f == null || f == 'ferme') { if (_etatFleuve != null) etatFleuve = null; return; }
+    if (_etatFleuve == null) { final g = etatFleuveGarde(); if (g != null) { etatFleuve = g; reglerMissionsFleuve(); maj(); } } // tout de suite, avant le serveur
+    try { etatFleuve = await lireEtatFleuve(); } catch (_) {}
+    reglerMissionsFleuve();
+  }
+  /// Missions du jour : celles qui visent le Fleuve ne sont tirées que pour un fleuve ouvert et publié.
+  void reglerMissionsFleuve() {
+    final e = etatFleuve, o = <String, bool>{};
+    if (e != null && e['ouvert'] == true && e['google'] == true) {
+      for (final k in ((e['fleuves'] as Map?) ?? {}).keys) { o[k.toString()] = ((e['fleuves'][k]['publiees'] as num?) ?? 0) > 0; }
+    }
+    R.reglerFleuve(o);
   }
   Future<void> majOngletLigue() async {
     if (!enLigne) return;
@@ -603,6 +710,10 @@ class App extends ChangeNotifier {
         toast(texte);
       case 'ami':
         toast(texte, Niv.succes);
+      case 'fleuve': // un ami t'a dépassé, gagnant de la course de la semaine
+        if (d['course'] == true) Api.get('/moi').then((m) => soldeServeur(m['compte']['solde'])).catchError((_) => null);
+        majFleuve().then((_) => maj());
+        toast(texte, d['course'] == true ? Niv.succes : Niv.info);
       default:
         toast(texte); // rivalité
     }
@@ -638,11 +749,13 @@ class App extends ChangeNotifier {
     return true;
   }
 
-  /// facon : {creer, jeu, mode, jRetour} | {code} | {taille, mise, jeu} | {reconnexion, code, taille} | {matchJour} | {robots...}
+  /// facon : {creer, jeu, mode, jRetour} | {code} | {taille, mise, jeu} | {reconnexion, code, taille} | {matchJour} | {fleuve, numero} | {robots...}
   Future<void> entrerServeur(String nom, Map<String, dynamic> facon) async {
-    if (facon['reconnexion'] == null && facon['matchJour'] == null && facon['robots'] == null && exigerGoogle()) return;
+    if (facon['reconnexion'] == null && facon['matchJour'] == null && facon['fleuve'] == null && facon['robots'] == null && exigerGoogle()) return;
     final mises = {for (final m in niveauxMise) m.$1: m.$2};
-    afficherConnexion(facon['matchJour'] != null
+    afficherConnexion(facon['fleuve'] != null
+        ? "Mise à l'eau de la pirogue…"
+        : facon['matchJour'] != null
         ? 'Préparation du Match du jour…'
         : facon['robots'] != null
             ? 'Préparation de la table…'
@@ -669,6 +782,8 @@ class App extends ChangeNotifier {
         }
       } else if (facon['matchJour'] != null) {
         room = await srv.creer('kopo-jour', {'jeton': j});
+      } else if (facon['fleuve'] != null) {
+        room = await srv.creer('fleuve', {'jeton': j, 'fleuve': facon['fleuve'], 'numero': facon['numero']});
       } else if (facon['robots'] != null) {
         room = await srv.creer('entrainement', {'jeton': j, ...(facon['robots'] as Map).cast<String, Object?>()});
       } else if (facon['creer'] != null) {
@@ -690,7 +805,7 @@ class App extends ChangeNotifier {
       }
       reveil.cancel();
       if (_client != jeton) { room.abandonner(); return; }
-      _annoncerMicro = facon['reconnexion'] == null && facon['matchJour'] == null && facon['robots'] == null;
+      _annoncerMicro = facon['reconnexion'] == null && facon['matchJour'] == null && facon['fleuve'] == null && facon['robots'] == null;
       _brancher(room, nom, facon);
     } catch (e) {
       reveil.cancel();
@@ -730,6 +845,7 @@ class App extends ChangeNotifier {
           bandeau = null;
           final v = (d as Map).cast<String, dynamic>();
           memoriser(v['code'].toString());
+          _toastNouvelHote(vue, v);
           afficher(v);
           if (_annoncerMicro) {
             _annoncerMicro = false;
@@ -752,6 +868,10 @@ class App extends ChangeNotifier {
           if (d is Map) { dernierParcours = (recu: DateTime.now(), detail: d); maj(); }
         case 'faceAFace':
           _faceAFace(d);
+        case 'adversaires':
+          final l = d is List ? d.whereType<Map>().where((j) => j['id'] != null).toList() : <Map>[];
+          derniersAdversaires = l.isEmpty ? null : (recu: DateTime.now(), liste: l);
+          maj();
         case 'reaction':
           if (d is Map) _reaction(d);
         case 'sticker':
@@ -767,6 +887,35 @@ class App extends ChangeNotifier {
           if (d is Map) {
             if (d['fin'] == true) { _depart = true; quitter(); Timer(const Duration(milliseconds: 250), () => resultatMatchJourUi?.call(d)); }
             else if (d['debut'] == true) { toast(d['officiel'] == true ? 'Match du jour n°${d['numero']} : un seul essai, bonne chance !' : 'Entraînement : ce Match ne compte pas.'); }
+          }
+        // Le Fleuve : au début, l'objectif de l'étape (rappelé en haut de la table) ; à la fin, les étoiles.
+        case 'fleuve':
+          if (d is Map) {
+            if (d['fin'] == true) {
+              // On laisse d'abord la jauge montrer la dernière étoile gagnée (ou l'objectif raté).
+              _depart = true;
+              final attente = DateTime.now().difference(_effetQuand).inMilliseconds < 1500 ? 1700 : 0;
+              Timer(Duration(milliseconds: attente), () {
+                quitter();
+                Timer(const Duration(milliseconds: 250), () { if (d['erreur'] != null) { toast(d['erreur'].toString(), Niv.echec); } else { resultatFleuveUi?.call(d); } });
+              });
+            } else if (d['direct'] is Map && !_depart) {
+              final n = d['direct'] as Map;
+              final type = ((etapeFleuve ?? const {})['objectif'] as Map?)?['type']?.toString();
+              final e = effetJauge(directFleuve, n, type, vue, ++_idEffet);
+              directFleuve = n;
+              if (e != null) { effetFleuve = e; if (e.visible) _effetQuand = DateTime.now(); }
+              objectifFleuve ??= n['texte']?.toString(); // retour après une coupure
+              maj();
+            } else if (d['debut'] == true && d['etape'] is Map) {
+              final t = (d['etape'] as Map)['texte']?.toString() ?? '';
+              objectifFleuve = t;
+              etapeFleuve = d['etape'] as Map;
+              directFleuve = {'score': 0, 'prog': '', 'val': 0, 'etat': 'en_cours', 'texte': t, 'seuils': etapeFleuve!['seuils']};
+              effetFleuve = null;
+              toast(d['adoucir'] == true ? "$t · robots un peu moins forts aujourd'hui" : t);
+              maj();
+            }
           }
       }
     }));
@@ -800,6 +949,7 @@ class App extends ChangeNotifier {
     if (vocal.actif) vocal.signaler();
   }
   void Function(Map r)? resultatMatchJourUi;
+  void Function(Map r)? resultatFleuveUi;
 
   void envoyer(Map<String, dynamic> msg) => _salle?.envoyer(msg['type'] as String, msg);
   void action(Map<String, dynamic> a) => envoyer({'type': 'action', 'action': a});
@@ -814,6 +964,9 @@ class App extends ChangeNotifier {
     _abonnements.clear();
     if (s != null) { s.quitter().catchError((_) => 1000); }
     vocal.arreter();
+    objectifFleuve = null;
+    etapeFleuve = directFleuve = null;
+    effetFleuve = null;
     vue = vueAvant = null;
     _minuteurFenetre?.cancel();
     robotsAComposer = false;
@@ -835,7 +988,7 @@ class App extends ChangeNotifier {
     _demarrerChrono(v);
     if (A == null || A['etat'] != v['etat'] || A['numeroManche'] != v['numeroManche']) { carteChoisie = null; choixInter = []; cartesRecues.clear(); }
     if (v['jeu'] != 'inter8') suivrePartie(v);
-    if (v['etat'] != 'finPartie') arreterSuiteAuto();
+    if (v['etat'] != 'finPartie') { arreterSuiteAuto(); derniersAdversaires = null; } // nouvelle partie : la liste de la précédente ne vaut plus
     if (v['etat'] == 'salon') {
       if (robotsAComposer) { _composerRobots(v); }
       if (!chatOuvert && fenetreType != 'annonce-micro') fenetre = null; // l'annonce du micro reste quand un joueur arrive
@@ -1215,6 +1368,7 @@ class App extends ChangeNotifier {
     entrerServeur(p, {'robots': {'jeu': inter ? 'inter8' : 'kopo', 'robots': 2, 'niveau': 'gentils', 'delai': 0, 'lancer': true, if (inter) 'mode': 'simple', if (inter) 'jRetour': false}});
   }
   void jouerMatchJour() { final p = lirePseudo(); if (p == null) return; fermerFenetre(); entrerServeur(p, {'matchJour': true}); }
+  void jouerEtapeFleuve(String fleuve, int numero) { final p = lirePseudo(); if (p == null) return; fermerFenetre(); entrerServeur(p, {'fleuve': fleuve, 'numero': numero}); }
   void rejoindreCode(String code) { final p = lirePseudo(); if (p == null) return; fermerFenetre(); entrerServeur(p, {'code': code}); }
 
   void inviterAmi(String id, String pseudoAmi) { amiAInviter = id; amiAInviterPseudo = pseudoAmi; amiAInviterQuand = DateTime.now(); }

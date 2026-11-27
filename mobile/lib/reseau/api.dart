@@ -12,6 +12,18 @@ class Api {
   /// Pour essayer un autre serveur : flutter run --dart-define=SERVEUR=http://10.0.2.2:2567
   static const serveur = String.fromEnvironment('SERVEUR', defaultValue: serveurParDefaut);
   static const version = '1.0.0';
+  /// Version du Google Play Store : flutter build appbundle --dart-define=STORE=play (workflow apk.yml).
+  /// Google exige sa propre facturation pour les pièces et Kopo+ (le paiement externe n'ouvre pas en RDC avant 2027) :
+  /// cette version n'affiche ni prix en francs ni mobile money, les pièces se gagnent en jouant. L'APK du site n'est pas concerné.
+  /// Version App Store (iPhone) : même règle, Apple impose aussi sa propre facturation (règle 3.1.1). Toute appli iPhone
+  /// est donc sans achats, même construite sans --dart-define=STORE=appstore (workflow ios.yml).
+  static const store = String.fromEnvironment('STORE');
+  static bool get sansAchats => store == 'play' || store == 'appstore' || (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS);
+  /// Version App Store : Kopo+ n'est jamais montré à un non-membre (ni micro verrouillé, ni invitation, ni voie Kopo+ du
+  /// parcours). Apple veut que ce qui se débloque dans une appli iPhone soit aussi en vente par l'App Store (règles 3.1.1
+  /// et 3.1.3(b)) : sans vitrine, l'appli ne fait que reconnaître ce que le compte a déjà (couronne, micro des membres).
+  /// Google Play accepte une appli « de consommation » : le micro reste visible avec un cadenas, sans prix ni lien.
+  static bool get sansVitrinePlus => store == 'appstore' || (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS);
   static String get plateforme => kIsWeb ? 'web' : (defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android');
   static Map<String, String> get entetes => {'X-Masano-Client': '$plateforme/$version'};
 

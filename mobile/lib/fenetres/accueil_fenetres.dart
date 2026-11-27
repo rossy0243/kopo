@@ -12,6 +12,7 @@ import '../etat.dart';
 import '../reseau/api.dart';
 import 'communes.dart';
 import 'compet.dart' show fenetreNouveaute;
+import 'fleuve.dart' show reglesFleuve;
 import 'progres.dart';
 
 // ---------------------------------------------------------------- Inter (8) : quelle partie ?
@@ -201,7 +202,7 @@ void ouvrirRobots() {
         for (var k = 1; k <= max; k++) SizedBox(width: 48, height: 48, child: Btn('$k', marge: EdgeInsets.zero, taille: 18, onTap: () { app.fermerFenetre(); app.partieRobots(k); })),
       ]),
       const Ecart(8),
-      Center(child: TextButton(onPressed: composerTable, child: Text('Composer ma table robot par robot', style: K.texte(14, couleur: K.brass).copyWith(decoration: TextDecoration.underline, decorationColor: K.brass)))),
+      Center(child: TextButton(onPressed: composerTable, style: TextButton.styleFrom(minimumSize: const Size(0, 40)), child: Text('Composer ma table robot par robot', style: K.texte(14, couleur: K.brass).copyWith(decoration: TextDecoration.underline, decorationColor: K.brass)))),
       if (guidee) ...[const Ecart(4), Btn.principal('Première partie guidée (2 robots gentils)', large: true, onTap: () => app.partieGuidee(inter: inter))],
       const Ecart(8),
       Btn('Annuler', large: true, onTap: app.fermerFenetre),
@@ -267,6 +268,12 @@ void montrerRegles() {
         ]),
       );
   app.ouvrirFenetre((context) => Fenetre(titre: 'Règles', enfants: [
+        // Les autres guides en haut, sans défiler ; « C'est compris » reste en bas, toujours visible.
+        _liensRegles([
+          ('▶ Apprendre en jouant (1 min)', ouvrirTutoriel),
+          if (_fleuveOuvert) ('Le Fleuve', reglesFleuve),
+          if (!app.fleuveLance) ('Match du jour et Bande', () => fenetreNouveaute(0)),
+        ]),
         titre('Le but'),
         li('•', ['Chacun reçoit 4 cartes. Débarrasse-toi de toutes tes cartes : tu es ', ['qualifié'], '.']),
         li('•', ['Le dernier joueur qui garde des cartes est ', ['éliminé'], ". On rejoue une manche sans lui, jusqu'à la finale à deux. Le gagnant de la finale gagne la partie."]),
@@ -285,12 +292,16 @@ void montrerRegles() {
         const Muet("36 cartes, du 2 au 10 dans les 4 couleurs. Le 10 est la plus forte. On tourne dans le sens des aiguilles d'une montre.", taille: 12),
         const Ecart(14),
         Btn.principal("C'est compris", large: true, onTap: app.fermerFenetre),
-        const Ecart(8),
-        Btn('Apprendre en jouant (1 min)', large: true, onTap: ouvrirTutoriel),
-        const Ecart(8),
-        Btn('Match du jour et Bande', large: true, onTap: () => fenetreNouveaute(0)),
       ]), 'regles');
 }
+
+/// Les liens des règles vers les autres guides, en petits boutons sous le titre.
+Widget _liensRegles(List<(String, VoidCallback)> l) => Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Wrap(spacing: 6, runSpacing: 6, children: [
+        for (final (t, f) in l) ConstrainedBox(constraints: const BoxConstraints(minHeight: 38), child: Btn(t, taille: 13.5, marge: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), onTap: f)),
+      ]),
+    );
 
 // ---------------------------------------------------------------- Règles d'Inter (8)
 void montrerReglesInter() {
@@ -303,6 +314,10 @@ void montrerReglesInter() {
         ]),
       );
   app.ouvrirFenetre((context) => Fenetre(titre: "Règles d'Inter (8)", enfants: [
+        _liensRegles([
+          ('▶ Partie guidée', () => app.partieGuidee(inter: true)),
+          if (_fleuveOuvert) ('Le Fleuve', reglesFleuve),
+        ]),
         titre('Le but'),
         li(['Chacun reçoit 4 cartes. Débarrasse-toi de toutes tes cartes : tu es ', ['qualifié'], '.']),
         li(['Le dernier joueur qui garde des cartes est ', ['éliminé'], ". On rejoue une manche sans lui, jusqu'au vainqueur."]),
@@ -326,8 +341,6 @@ void montrerReglesInter() {
         const Muet("La carte de départ n'est jamais un 8. Si c'est un 2, un 10, un As, un joker (ou un valet avec le J retour), son effet s'applique au premier joueur. On tourne dans le sens des aiguilles d'une montre.", taille: 12),
         const Ecart(14),
         Btn.principal("C'est compris", large: true, onTap: app.fermerFenetre),
-        const Ecart(8),
-        Btn('Jouer une partie guidée', large: true, onTap: () => app.partieGuidee(inter: true)),
       ]), 'regles');
 }
 
@@ -439,8 +452,15 @@ void fenetrePieces(Map? b) {
         ]),
       ),
       const Ecart(12),
-      Btn.principal(b != null ? 'Récupérer' : 'OK', large: true, onTap: () { app.fermerFenetre(); if (b != null) app.suiteAccueil(); }),
-      if (b == null) ...[const Ecart(8), Btn('Acheter des pièces', large: true, onTap: () => ouvrirAchatPieces(retour: () => fenetrePieces(null))), const Ecart(8), Btn('Boutique', large: true, onTap: ouvrirBoutique)],
+      // Site et APK : « Recharger mes pièces » en avant (comme sur le site). Versions des stores : rien à acheter.
+      if (b == null && !Api.sansAchats) ...[
+        Btn.principal('Recharger mes pièces', large: true, onTap: () => ouvrirAchatPieces(retour: () => fenetrePieces(null))),
+        const Ecart(8), Btn('Boutique', large: true, onTap: ouvrirBoutique),
+        const Ecart(8), Btn('OK', large: true, onTap: app.fermerFenetre),
+      ] else ...[
+        Btn.principal(b != null ? 'Récupérer' : 'OK', large: true, onTap: () { app.fermerFenetre(); if (b != null) app.suiteAccueil(); }),
+        if (b == null) ...[const Ecart(8), Btn('Boutique', large: true, onTap: ouvrirBoutique)],
+      ],
     ]);
   }, 'pieces');
 }
@@ -478,3 +498,6 @@ void fenetreJouerEnLigne() {
   fenetreGoogle('Jouer en ligne', "Pour jouer en ligne ou entre amis, connecte-toi avec Google : c'est gratuit, et tes pièces et ton niveau te suivent sur tous tes téléphones. Sans compte, tu peux jouer contre les robots.",
       extra: (_) => [Btn('Jouer contre les robots', large: true, onTap: () { app.fermerFenetre(); ouvrirRobots(); })]);
 }
+
+/// Le Fleuve ouvert (à tous ou aux testeurs) : Règles → Le Fleuve.
+bool get _fleuveOuvert => app.enLigne && app.config?['fleuve'] != null && app.config?['fleuve'] != 'ferme';

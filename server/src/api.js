@@ -2,7 +2,7 @@
 'use strict';
 const express = require('express');
 const { DEBLOCAGE } = require('./salle-kopo');
-const { etatJeuPour, NOMS_JEUX, communautesPubliques, versionPlusRecente, PLATEFORMES, evenementEnCours, totauxCahier } = require('./reglages');
+const { etatJeuPour, NOMS_JEUX, communautesPubliques, versionPlusRecente, PLATEFORMES, evenementEnCours, totauxCahier, annonceVisible } = require('./reglages');
 // Texte de l'annonce d'un événement : « 🎉 Week-end doré : pièces x2 sur les tables gratuites et bonus du jour x2, jusqu'à dimanche 22 h. »
 const JOURS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
 function texteEvenement(ev) {
@@ -30,7 +30,7 @@ function clientMobile(req) {
 // Adresse publique du site (liens légaux, liens d'invitation).
 const adresseSite = (env) => String(env.SITE_URL || 'https://masano.online/').replace(/\/?$/, '/');
 
-function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours, parrainage, matchJour, bande, push, stickers, bouquets, abonnement, env = process.env }) {
+function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours, parrainage, matchJour, bande, fleuve, push, stickers, bouquets, abonnement, env = process.env }) {
   const r = express.Router();
   r.use(express.json({ limit: '64kb' })); // la copie du profil (PUT /profil) peut faire quelques dizaines de ko
   // Limite par adresse IP (large : en 4G, beaucoup de joueurs partagent la même adresse).
@@ -81,13 +81,17 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours,
     // Événement en cours (Pilotage) : annoncé tout seul (fenêtre d'annonce du site et de l'appli, une fois par texte)
     // quand aucune annonce de l'admin n'est affichée.
     const ev = evenementEnCours(t.evenement);
-    const annonce = t.annonce.active && t.annonce.texte ? t.annonce.texte : ev ? texteEvenement(ev) : null;
+    const annonce = annonceVisible(t.annonce) ? t.annonce.texte : ev ? texteEvenement(ev) : null;
     res.json({ jeux, annonce, evenement: ev ? { nom: ev.nom, fin: ev.fin, pieces: ev.pieces, bonus: ev.bonus } : null, maintenance: t.maintenance.active ? t.maintenance.message : null, versionMin: t.versionMin, tables: t.tables, deblocage: DEBLOCAGE, pot: t.pot, remiseAFlot: t.remiseAFlot.seuil, messages: t.messagesRapides,
       cahierTotaux: totauxCahier(t.cahierTotaux), // montants d'élimination du Cahier [petit, grand] (boutons du site et de l'appli)
+      rythme: t.rythme, // temps entre les coups (Réglages > Rythme des parties), pour les parties que le site fait tourner lui-même
       cahier: t.cahier, // barème du mode Cahier (Pilotage), pour les parties que le site fait tourner lui-même
       stickers: { actif: !!(t.stickers && t.stickers.actif), vente: !!(t.stickers && t.stickers.actif && t.stickers.vente) }, // stickers animés : grisés tant que l'admin ne les allume pas
       communautes: communautesPubliques(t.communautes), // groupes à rejoindre (bouton Partager)
-      nouveaute: t.nouveaute && t.nouveaute.bande ? 'bande' : null, // fenêtre « Nouveau : Match du jour et Bande »
+      fleuve: (t.fleuve && t.fleuve.etat) || 'ferme', // Le Fleuve : ferme, testeurs (GET /fleuve dit si ce joueur y a accès) ou ouvert
+      // Fenêtre « Nouveau » : le Fleuve dès son lancement (il remplace la Bande et le Match du jour), sinon la Bande.
+      nouveaute: t.fleuve && t.fleuve.lance ? 'fleuve' : t.nouveaute && t.nouveaute.bande ? 'bande' : null,
+      fleuveLance: (t.fleuve && t.fleuve.lance) || null, // date du lancement : badge NOUVEAU 7 jours, cartes Match du jour et Bande retirées
       // Connexion Google : active quand CONNEXION_GOOGLE=1 et que Google est activé dans Supabase.
       google: env.CONNEXION_GOOGLE === '1' && env.SUPABASE_URL ? origineSupabase(env.SUPABASE_URL) : null,
       // Applis mobiles : connexion Google native par le SDK Supabase (adresse + clé publique « anon », pas secrète).
@@ -106,10 +110,11 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours,
   const parIp = new Map();
   setInterval(() => parIp.clear(), 3600e3).unref();
   r.post('/invite', enveloppe(async (req, res) => {
+    if (!(reglages.get('inscriptions') || {}).invites) return res.status(403).json({ erreur: 'Les nouveaux comptes sans Google sont fermés pour l\'instant. Connecte-toi avec Google pour jouer.' });
     const n = (parIp.get(req.ip) || 0) + 1; parIp.set(req.ip, n);
     if (n > 20 && process.env.KOPO_TESTS !== '1') return res.status(429).json({ erreur: 'Trop de comptes créés depuis ce réseau. Réessaie plus tard.' });
     const c = await comptes.creer({ pseudo: req.body.pseudo, pays: paysReseau(req) });
-    await comptes.presence(c.id);
+    await comptes.presence(c.id, clientMobile(req));
     res.json({ jeton: await auth.jetonJoueur(c.id), compte: publicCompte(c) });
   }));
 
@@ -130,7 +135,7 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours,
       throw e;
     });
     if (c.statut === 'banni') return res.status(403).json({ erreur: 'Ce compte est banni.' });
-    await comptes.presence(c.id);
+    await comptes.presence(c.id, clientMobile(req));
     await comptes.noterEmail(c.id, s.email);
     // Empreinte du compte Google (anti-abus du parrainage), puis le code du lien d'invitation s'il y en a un.
     let parrain = null;
@@ -143,12 +148,12 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours,
 
   // Renouveler son jeton (valable 90 jours) sans se reconnecter : l'appli l'appelle au démarrage, par exemple une fois par semaine.
   r.post('/jeton', joueur, enveloppe(async (req, res) => {
-    await comptes.presence(req.compte.id);
+    await comptes.presence(req.compte.id, clientMobile(req));
     res.json({ jeton: await auth.jetonJoueur(req.compte.id), expireDans: 90 * 24 * 3600 });
   }));
 
   r.get('/moi', joueur, enveloppe(async (req, res) => {
-    await comptes.presence(req.compte.id);
+    await comptes.presence(req.compte.id, clientMobile(req));
     res.json({ compte: publicCompte(req.compte), lie: !!req.compte.auth_id, quotaPseudo: await comptes.quotaPseudo(req.compte.id) });
   }));
   r.patch('/moi', joueur, enveloppe(async (req, res) => {
@@ -175,9 +180,16 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours,
   r.get('/stickers', joueur, enveloppe(async (req, res) => res.json(await stickers.pourJoueur(req.compte.id))));
   r.post('/stickers/acheter', joueur, enveloppe(async (req, res) => res.json(await stickers.acheter(req.compte, req.body || {}))));
   // Bouquets de pièces (argent réel) : prix fixés ici, au taux des stickers ; le paiement mobile money n'est pas encore branché.
-  r.get('/bouquets', joueur, (req, res) => res.json({ solde: req.compte.solde, ...bouquets.pourJoueur() }));
+  // whatsapp : numéro qui reçoit les commandes tant que le mobile money n'est pas branché (null = « Bientôt »).
+  const whatsappAchat = () => ((reglages.get('achat') || {}).whatsapp) || null;
+  r.get('/bouquets', joueur, (req, res) => res.json({ solde: req.compte.solde, ...bouquets.pourJoueur(), whatsapp: whatsappAchat() }));
   // Abonnement Kopo+ (micro en salle, couronne dorée) : prix en francs congolais, l'abonnement du joueur, micro prêt ou non.
-  r.get('/abonnement', joueur, (req, res) => res.json(abonnement.pourJoueur(req.compte)));
+  r.get('/abonnement', joueur, (req, res) => res.json({ ...abonnement.pourJoueur(req.compte), whatsapp: whatsappAchat(), compte: req.compte.pseudo + '#' + req.compte.numero }));
+  // Page « Recharger » (site et APK seulement) : pièces et Kopo+ ensemble, avec le nom du compte à donner en payant.
+  r.get('/recharger', joueur, (req, res) => res.json({
+    solde: req.compte.solde, compte: req.compte.pseudo + '#' + req.compte.numero, whatsapp: whatsappAchat(),
+    pieces: bouquets.pourJoueur(), kopoPlus: abonnement.pourJoueur(req.compte),
+  }));
   // Essai de bienvenue : 7 jours de Kopo+, une seule fois, compte Google.
   r.post('/abonnement/essai', joueur, enveloppe(async (req, res) => res.json(await abonnement.essayer(req.compte))));
   r.get('/boutique', joueur, enveloppe(async (req, res) => res.json({ solde: req.compte.solde, objets: parcours.catalogue(), ...(await parcours.collection(req.compte)) })));
@@ -191,6 +203,12 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours,
   // --- Match du jour et Bande (competition-amis.md)
   r.get('/match-jour', joueur, enveloppe(async (req, res) => res.json(await matchJour.etat(req.compte))));
   r.get('/match-jour/classement', joueur, enveloppe(async (req, res) => res.json(await matchJour.classement(req.compte, String(req.query.type || 'mondial'), { limite: req.query.limite }))));
+  // --- Le Fleuve (fleuve.md) : cartes du Congo et du Niger, pagaies, étoiles. On joue dans la salle « fleuve ».
+  if (fleuve) {
+    r.get('/fleuve', joueur, enveloppe(async (req, res) => res.json(await fleuve.etat(req.compte))));
+    r.post('/fleuve/pagaie', joueur, enveloppe(async (req, res) => res.json(await fleuve.acheterPagaie(req.compte))));
+    r.get('/fleuve/:fleuve/:numero', joueur, enveloppe(async (req, res) => res.json(await fleuve.etape(req.compte, req.params.fleuve, req.params.numero))));
+  }
   r.get('/bandes', joueur, enveloppe(async (req, res) => res.json(await bande.mesBandes(req.compte))));
   r.post('/bandes', joueur, enveloppe(async (req, res) => res.json(await bande.creer(req.compte, req.body || {}))));
   r.get('/bandes/ouvertes', joueur, enveloppe(async (req, res) => res.json(await bande.ouvertes(req.compte, req.query.pays))));

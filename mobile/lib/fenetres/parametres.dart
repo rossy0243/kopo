@@ -116,7 +116,7 @@ class _ParametresState extends State<_Parametres> {
           Bascule('Sur ce téléphone', pushIci, (v) async {
             try { v ? await Push.activer() : await Push.couper(); setState(() => pushIci = v); } catch (e) { app.toast(e.toString().replaceFirst('Exception: ', ''), Niv.echec); }
           }, aide: 'Même quand Masano est fermé'),
-          for (final (t, texte, aide) in const [('invitation', 'Invitations', "Un ami t'invite à sa table"), ('ami', "Demandes d'ami", 'Reçues et acceptées'), ('match', 'Rappel du Match du jour', "À 19 h, si tu ne l'as pas joué"), ('annonce', 'Annonces de Masano', 'Tournois, nouveautés')])
+          for (final (t, texte, aide) in const [('invitation', 'Invitations', "Un ami t'invite à sa table"), ('ami', "Demandes d'ami", 'Reçues et acceptées'), ('match', 'Rappel du Match du jour', "À 19 h, si tu ne l'as pas joué"), ('annonce', 'Annonces de Masano', 'Tournois, nouveautés'), ('fleuve', 'Le Fleuve', "Un ami t'a dépassé (une fois par jour au plus)")].where((x) => (x.$1 != 'fleuve' || (app.config?['fleuve'] != null && app.config?['fleuve'] != 'ferme')) && (x.$1 != 'match' || !app.fleuveLance)))
             Bascule(texte, prefsPush[t] != false, (v) async {
               try { final r = await Api.patch('/push/prefs', {t: v}); setState(() => etatPush = {...etatPush!, 'prefs': r['prefs']}); } catch (e) { app.toast(messageErreur(e), Niv.echec); }
             }, aide: aide),
@@ -176,9 +176,9 @@ class _ParametresState extends State<_Parametres> {
       const Ecart(8),
       // Wrap : sur un écran étroit, les deux liens passent l'un sous l'autre au lieu de sortir de la fenêtre.
       Wrap(alignment: WrapAlignment.center, crossAxisAlignment: WrapCrossAlignment.center, children: [
-        TextButton(onPressed: () => ouvrirLien('${lienJeu.replaceAll(RegExp(r'#.*$'), '')}legal/conditions.html'), child: Text("Conditions d'utilisation", style: K.texte(13, couleur: K.brass))),
+        TextButton(onPressed: () => ouvrirLien('${lienJeu.replaceAll(RegExp(r'#.*$'), '')}legal/conditions.html${Api.sansAchats ? '?appli=1' : ''}'), child: Text("Conditions d'utilisation", style: K.texte(13, couleur: K.brass))),
         Text('·', style: K.texte(13, couleur: K.muted)),
-        TextButton(onPressed: () => ouvrirLien('${lienJeu.replaceAll(RegExp(r'#.*$'), '')}legal/confidentialite.html'), child: Text('Confidentialité', style: K.texte(13, couleur: K.brass))),
+        TextButton(onPressed: () => ouvrirLien('${lienJeu.replaceAll(RegExp(r'#.*$'), '')}legal/confidentialite.html${Api.sansAchats ? '?appli=1' : ''}'), child: Text('Confidentialité', style: K.texte(13, couleur: K.brass))),
       ]),
       Btn('Remettre les réglages par défaut', large: true, onTap: () { app.prefs = Map.of(App.prefsDefaut); app.enregistrerPrefs(); setState(() {}); }),
       const Ecart(6),

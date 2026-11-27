@@ -9,9 +9,11 @@ import '../commun/retention.dart';
 import '../commun/stock.dart';
 import '../commun/theme.dart';
 import '../etat.dart';
+import '../reseau/api.dart';
 import '../fenetres/accueil_fenetres.dart';
 import '../fenetres/communes.dart';
 import '../fenetres/compet.dart';
+import '../fenetres/fleuve.dart';
 import '../fenetres/parametres.dart';
 import '../fenetres/progres.dart';
 import '../fenetres/social.dart';
@@ -65,7 +67,7 @@ class Accueil extends StatelessWidget {
                           // Cartes étroites (Galaxy Fold fermé) : un peu plus hautes pour que leur texte tienne.
                           final h = w < 150 ? w * 1.12 : w * 3.6 / 4;
                           return Wrap(spacing: 10, runSpacing: 10, children: [
-                            for (final m in modes) SizedBox(width: m.creer ? c.maxWidth : w, height: m.creer ? 112 : h, child: m),
+                            for (final m in modes) SizedBox(width: m.creer || m.ligne ? c.maxWidth : w, height: m.creer ? 112 : m.ligne ? 96 : h, child: m),
                           ]);
                         }),
                       ),
@@ -97,11 +99,22 @@ class Accueil extends StatelessWidget {
       resumeBande = x == null ? 'Défie tes amis' : x['inscrit'] == true ? "${x['jeSuisChef'] == true ? '👑 ' : ''}${x['nom']} · ${x['rang']}e" : x['nom'].toString();
     }
     final creerSous = inter ? 'Entre amis, de 2 à 8 · simple ou délire' : 'Entre amis, de 2 à 9';
+    // Le Fleuve : le Congo pour Kopo, le Niger pour Inter (8). Visible quand l'admin l'ouvre (à tous ou aux testeurs).
+    final ef = app.etatFleuve;
+    final fleuves = ef != null && ef['ouvert'] == true ? ef['fleuves'] as Map? : null;
+    final cleFleuve = fleuveDuJeu(inter ? 'inter8' : 'kopo');
+    final fl = fleuves == null ? null : fleuves[cleFleuve] as Map?;
+    // L'étape du joueur en grand ; le fleuve et les étoiles en petit.
+    final publie = fl != null && (fl['publiees'] as num? ?? 0) > 0;
+    final resumeFleuve = fl == null ? null : publie ? "${fl['nom']} · ★ ${fl['etoiles']}" : "${fl['nom']} · bientôt";
+    final etapeFleuve = !publie ? null : fl['courante'] != null ? ('Étape', '${fl['courante']}') : ('Tout', 'fait');
     return [
       CarteMode('creer', 'Créer une partie', creerSous, coin: '♠', creer: true, amis: app.amisEnLigne, onTap: garde(() => creer(), ouvertInter: true)),
+      if (resumeFleuve != null) CarteMode('fleuve', 'Le Fleuve', resumeFleuve, coin: '♠', ligne: true, grand: etapeFleuve, badge: badgeFleuve(), onTap: garde(() { fleuveVu(); ouvrirFleuve(cleFleuve); }, ouvertInter: true)),
       // Match du jour et Bande : Kopo seulement, les cartes disparaissent avec Inter (8), comme sur le site.
-      if (!inter) CarteMode('jour', 'Match du jour', resumeJour ?? 'La même partie pour tous', coin: '♦', point: app.pointJour, onTap: garde(ouvrirMatchJour)),
-      if (!inter) CarteMode('bande', 'La Bande', resumeBande ?? 'Défie tes amis', coin: '♥', onTap: garde(() => ouvrirBande())),
+      // Le Fleuve lancé : ils laissent la place au Fleuve.
+      if (!inter && !app.fleuveLance) CarteMode('jour', 'Match du jour', resumeJour ?? 'La même partie pour tous', coin: '♦', point: app.pointJour, onTap: garde(ouvrirMatchJour)),
+      if (!inter && !app.fleuveLance) CarteMode('bande', 'La Bande', resumeBande ?? 'Défie tes amis', coin: '♥', onTap: garde(() => ouvrirBande())),
       CarteMode('enligne', 'En ligne', 'Avec des inconnus', coin: '♦', enLigne: app.nbEnLigne, onTap: garde(ouvrirEnLigne, ouvertInter: true)),
       CarteMode('rejoindre', 'Rejoindre', 'Avec un code', coin: '♥', onTap: garde(ouvrirRejoindre, ouvertInter: true)),
       CarteMode('robots', 'Contre les robots', inter ? 'Pour apprendre Inter (8)' : 'Partie rapide · niveau ${(App.nomsNiveauxRobots[app.niveauRobots] ?? 'Normal').toLowerCase()}', coin: '♣', onTap: garde(ouvrirRobots, ouvertInter: true)),
@@ -120,16 +133,21 @@ String dureeLisible(int ms) {
 class CarteMode extends StatelessWidget {
   final String icone, titre, sous, coin;
   final bool creer, point;
+  final bool ligne; // sur toute une ligne (Le Fleuve), sous « Créer une partie »
+  final (String, String)? grand; // à droite, en grand : (« Étape », « 10 »)
+  final bool badge; // pastille NOUVEAU
   final int amis;
   final int? enLigne;
   final VoidCallback onTap;
-  const CarteMode(this.icone, this.titre, this.sous, {super.key, required this.coin, this.creer = false, this.point = false, this.amis = 0, this.enLigne, required this.onTap});
+  const CarteMode(this.icone, this.titre, this.sous, {super.key, required this.coin, this.creer = false, this.point = false, this.ligne = false, this.grand, this.badge = false, this.amis = 0, this.enLigne, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final encre = creer ? K.encre : K.brass;
     final coinCouleur = creer ? const Color(0x8C1D1606) : const Color(0xB3E2B04A);
-    return Material(
+    // Téléphone couché : la carte du Fleuve a la forme des autres ; l'étape passe sous le nom (« Étape 16 »).
+    final enLigne2 = ligne && MediaQuery.orientationOf(context) == Orientation.portrait;
+    final carte = Material(
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
@@ -149,7 +167,7 @@ class CarteMode extends StatelessWidget {
             child: Stack(children: [
               Positioned(top: 5, left: 6, child: Text(coin, style: TextStyle(fontSize: 13, color: coinCouleur))),
               Positioned(bottom: 5, right: 6, child: Transform.rotate(angle: math.pi, child: Text(coin, style: TextStyle(fontSize: 13, color: coinCouleur)))),
-              Center(
+              if (enLigne2) _contenuLigne() else Center(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                   // Si la carte est petite (écran étroit ou bas), tout son contenu rétrécit au lieu d'être coupé.
@@ -162,6 +180,10 @@ class CarteMode extends StatelessWidget {
                     FittedBox(fit: BoxFit.scaleDown, child: Text(titre, style: TextStyle(fontFamily: K.display, fontSize: creer ? 24 : 19, letterSpacing: 1.2, height: 1, color: encre))),
                     const SizedBox(height: 4),
                     Text(sous, textAlign: TextAlign.center, maxLines: 3, overflow: TextOverflow.ellipsis, style: K.texte(11, couleur: creer ? const Color(0xFF4A3A12) : K.muted).copyWith(height: 1.2)),
+                    if (grand != null) Padding(padding: const EdgeInsets.only(top: 4), child: Text.rich(TextSpan(children: [
+                      TextSpan(text: '${grand!.$1.toUpperCase()} ', style: K.texte(11, couleur: const Color(0xFF7FC4E8)).copyWith(letterSpacing: 1.5)),
+                      TextSpan(text: grand!.$2, style: const TextStyle(fontFamily: K.display, fontSize: 26, height: 1, color: Colors.white)),
+                    ]))),
                     if (creer && amis > 0) _pointEnLigne('$amis ami${amis > 1 ? 's' : ''} en ligne', const Color(0xFF4A3A12)),
                     if (enLigne != null) _pointEnLigne('$enLigne joueur${enLigne! > 1 ? 's' : ''} en ligne', K.muted),
                   ])))),
@@ -172,7 +194,34 @@ class CarteMode extends StatelessWidget {
         ),
       ),
     );
+    if (!badge) return carte;
+    return Stack(clipBehavior: Clip.none, children: [
+      Positioned.fill(child: carte),
+      Positioned(top: -8, right: 14, child: IgnorePointer(child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        decoration: BoxDecoration(color: K.red, borderRadius: BorderRadius.circular(99), boxShadow: const [BoxShadow(color: Color(0x73000000), blurRadius: 4, offset: Offset(0, 2))]),
+        child: Text('NOUVEAU', style: K.texte(11, couleur: Colors.white, poids: FontWeight.w700).copyWith(letterSpacing: 1.2)),
+      ))),
+    ]);
   }
+
+  // Carte sur toute une ligne : icône, titre et résumé à gauche, l'étape en grand à droite.
+  Widget _contenuLigne() => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 6, 18, 6),
+        child: Row(children: [
+          Ico(icone, taille: 34),
+          const SizedBox(width: 12),
+          Expanded(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(titre, style: TextStyle(fontFamily: K.display, fontSize: 19, letterSpacing: 1.2, height: 1, color: K.brass)),
+            const SizedBox(height: 4),
+            Text(sous, maxLines: 2, overflow: TextOverflow.ellipsis, style: K.texte(11, couleur: K.muted).copyWith(height: 1.2)),
+          ])),
+          if (grand != null) Column(mainAxisSize: MainAxisSize.min, children: [
+            Text(grand!.$1.toUpperCase(), style: K.texte(12, couleur: const Color(0xFF7FC4E8)).copyWith(letterSpacing: 1.5)),
+            Text(grand!.$2, style: const TextStyle(fontFamily: K.display, fontSize: 44, height: .9, color: Colors.white)),
+          ]),
+        ]),
+      );
 
   Widget _pointEnLigne(String t, Color c) => Padding(
         padding: const EdgeInsets.only(top: 2),
@@ -217,6 +266,15 @@ class _Haut extends StatelessWidget {
               Text(App.formatPieces(app.solde), style: K.titre(21).copyWith(height: 1)),
               if (!etroit) Text('pièces', style: K.texte(10, couleur: K.muted)),
             ]),
+            // « + » : Recharger (comme sur le site). Jamais dans les versions des stores (Api.sansAchats).
+            if (app.enLigne && !Api.sansAchats) ...[
+              const SizedBox(width: 6),
+              Container(
+                width: 18, height: 18, alignment: Alignment.center,
+                decoration: const BoxDecoration(color: K.brass, shape: BoxShape.circle),
+                child: Text('+', style: K.texte(14, couleur: K.encre, poids: FontWeight.w800).copyWith(height: 1)),
+              ),
+            ],
           ]),
         ),
       ),

@@ -12,6 +12,8 @@ const { idAleatoire } = require('./comptes');
 const { etatJeuPour, NOMS_JEUX, evenementEnCours, totauxCahier } = require('./reglages');
 const ATTENTE_STICKER = require('./stickers').ATTENTE_MS;
 const { permis, SALLES_MAX, actives: limitesActives } = require('./limites');
+const FG = require('./fleuve-generateur');
+const { creerSuivi } = require('./fleuve-suivi');
 
 const salles = new Set(); // salles ouvertes (tableau de bord : en direct)
 const LETTRES = 'ABCDEFGHJKMNPQRSTUVWXYZ';
@@ -33,7 +35,13 @@ class SalleKopo extends Room {
     // Pour les applis qui ne font pas tourner le moteur sur le téléphone (appli Flutter). Sans compte Google,
     // sans pièces, sans ligue, sans XP de parcours : comme « Contre les robots » sur le site.
     this.entrainement = this.roomName === 'entrainement';
-    this.jeu = this.roomName === 'inter8' || this.roomName === 'inter8-mise' || (this.entrainement && options.jeu === 'inter8') ? 'inter8' : 'kopo';
+    // Le Fleuve (salles « fleuve ») : une étape, un joueur seul contre les robots fixés par l'étape. Le jeu suit le fleuve.
+    this.fl = null;
+    if (this.roomName === 'fleuve') {
+      if (!FG.FLEUVES[options.fleuve]) throw new Error('Fleuve inconnu.');
+      this.fl = { fleuve: options.fleuve, numero: Math.trunc(Number(options.numero)) || 0, compteId: null, essai: null, etape: null, suivi: null, termine: false };
+    }
+    this.jeu = this.roomName === 'inter8' || this.roomName === 'inter8-mise' || (this.entrainement && options.jeu === 'inter8') || (this.fl && FG.FLEUVES[this.fl.fleuve] === 'inter8') ? 'inter8' : 'kopo';
     this.S = this.jeu === 'inter8' ? SI : SK;
     this.maxClients = this.S.MAX;
     this.autoDispose = true;
@@ -42,7 +50,7 @@ class SalleKopo extends Room {
     const pris = (c) => [...salles].some((x) => x.code === c);
     this.code = options.code && /^[A-Z]{4}$/.test(options.code) && !pris(options.code) ? options.code : nouveauCode();
     while (pris(this.code)) this.code = nouveauCode();
-    this.publique = !!options.publique && !this.entrainement;
+    this.publique = !!options.publique && !this.entrainement && !this.fl;
     // Match du jour (salles « kopo-jour ») : un joueur seul contre 8 robots, la même donne pour tous ce jour-là.
     this.jour = null;
     if (this.roomName === 'kopo-jour') {
@@ -55,6 +63,8 @@ class SalleKopo extends Room {
       this.salle.niveauJoueur = d.niveauRobots;
       this.salle.sansPause = true; // même temps pour tous : pas de pause
     } else this.salle = this.S.creerSalle(this.code);
+    // Rythme des parties réglé dans le tableau de bord (temps entre les coups) : figé pour la vie de la salle.
+    if (SalleKopo.services) this.S.appliquerRythme(this.salle, (SalleKopo.services.reglages.get('rythme') || {})[this.jeu]);
     this.baremeAJour();
     // Inter (8) : le style choisi à la création (« Quelle partie ? »), modifiable ensuite dans le salon.
     // J retour en option, en simple comme en délire (22/11). Une ancienne appli qui ne l'envoie pas jouait le délire avec.
@@ -91,27 +101,28 @@ class SalleKopo extends Room {
     // Salle publique gratuite (Kopo ou Inter (8)) : après une attente sans assez de joueurs, des robots complètent
     // la table (réglage robotsPublics, onglet Pilotage). Jamais aux tables à mise. Les robots restent affichés
     // comme robots ; avec eux la partie ne rapporte ni pièces, ni Ligue, ni XP de parcours (enregistrerPartie).
-    this.robotsPublics = this.publique && !this.mise && !this.jour && !this.entrainement;
+    this.robotsPublics = this.publique && !this.mise && !this.jour && !this.entrainement && !this.fl;
     this.attenteDepuis = null; // arrivée du premier joueur dans le salon
     this.attenteTest = rapide && Number(options.attenteRobots) >= 0 ? Number(options.attenteRobots) : null; // tests seulement (ms)
-    if (rapide) { this.salle.durees = { depart: 0, finTour: 0, mancheAuto: 1 }; if (this.jour || this.entrainement) this.salle.pauseRobot = 0; } // tests seulement
+    if (rapide) { this.salle.durees = { depart: 0, finTour: 0, mancheAuto: 1 }; if (this.jour || this.entrainement || this.fl) this.salle.pauseRobot = 0; } // tests seulement
     this.clientsParId = new Map();
     this.comptes = new Map(); // id -> compte (au moment de l'entrée)
     this.attentes = new Map(); // id -> reconnexion en attente (allowReconnection), annulée si le joueur revient par le code
     this.partie = null; // { id, katapss: Map, abandons: Set, coupures: Set, classee, enregistree }
     // Ligue : seulement en salle publique (inconnus placés au hasard). Dès qu'un joueur entre
     // avec le code (un ami), la salle n'est plus classée : pas de complicité (strategie-pieces §6.3).
-    this.classee = this.publique && !this.jour && this.jeu === 'kopo'; // ligue d'Inter (8) : plus tard, séparée
+    this.classee = this.publique && !this.jour && !this.fl && this.jeu === 'kopo'; // ligue d'Inter (8) : plus tard, séparée
     this.setMetadata(this.meta('salon', 0));
     salles.add(this);
 
     this.onMessage('*', (client, type, msg) => this.recevoir(client, type, msg));
     this.setSimulationInterval(() => {
-      if (this.jour && this.jour.termine) return; // Match du jour fini pour le joueur : les robots s'arrêtent
+      const fini = () => (this.jour && this.jour.termine) || (this.fl && this.fl.termine);
+      if (fini()) return; // Match du jour ou étape du Fleuve finis pour le joueur : les robots s'arrêtent
       if (this.robotsPublics && this.completerAvecRobots()) this.apresChangement();
       // Les robots jouent l'un après l'autre : en test, plusieurs coups par tour de boucle.
-      for (let i = 0; i < (rapide && this.jour ? 50 : 1); i++) { if (!this.S.tic(this.salle)) break; this.apresChangement(); if (this.jour && this.jour.termine) break; }
-    }, rapide && this.jour ? 20 : 200);
+      for (let i = 0; i < (rapide && (this.jour || this.fl) ? 50 : 1); i++) { if (!this.S.tic(this.salle)) break; this.apresChangement(); if (fini()) break; }
+    }, rapide && (this.jour || this.fl) ? 20 : 200);
   }
 
   async onAuth(client, options = {}) {
@@ -127,7 +138,8 @@ class SalleKopo extends Room {
     const dejaAssis = this.salle && this.salle.joueurs.some((j) => j.id === c.id);
     if (!dejaAssis && limitesActives()) {
       const ailleurs = [...salles].filter((s) => s !== this && s.clientsParId.has(c.id)).length;
-      if (ailleurs >= SALLES_MAX) throw new Error('Tu as déjà trop de parties ouvertes. Quitte-en une pour en commencer une autre.');
+      const max = Math.trunc(Number((SalleKopo.services.reglages.get('limites') || {}).sallesMax)) || SALLES_MAX;
+      if (ailleurs >= max) throw new Error('Tu as déjà trop de parties ouvertes. Quitte-en une pour en commencer une autre.');
     }
     if (!dejaAssis && options.code && !options.retour && !permis('codesCompte', c.id)) throw new Error('Trop de codes essayés. Réessaie dans une minute.');
     // Jeu en maintenance, ou réservé aux testeurs : on n'entre plus (sauf pour reprendre sa place).
@@ -137,7 +149,7 @@ class SalleKopo extends Room {
     if (!assis && etat === 'ferme') throw new Error(`${NOMS_JEUX[this.jeu]} n'est pas encore ouvert.`);
     // En ligne et entre amis : compte Google obligatoire (quand la connexion Google est active).
     // Sans compte, on joue contre les robots, sur le téléphone. On laisse revenir un joueur déjà assis.
-    if (!assis && !this.jour && !this.entrainement && SalleKopo.services.googleObligatoire && !c.auth_id) throw new Error(ERREUR_GOOGLE);
+    if (!assis && !this.jour && !this.fl && !this.entrainement && SalleKopo.services.googleObligatoire && !c.auth_id) throw new Error(ERREUR_GOOGLE);
     if (this.entrainement) {
       if (this.proprietaire && this.proprietaire !== c.id) throw new Error('Cette partie n\'est pas la tienne.');
       this.proprietaire = c.id;
@@ -150,6 +162,17 @@ class SalleKopo extends Room {
         if (this.jour.compteId) throw new Error('Cette partie n\'est pas la tienne.');
         this.jour.compteId = c.id;
         this.jour.officiel = r.officiel;
+      }
+    }
+    if (this.fl) {
+      // Une seule personne par étape : son retour après une coupure, ou rien. Tout est vérifié par le service
+      // (Google, Fleuve ouvert, ordre des étapes, pagaies) ; une pagaie ne se perd qu'à l'échec.
+      if (this.fl.compteId) { if (this.fl.compteId !== c.id) throw new Error('Cette partie n\'est pas la tienne.'); }
+      else {
+        const r = await SalleKopo.services.fleuve.commencer(c, this.fl.fleuve, this.fl.numero);
+        if (this.fl.compteId) { SalleKopo.services.fleuve.annuler(c.id, r.essai).catch(() => {}); throw new Error('Cette partie n\'est pas la tienne.'); }
+        Object.assign(this.fl, { compteId: c.id, essai: r.essai, etape: r.etape, adoucir: r.adoucir, public: r.public });
+        this.salle.rng = K.hasard((r.etape.graine ^ 0x5bd1e995) >>> 0); // robots reproductibles, comme dans les essais
       }
     }
     if (this.mise) {
@@ -174,6 +197,7 @@ class SalleKopo extends Room {
     if (this.partie) this.partie.coupures.delete(id);
     this.comptes.set(id, compte);
     if (this.jour && this.salle.etat === 'salon') this.lancerJour(id, client);
+    if (this.fl && this.salle.etat === 'salon') this.lancerFleuve(id, client);
     if (this.entrainement && !ancien && this.salle.etat === 'salon' && !this.salle.joueurs.some((j) => j.robot)) this.preparerEntrainement(id);
     this.apresChangement();
   }
@@ -215,8 +239,8 @@ class SalleKopo extends Room {
       const p = libres.length ? libres.splice(Math.floor(Math.random() * libres.length), 1)[0] : String(s.joueurs.length + 1);
       s.joueurs.push({ id: 'robot-' + Math.floor(Math.random() * 1e9), nom: 'Robot ' + p, connecte: true, robot: true, voix: false, muet: true });
     }
-    s.robots = 'normaux';
-    s.niveauJoueur = 10; // force moyenne : ni trop facile, ni imbattable
+    s.robots = ['faciles', 'normaux', 'forts'].includes(r.robots) ? r.robots : 'normaux'; // réglé dans le tableau de bord
+    s.niveauJoueur = Math.min(20, Math.max(1, Math.trunc(Number(r.force)) || 10)); // force 10 : ni trop facile, ni imbattable
     if (this.attenteTest !== null) s.pauseRobot = 0; // tests seulement
     this.classee = false;
     if (!this.locked) this.lock(); // plus de place : les inconnus suivants ouvrent une autre salle
@@ -230,6 +254,55 @@ class SalleKopo extends Room {
     this.salle.donne = { graine: this.jour.graine, ordre: [id].concat(ROBOTS) };
     this.S.recevoir(this.salle, id, { type: 'lancer' });
     client.send('matchJour', { debut: true, numero: this.jour.numero, officiel: this.jour.officiel });
+  }
+
+  // Le Fleuve : les robots, la donne et les pièges de l'étape, puis la partie part tout de suite.
+  lancerFleuve(id, client) {
+    const f = this.fl, s = this.salle;
+    s.joueurs = s.joueurs.filter((j) => j.id === id);
+    s.hote = id;
+    FG.placerRobots(s, f.etape, id, { adoucir: f.adoucir });
+    f.suivi = creerSuivi(id, f.etape);
+    s.surAction = f.suivi.surAction;
+    const r = this.S.recevoir(s, id, { type: 'lancer' });
+    if (!r.ok) console.error('Fleuve : lancement refusé', r.erreur);
+    client.send('fleuve', { debut: true, etape: f.public, adoucir: f.adoucir > 0 });
+    this.directFleuve(true);
+  }
+
+  // Suit l'étape : quand l'objectif est jugé (atteint, raté, ou partie finie), le résultat part au service.
+  suivreFleuve() {
+    const f = this.fl;
+    if (!f || f.termine || !f.suivi) return;
+    f.suivi.observer(this.salle);
+    this.directFleuve();
+    if (f.suivi.fini()) this.terminerFleuve();
+  }
+
+  // La jauge en direct : l'avancée de l'étape part au joueur dès qu'elle change (texte et seuils compris :
+  // un joueur qui revient après une coupure retrouve sa jauge).
+  directFleuve(forcer = false) {
+    const f = this.fl;
+    if (!f || !f.suivi || !f.compteId) return;
+    const d = f.suivi.direct();
+    const cle = JSON.stringify(d);
+    if (cle === f.dernierDirect && !forcer) return;
+    f.dernierDirect = cle;
+    const c = this.clientsParId.get(f.compteId);
+    if (c) try { c.send('fleuve', { direct: { ...d, texte: f.public.texte, seuils: f.public.seuils || null } }); } catch (e) {}
+  }
+
+  terminerFleuve({ parti = false } = {}) {
+    const f = this.fl;
+    if (!f || f.termine || !f.compteId) return;
+    f.termine = true;
+    if (!f.suivi) { SalleKopo.services.fleuve.annuler(f.compteId, f.essai).catch(() => {}); return; } // jamais commencée : rien n'est perdu
+    f.suivi.arreter();
+    const resultat = f.suivi.resultat();
+    const envoyer = (m) => { const c = this.clientsParId.get(f.compteId); if (c) try { c.send('fleuve', m); } catch (e) {} };
+    return SalleKopo.services.fleuve.terminer(f.compteId, f.essai, resultat, { parti })
+      .then((r) => { envoyer({ fin: true, ...r }); return r; })
+      .catch((e) => { console.error('Fleuve :', e.message); envoyer({ fin: true, erreur: 'Résultat non enregistré. Réessaie.' }); });
   }
 
   // Manches passées par le joueur du Match du jour (si la partie s'arrête maintenant).
@@ -272,6 +345,7 @@ class SalleKopo extends Room {
     if (this.clientsParId.get(id) !== client) return;
     this.S.deconnecter(this.salle, id);
     if (this.jour && volontaire) { this.terminerJour({ parti: true }); return; } // quitter = le score s'arrête là
+    if (this.fl && volontaire) { if (!this.fl.termine) this.terminerFleuve({ parti: true }); return; } // quitter l'étape = échec
     if (volontaire && this.partie && this.salle.etat !== 'salon') this.partie.abandons.add(id);
     const partie = this.partie;
     if (!volontaire && partie && this.salle.etat !== 'salon') partie.coupures.add(id); // pas sa faute : pas de points perdus
@@ -310,6 +384,7 @@ class SalleKopo extends Room {
   onDispose() {
     salles.delete(this);
     if (this.jour && !this.jour.termine) this.terminerJour({ parti: true }); // jamais revenu après une coupure
+    if (this.fl && !this.fl.termine) this.terminerFleuve(); // jamais revenu : l'objectif est jugé sur ce qui est fait
   }
 
   recevoir(client, type, msg) {
@@ -319,8 +394,9 @@ class SalleKopo extends Room {
     msg = Object.assign({}, msg && typeof msg === 'object' ? msg : {}, { type });
     if (type === 'rejoindre') return; // l'entrée passe par onJoin
     // Match du jour : la table est fixée par le serveur (robots, donne), pas de revanche ni de réglages.
-    if (this.jour && ['lancer', 'ajouterRobot', 'niveauRobot', 'retirer', 'remplacerParRobot', 'reglages', 'revanche', 'revancheNon', 'rejouer', 'passerFin', 'enPause'].includes(type)) { client.send('erreur', 'Pas pendant le Match du jour.'); return; }
-    if (type === 'sync') { client.send('vue', this.vuePour(id)); return; } // la page demande sa vue dès qu'elle écoute
+    if (this.fl && ['lancer', 'ajouterRobot', 'niveauRobot', 'retirer', 'remplacerParRobot', 'reglages', 'revanche', 'revancheNon', 'rejouer', 'passerFin', 'passerPause', 'enPause'].includes(type)) { client.send('erreur', 'Pas pendant une étape du Fleuve.'); return; }
+    if (this.jour && ['lancer', 'ajouterRobot', 'niveauRobot', 'retirer', 'remplacerParRobot', 'reglages', 'revanche', 'revancheNon', 'rejouer', 'passerFin', 'passerPause', 'enPause'].includes(type)) { client.send('erreur', 'Pas pendant le Match du jour.'); return; }
+    if (type === 'sync') { client.send('vue', this.vuePour(id)); if (this.fl && this.fl.compteId === id && !this.fl.termine) this.directFleuve(true); return; } // la page demande sa vue dès qu'elle écoute
     if (type === 'reaction') { // chat : seulement les messages choisis dans le tableau de bord
       const liste = SalleKopo.services.reglages.get('messagesRapides') || [];
       if (!liste.includes(typeof msg.emoji === 'string' ? msg.emoji.trim() : '')) { client.send('erreur', 'Ce message n\'est plus proposé.'); return; }
@@ -367,12 +443,13 @@ class SalleKopo extends Room {
   async donnerVocal(client, id) {
     const { abonnement, comptes } = SalleKopo.services;
     if (!this.salle.joueurs.some((j) => j.id === id && !j.robot)) return;
-    if (this.entrainement || this.jour) { client.send('vocal', { refuse: 'seul' }); return; }
+    if (this.entrainement || this.jour || this.fl) { client.send('vocal', { refuse: 'seul' }); return; }
     const c = (await comptes.lire(id)) || this.comptes.get(id);
     if (c && this.comptes.has(id)) Object.assign(this.comptes.get(id), { kopo_plus_jusqu: c.kopo_plus_jusqu, micro_coupe: c.micro_coupe });
     if (!abonnement.estAbonne(c)) { client.send('vocal', { refuse: 'abonnement', ...abonnement.offre() }); return; }
     if (!abonnement.microPret()) { client.send('vocal', { refuse: 'bientot' }); return; }
-    client.send('vocal', abonnement.jetonVocal({ compte: c, salon: 'table-' + this.roomId, parler: !c.micro_coupe }));
+    const coupeHote = this.salle.joueurs.some((j) => j.id === id && j.micCoupe); // l'hôte a coupé son micro (éliminé)
+    client.send('vocal', Object.assign(abonnement.jetonVocal({ compte: c, salon: 'table-' + this.roomId, parler: !c.micro_coupe && !coupeHote }), coupeHote ? { coupeHote: true } : null));
   }
 
   // Sticker animé : interrupteur de l'admin allumé, joueur assis, un toutes les 5 s, et une utilisation à décompter
@@ -399,16 +476,20 @@ class SalleKopo extends Room {
 
   apresChangement() {
     const s = this.salle;
-    if (this.jour) { // pas de pièces, de ligue ni de parcours : seulement le score du jour
-      this.suivreJour();
+    if (this.jour || this.fl) { // pas de pièces de partie, de ligue ni de parcours : seulement le score du jour, ou l'étape
+      if (this.jour) this.suivreJour(); else this.suivreFleuve();
       if (s.etat !== 'salon' && !this.locked) this.lock();
       for (const [id, c] of this.clientsParId) c.send('vue', this.vuePour(id));
       return;
     }
+    // Temps d'attente en salle publique (tableau de bord) : de l'arrivée du premier humain au départ de la partie.
+    if (this.publique && s.etat === 'salon' && !this.salonDepuis && s.joueurs.some((j) => !j.robot)) this.salonDepuis = Date.now();
     if (s.etat === 'manche' && s.numeroManche === 1 && (!this.partie || this.partie.enregistree)) {
       const humains = s.joueurs.filter((j) => !j.robot).length;
       const classee = this.classee && !s.joueurs.some((j) => j.robot) && humains >= SalleKopo.services.reglages.get('ligue').joueursMin;
-      this.partie = { id: idAleatoire('p_'), katapss: new Map(), abandons: new Set(), coupures: new Set(), classee, enregistree: false, debut: new Date(), payeurs: new Set() };
+      const attente = this.salonDepuis ? Math.round((Date.now() - this.salonDepuis) / 1000) : null;
+      this.salonDepuis = null;
+      this.partie = { id: idAleatoire('p_'), katapss: new Map(), abandons: new Set(), coupures: new Set(), classee, enregistree: false, debut: new Date(), payeurs: new Set(), attente };
       // La page peut afficher « Partie classée » dès le début.
       for (const c of this.clientsParId.values()) c.send('classee', { classee });
       // Table à mise : chaque joueur paie sa mise au début de chaque partie (revanche comprise).
@@ -424,7 +505,25 @@ class SalleKopo extends Room {
     if (s.etat === 'salon' && this.maxClients !== places) this.maxClients = places; // place ajoutée par reserverRetour
     if (s.etat === 'salon' && this.locked && s.joueurs.length < places) this.unlock();
     this.setMetadata(this.meta(s.etat, s.joueurs.filter((j) => !j.robot).length));
+    this.suivreMicros();
     for (const [id, c] of this.clientsParId) c.send('vue', this.vuePour(id));
+  }
+
+  // Micro coupé par l'hôte (joueur éliminé) : LiveKit lui retire tout de suite le droit de parler, et le lui rend
+  // quand l'hôte change d'avis ou qu'une nouvelle partie commence. Le joueur est prévenu (message « vocal »).
+  suivreMicros() {
+    this.micsCoupes = this.micsCoupes || new Set();
+    const { abonnement } = SalleKopo.services;
+    for (const j of this.salle.joueurs) {
+      const coupe = !!j.micCoupe, avant = this.micsCoupes.has(j.id);
+      if (coupe === avant) continue;
+      if (coupe) this.micsCoupes.add(j.id); else this.micsCoupes.delete(j.id);
+      const c = this.comptes.get(j.id), parler = !coupe && !(c && c.micro_coupe);
+      if (abonnement && abonnement.permissionVocal) abonnement.permissionVocal({ salon: 'table-' + this.roomId, identite: j.id, parler }).catch(() => {});
+      const cl = this.clientsParId.get(j.id);
+      if (cl) cl.send('vocal', { coupeHote: coupe, parler });
+    }
+    for (const id of [...this.micsCoupes]) if (!this.salle.joueurs.some((j) => j.id === id)) this.micsCoupes.delete(id); // parti de la table
   }
 
   // Mises : prélevées au début de la partie. Un joueur qui n'a plus assez (dépensé entre-temps)
@@ -477,8 +576,12 @@ class SalleKopo extends Room {
     const fois = ev ? ev.pieces : 1;
     const partage = this.mise ? this.potParPlace(p, ordre) : null;
     await base.transaction(async (q) => {
-      await q.query('INSERT INTO parties (id, code, publique, nb_joueurs, avec_robots, vainqueur, debut, fin, classee, jeu) VALUES ($1,$2,$3,$4,$5,$6,$7, now(), $8, $9)',
-        [p.id, this.code, this.publique, ordre.length, avecRobots, this.comptes.has(s.vainqueur) ? s.vainqueur : null, p.debut, p.classee && !avecRobots, this.jeu]);
+      await q.query('INSERT INTO parties (id, code, publique, nb_joueurs, avec_robots, vainqueur, debut, fin, classee, jeu, attente_s) VALUES ($1,$2,$3,$4,$5,$6,$7, now(), $8, $9, $10)',
+        [p.id, this.code, this.publique, ordre.length, avecRobots, this.comptes.has(s.vainqueur) ? s.vainqueur : null, p.debut, p.classee && !avecRobots, this.jeu, p.attente === undefined ? null : p.attente]);
+      // Plafond du tableau de bord : pièces gagnées au plus par jour (Kinshasa) aux tables gratuites (0 = sans plafond).
+      const plafond = Math.max(0, Math.trunc(Number(g.plafondJour)) || 0);
+      const dejaGagne = async (id) => Number((await q.query(`SELECT coalesce(sum(montant), 0)::int AS n FROM registre_pieces WHERE compte_id = $1
+        AND motif IN ('manche', 'katapss', 'victoire', 'deuxieme') AND cree_le >= date_trunc('day', now() + interval '1 hour') - interval '1 hour'`, [id])).rows[0].n);
       for (const id of humains) {
         const pl = place(id);
         await q.query('INSERT INTO participations (partie_id, compte_id, place, abandon) VALUES ($1,$2,$3,$4)', [p.id, id, pl, p.abandons.has(id)]);
@@ -495,7 +598,11 @@ class SalleKopo extends Room {
           [pl === 1 ? g.victoire : 0, 'victoire'],
           [pl === 2 ? g.deuxieme : 0, 'deuxieme'],
         ];
-        for (const [montant, motif] of gains) if (montant > 0) await comptes.mouvement(q, id, Math.round(montant * fois), motif, p.id);
+        let reste = plafond ? Math.max(0, plafond - (await dejaGagne(id))) : Infinity;
+        for (const [montant, motif] of gains) {
+          const m = Math.min(Math.round(montant * fois), reste);
+          if (m > 0) { await comptes.mouvement(q, id, m, motif, p.id); reste -= m; }
+        }
       }
     });
     // Ligue : points selon la place, envoyés à chacun pour l'écran de fin.
@@ -528,6 +635,13 @@ class SalleKopo extends Room {
         if (duels.length) c.send('faceAFace', duels);
       }
       if (compte) c.send('solde', { solde: compte.solde });
+      // Ses adversaires humains de cette partie qui ne sont pas encore ses amis (ni demandés) : l'écran de fin
+      // propose de les ajouter d'un toucher. Mêmes règles que l'onglet Récents (pas de robots, ni de bloqués).
+      if (social && humains.length >= 2 && humains.includes(id)) {
+        const r = (await social.recents(id, 1).catch(() => []))[0];
+        const liste = r && r.id === p.id ? r.joueurs.filter((j) => !j.ami && !j.envoyee) : [];
+        if (liste.length) c.send('adversaires', liste);
+      }
       if (partage && p.payeurs.has(id)) c.send('pot', { pot: partage.pot, gain: partage.gains.get(id) || 0, place: place(id) });
       if (resultats.has(id)) c.send('ligue', resultats.get(id));
       if (xps.has(id)) c.send('parcours', xps.get(id));
@@ -577,7 +691,7 @@ async function reprendre(compte, code) {
 // Quelle salle ouverte porte ce code ? (GET /api/salles/:code) Les salles d'entraînement et du Match du jour ne se rejoignent pas.
 function salleParCode(code) {
   for (const s of salles) {
-    if (s.code !== code || s.entrainement || s.jour) continue;
+    if (s.code !== code || s.entrainement || s.jour || s.fl) continue;
     return { code, jeu: s.jeu, salle: s.roomName, roomId: s.roomId, etat: s.salle.etat, publique: s.publique, mise: s.mise ? s.mise.niveau : null, mode: s.jeu === 'inter8' ? s.salle.mode : null, joueurs: s.salle.joueurs.filter((j) => !j.robot).length, places: s.publique ? s.taille : s.S.MAX, pleine: s.salle.joueurs.length >= (s.publique ? s.taille : s.S.MAX) };
   }
   return null;

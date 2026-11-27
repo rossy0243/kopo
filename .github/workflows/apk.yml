@@ -1,8 +1,10 @@
 # Construit l'APK Android de l'appli (mobile/) et le met en téléchargement sur la page du run (« Artifacts »).
 # Lancement : à chaque fusion sur main qui touche l'appli (mobile/), ou à la main (onglet Actions > APK Android > Run workflow).
 # Une PR qui touche l'appli construit aussi l'APK (vérification), sans le publier. Seul main publie : l'APK de app.masano.online est donc toujours celui de main, jamais celui d'une branche en cours.
-# Sans les secrets de publication, l'APK est signé avec une clé de test : il s'installe, mais ne remplace pas
-# une version du Play Store.
+# Construit aussi le fichier AAB du Google Play Store (artefact « masano-play-aab »), à envoyer à la main dans la Play Console.
+# Clé de signature fixe : secrets ANDROID_CLE_BASE64 et ANDROID_CLE_MOT_DE_PASSE (voir mobile/README.md, « Publication Android »).
+# Sans eux, l'APK est signé avec une clé de test (il s'installe, mais ne se met pas à jour par-dessus une autre version)
+# et l'AAB n'est pas construit (la Play Console le refuserait).
 name: APK Android
 
 on:
@@ -36,21 +38,33 @@ jobs:
           cache: true
       - run: flutter --version
       - run: flutter pub get
-      # Clé de signature fixe (secrets ANDROID_CLE_BASE64 et ANDROID_CLE_MOT_DE_PASSE, voir mobile/README.md) :
-      # Android ne vérifie les liens masano.online (App Links) que si l'empreinte de la clé est celle de
-      # .well-known/assetlinks.json, et une mise à jour ne s'installe par-dessus l'ancienne qu'avec la même clé.
-      # Sans les secrets, l'APK est signé avec une clé de test qui change à chaque construction.
+      # Clé de signature fixe : une mise à jour ne s'installe par-dessus l'ancienne qu'avec la même clé, et la Play Console
+      # refuse tout fichier signé avec une autre clé que la première envoyée.
       - name: Clé de signature
+        id: cle
         env:
           CLE: ${{ secrets.ANDROID_CLE_BASE64 }}
           MDP: ${{ secrets.ANDROID_CLE_MOT_DE_PASSE }}
         run: |
-          if [ -z "$CLE" ] || [ -z "$MDP" ]; then echo "::warning::Secrets ANDROID_CLE_BASE64 / ANDROID_CLE_MOT_DE_PASSE absents : APK signé avec une clé de test, les liens masano.online n'ouvriront pas l'appli d'eux-mêmes."; exit 0; fi
+          if [ -z "$CLE" ] || [ -z "$MDP" ]; then echo "::warning::Secrets ANDROID_CLE_BASE64 / ANDROID_CLE_MOT_DE_PASSE absents : APK signé avec une clé de test, pas de fichier pour le Play Store."; echo "ok=0" >> "$GITHUB_OUTPUT"; exit 0; fi
           echo "$CLE" | base64 -d > android/app/masano.jks
           printf 'storeFile=masano.jks\nstorePassword=%s\nkeyPassword=%s\nkeyAlias=masano\n' "$MDP" "$MDP" > android/key.properties
-          echo "Empreinte (doit être dans .well-known/assetlinks.json) :"
+          echo "Empreinte SHA-256 (attendue : 2B:1C:A9:47:…:F8:E5:2A) :"
           keytool -list -v -keystore android/app/masano.jks -storepass "$MDP" | grep 'SHA256:'
-      - run: flutter build apk --release
+          echo "ok=1" >> "$GITHUB_OUTPUT"
+      # Numéro de version (versionCode) : celui du run, qui ne fait que monter. Le Play Store refuse un numéro déjà envoyé.
+      # Le nom de version (1.0.0) vient de pubspec.yaml.
+      - run: flutter build apk --release --build-number=$((100 + ${{ github.run_number }}))
+      # Version Play Store : sans achat en francs ni mobile money (Google impose sa propre facturation, voir Api.sansAchats).
+      - name: Fichier du Play Store (AAB)
+        if: steps.cle.outputs.ok == '1'
+        run: flutter build appbundle --release --dart-define=STORE=play --build-number=$((100 + ${{ github.run_number }}))
+      - uses: actions/upload-artifact@v4
+        if: steps.cle.outputs.ok == '1'
+        with:
+          name: masano-play-aab
+          path: mobile/build/app/outputs/bundle/release/app-release.aab
+          retention-days: 30
       - uses: actions/upload-artifact@v4
         with:
           name: masano-apk
@@ -66,4 +80,4 @@ jobs:
           gh release delete apk-test --yes --cleanup-tag || true
           gh release create apk-test masano.apk --prerelease --target "$GITHUB_SHA" \
             --title "APK de test Masano" \
-            --notes "APK Android de test (signé avec la clé de test). Construit depuis $GITHUB_SHA."
+            --notes "APK Android de Masano. Construit depuis $GITHUB_SHA."

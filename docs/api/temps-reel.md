@@ -16,6 +16,7 @@ Un client Dart de référence, sans dépendance et testé contre le serveur, est
 | `inter8` | Inter (8) entre amis ou en ligne (2 à 8 joueurs, gratuit) | comme `kopo`, plus `mode: 'simple'\|'delire'` et `jRetour: bool` (Délire seulement) à la création |
 | `entrainement` | Seul contre des robots (Kopo ou Inter (8)). **Pas besoin de Google**, ni pièces, ni ligue, ni XP de parcours | `jeton`, `jeu: 'kopo'\|'inter8'`, `robots` (1 à 8 en Kopo, 1 à 7 en Inter (8), 2 par défaut), `niveau: 'faciles'\|'normaux'\|'forts'\|'gentils'`, `niveauJoueur: 1..1000` (les robots se renforcent avec le niveau du joueur, plafond 20), `delai` (secondes du chrono), `mode`, `jRetour` (Inter (8)), `lancer: true` pour démarrer tout de suite. Une seule personne par salle |
 | `kopo-jour` | Match du jour : seul contre 8 robots Forts, même donne pour tous | `jeton` seulement (`create`). Compte Google obligatoire, un essai officiel par jour |
+| `fleuve` | Le Fleuve : une étape, seul contre les robots fixés par l'étape (Kopo sur le Congo, Inter (8) sur le Niger) | `jeton`, `fleuve` (`congo` ou `niger`), `numero` (`create`). Compte Google obligatoire, une pagaie perdue en cas d'échec |
 
 Pour rejoindre un ami avec un code, demander d'abord **`GET /api/v1/salles/{code}`** : la réponse donne `salle` (`kopo`, `kopo-mise`, `inter8` ou `inter8-mise`), puis `join(salle, { jeton, code })`.
 
@@ -119,6 +120,7 @@ Après l'entrée, envoyer **`sync`** : le serveur répond par la vue. Toutes les
 | `rejouer` | rien | L'hôte, fin de partie : retour au salon avec les mêmes joueurs |
 
 Match du jour (`kopo-jour`) : la table est fixée par le serveur et la partie démarre seule. `lancer`, `reglages`, les robots et la revanche répondent `Pas pendant le Match du jour.`
+Le Fleuve (`fleuve`) : pareil, la table et la donne sont fixées par l'étape. Les mêmes messages répondent `Pas pendant une étape du Fleuve.` Quitter (`leave`) compte comme un échec.
 
 ## 4. Messages reçus du serveur
 
@@ -136,7 +138,9 @@ Match du jour (`kopo-jour`) : la table est fixée par le serveur et la partie d�
 | `ligue` | `{ delta, points, division, divisionAvant, promu, relegue, protection, prochaine, saison }` | Fin d'une partie classée |
 | `parcours` | `{ xp, total, palier, nouveaux, xpPalier, paliers }` | Fin de partie entre humains : XP du parcours de saison |
 | `faceAFace` | `[{ id, pseudo, moi, lui }]` | Fin d'un duel : score du face-à-face, le même des deux côtés |
+| `adversaires` | `[{ id, pseudo, numero, avatar, apparence, niveau…, recue, moi, lui }]` | Fin d'une partie entre humains : ses adversaires qui ne sont pas encore ses amis (ni demandés). L'écran de fin propose « Ajouter » (`POST /amis`), ou « Accepter » si `recue` |
 | `matchJour` | `{ debut: true, numero, officiel }` puis `{ fin: true, numero, officiel, manches, victoire, score, parti }` | Match du jour |
+| `fleuve` | `{ debut: true, etape, adoucir }`, puis `{ direct: { score, prog, val, etat, texte, seuils } }` à chaque changement (jauge des étoiles en direct ; `etat` : `en_cours`, `danger`, `ok` ou `rate` ; renvoyé aussi après `sync`), puis `{ fin: true, fleuve, numero, reussi, parti, etoiles, score, seuils, texte, pieces, double, piecesEscale?, solde?, pagaies, biefTermine?, depasses?, premierA?, premierEssai, premierCoup? }` (`depasses` : pseudos des amis que tu viens de dépasser ; `premierA` : ville où tu arrives avant tous tes amis ; `premierCoup` : `{ joueurs, pct }`, part des joueurs qui ont réussi l'étape à leur premier essai, `pct` null sous 5 joueurs, seulement si `premierEssai`) (ou `{ fin: true, erreur }`) | Le Fleuve |
 | `exclu` | texte (raison) | Exclu par l'admin (la connexion se ferme avec 4001) |
 
 ### 4.1 La vue

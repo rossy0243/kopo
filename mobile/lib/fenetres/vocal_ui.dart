@@ -9,6 +9,7 @@ import '../commun/vocal.dart';
 import '../etat.dart';
 import '../reseau/api.dart';
 import 'communes.dart';
+import 'progres.dart' show commander;
 
 /// Couronne dorée des abonnés Kopo+ (pleine, pour la distinguer des icônes au trait).
 class CouronnePlus extends StatelessWidget {
@@ -35,12 +36,13 @@ class BoutonsMicro extends StatelessWidget {
     final moi = (v['joueurs'] as List).cast<Map>().firstWhere((j) => j['id'] == v['moi'], orElse: () => {});
     if (!vo.actif) {
       final plus = moi['plus'] == true;
+      if (!plus && Api.sansVitrinePlus) return const SizedBox.shrink(); // App Store : pas de micro verrouillé
       return IconButton(
         onPressed: vo.demande ? null : vo.activer,
-        tooltip: plus ? 'Activer le micro pour parler avec les abonnés de la table' : 'Micro réservé aux abonnés Kopo+',
+        tooltip: plus ? 'Activer le micro pour parler avec les abonnés de la table' : 'Micro réservé aux membres Kopo+',
         icon: Opacity(opacity: plus ? 1 : .75, child: Row(mainAxisSize: MainAxisSize.min, children: [
           const Ico('micro', taille: 22),
-          if (!plus) Text('+', style: K.texte(15, couleur: K.brass, poids: FontWeight.w800)),
+          if (!plus) Api.sansAchats ? const Padding(padding: EdgeInsets.only(left: 2), child: Ico('cadenas', taille: 13, couleur: K.brass)) : Text('+', style: K.texte(15, couleur: K.brass, poids: FontWeight.w800)),
         ])),
       );
     }
@@ -61,7 +63,7 @@ class BoutonsMicro extends StatelessWidget {
         );
     return Row(mainAxisSize: MainAxisSize.min, children: [
       rond(vo.muet ? 'micro-coupe' : 'micro', vo.muet ? K.bad : K.good,
-          (!vo.parler ? 'Micro coupé par la modération' : vo.muet ? 'Micro coupé, toucher pour parler' : 'Micro ouvert, toucher pour couper') + enVocal, vo.basculerMicro),
+          (!vo.parler ? (vo.coupeHote ? 'Micro coupé par l\'hôte jusqu\'à la fin de la partie' : 'Micro coupé par la modération') : vo.muet ? 'Micro coupé, toucher pour parler' : 'Micro ouvert, toucher pour couper') + enVocal, vo.basculerMicro),
       // Téléphone étroit : le son des autres se coupe dans les Paramètres, pour garder la place.
       if (!etroit) rond(vo.sonCoupe ? 'son-coupe' : 'son', vo.sonCoupe ? K.bad : K.brass, vo.sonCoupe ? 'Micro des autres coupé pour toi, toucher pour les réentendre' : 'Couper le micro de tous les autres (pour toi seul)', vo.basculerSon),
     ]);
@@ -171,6 +173,41 @@ String _date(String iso, {bool annee = true}) {
   return d == null ? '' : '${d.day} ${mois[d.month - 1]}${annee ? ' ${d.year}' : ''}';
 }
 
+/// Date en toutes lettres (« 23 novembre 2026 »), pour la fin d'un abonnement.
+String dateKopoPlus(String iso) => _date(iso);
+
+/// Une formule de Kopo+ (1 mois, 1 an) avec son prix en francs : site et APK seulement (jamais dans les versions des stores).
+Widget carteFormule(Map f, {required VoidCallback onTap}) {
+  final top = f['id'] == 'an';
+  return Expanded(child: Padding(
+    padding: const EdgeInsets.fromLTRB(4, 10, 4, 0),
+    child: Semantics(
+      button: true,
+      label: 'Kopo+ ${f['nom']} : ${f['francs']} francs congolais',
+      child: GestureDetector(
+        onTap: onTap,
+        child: Stack(clipBehavior: Clip.none, alignment: Alignment.topCenter, children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(8, 14, 8, 10),
+            decoration: BoxDecoration(color: top ? const Color(0x1AE2B04A) : const Color(0x0AFFFFFF), borderRadius: BorderRadius.circular(14), border: Border.all(color: top ? K.brass : K.line)),
+            child: Column(children: [
+              Text('${f['nom']}'.toUpperCase(), style: K.texte(11, couleur: K.muted).copyWith(letterSpacing: 1.2)),
+              FittedBox(child: Text('${App.formatPieces(f['francs'] as num)} FC', style: K.titre(24))),
+            ]),
+          ),
+          if (f['note'] != null)
+            Positioned(top: -9, child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(color: K.brass, borderRadius: BorderRadius.circular(6)),
+              child: Text('${f['note']}'.toUpperCase(), style: K.texte(10.5, couleur: K.encre, poids: FontWeight.w700)),
+            )),
+        ]),
+      ),
+    ),
+  ));
+}
+
 /// La fenêtre elle-même (séparée pour les captures d'écran).
 Widget fenetreAbonnement(Map A, {bool annonce = false}) {
   final actif = A['actif'] == true;
@@ -178,36 +215,6 @@ Widget fenetreAbonnement(Map A, {bool annonce = false}) {
   final avantages = ((A['avantages'] as List?) ?? const []).map((e) => e.toString()).toList();
   final essai = !actif && A['essai'] is Map ? A['essai'] as Map : null;
   final jours = essai?['jours'] ?? 7;
-  Widget formule(Map f) {
-    final top = f['id'] == 'an';
-    return Expanded(child: Padding(
-      padding: const EdgeInsets.fromLTRB(4, 10, 4, 0),
-      child: Semantics(
-        button: true,
-        label: 'Kopo+ ${f['nom']} : ${f['francs']} francs congolais',
-        child: GestureDetector(
-          onTap: () => app.toast('Kopo+ ${f['nom']} : le paiement mobile money arrive bientôt.', Niv.alerte),
-          child: Stack(clipBehavior: Clip.none, alignment: Alignment.topCenter, children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(8, 14, 8, 10),
-              decoration: BoxDecoration(color: top ? const Color(0x1AE2B04A) : const Color(0x0AFFFFFF), borderRadius: BorderRadius.circular(14), border: Border.all(color: top ? K.brass : K.line)),
-              child: Column(children: [
-                Text('${f['nom']}'.toUpperCase(), style: K.texte(11, couleur: K.muted).copyWith(letterSpacing: 1.2)),
-                FittedBox(child: Text('${App.formatPieces(f['francs'] as num)} FC', style: K.titre(24))),
-              ]),
-            ),
-            if (f['note'] != null)
-              Positioned(top: -9, child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                decoration: BoxDecoration(color: K.brass, borderRadius: BorderRadius.circular(6)),
-                child: Text('${f['note']}'.toUpperCase(), style: K.texte(10.5, couleur: K.encre, poids: FontWeight.w700)),
-              )),
-          ]),
-        ),
-      ),
-    ));
-  }
   const icones = ['micro', 'couronne', 'cadeau'];
   return Fenetre(titre: actif ? 'Ton abonnement' : annonce ? 'Nouveau : le micro en partie' : 'Le micro en partie', enfants: [
     Row(mainAxisAlignment: MainAxisAlignment.center, children: [const CouronnePlus(taille: 28), const SizedBox(width: 8), Text('KOPO+', style: K.titre(28))]),
@@ -225,16 +232,24 @@ Widget fenetreAbonnement(Map A, {bool annonce = false}) {
       const Ecart(6),
       Btn.principal('Essayer $jours jours gratuits', large: true, onTap: lancerEssai),
       const Ecart(4),
-      Muet("Sans engagement : après $jours jours, le micro s'arrête tout seul. Ou abonne-toi :", taille: 12),
+      Muet(Api.sansAchats ? "Sans engagement : après $jours jours, le micro s'arrête tout seul." : "Sans engagement : après $jours jours, le micro s'arrête tout seul. Ou abonne-toi :", taille: 12),
     ] else if (essai != null && essai['raison'] == 'google') ...[
       const Ecart(6),
       Muet('Essai gratuit de $jours jours avec un compte Google.', taille: 13),
       const Ecart(4),
       Btn('Se connecter avec Google', large: true, onTap: () { app.fermerFenetre(); connecterGoogle(); }),
     ],
-    Row(children: [for (final f in formules) formule(f)]),
+    if (Api.sansAchats) ...[
+      // Versions des stores : rien à vendre, aucun prix, aucun lien, aucune mention d'un autre moyen de payer
+      // (règles de paiement de Google Play et de l'App Store). On dit seulement à qui le micro est réservé.
+      if (!actif) ...[const Ecart(10), const Muet("Réservé aux membres Kopo+. Kopo+ ne donne jamais d'avantage pour gagner.", taille: 12)],
+    ] else ...[
+    Row(children: [for (final f in formules) carteFormule(f, onTap: () => commander(A, 'Kopo+ ${f['nom']} (${App.formatPieces(f['francs'] as num)} FC)'))]),
     const Ecart(10),
-    Muet(A['paiement'] == true ? 'Paiement en francs congolais par mobile money.' : "Paiement en francs congolais (mobile money : M-Pesa, Orange Money, Airtel Money) : bientôt. Kopo+ ne donne jamais d'avantage pour gagner.", taille: 12),
+    Muet(A['whatsapp'] is String && (A['whatsapp'] as String).isNotEmpty
+        ? "Touche une formule : WhatsApp s'ouvre avec ta commande, tu paies par mobile money (M-Pesa, Orange Money, Airtel Money). Kopo+ ne donne jamais d'avantage pour gagner."
+        : "Paiement en francs congolais (mobile money : M-Pesa, Orange Money, Airtel Money) : bientôt. Kopo+ ne donne jamais d'avantage pour gagner.", taille: 12),
+    ],
     const Ecart(10),
     if (essai != null && essai['possible'] == true)
       Btn(annonce ? 'Plus tard' : 'Fermer', large: true, onTap: app.fermerFenetre)

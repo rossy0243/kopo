@@ -22,6 +22,7 @@ class MainActivity : FlutterActivity() {
             NotificationChannel("ami", "Amis", NotificationManager.IMPORTANCE_DEFAULT).apply { description = "Demandes d'ami reçues et acceptées" },
             NotificationChannel("match", "Match du jour", NotificationManager.IMPORTANCE_DEFAULT).apply { description = "Rappel du Match du jour à 19 h" },
             NotificationChannel("annonce", "Annonces", NotificationManager.IMPORTANCE_DEFAULT).apply { description = "Nouveautés et messages de Masano" },
+            NotificationChannel("fleuve", "Le Fleuve", NotificationManager.IMPORTANCE_DEFAULT).apply { description = "Un ami t'a dépassé, course de la semaine" },
         )
         gestion.createNotificationChannels(canaux)
     }

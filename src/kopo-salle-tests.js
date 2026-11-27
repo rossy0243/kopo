@@ -1028,5 +1028,94 @@ test('Entre les manches, personne ne change de place (créateur, 16/11)', () => 
   }
 });
 
+console.log('\nHôte éliminé et micro');
+test("L'hôte éliminé passe la main à un joueur encore en jeu (humain, présent)", () => {
+  const s = salleAvec(4);
+  S.recevoir(s, 'p4', { type: 'micro', voix: true, muet: false });
+  assert.ok(!S.recevoir(s, 'p1', { type: 'passerHote', cible: 'p2' }).ok, 'pas dans le salon');
+  assert.ok(S.recevoir(s, 'p1', { type: 'lancer' }).ok);
+  assert.ok(!S.recevoir(s, 'p1', { type: 'passerHote', cible: 'p2' }).ok, "pas tant qu'il joue");
+  // p1 (l'hôte) et p4 sont éliminés
+  s.elimines = ['p1', 'p4']; s.restants = ['p2', 'p3'];
+  assert.ok(!S.recevoir(s, 'p2', { type: 'passerHote', cible: 'p3' }).ok, "seul l'hôte");
+  assert.ok(!S.recevoir(s, 'p1', { type: 'passerHote', cible: 'p4' }).ok, 'pas à un éliminé');
+  s.joueurs.find((j) => j.id === 'p3').connecte = false;
+  assert.ok(!S.recevoir(s, 'p1', { type: 'passerHote', cible: 'p3' }).ok, 'pas à un absent');
+  assert.ok(S.recevoir(s, 'p1', { type: 'passerHote', cible: 'p2' }).ok);
+  assert.strictEqual(s.hote, 'p2');
+  assert.strictEqual(S.vue(s, 'p3').hote, 'p2');
+  assert.ok(!S.recevoir(s, 'p1', { type: 'couperMicro', cible: 'p4' }).ok, "l'ancien hôte n'a plus la main");
+});
+test("L'hôte coupe le micro d'un joueur éliminé pour toute la table, le rend, et une nouvelle partie le rend aussi", () => {
+  const s = salleAvec(3);
+  S.recevoir(s, 'p3', { type: 'micro', voix: true, muet: false });
+  assert.ok(!S.recevoir(s, 'p1', { type: 'couperMicro', cible: 'p3' }).ok, 'pas dans le salon');
+  S.recevoir(s, 'p1', { type: 'lancer' });
+  assert.ok(!S.recevoir(s, 'p1', { type: 'couperMicro', cible: 'p3' }).ok, 'pas un joueur encore en jeu');
+  s.elimines = ['p3']; s.restants = ['p1', 'p2'];
+  assert.ok(!S.recevoir(s, 'p2', { type: 'couperMicro', cible: 'p3' }).ok, "seul l'hôte");
+  assert.ok(S.recevoir(s, 'p1', { type: 'couperMicro', cible: 'p3' }).ok);
+  let j = S.vue(s, 'p2').joueurs.find((x) => x.id === 'p3');
+  assert.ok(j.micCoupe && j.muet);
+  S.recevoir(s, 'p3', { type: 'micro', voix: true, muet: false });
+  assert.ok(S.vue(s, 'p2').joueurs.find((x) => x.id === 'p3').muet, 'il ne peut pas rouvrir son micro');
+  assert.ok(S.recevoir(s, 'p1', { type: 'couperMicro', cible: 'p3', coupe: false }).ok);
+  assert.ok(!S.vue(s, 'p2').joueurs.find((x) => x.id === 'p3').micCoupe);
+  S.recevoir(s, 'p1', { type: 'couperMicro', cible: 'p3' });
+  s.etat = 'salon';
+  S.recevoir(s, 'p1', { type: 'lancer' });
+  assert.ok(!S.vue(s, 'p2').joueurs.find((x) => x.id === 'p3').micCoupe, 'nouvelle partie : micro rendu');
+});
+
+test('Rythme du tableau de bord : temps de la salle réglés en secondes, valeurs hors bornes ignorées', () => {
+  const s = S.creerSalle('RYTM');
+  S.appliquerRythme(s, { finTour: 3, depart: 3, mancheAuto: 6, revanche: 99, pauseRobot: 0.8, absent: 4, rapide: 0 });
+  assert.strictEqual(s.durees.depart, 3000);
+  assert.strictEqual(s.durees.mancheAuto, 6000);
+  assert.strictEqual(s.durees.revanche, S.DUREES.revanche, 'revanche hors bornes : valeur de départ');
+  assert.strictEqual(s.rythme.pauseRobot, 800);
+  assert.strictEqual(s.rythme.absent, 4);
+  assert.strictEqual(s.rythme.rapide, false);
+  const h = (() => { let t = 1000; const f = () => t; return f; })();
+  s.horloge = h; s.durees.depart = 0;
+  S.recevoir(s, 'p1', { type: 'rejoindre', nom: 'A' }); S.recevoir(s, 'p2', { type: 'rejoindre', nom: 'B' });
+  assert.ok(S.recevoir(s, 'p1', { type: 'lancer' }).ok);
+  assert.strictEqual(s.robotPret - h(), 800, 'un robot réfléchit le temps réglé');
+  const t = S.creerSalle('SANS'); S.appliquerRythme(t, null);
+  assert.strictEqual(t.rythme, undefined);
+  assert.deepStrictEqual(t.durees, S.DUREES);
+});
+
+
+test('Toucher la table contre les robots : le pli ou le compte à rebours passe tout de suite, seul contre les robots', () => {
+  const SP = require('./kopo-salle.js');
+  let t = 1000000;
+  const s = SP.creerSalle('TOUC');
+  s.horloge = () => t;
+  SP.recevoir(s, 'p1', { type: 'rejoindre', nom: 'Moi' });
+  SP.recevoir(s, 'p1', { type: 'ajouterRobot' }); SP.recevoir(s, 'p1', { type: 'ajouterRobot' });
+  assert.ok(!SP.recevoir(s, 'p1', { type: 'passerPause' }).ok, 'pas dans le salon');
+  assert.ok(SP.recevoir(s, 'p1', { type: 'lancer' }).ok);
+  assert.strictEqual(s.pause && s.pause.type, 'depart');
+  assert.ok(SP.recevoir(s, 'p1', { type: 'passerPause' }).ok);
+  assert.ok(!s.pause || s.pause.type !== 'depart' || s.pause.jusqua <= t, 'le compte à rebours est passé');
+  // Pendant la partie : chaque pause se passe d'un toucher, sans attendre.
+  let passees = 0;
+  for (let i = 0; i < 4000 && s.etat === 'manche'; i++) {
+    if (s.pause && s.pause.jusqua > t) { assert.ok(SP.recevoir(s, 'p1', { type: 'passerPause' }).ok); passees++; continue; }
+    const v = SP.vue(s, 'p1');
+    if (v.manche && v.manche.actions && v.manche.actions.length) { SP.recevoir(s, 'p1', { type: 'action', action: v.manche.actions[0] }); continue; }
+    t += 50; SP.tic(s);
+  }
+  assert.ok(passees > 0, 'au moins une pause passée');
+  // Deux humains : refusé.
+  const d = SP.creerSalle('DEUX');
+  d.horloge = () => t;
+  SP.recevoir(d, 'p1', { type: 'rejoindre', nom: 'A' }); SP.recevoir(d, 'p2', { type: 'rejoindre', nom: 'B' });
+  SP.recevoir(d, 'p1', { type: 'lancer' });
+  assert.ok(d.pause);
+  assert.ok(!SP.recevoir(d, 'p1', { type: 'passerPause' }).ok);
+});
+
 console.log(`\n${ok} tests réussis, ${ko} en échec.`);
 process.exit(ko ? 1 : 0);

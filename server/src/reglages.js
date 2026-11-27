@@ -2,12 +2,15 @@
 'use strict';
 
 const DEFAUTS = {
-  gains: { bienvenue: 500, manche: 5, katapss: 10, victoire: 40, deuxieme: 15 },
+  // plafondJour : pièces gagnées au plus par jour (heure de Kinshasa) aux tables gratuites, manches, Katapss et places
+  // comprises (0 = sans plafond). Contre les comptes qui enchaînent les parties pour amasser des pièces.
+  gains: { bienvenue: 500, manche: 5, katapss: 10, victoire: 40, deuxieme: 15, plafondJour: 0 },
   bonusJour: { depart: 50, pas: 10, plafond: 150 },
   remiseAFlot: { seuil: 20, niveau: 100 },
   pot: { vainqueur: 50, deuxieme: 25, troisieme: 10, maison: 15 },
   tables: { bronze: 50, argent: 200, or: 1000, diamant: 5000 },
-  annonce: { texte: '', active: false },
+  // debut / fin (instants ISO, facultatifs) : l'annonce n'est montrée qu'entre ces deux dates (annonce programmée).
+  annonce: { texte: '', active: false, debut: '', fin: '' },
   // Fenêtre « Nouveau » au premier lancement (annonce-competition.md) : éteinte tant qu'on n'ouvre pas la compétition.
   nouveaute: { bande: false },
   maintenance: { active: false, message: 'Masano est en maintenance. On revient très vite !' },
@@ -43,7 +46,34 @@ const DEFAUTS = {
   matchJour: { actif: true, robots: 'forts', niveauRobots: 20 },
   // Salles publiques gratuites (Kopo et Inter (8)) : des robots complètent la table après `attente` secondes
   // sans assez de joueurs (actif : 1 = oui, 0 = non). Jamais aux tables à mise ; partie sans pièces, Ligue ni XP.
-  robotsPublics: { actif: 1, attente: 45 },
+  // robots / force : niveau des robots qui complètent la table (faciles, normaux, forts) et leur force (1 à 20).
+  robotsPublics: { actif: 1, attente: 45, robots: 'normaux', force: 10 },
+  // Rythme des parties (onglet Réglages > Rythme des parties), en secondes. Lu à l'ouverture de chaque salle, sur le
+  // serveur (salles en ligne, entre amis, entraînement de l'appli) et sur le site (contre les robots, via /api/config).
+  // rapide : robots entre eux (plus aucun humain dans la manche), tout s'accélère (1 = oui, 0 = non).
+  rythme: {
+    kopo: { finTour: 5, depart: 5, mancheAuto: 10, revanche: 15, pauseRobot: 1.2, absent: 5, rapide: 1 },
+    inter8: { depart: 5, mancheAuto: 10, revanche: 15, pauseRobot: 1.8, annonce: 3, absent: 5, rapide: 1 },
+  },
+  // Heures (Kinshasa) des rappels push automatiques, et heures de silence (aucun rappel entre silenceDebut et silenceFin).
+  heuresPush: { serie: 17, relance: 18, bande: 18, matchJour: 19, silenceDebut: 22, silenceFin: 8 },
+  // Notifications push programmées (onglet Notifications) : { id, titre, texte, quand (ISO), pays, envoye (ISO ou '') }.
+  pushProgrammes: [],
+  // Prix de Kopo+ en francs congolais (formules « 1 mois » et « 1 an »).
+  kopoPlus: { mois: 2500, an: 25000 },
+  // Paiement à la main en attendant le mobile money : numéro WhatsApp (chiffres, indicatif compris, ex. 243812345678)
+  // qui reçoit les commandes de la page « Recharger » du site et de l'APK. Vide = pas de commande, « Bientôt ».
+  // Jamais montré dans les versions Google Play et App Store (elles ne vendent rien).
+  achat: { whatsapp: '' },
+  // Comptes suspects : deux comptes qui ont joué au moins `parties` parties seuls ensemble en `jours` jours,
+  // gagnées à `pourcent` % ou plus par le même.
+  suspects: { jours: 14, parties: 5, pourcent: 80 },
+  // Limites contre les abus (par minute) et salles ouvertes en même temps par compte.
+  limites: { apiCompte: 120, apiIp: 600, codesCompte: 30, sallesMax: 3 },
+  // Création de comptes invités (sans Google) : 1 = ouverte, 0 = fermée (les comptes déjà créés continuent).
+  inscriptions: { invites: 1 },
+  // Tableau de bord : alerte quand les pièces créées dépassent les détruites de plus de `inflation` % sur 7 jours.
+  alertes: { inflation: 25 },
   // Rappels push du serveur (1 = oui, 0 = non), rangés avec le rappel du Match du jour (le joueur les coupe ensemble) :
   // série du bonus du jour à 17 h, mise de la Bande le mercredi à 18 h, fin de saison de la Ligue 24 h avant (heure de Kinshasa).
   rappels: { serie: 1, bande: 1, saison: 1 },
@@ -71,6 +101,12 @@ const DEFAUTS = {
   stickers: { actif: false, vente: false, remisePack: require('./stickers').REMISE_PACK, offres: require('./stickers').OFFRES_DEFAUT },
   // Bouquets de pièces (argent réel, du moins cher au plus cher, 40 000 FC au plus) : au taux des stickers, bonus croissant.
   bouquets: { bouquets: require('./bouquets').BOUQUETS_DEFAUT },
+  // Le Fleuve (fleuve.md) : fermé jusqu'au lancement (ferme, testeurs, ouvert), 5 pagaies par jour, pièces par étoile et par ville.
+  // prixPagaie1 à 3 : prix en pièces de la 1re, 2e et 3e pagaie achetée dans la journée, quand on n'en a plus (0 = pas en vente).
+  // Ces pièces sont détruites : c'est un puits pour les joueurs riches, sans aide contre les autres joueurs (le Fleuve se joue seul).
+  fleuve: { etat: 'ferme', pagaies: 5, piecesEtoile: 5, piecesEscale: 200, etoilesVille: 20, adoucirJours: 5, piecesCourse: 300, prixPagaie1: 100, prixPagaie2: 200, prixPagaie3: 400, lance: null, fleuves: { congo: 'ouvert', niger: 'ouvert', kasai: 'ferme', oubangui: 'ferme', nil: 'ferme' } }, // lance : date du lancement (Bande fermée, mises rendues)
+  // Recette qui fabrique les étapes du Fleuve (courbe de difficulté, étoiles, objectifs et pièges débloqués).
+  fleuveRecette: require('./fleuve-generateur').RECETTE_DEFAUT,
   messagesRapides: ['👏', '😂', '😮', '🔥', '😡', '👍', '😭', '🙏', 'Bien joué !', 'Bravo !', 'Joli coup !', 'Belle carte !', 'Bien vu !', 'Trop fort !', 'Merci !', 'Désolé !', 'Oups !', 'Aïe !', 'Pas de chance !', 'Je ramasse…', 'Je t’ai eu !', 'Katapss !', 'Vite !', 'Prends ton temps', 'À toi !', 'Encore une !', 'Bonne chance !', 'Bonne partie !', 'GG !', 'Revanche ?', 'On en refait une ?', 'Je reviens', 'Salut tout le monde !', 'À la prochaine !'],
 };
 // Version actuelle de l'appli (const VERSION dans src/source.html). La version minimale demandée
@@ -125,6 +161,13 @@ function verifierCommunautes(v) {
 }
 // Ce que voient les joueurs : les groupes visibles qui ont un lien, dans l'ordre.
 const communautesPubliques = (l) => (Array.isArray(l) ? l : []).filter((g) => g && g.visible && g.url).map((g) => ({ reseau: g.reseau, libelle: g.libelle || RESEAUX[g.reseau] || '', url: g.url }));
+
+// Numéro WhatsApp des commandes : chiffres seuls (espaces, +, tirets retirés), 8 à 15 chiffres, ou vide.
+function verifierWhatsapp(v) {
+  const n = String(v == null ? '' : v).replace(/[\s+().-]/g, '');
+  if (n && !/^[1-9]\d{7,14}$/.test(n)) throw Object.assign(new Error('Numéro WhatsApp invalide : les chiffres avec l\'indicatif du pays (exemple : 243812345678).'), { statut: 400 });
+  return n;
+}
 
 const DIVISIONS = ['bois', 'bronze', 'argent', 'or', 'diamant', 'legende'];
 const entier = (x) => Number.isInteger(Number(x)) && x !== '' && x !== null ? Number(x) : NaN;
@@ -262,6 +305,65 @@ function evenementEnCours(e, maintenant = new Date()) {
   return t >= Date.parse(e.debut) && t < Date.parse(e.fin) ? e : null;
 }
 
+// Nombres d'un réglage, chacun dans ses bornes [min, max] ; `pas` : entiers seulement si 1.
+function verifierBornes(v, bornes, { pas = 1, nom = '' } = {}) {
+  const out = {};
+  for (const [k, [a, b, lib]] of Object.entries(bornes)) {
+    const n = Number(v && v[k]);
+    if (!Number.isFinite(n) || n < a || n > b || (pas === 1 && !Number.isInteger(n))) throw Object.assign(new Error(`${nom}${lib || k} : entre ${String(a).replace('.', ',')} et ${String(b).replace('.', ',')}.`), { statut: 400 });
+    out[k] = pas === 1 ? n : Math.round(n * 10) / 10;
+  }
+  return out;
+}
+const oui = (x) => !(x === false || x === 0 || x === '0');
+// Rythme des parties : bornes des salles (src/kopo-salle.js, src/inter8-salle.js), en secondes, au dixième.
+function verifierRythme(v) {
+  const SK = require('../../src/kopo-salle.js'), SI = require('../../src/inter8-salle.js');
+  const LIB = { finTour: 'cartes sur la table', depart: 'compte à rebours du départ', mancheAuto: 'manche suivante', revanche: 'temps pour la revanche', pauseRobot: 'réflexion d\'un robot', absent: 'temps d\'un absent', annonce: 'délai pour annoncer' };
+  const bornes = (B) => Object.fromEntries(Object.entries(B).map(([k, [a, b]]) => [k, [a, b, LIB[k]]]));
+  return {
+    kopo: { ...verifierBornes((v || {}).kopo, bornes(SK.BORNES_RYTHME), { pas: 0.1, nom: 'Kopo, ' }), rapide: oui(((v || {}).kopo || {}).rapide) ? 1 : 0 },
+    inter8: { ...verifierBornes((v || {}).inter8, bornes(SI.BORNES_RYTHME), { pas: 0.1, nom: 'Inter (8), ' }), rapide: oui(((v || {}).inter8 || {}).rapide) ? 1 : 0 },
+  };
+}
+// Heures de Kinshasa : entiers de 0 à 23.
+const HEURES_PUSH = { serie: 'série du bonus', relance: 'relance des absents', bande: 'mise de la Bande', matchJour: 'Match du jour', silenceDebut: 'début du silence', silenceFin: 'fin du silence' };
+const verifierHeuresPush = (v) => verifierBornes(v, Object.fromEntries(Object.entries(HEURES_PUSH).map(([k, l]) => [k, [0, 23, 'Heure ' + l]])));
+// L'heure h (0 à 23) tombe-t-elle dans le silence ? (de 22 h à 8 h : la plage passe minuit)
+function heureDeSilence(h, hp) {
+  const d = hp && Number.isInteger(hp.silenceDebut) ? hp.silenceDebut : 22, f = hp && Number.isInteger(hp.silenceFin) ? hp.silenceFin : 8;
+  if (d === f) return false;
+  return d < f ? h >= d && h < f : h >= d || h < f;
+}
+// Notifications programmées : 20 au plus, texte court, date à l'heure de Kinshasa ou ISO.
+function verifierPushProgrammes(v) {
+  const err = (m) => { throw Object.assign(new Error(m), { statut: 400 }); };
+  if (!Array.isArray(v)) err('Il faut une liste de notifications.');
+  if (v.length > 20) err('Au plus 20 notifications programmées.');
+  return v.map((x, i) => {
+    x = x || {};
+    const texte = String(x.texte || '').replace(/\s+/g, ' ').trim().slice(0, 200), titre = String(x.titre || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+    if (!texte) err(`Notification ${i + 1} : écris le texte.`);
+    if (/[<>]/.test(texte + titre)) err(`Notification ${i + 1} : les signes < et > ne sont pas acceptés.`);
+    const t = String(x.quand || '').trim();
+    const d = new Date(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(t) ? t + '+01:00' : t);
+    if (!t || isNaN(d)) err(`Notification ${i + 1} : date d'envoi invalide.`);
+    const pays = String(x.pays || '').trim().toUpperCase();
+    if (pays && !/^[A-Z]{2}$/.test(pays)) err(`Notification ${i + 1} : pays inconnu (deux lettres, ex. CD).`);
+    const envoye = x.envoye && !isNaN(new Date(x.envoye)) ? new Date(x.envoye).toISOString() : '';
+    const id = /^[a-z0-9]{4,16}$/.test(String(x.id || '')) ? String(x.id) : Math.random().toString(36).slice(2, 10);
+    return { id, titre, texte, quand: d.toISOString(), pays, envoye, resultat: String(x.resultat || '').slice(0, 120) };
+  });
+}
+// L'annonce de l'admin est-elle visible maintenant ? (active, avec un texte, et dans sa fenêtre si elle en a une)
+function annonceVisible(a, maintenant = new Date()) {
+  if (!a || !a.active || !a.texte) return false;
+  const t = maintenant.getTime();
+  if (a.debut && t < Date.parse(a.debut)) return false;
+  if (a.fin && t >= Date.parse(a.fin)) return false;
+  return true;
+}
+
 function creerReglages(base) {
   let cache = JSON.parse(JSON.stringify(DEFAUTS));
   return {
@@ -269,6 +371,16 @@ function creerReglages(base) {
       const r = await base.query('SELECT cle, valeur FROM reglages_jeu');
       cache = JSON.parse(JSON.stringify(DEFAUTS));
       for (const l of r.rows) if (l.cle in cache) cache[l.cle] = typeof l.valeur === 'string' ? JSON.parse(l.valeur) : l.valeur;
+      // Réglages enregistrés avant l'ajout d'un champ (ex. gains.plafondJour) : le champ manquant prend sa valeur de départ.
+      for (const k of ['gains', 'annonce', 'robotsPublics', 'heuresPush', 'kopoPlus', 'suspects', 'limites', 'inscriptions', 'alertes', 'fleuve', 'achat']) {
+        if (cache[k] && typeof cache[k] === 'object' && !Array.isArray(cache[k])) cache[k] = { ...DEFAUTS[k], ...cache[k] };
+      }
+      if (cache.fleuveRecette) cache.fleuveRecette = require('./fleuve-generateur').completerRecette(cache.fleuveRecette);
+      // Ancienne réussite visée par défaut (92 % → 25 %, bief 1 trop facile) enregistrée telle quelle : elle prend la nouvelle.
+      if (cache.fleuveRecette && cache.fleuveRecette.taux.facile === 92 && cache.fleuveRecette.taux.dur === 25) {
+        cache.fleuveRecette = { ...cache.fleuveRecette, taux: { ...require('./fleuve-generateur').RECETTE_DEFAUT.taux } };
+      }
+      if (cache.rythme) cache.rythme = { kopo: { ...DEFAUTS.rythme.kopo, ...cache.rythme.kopo }, inter8: { ...DEFAUTS.rythme.inter8, ...cache.rythme.inter8 } };
       // L'appli s'appelle maintenant Masano : l'ancien message par défaut, enregistré tel quel, prend le nouveau nom.
       if (cache.maintenance && cache.maintenance.message === ANCIEN_MESSAGE_MAINTENANCE) cache.maintenance = { ...cache.maintenance, message: DEFAUTS.maintenance.message };
       // Une version minimale plus haute que l'appli bloquerait tout le monde : on la ramène à la version actuelle.
@@ -287,6 +399,7 @@ function creerReglages(base) {
       }
       if (cle === 'ligue') valeur = verifierLigue(valeur);
       if (cle === 'communautes') valeur = verifierCommunautes(valeur);
+      if (cle === 'achat') valeur = { whatsapp: verifierWhatsapp(valeur.whatsapp) };
       if (cle === 'versionMin') {
         valeur = String(valeur || '').trim();
         if (!/^\d{1,3}(\.\d{1,3}){0,3}$/.test(valeur)) throw Object.assign(new Error('Version invalide (exemple : 1.1).'), { statut: 400 });
@@ -326,13 +439,48 @@ function creerReglages(base) {
         valeur = { actif: valeur.actif === false || valeur.actif === 0 || valeur.actif === '0' ? 0 : 1, jours, pieces };
       }
       if (cle === 'evenement') valeur = verifierEvenement(valeur);
+      if (cle === 'rythme') valeur = verifierRythme(valeur);
+      if (cle === 'heuresPush') valeur = verifierHeuresPush(valeur);
+      if (cle === 'pushProgrammes') valeur = verifierPushProgrammes(valeur);
+      if (cle === 'kopoPlus') {
+        valeur = verifierBornes(valeur, { mois: [100, 1e6, 'Prix d\'un mois'], an: [100, 1e7, 'Prix d\'un an'] });
+        if (valeur.an < valeur.mois) throw Object.assign(new Error('Un an ne peut pas coûter moins qu\'un mois.'), { statut: 400 });
+      }
+      if (cle === 'suspects') valeur = verifierBornes(valeur, { jours: [1, 90, 'Période (jours)'], parties: [2, 100, 'Parties ensemble'], pourcent: [50, 100, 'Victoires du même (%)'] });
+      if (cle === 'limites') valeur = verifierBornes(valeur, { apiCompte: [30, 2000, 'Appels par compte'], apiIp: [100, 10000, 'Appels par adresse'], codesCompte: [5, 200, 'Codes essayés'], sallesMax: [1, 10, 'Salles par compte'] });
+      if (cle === 'inscriptions') valeur = { invites: oui(valeur.invites) ? 1 : 0 };
+      if (cle === 'alertes') valeur = verifierBornes(valeur, { inflation: [0, 500, 'Seuil d\'alerte (%)'] });
+      if (cle === 'gains') valeur = verifierBornes({ plafondJour: 0, ...valeur }, { bienvenue: [0, 100000], manche: [0, 10000], katapss: [0, 10000], victoire: [0, 100000], deuxieme: [0, 100000], plafondJour: [0, 1e6, 'Plafond par jour'] });
+      if (cle === 'annonce') {
+        const date = (x, nom) => { const t = String(x || '').trim(); if (!t) return ''; const d = new Date(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(t) ? t + '+01:00' : t); if (isNaN(d)) throw Object.assign(new Error(`Date de ${nom} invalide.`), { statut: 400 }); return d.toISOString(); };
+        valeur = { texte: String(valeur.texte || '').slice(0, 300), active: !!valeur.active, debut: date(valeur.debut, 'début'), fin: date(valeur.fin, 'fin') };
+        if (valeur.debut && valeur.fin && valeur.fin <= valeur.debut) throw Object.assign(new Error('La fin doit venir après le début.'), { statut: 400 });
+      }
       if (cle === 'rappels') valeur = Object.fromEntries(Object.keys(DEFAUTS.rappels).map((k) => [k, valeur[k] === false || valeur[k] === 0 || valeur[k] === '0' ? 0 : 1]));
       if (cle === 'robotsPublics') {
         const attente = entier(valeur.attente);
         if (!(attente >= 10 && attente <= 600)) throw Object.assign(new Error('Attente entre 10 et 600 secondes.'), { statut: 400 });
-        valeur = { actif: valeur.actif !== false && valeur.actif !== 0 && valeur.actif !== '0' ? 1 : 0, attente };
+        const force = valeur.force === undefined ? 10 : entier(valeur.force);
+        if (!(force >= 1 && force <= 20)) throw Object.assign(new Error('Force des robots entre 1 et 20.'), { statut: 400 });
+        const robots = valeur.robots === undefined ? 'normaux' : valeur.robots;
+        if (!['faciles', 'normaux', 'forts'].includes(robots)) throw Object.assign(new Error('Niveau des robots : faciles, normaux ou forts.'), { statut: 400 });
+        valeur = { actif: valeur.actif !== false && valeur.actif !== 0 && valeur.actif !== '0' ? 1 : 0, attente, robots, force };
       }
       if (cle === 'bande') valeur = verifierBande(valeur);
+      if (cle === 'fleuve') {
+        if (!['ferme', 'testeurs', 'ouvert'].includes(valeur.etat)) throw Object.assign(new Error('Le Fleuve : fermé, testeurs ou ouvert.'), { statut: 400 });
+        // La date du lancement ne s'efface pas par un simple enregistrement des réglages (seul le bouton Lancer la pose).
+        const lance = valeur.lance && !Number.isNaN(Date.parse(valeur.lance)) ? new Date(valeur.lance).toISOString() : (cache.fleuve || {}).lance || null;
+        // Interrupteur de chaque fleuve : 'ouvert', 'testeurs' ou 'ferme' (les fleuves non donnés gardent leur état).
+        const fleuves = { ...DEFAUTS.fleuve.fleuves, ...((cache.fleuve || {}).fleuves || {}) };
+        for (const [k, v] of Object.entries(valeur.fleuves || {})) {
+          if (!(k in DEFAUTS.fleuve.fleuves)) throw Object.assign(new Error(`Fleuve inconnu : ${k}.`), { statut: 400 });
+          if (!['ferme', 'testeurs', 'ouvert'].includes(v)) throw Object.assign(new Error(`Fleuve ${k} : fermé, testeurs ou ouvert.`), { statut: 400 });
+          fleuves[k] = v;
+        }
+        valeur = { etat: valeur.etat, lance, fleuves, ...verifierBornes({ ...DEFAUTS.fleuve, ...valeur }, { pagaies: [1, 20, 'Pagaies par jour'], piecesEtoile: [0, 1000, 'Pièces par étoile'], piecesEscale: [0, 10000, 'Pièces par ville'], etoilesVille: [0, 27, 'Étoiles pour le boss'], adoucirJours: [1, 30, 'Jours avant l\'aide'], piecesCourse: [0, 10000, 'Pièces du gagnant de la semaine'], prixPagaie1: [0, 100000, 'Prix de la 1re pagaie achetée'], prixPagaie2: [0, 100000, 'Prix de la 2e pagaie achetée'], prixPagaie3: [0, 100000, 'Prix de la 3e pagaie achetée'] }) };
+      }
+      if (cle === 'fleuveRecette') valeur = require('./fleuve-generateur').verifierRecette(valeur);
       if (cle === 'cahier') valeur = verifierCahier(valeur);
       if (cle === 'cahierTotaux') valeur = verifierTotauxCahier(valeur);
       if (cle === 'stickers') valeur = require('./stickers').verifierReglage(valeur);
@@ -359,4 +507,4 @@ function creerReglages(base) {
   };
 }
 
-module.exports = { verifierTotauxCahier, totauxCahier, verifierCahier, evenementEnCours, verifierEvenement, verifierMobile, PLATEFORMES, verifierCommunautes, communautesPubliques, RESEAUX, verifierJeux, etatJeuPour, NOMS_JEUX, creerReglages, DEFAUTS, VERSION_APPLI, versionPlusRecente, verifierMessages, verifierLigue, verifierBande, DIVISIONS, MESSAGE_MAX };
+module.exports = { verifierWhatsapp, verifierRythme, verifierHeuresPush, heureDeSilence, verifierPushProgrammes, annonceVisible, verifierBornes, verifierTotauxCahier, totauxCahier, verifierCahier, evenementEnCours, verifierEvenement, verifierMobile, PLATEFORMES, verifierCommunautes, communautesPubliques, RESEAUX, verifierJeux, etatJeuPour, NOMS_JEUX, creerReglages, DEFAUTS, VERSION_APPLI, versionPlusRecente, verifierMessages, verifierLigue, verifierBande, DIVISIONS, MESSAGE_MAX };

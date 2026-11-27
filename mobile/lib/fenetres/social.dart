@@ -63,6 +63,55 @@ void toastAjoutAmi(Object? r, [String? nom]) {
   app.toast(m['etat'] == 'ami' ? '$n est dans tes amis.' : "Demande envoyée à $n. Il doit l'accepter.", Niv.succes);
 }
 
+// ---------------------------------------------------------------- l'hôte en partie (comme sur le site)
+// Éliminé, l'hôte laisse la main à un joueur encore en jeu ; il coupe (ou rend) le micro d'un joueur éliminé, pour toute la table.
+List _liste(Vue v, String cle) => (v[cle] as List?) ?? const [];
+
+bool peutPasserHote(Vue v, Object? id) =>
+    v['hote'] == v['moi'] && (v['etat'] == 'manche' || v['etat'] == 'finManche') && _liste(v, 'elimines').contains(v['moi']) &&
+    _liste(v, 'restants').contains(id) && _liste(v, 'joueurs').cast<Map>().any((j) => j['id'] == id && j['robot'] != true && j['connecte'] == true);
+
+bool hotePeutPasser(Vue v) => _liste(v, 'restants').any((id) => peutPasserHote(v, id));
+
+List<Widget> actionsHote(String id, String nom, VoidCallback retour) {
+  final v = app.vue;
+  if (v == null || v['hote'] != v['moi'] || v['etat'] == 'salon' || id == v['moi']) return const [];
+  final jv = _liste(v, 'joueurs').cast<Map>().where((j) => j['id'] == id).firstOrNull;
+  final n = nom.isEmpty ? 'ce joueur' : nom;
+  final coupe = jv?['micCoupe'] == true;
+  return [
+    if (peutPasserHote(v, id)) ...[
+      Btn.principal('Lui passer la main', icone: 'couronne', large: true, onTap: () { app.envoyer({'type': 'passerHote', 'cible': id}); retour(); }),
+      const Ecart(4),
+      Muet("Tu es éliminé : $n devient l'hôte (manche suivante, revanche…).", taille: 12),
+      const Ecart(10),
+    ],
+    if (jv != null && _liste(v, 'elimines').contains(id) && (jv['voix'] == true || coupe)) ...[
+      Btn(coupe ? 'Lui rendre la parole' : 'Couper son micro pour toute la table', icone: coupe ? 'micro' : 'micro-coupe', large: true,
+          onTap: () { app.vocal.couperPourTous(id, nom, !coupe); retour(); }),
+      const Ecart(4),
+      Muet(coupe ? "Personne ne l'entend jusqu'à la fin de la partie." : "Il est éliminé : personne ne l'entendra plus jusqu'à la fin de la partie.", taille: 12),
+      const Ecart(10),
+    ],
+  ];
+}
+
+/// L'hôte éliminé choisit à qui laisser la main parmi les joueurs encore en jeu.
+void choisirNouvelHote() {
+  app.ouvrirFenetre((context) {
+    final v = app.vue;
+    final ids = v == null ? const [] : _liste(v, 'restants').where((id) => peutPasserHote(v, id)).toList();
+    return Fenetre(titre: 'Passer la main', enfants: [
+      Text("Tu es éliminé. Qui devient l'hôte de la table ?", style: K.texte(15)),
+      const Ecart(10),
+      if (ids.isEmpty) Muet('Aucun joueur encore en jeu ne peut prendre la main.'),
+      for (final id in ids) Padding(padding: const EdgeInsets.only(bottom: 6), child: Btn(app.nomDe(v!, id), icone: 'couronne', large: true, onTap: () { app.envoyer({'type': 'passerHote', 'cible': id}); app.fermerFenetre(); })),
+      const Ecart(4),
+      Btn('Annuler', large: true, onTap: app.fermerFenetre),
+    ]);
+  }, 'passerHote');
+}
+
 void ficheJoueur(String id, String nom) {
   void retour() => app.fermerFenetre();
   app.ouvrirFenetre((context) {
@@ -80,6 +129,7 @@ void ficheJoueur(String id, String nom) {
         Muet(coupe ? "Tu ne l'entends plus. Les autres joueurs l'entendent toujours." : "Seulement pour toi : les autres joueurs l'entendent toujours.", taille: 12),
         const Ecart(10),
       ],
+      ...actionsHote(id, nom, retour),
       if (!avecCompte) Text('Amis, blocage et signalement arrivent avec les comptes en ligne.', style: K.texte(15))
       else ...[
         Btn.principal('Ajouter en ami', large: true, onTap: () async { try { toastAjoutAmi(await Api.post('/amis', {'cible': id}), nom); retour(); } catch (e) { app.toast(messageErreur(e), Niv.echec); } }),
@@ -198,10 +248,11 @@ Future<void> repondreDemande(String id, bool accepter) async {
 
 String _ongletAmis = 'amis';
 
-void ouvrirAmis({VoidCallback? retour, bool garderOnglet = false}) {
+void ouvrirAmis({VoidCallback? retour, bool garderOnglet = false, String? onglet}) {
   final c = Api.compte;
   if (c == null) return;
-  if (!garderOnglet) _ongletAmis = app.demandesAmi > 0 ? 'demandes' : 'amis';
+  if (onglet != null) { _ongletAmis = onglet; }
+  else if (!garderOnglet) { _ongletAmis = app.demandesAmi > 0 ? 'demandes' : 'amis'; }
   final champ = TextEditingController();
   app.ouvrirFenetre((context) => _Amis(retour ?? app.fermerFenetre, champ), 'amis');
 }

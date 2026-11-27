@@ -43,6 +43,7 @@ tags:
   - name: Ligue
   - name: Parrainage
   - name: Match du jour
+  - name: Le Fleuve
   - name: La Bande
   - name: Salles
 
@@ -491,7 +492,7 @@ paths:
                 type: object
                 properties:
                   solde: { type: integer }
-                  historique: { type: array, items: { type: object, properties: { montant: { type: integer }, motif: { type: string, description: 'bienvenue, bonus_jour, manche, katapss, victoire, deuxieme, mise, pot, achat, parcours, mission, defi, bienvenue7, parrainage, bande…' }, ref: { type: [string, 'null'] }, par_admin: { type: boolean }, cree_le: { type: string, format: date-time } } } }
+                  historique: { type: array, items: { type: object, properties: { montant: { type: integer }, motif: { type: string, description: 'bienvenue, bonus_jour, manche, katapss, victoire, deuxieme, mise, pot, achat, parcours, mission, defi, bienvenue7, parrainage, bande, fermeture_bande…' }, ref: { type: [string, 'null'] }, par_admin: { type: boolean }, cree_le: { type: string, format: date-time } } } }
   /bonus-du-jour:
     post:
       tags: [Pièces]
@@ -619,6 +620,25 @@ paths:
                   paiement: { type: boolean }
                   taux: { type: object, properties: { piecesPour500FC: { type: integer } } }
                   bouquets: { type: array, items: { $ref: '#/components/schemas/Bouquet' } }
+  /recharger:
+    get:
+      tags: [Pièces, Boutique et parcours]
+      summary: Page « Recharger » (site et APK) : bouquets de pièces et Kopo+ ensemble
+      description: "Jamais appelée par les versions Google Play et App Store (elles ne vendent rien). `compte` est le Pseudo#1234 à donner en payant. `whatsapp` : numéro (chiffres, indicatif compris) qui reçoit les commandes tant que le mobile money n'est pas branché, null sinon. Aussi présent dans /bouquets et /abonnement."
+      responses:
+        '200':
+          description: Pièces et Kopo+
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  solde: { type: integer }
+                  compte: { type: string }
+                  whatsapp: { type: [string, 'null'] }
+                  pieces: { type: object, description: 'Comme /bouquets (sans solde)' }
+                  kopoPlus: { type: object, description: 'Comme /abonnement' }
+        '401': { $ref: '#/components/responses/Erreur' }
   /abonnement:
     get:
       tags: [Pièces, Boutique et parcours]
@@ -876,6 +896,106 @@ paths:
                   numero: { type: integer }
                   liste: { type: array, items: { $ref: '#/components/schemas/LigneMatchJour' } }
                   moi: { oneOf: [{ type: 'null' }, { $ref: '#/components/schemas/LigneMatchJour' }] }
+
+  # ------------------------------------------------------------------ Le Fleuve
+  /fleuve:
+    get:
+      tags: [Le Fleuve]
+      summary: 'Le Fleuve (Congo pour Kopo, Niger pour Inter (8)) : pagaies, étoiles, étapes visibles'
+      description: |
+        Fermé tant que l'admin ne l'ouvre pas (`/config` donne `fleuve` : ferme, testeurs ou ouvert). Cinq fleuves : congo, kasai, nil (Kopo) ; niger, oubangui (Inter (8)). Chacun a son interrupteur dans l'admin : `fleuves` ne contient que ceux ouverts à ce joueur (Kasaï, Oubangui et Nil éteints au départ). 5 pagaies par jour (Kinshasa), communes
+        aux deux fleuves ; une pagaie se perd à chaque échec. Les étapes renvoyées vont jusqu'à la fin du bief en cours (50 étapes par bief,
+        une escale toutes les 10). Pour jouer : salle temps réel `fleuve` (voir temps-reel.md).
+      responses:
+        '200':
+          description: État des deux fleuves
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ouvert: { type: boolean }
+                  google: { type: boolean }
+                  pagaies: { type: object, properties: { restantes: { type: integer }, max: { type: integer, description: Pagaies du jour + pagaies achetées }, achetees: { type: integer }, prix: { type: [integer, 'null'], description: 'Prix en pièces de la prochaine pagaie à acheter (null = plus rien en vente aujourd''hui)' }, retourMs: { type: integer } } }
+                  etoilesVille: { type: integer, description: Étoiles à gagner dans une ville pour affronter son boss }
+                  lance: { type: [string, 'null'], format: date-time, description: 'Date du lancement (bouton admin « Lancer le Fleuve ») : la Bande et le Match du jour sont fermés' }
+                  rembourse: { type: integer, description: 'Pièces rendues à ce joueur à la fermeture de la Bande (motif fermeture_bande), 0 sinon' }
+                  fleuves:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      properties:
+                        nom: { type: string }
+                        jeu: { enum: [kopo, inter8] }
+                        courante: { type: [integer, 'null'], description: Première étape pas encore réussie (null = tout est fait) }
+                        publiees: { type: integer }
+                        bief: { type: integer }
+                        etoiles: { type: integer }
+                        suiteBientot: { type: boolean }
+                        ville: { type: string }
+                        etapes: { type: array, items: { type: object, properties: { n: { type: integer }, etoiles: { type: integer }, escale: { type: boolean }, ville: { type: string } } } }
+                        amis:
+                          type: array
+                          description: Mes amis qui ont commencé ce fleuve, posés sur leur étape (n null = ils ont fini tout ce qui est publié)
+                          items: { type: object, properties: { id: { type: string }, pseudo: { type: string }, apparence: { type: [string, 'null'] }, n: { type: [integer, 'null'] }, faites: { type: integer }, etoiles: { type: integer }, premiers: { type: array, items: { type: string } }, pagayeur: { type: boolean } } }
+                        marques: { type: object, description: Mes marques sur ce fleuve, properties: { premiers: { type: array, items: { type: string }, description: « 1er à Banana »… }, pagayeur: { type: boolean, description: Pagayeur de la semaine (7 jours) } } }
+                        course:
+                          type: object
+                          description: Course de la semaine (lundi à dimanche minuit, Kinshasa) entre moi et mes amis, au nombre d'étoiles nouvelles
+                          properties:
+                            lignes: { type: array, items: { type: object, properties: { id: { type: string }, pseudo: { type: string }, apparence: { type: [string, 'null'] }, etoiles: { type: integer }, moi: { type: boolean }, pagayeur: { type: boolean } } } }
+                            finMs: { type: integer }
+                            pieces: { type: integer, description: Prix offert par le jeu au gagnant }
+                            amis: { type: integer }
+  /fleuve/pagaie:
+    post:
+      tags: [Le Fleuve]
+      summary: Acheter une pagaie avec ses pièces, quand on n'en a plus
+      description: >-
+        Seulement quand `pagaies.restantes` vaut 0. Prix du tableau de bord (100, puis 200, puis 400 pièces au départ),
+        3 par jour au plus, remis à zéro à minuit (Kinshasa). Les pièces sont détruites (motif `pagaie`). Compte Google obligatoire.
+        409 s'il reste des pagaies, 403 si plus rien n'est en vente aujourd'hui, 400 si le solde ne suffit pas.
+      responses:
+        '200':
+          description: Pagaie achetée
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pagaies: { type: object, description: Même forme que dans GET /fleuve (sans retourMs) }
+                  solde: { type: integer }
+                  paye: { type: integer }
+  /fleuve/{fleuve}/{numero}:
+    get:
+      tags: [Le Fleuve]
+      summary: Une étape avant de jouer (objectif, robots, pièges, seuils des étoiles)
+      parameters:
+        - { name: fleuve, in: path, required: true, schema: { enum: [congo, niger, kasai, oubangui, nil] } }
+        - { name: numero, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: L'étape ; `refus` dit pourquoi on ne peut pas la jouer (null sinon)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  numero: { type: integer }
+                  jeu: { enum: [kopo, inter8] }
+                  escale: { type: boolean }
+                  ville: { type: string }
+                  joueurs: { type: integer }
+                  robots: { enum: [faciles, normaux, forts] }
+                  force: { type: integer }
+                  texte: { type: string }
+                  pieges: { type: array, items: { type: object, properties: { id: { type: string }, texte: { type: string } } } }
+                  seuils: { type: object, properties: { deux: { type: integer }, trois: { type: integer } } }
+                  etoiles: { type: integer }
+                  refus: { type: [string, 'null'] }
+                  pagaies: { type: object, properties: { restantes: { type: integer }, max: { type: integer } } }
+                  villeEtoiles: { type: [integer, 'null'] }
+                  etoilesVille: { type: integer }
 
   # ------------------------------------------------------------------ La Bande
   /bandes:
@@ -1160,12 +1280,12 @@ components:
       type: object
       properties:
         id: { type: integer }
-        type: { enum: [rivalite, invitation, ami, bande] }
+        type: { enum: [rivalite, invitation, ami, bande, parrainage, cadeau, fleuve] }
         texte: { type: string }
-        donnees: { type: [object, 'null'], description: 'invitation : { de, pseudo, code, jeu } ; ami : { de, pseudo, numero, demande | accepte } ; rivalite : { de, pseudo, toi, lui } ; bande : { bande, … }' }
+        donnees: { type: [object, 'null'], description: 'invitation : { de, pseudo, code, jeu } ; ami : { de, pseudo, numero, demande | accepte } ; rivalite : { de, pseudo, toi, lui } ; bande : { bande, … } ; fleuve : { depasse, de, pseudo, fleuve, numero } ou { course, fleuve, semaine, pieces }' }
         lue: { type: boolean }
         cree_le: { type: string, format: date-time }
-        action: { enum: [table, amis, rivaux, bande, accueil], description: Écran à ouvrir au toucher }
+        action: { enum: [table, amis, rivaux, bande, fleuve, accueil], description: Écran à ouvrir au toucher }
     PrefsPush:
       type: object
       properties:
@@ -1173,6 +1293,7 @@ components:
         ami: { type: boolean }
         match: { type: boolean }
         annonce: { type: boolean }
+        fleuve: { type: boolean, description: Un ami t'a dépassé sur le Fleuve (une fois par jour au plus), gagnant de la course de la semaine }
     Bouquet:
       type: object
       properties:
@@ -1288,7 +1409,8 @@ components:
         messages: { type: array, items: { type: string }, description: 'Messages du chat en partie (les seuls acceptés par le message « reaction »)' }
         stickers: { type: object, properties: { actif: { type: boolean } }, description: 'Stickers animés allumés par l\'admin (sinon grisés)' }
         communautes: { type: array, items: { type: object, properties: { reseau: { type: string }, libelle: { type: string }, url: { type: string } } } }
-        nouveaute: { type: [string, 'null'] }
+        nouveaute: { type: [string, 'null'], description: "Annonce « Nouveau » à montrer une fois : 'fleuve' dès le lancement du Fleuve, sinon 'bande' si l'admin l'allume" }
+        fleuveLance: { type: [string, 'null'], format: date-time, description: 'Date du lancement du Fleuve : badge NOUVEAU 7 jours sur sa carte ; cartes Match du jour et Bande et parcours de saison retirés' }
         google: { type: [string, 'null'], description: 'Adresse Supabase (site), null si la connexion Google est fermée' }
         supabase: { type: [object, 'null'], properties: { url: { type: string }, cleAnon: { type: [string, 'null'], description: Clé publique anon pour le SDK Supabase } } }
         googleObligatoire: { type: boolean, description: 'En ligne et entre amis : compte Google exigé (sinon : robots seulement)' }

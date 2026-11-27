@@ -7,6 +7,7 @@ import '../reseau/google.dart';
 import '../reseau/push.dart';
 import 'accueil_fenetres.dart';
 import 'compet.dart';
+import 'fleuve.dart';
 import 'partie_fenetres.dart';
 import 'progres.dart';
 import 'social.dart';
@@ -25,6 +26,7 @@ void brancherFenetres() {
   app.finMancheUi = afficherFinManche;
   app.finPartieUi = afficherFinPartie;
   app.resultatMatchJourUi = resultatMatchJour;
+  app.resultatFleuveUi = resultatFleuve;
   app.vocal.inviterAbonnement = (offre) => ouvrirAbonnement(offre);
   app.vocal.annoncer = () => ouvrirAbonnement(null, true);
   app.onConnecte = () { Push.synchroniser(); };
@@ -82,6 +84,9 @@ void brancherFenetres() {
         ouvrirAmis();
       } else if (action == 'match' && app.ecran == 'accueil') {
         ouvrirMatchJour();
+      } else if (action == 'fleuve' && app.ecran == 'accueil') {
+        final f = d['fleuve']?.toString();
+        ouvrirFleuve(f is String ? f : null);
       }
     }
     // Au lancement, on attend que l'accueil soit prêt.

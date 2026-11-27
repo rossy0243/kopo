@@ -1,10 +1,11 @@
 // API du tableau de bord du super admin. Tout est réservé au jeton admin, et chaque action est tracée.
 'use strict';
+const { conditionCible } = require('./stickers');
 const express = require('express');
 const { enveloppe, publicCompte } = require('./api');
 const { emailSupabase } = require('./comptes');
 
-function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainage, bande, push, stickers, bouquets, abonnement, salles, demarrage }) {
+function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainage, bande, fleuve, push, stickers, bouquets, abonnement, salles, demarrage }) {
   const r = express.Router();
   r.use(express.json({ limit: '50kb' }));
 
@@ -40,6 +41,106 @@ function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainag
       tables: liste.slice(0, 100).map((s) => ({ jeu: s.jeu || 'kopo', code: s.code, publique: s.publique, etat: s.salle.etat, manche: s.salle.numeroManche, joueurs: s.salle.joueurs.map((j) => ({ id: j.id, nom: j.nom, robot: !!j.robot, connecte: j.connecte !== false })) })),
     });
   });
+
+  // --- Tableau de bord (page d'accueil de l'admin) : chiffres clés de la période (aujourd'hui, 7 ou 30 jours) comparés
+  // à la période d'avant, courbes sur 30 jours, rétention, heures de jeu, parties, pièces, compétition, appareils, alertes.
+  // Jours en UTC (comme les présences) ; heures de jeu à l'heure de Kinshasa (UTC+1).
+  r.get('/tableau', enveloppe(async (req, res) => {
+    const q = async (sql, p) => n((await base.query(sql, p)).rows);
+    const jours = { jour: 1, '7': 7, '30': 30 }[req.query.periode] || 7;
+    const P = [jours]; // $1 : longueur de la période ; période = [current_date - ($1 - 1), maintenant], précédente juste avant
+    const dans = (col) => `${col} >= current_date - ($1::int - 1)`;
+    const avant = (col) => `${col} >= current_date - (2 * $1::int - 1) AND ${col} < current_date - ($1::int - 1)`;
+    // En ce moment (salles ouvertes)
+    let connectes = 0, enCours = 0, enAttente = 0;
+    for (const s of salles) { connectes += s.clientsParId.size; if (s.salle.etat === 'manche' || s.salle.etat === 'finManche') enCours++; if (s.publique && s.salle.etat === 'salon') enAttente += s.clientsParId.size; }
+    const [cles] = await q(`SELECT
+        (SELECT count(DISTINCT compte_id) FROM presences WHERE ${dans('jour')})::int AS actifs,
+        (SELECT count(DISTINCT compte_id) FROM presences WHERE ${avant('jour')})::int AS actifs_avant,
+        (SELECT count(*) FROM comptes WHERE ${dans('cree_le')} AND statut <> 'supprime')::int AS nouveaux,
+        (SELECT count(*) FROM comptes WHERE ${avant('cree_le')} AND statut <> 'supprime')::int AS nouveaux_avant,
+        (SELECT count(*) FROM comptes WHERE ${dans('cree_le')} AND statut <> 'supprime' AND auth_id IS NOT NULL)::int AS nouveaux_google,
+        (SELECT count(*) FROM parties WHERE ${dans('debut')})::int AS parties,
+        (SELECT count(*) FROM parties WHERE ${avant('debut')})::int AS parties_avant,
+        (SELECT count(*) FROM parties WHERE ${dans('debut')} AND avec_robots)::int AS parties_robots,
+        (SELECT count(*) FROM comptes WHERE kopo_plus_jusqu > now())::int AS kopo_plus,
+        (SELECT count(*) FROM comptes WHERE kopo_plus_jusqu > now() AND kopo_plus_jusqu < now() + interval '3 days')::int AS kopo_plus_fin,
+        (SELECT count(*) FROM abonnements WHERE ${dans('cree_le')} AND annule_le IS NULL AND francs > 0)::int AS kopo_plus_nouveaux`, P);
+    // Argent réel encaissé : bouquets livrés (francs écrits dans la référence) et activations Kopo+ (hors essais et annulations).
+    const ventes = `(SELECT cree_le, compte_id, coalesce(substring(ref from ':([0-9]+)FC:')::int, 0) AS francs, 'bouquets' AS source FROM registre_pieces WHERE motif = 'achat_pieces'
+        UNION ALL SELECT cree_le, compte_id, francs, 'kopoPlus' FROM abonnements WHERE annule_le IS NULL AND francs > 0) v`;
+    const [argent] = await q(`SELECT
+        coalesce(sum(francs) FILTER (WHERE ${dans('cree_le')}), 0)::int AS revenus,
+        coalesce(sum(francs) FILTER (WHERE ${avant('cree_le')}), 0)::int AS revenus_avant,
+        count(DISTINCT compte_id) FILTER (WHERE ${dans('cree_le')})::int AS acheteurs
+      FROM ${ventes}`, P);
+    const parJour = await q(`SELECT d::date AS jour,
+        (SELECT count(*) FROM presences p WHERE p.jour = d::date)::int AS actifs,
+        (SELECT count(*) FROM comptes c WHERE c.cree_le::date = d::date)::int AS nouveaux,
+        (SELECT count(*) FROM parties x WHERE x.debut::date = d::date)::int AS parties,
+        (SELECT coalesce(sum(francs), 0) FROM ${ventes} WHERE v.cree_le::date = d::date AND v.source = 'bouquets')::int AS bouquets,
+        (SELECT coalesce(sum(francs), 0) FROM ${ventes} WHERE v.cree_le::date = d::date AND v.source = 'kopoPlus')::int AS kopo_plus
+      FROM generate_series(current_date - 29, current_date, interval '1 day') d ORDER BY d`);
+    // Rétention à J1, J7, J30 (cohortes arrivées sur 7 jours), comme l'onglet Audience.
+    const retention = {};
+    for (const j of [1, 7, 30]) {
+      const [x] = await q(`SELECT count(*)::int AS cohorte, count(p.compte_id)::int AS revenus
+        FROM comptes c LEFT JOIN presences p ON p.compte_id = c.id AND p.jour = (c.cree_le::date + $1::int)
+        WHERE c.cree_le::date BETWEEN current_date - ($1::int + 7) AND current_date - ($1::int + 1)`, [j]);
+      retention['j' + j] = { cohorte: x.cohorte, taux: x.cohorte ? Math.round((100 * x.revenus) / x.cohorte) : null };
+    }
+    const [fidelite] = await q(`SELECT
+        (SELECT count(DISTINCT compte_id) FROM presences WHERE jour = current_date)::int AS jour,
+        (SELECT count(DISTINCT compte_id) FROM presences WHERE jour > current_date - 30)::int AS mois,
+        (SELECT count(*) FROM participations pa JOIN parties x ON x.id = pa.partie_id WHERE ${dans('x.debut')})::int AS participations`, P);
+    // Heures de jeu : parties lancées sur 28 jours, par jour de la semaine (1 = lundi) et heure de Kinshasa.
+    const heures = await q(`SELECT extract(isodow FROM debut + interval '1 hour')::int AS jour, extract(hour FROM debut + interval '1 hour')::int AS heure, count(*)::int AS parties
+      FROM parties WHERE debut > now() - interval '28 days' GROUP BY 1, 2`);
+    const [parties] = await q(`SELECT count(*) FILTER (WHERE jeu = 'kopo')::int AS kopo, count(*) FILTER (WHERE jeu = 'inter8')::int AS inter8,
+        coalesce(round(avg(extract(epoch FROM fin - debut) / 60) FILTER (WHERE fin IS NOT NULL)::numeric, 1), 0)::float AS duree_min,
+        coalesce(round(avg(nb_joueurs)::numeric, 1), 0)::float AS joueurs_moyens,
+        round(avg(attente_s) FILTER (WHERE publique AND attente_s IS NOT NULL))::int AS attente_s,
+        (SELECT count(*) FROM participations pa JOIN parties x ON x.id = pa.partie_id WHERE ${dans('x.debut')} AND pa.abandon)::int AS abandons
+      FROM parties WHERE ${dans('debut')}`, P);
+    const [pieces] = await q(`SELECT
+        coalesce(sum(montant) FILTER (WHERE montant > 0), 0)::bigint AS creees, coalesce(-sum(montant) FILTER (WHERE montant < 0), 0)::bigint AS detruites,
+        coalesce(sum(montant) FILTER (WHERE motif = 'achat_pieces'), 0)::bigint AS vendues
+      FROM registre_pieces WHERE ${dans('cree_le')}`, P);
+    const [p7] = await q(`SELECT coalesce(sum(montant) FILTER (WHERE montant > 0), 0)::bigint AS creees, coalesce(-sum(montant) FILTER (WHERE montant < 0), 0)::bigint AS detruites
+      FROM registre_pieces WHERE cree_le > now() - interval '7 days'`);
+    const [soldes] = await q(`SELECT coalesce(sum(solde), 0)::bigint AS en_circulation,
+        coalesce(round(100.0 * count(*) FILTER (WHERE solde < 20) / nullif(count(*), 0)), 0)::int AS part_a_court
+      FROM comptes WHERE statut = 'actif' AND vu_le > now() - interval '7 days'`);
+    const saison = (await q("SELECT numero, nom, fin FROM saisons WHERE statut = 'en_cours'"))[0] || null;
+    const [competition] = await q(`SELECT
+        (SELECT count(*) FROM ligue g WHERE g.saison = $2::int AND g.parties > 0)::int AS classes,
+        (SELECT count(*) FROM parties WHERE ${dans('debut')} AND classee)::int AS parties_classees,
+        (SELECT count(*) FROM match_jour WHERE jour = (now() + interval '1 hour')::date)::int AS match_jour,
+        (SELECT count(*) FROM bande_semaines WHERE statut = 'ouverte')::int AS bandes,
+        (SELECT coalesce(sum(i.mise), 0) FROM bande_inscriptions i JOIN bande_semaines w ON w.bande_id = i.bande_id AND w.semaine = i.semaine WHERE w.statut = 'ouverte')::bigint AS pot_bande`, [jours, saison ? saison.numero : -1]);
+    // Appareils : dernière présence de chaque joueur actif de la période (web, android, ios ; vide = avant la mesure).
+    const appareils = await q(`SELECT coalesce(plateforme, '?') AS plateforme, version, count(*)::int AS joueurs FROM (
+        SELECT DISTINCT ON (compte_id) compte_id, plateforme, version FROM presences WHERE ${dans('jour')} ORDER BY compte_id, jour DESC) d GROUP BY 1, 2`, P);
+    const [notifs] = await q(`SELECT count(DISTINCT p.compte_id)::int AS abonnes FROM presences p
+      WHERE ${dans('p.jour')} AND (EXISTS (SELECT 1 FROM push_abonnements a WHERE a.compte_id = p.compte_id) OR EXISTS (SELECT 1 FROM push_natifs a WHERE a.compte_id = p.compte_id))`, P);
+    // À traiter
+    const sp = reglages.get('suspects') || {};
+    const [signal] = await q("SELECT count(*)::int AS n FROM signalements WHERE statut = 'ouvert'");
+    const suspects = (await chercherSuspects(sp.jours || 14, sp.parties || 5, sp.pourcent || 80)).length;
+    const t = reglages.tout(), seuil = Number((t.alertes || {}).inflation);
+    const ev = require('./reglages').evenementEnCours(t.evenement);
+    const inflation = Number(p7.detruites) > 0 ? Math.round((100 * (Number(p7.creees) - Number(p7.detruites))) / Number(p7.detruites)) : null;
+    res.json(n2({
+      periode: jours, maintenant: { connectes, enCours, enAttente },
+      cles: { ...cles, ...argent }, parJour, retention, fidelite, heures, parties, pieces: { ...pieces, ...soldes }, saison, competition,
+      appareils, notifs: notifs.abonnes,
+      alertes: {
+        signalements: signal.n, suspects, inflation, seuilInflation: Number.isFinite(seuil) ? seuil : 25,
+        maintenance: !!(t.maintenance && t.maintenance.active), jeuxFermes: Object.entries(t.jeux || {}).filter(([k, v]) => k !== 'testeurs' && v !== 'ouvert').map(([k, v]) => ({ jeu: k, etat: v })),
+        evenement: ev ? { nom: ev.nom, fin: ev.fin } : null, invitesFermes: !((t.inscriptions || {}).invites ?? 1),
+      },
+    }));
+  }));
 
   // --- Audience
   r.get('/audience', enveloppe(async (req, res) => {
@@ -95,10 +196,9 @@ function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainag
   // --- Comptes suspects (sécurité, 17/11) : deux comptes qui jouent très souvent seuls ensemble (sans robot),
   // et où c'est presque toujours le même qui gagne. Signe qu'un joueur se fait donner des pièces (pots des tables à mise)
   // ou des points de ligue par un faux compte. Rien n'est sanctionné automatiquement : l'admin regarde et décide.
-  r.get('/suspects', enveloppe(async (req, res) => {
-    const jours = Math.min(90, Math.max(1, Math.trunc(Number(req.query.jours)) || 14));
-    const min = Math.min(100, Math.max(2, Math.trunc(Number(req.query.min)) || 5));
-    const l = n((await base.query(`WITH duos AS (
+  // Seuils par défaut : Réglages > Sécurité (suspects : jours, parties, pourcent).
+  async function chercherSuspects(jours, min, pourcent) {
+    return n((await base.query(`WITH duos AS (
         SELECT p.id, p.classee, p.vainqueur, array_agg(pa.compte_id ORDER BY pa.compte_id) AS ids
         FROM parties p JOIN participations pa ON pa.partie_id = p.id
         WHERE p.fin > now() - make_interval(days => $1) AND NOT p.avec_robots
@@ -114,9 +214,15 @@ function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainag
         coalesce((SELECT sum(r.montant) FROM registre_pieces r WHERE r.motif = 'pot' AND r.ref = ANY(x.parties) AND r.compte_id = x.a), 0)::int AS pots_a,
         coalesce((SELECT sum(r.montant) FROM registre_pieces r WHERE r.motif = 'pot' AND r.ref = ANY(x.parties) AND r.compte_id = x.b), 0)::int AS pots_b
       FROM paires x JOIN comptes ca ON ca.id = x.a JOIN comptes cb ON cb.id = x.b
-      WHERE x.ensemble >= $2 AND greatest(x.victoires_a, x.victoires_b) >= 0.8 * x.ensemble
-      ORDER BY x.ensemble DESC LIMIT 50`, [jours, min])).rows);
-    res.json({ jours, min, paires: l });
+      WHERE x.ensemble >= $2 AND greatest(x.victoires_a, x.victoires_b) >= $3::float * x.ensemble
+      ORDER BY x.ensemble DESC LIMIT 50`, [jours, min, pourcent / 100])).rows);
+  }
+  r.get('/suspects', enveloppe(async (req, res) => {
+    const d = reglages.get('suspects') || {};
+    const jours = Math.min(90, Math.max(1, Math.trunc(Number(req.query.jours)) || d.jours || 14));
+    const min = Math.min(100, Math.max(2, Math.trunc(Number(req.query.min)) || d.parties || 5));
+    const pourcent = Math.min(100, Math.max(50, Math.trunc(Number(d.pourcent)) || 80));
+    res.json({ jours, min, pourcent, paires: await chercherSuspects(jours, min, pourcent) });
   }));
 
   // --- Joueurs
@@ -252,13 +358,27 @@ function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainag
   }));
 
   // --- Abonnement Kopo+ (micro) : formules, abonnés, et un abonnement activé à la main (paiement mobile money reçu).
-  r.get('/abonnements', enveloppe(async (req, res) => res.json(n2(await abonnement.resumeAdmin()))));
+  r.get('/abonnements', enveloppe(async (req, res) => res.json(n2({ ...(await abonnement.resumeAdmin()),
+    criteres: Object.entries(stickers.CRITERES).map(([id, d]) => ({ id, texte: d.texte, n: d.n || null, pays: !!d.pays })) }))));
   r.get('/abonnements/livekit', enveloppe(async (req, res) => res.json(await abonnement.verifierLiveKit())));
   r.post('/abonnements/:id/annuler', enveloppe(async (req, res) => {
     const x = await abonnement.annuler(req.params.id);
     await journal('abonnement:annule', x.compte, { activation: Number(req.params.id), formule: x.formule, francs: x.francs, jusqu: x.jusqu });
     for (const s of salles) if (s.majAbonne) s.majAbonne(x.compte, x.jusqu);
     res.json(x);
+  }));
+  // Kopo+ offert (à un joueur, à tous ou à un groupe) : jours ajoutés, message dans le jeu, push en option.
+  r.post('/abonnements/compter', enveloppe(async (req, res) => res.json(await stickers.compter(req.body.cible))));
+  r.post('/abonnements/offrir', enveloppe(async (req, res) => {
+    const b = req.body || {};
+    const x = await abonnement.offrir(b, conditionCible);
+    let envoi = null;
+    if (b.push) {
+      envoi = await push.annonceA(x.ids, { titre: 'Kopo+ offert', texte: `${x.message} +${x.jours} jours de Kopo+ : micro et couronne dorée.` })
+        .catch((e) => ({ erreur: e.message }));
+    }
+    await journal('abonnement:offert', x.cible.type === 'joueur' ? x.cible.id : null, { cible: x.cible, jours: x.jours, joueurs: x.joueurs, message: x.message, push: envoi });
+    res.json({ ok: true, joueurs: x.joueurs, jours: x.jours, cible: x.cible, push: envoi });
   }));
   r.post('/abonnements/activer', enveloppe(async (req, res) => {
     const x = await abonnement.activer(req.body || {});
@@ -318,16 +438,52 @@ function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainag
     res.json({ matchJour: jour, bandes: bande ? await bande.surveillance() : [] });
   }));
 
+  // --- Le Fleuve (fleuve.md) : biefs, étapes et chiffres réels ; fabrication par les robots, puis publication.
+  if (fleuve) {
+    r.get('/fleuve', enveloppe(async (req, res) => res.json(await fleuve.resumeAdmin())));
+    // Le lancement : Bande fermée (mises rendues), Match du jour arrêté, Fleuve ouvert à tous. Une seule fois.
+    r.post('/fleuve/lancer', enveloppe(async (req, res) => {
+      if (!req.body || req.body.confirmation !== 'LANCER') throw Object.assign(new Error('Écris LANCER pour confirmer.'), { statut: 400 });
+      const x = await fleuve.lancer();
+      await journal('fleuve:lancer', 'fleuve', { semaines: x.semaines, joueurs: x.joueurs, pieces: x.pieces });
+      res.json(x);
+    }));
+    r.get('/fleuve/:fleuve/biefs/:bief', enveloppe(async (req, res) => res.json(await fleuve.etapesAdmin(req.params.fleuve, req.params.bief))));
+    r.post('/fleuve/:fleuve/biefs/:bief/generer', enveloppe(async (req, res) => {
+      const t = fleuve.generer(req.params.fleuve, req.params.bief);
+      await journal('fleuve:generer', req.params.fleuve + ':' + req.params.bief, null);
+      res.json(t);
+    }));
+    r.post('/fleuve/:fleuve/biefs/:bief/publier', enveloppe(async (req, res) => {
+      const x = await fleuve.publier(req.params.fleuve, req.params.bief);
+      await journal('fleuve:publier', req.params.fleuve + ':' + req.params.bief, null);
+      res.json(x);
+    }));
+    r.post('/fleuve/:fleuve/etapes/:numero/refaire', enveloppe(async (req, res) => {
+      const x = await fleuve.refaire(req.params.fleuve, Math.trunc(Number(req.params.numero)));
+      await journal('fleuve:refaire', req.params.fleuve + ':' + req.params.numero, null);
+      res.json(x);
+    }));
+    r.post('/fleuve/:fleuve/etapes/:numero/modifier', enveloppe(async (req, res) => {
+      const x = await fleuve.modifier(req.params.fleuve, Math.trunc(Number(req.params.numero)), req.body || {});
+      await journal('fleuve:modifier', req.params.fleuve + ':' + req.params.numero, { d: x && x.d });
+      res.json(x);
+    }));
+  }
+
   // --- Pilotage : gains, bonus, tables, pot, annonce, maintenance
   r.get('/reglages', (req, res) => res.json({ ...reglages.tout(), versionAppli: require('./reglages').VERSION_APPLI }));
   r.put('/reglages/:cle', enveloppe(async (req, res) => {
     const avant = reglages.get(req.params.cle);
     const v = await reglages.ecrire(req.params.cle, req.body.valeur);
+    if (req.params.cle === 'limites') require('./limites').appliquerLimites(v);
     await journal('reglage:' + req.params.cle, null, { avant, apres: v });
     res.json({ ok: true, valeur: v });
   }));
 
-  r.get('/journal', enveloppe(async (req, res) => res.json(n((await base.query('SELECT * FROM journal_admin ORDER BY id DESC LIMIT 100')).rows))));
+  r.get('/journal', enveloppe(async (req, res) => res.json(n((await base.query('SELECT * FROM journal_admin ORDER BY id DESC LIMIT 300')).rows))));
+  // Valeurs de départ des réglages (bouton « rétablir » de l'onglet Réglages).
+  r.get('/reglages/defauts', (req, res) => res.json(require('./reglages').DEFAUTS));
 
   return r;
 }

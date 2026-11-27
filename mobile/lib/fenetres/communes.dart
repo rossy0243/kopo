@@ -1,4 +1,6 @@
 // Petits morceaux partagés par les fenêtres : confirmation, Google, partage, pièce, listes.
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -126,7 +128,11 @@ void demanderConfirmation(String texte, VoidCallback ok, {String titre = 'Quitte
 void demanderQuitter() {
   final v = app.vue;
   if (app.ecran == 'connexion') { app.quitter(); return; }
-  demanderConfirmation(v != null && v['etat'] == 'manche' ? 'Tu ne pourras pas revenir dans cette partie avec un autre code.' : 'Tu quittes la partie.', () => app.quitter());
+  demanderConfirmation(app.objectifFleuve != null ? "Quitter l'étape compte comme un échec : tu perds une pagaie." : v != null && v['etat'] == 'manche' ? 'Tu ne pourras pas revenir dans cette partie avec un autre code.' : 'Tu quittes la partie.', () {
+    final etape = app.objectifFleuve != null;
+    app.quitter();
+    if (etape) { app.toast('Étape abandonnée : une pagaie perdue.', Niv.alerte); Timer(const Duration(milliseconds: 800), () => app.majCartesCompetition()); }
+  });
 }
 
 /// Fenêtre Google : on explique pourquoi, et on propose de se connecter.

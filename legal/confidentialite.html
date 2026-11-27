@@ -4,9 +4,9 @@
 <body><main>
 <a class="logo" href="../"><img src="../icons/masano-logo.svg" alt="">MASANO</a>
 <h1>Politique de confidentialité</h1>
-<p class="muted">Version du 9 novembre 2026</p>
+<p class="muted">Version du 23 novembre 2026</p>
 
-<p>Cette page explique quelles données Masano utilise, pourquoi, et comment les supprimer. Elle vaut pour tous les jeux de Masano (aujourd'hui le Kopo et Inter (8)) : un seul compte sert pour tous les jeux, et les données ci-dessous sont communes. Responsable : Rossy Mundyo Busyo, Kinshasa, République démocratique du Congo, contact : <a href="mailto:contact@masano.online">contact@masano.online</a>.</p>
+<p>Cette page explique quelles données Masano utilise, pourquoi, et comment les supprimer. Elle vaut pour tous les jeux de Masano (aujourd'hui le Kopo et Inter (8)), sur le site masano.online comme dans l'appli Masano pour Android et iPhone : un seul compte sert pour tous les jeux, et les données ci-dessous sont communes. Responsable : Rossy Mundyo Busyo, Kinshasa, République démocratique du Congo, contact : <a href="mailto:contact@masano.online">contact@masano.online</a>.</p>
 
 <h2>1. Les données que nous utilisons</h2>
 <table>
@@ -19,9 +19,10 @@
 <tr><td>Amis, joueurs bloqués, signalements et sanctions</td><td>Les fonctions entre joueurs et la modération</td></tr>
 <tr><td>Adresse IP</td><td>Bloquer les abus (trop de comptes créés depuis la même connexion) et déduire ton pays</td></tr>
 <tr><td>Jours où tu as ouvert le jeu, pays</td><td>Mesurer la fréquentation de Masano et de chacun de ses jeux (chiffres globaux)</td></tr>
+<tr><td>Jeton de notifications du téléphone (si tu acceptes les notifications)</td><td>T'envoyer les invitations, demandes d'ami et rappels que tu as choisis. Il est effacé quand tu supprimes ton compte ou refuses les notifications.</td></tr>
 <tr><td>Réglages (son, vibrations…)</td><td>Gardés sur ton téléphone uniquement</td></tr>
 </table>
-<p>Nous ne demandons ni ton adresse, ni tes contacts, ni ta position précise. Le son du micro n'est <b>ni enregistré ni conservé</b> : il passe directement entre les téléphones de la table. Pour cela, les téléphones de la table échangent leur adresse IP : n'active pas le micro si cela te gêne.</p>
+<p>Nous ne demandons ni ton adresse, ni tes contacts, ni ta position précise. Le son du micro (abonnés Kopo+) n'est <b>ni enregistré ni conservé</b> : il passe en direct par un serveur vocal (LiveKit) jusqu'aux autres abonnés de la table, et seulement quand tu as activé le micro. Le téléphone ne demande l'accès au micro qu'au premier toucher du bouton micro.</p>
 
 <h2>2. Pourquoi nous avons le droit de les utiliser</h2>
 <ul>
@@ -44,7 +45,8 @@
 <li><b>Supabase</b> (Supabase, Inc., États-Unis) : base de données et connexion Google ;</li>
 <li><b>GitHub Pages</b> (GitHub, Inc., États-Unis) : page du jeu ;</li>
 <li><b>Google</b> (Google LLC, États-Unis) : si tu choisis de te connecter avec Google ;</li>
-<li>relais réseau pour le micro (PeerJS / TURN), qui ne gardent pas le son ;</li>
+<li><b>LiveKit</b> (LiveKit, Inc., États-Unis) : serveur vocal du micro, qui ne garde pas le son ;</li>
+<li><b>Firebase Cloud Messaging</b> (Google LLC, États-Unis) : envoi des notifications sur le téléphone ;</li>
 <li>relais publics de messages (EMQX, HiveMQ, Mosquitto), utilisés seulement pour les parties entre amis lancées sans le serveur : ils transmettent les coups de la partie et les pseudos, sans les garder.</li>
 </ul>
 <p>Ces sociétés sont établies aux États-Unis : certaines données peuvent donc y être consultées. Elles s'engagent par contrat à les protéger (clauses contractuelles types de la Commission européenne ou cadre de protection des données UE–États-Unis). Nous pouvons aussi transmettre des données à une autorité si la loi nous y oblige.</p>
@@ -77,8 +79,15 @@
 <p>Masano est réservé aux 13 ans et plus. Si tu penses qu'un enfant plus jeune a créé un compte, écris-nous et nous le supprimerons.</p>
 
 <h2>10. Stockage sur ton téléphone</h2>
-<p>Le jeu garde sur ton téléphone (stockage du navigateur) ton identifiant de joueur, tes réglages, le dernier jeu choisi (Kopo ou Inter (8)) et ta partie en cours. Pas de cookies publicitaires ni de traceurs de mesure d'audience.</p>
+<p>Le jeu garde sur ton téléphone (stockage du navigateur, ou de l'appli) ton identifiant de joueur, tes réglages, le dernier jeu choisi (Kopo ou Inter (8)) et ta partie en cours. Pas de cookies publicitaires ni de traceurs de mesure d'audience.</p>
 
 <h2>11. Changements</h2>
 <p>La date en haut de la page indique la dernière version. Si cette politique change de façon importante, nous te prévenons dans le jeu.</p>
-</main></body></html>
+</main><script>
+// Ouverte depuis une appli des stores (?appli=1) : pas de lien vers le reste du site, seulement entre les pages légales.
+if (/[?&]appli=1/.test(location.search)) {
+  var logo = document.querySelector('a.logo'); if (logo) logo.removeAttribute('href');
+  document.querySelectorAll('a[href*=".html"]').forEach(function (a) { a.setAttribute('href', a.getAttribute('href').replace('.html', '.html?appli=1')); });
+}
+</script>
+</body></html>

@@ -13,6 +13,18 @@
   const DELAI_ABSENT = 5; // secondes accordées à un joueur déconnecté ou absent (2 temps écoulés d'affilée)
   // Robots entre eux (plus aucun humain dans la manche) : tout va plus vite, on voit encore les coups.
   const RAPIDE = { pauseRobot: 300, finTour: 1500, depart: 1500, mancheAuto: 3000 };
+  // Rythme réglé dans le tableau de bord (onglet Réglages > Rythme des parties), en secondes :
+  // { finTour, depart, mancheAuto, revanche, pauseRobot, absent, rapide (1 = oui, 0 = non) }. Lu à l'ouverture de la salle.
+  const BORNES_RYTHME = { finTour: [0, 10], depart: [0, 10], mancheAuto: [2, 30], revanche: [5, 60], pauseRobot: [0.2, 5], absent: [2, 15] };
+  function appliquerRythme(s, r) {
+    if (!r || typeof r !== 'object') return s;
+    const sec = (k) => { const n = Number(r[k]), b = BORNES_RYTHME[k]; return Number.isFinite(n) && n >= b[0] && n <= b[1] ? n : null; };
+    for (const k of ['finTour', 'depart', 'mancheAuto', 'revanche']) if (sec(k) !== null) s.durees[k] = Math.round(sec(k) * 1000);
+    s.rythme = { pauseRobot: sec('pauseRobot') !== null ? Math.round(sec('pauseRobot') * 1000) : PAUSE_ROBOT, absent: sec('absent') !== null ? sec('absent') : DELAI_ABSENT, rapide: !(r.rapide === 0 || r.rapide === false || r.rapide === '0') };
+    return s;
+  }
+  const pauseRobotDe = (s) => (s.rythme && s.rythme.pauseRobot >= 0 ? s.rythme.pauseRobot : PAUSE_ROBOT);
+  const absentDe = (s) => (s.rythme && s.rythme.absent > 0 ? s.rythme.absent : DELAI_ABSENT);
 
   // Hasard de qualité cryptographique quand le navigateur le permet.
   function hasardFort() {
@@ -63,6 +75,8 @@
     if (s.etat === 'finManche') return s.restants.every((id) => vraiRobot(s, id));
     return false;
   }
+  // Robots entre eux et « mode rapide » laissé actif dans le tableau de bord : tout va plus vite.
+  const rapide = (s) => entreRobots(s) && !(s.rythme && s.rythme.rapide === false);
 
   // Niveaux des robots. Chaque robot ne voit que ce qu'un joueur voit (K.vuePublique) :
   // sa main, la table, le nombre de cartes de chacun et les cartes déjà montrées.
@@ -80,7 +94,10 @@
   function forceRobots(s, j) {
     if (s.robots === 'gentils') return 0;
     const plage = PLAGES_FORCE[niveauDuRobot(s, j)] || PLAGES_FORCE.normaux;
-    const n = s.niveauJoueur > 1 ? s.niveauJoueur : 1;
+    // Le Fleuve (serveur) : un robot peut avoir sa propre force (j.force, 1 à 20), sinon celle de la table.
+    const r = j && s.joueurs ? s.joueurs.find((x) => x.id === j) : null;
+    const f = r && !r.remplace && r.force > 0 ? r.force : s.niveauJoueur;
+    const n = f > 1 ? f : 1;
     const t = Math.min(1, (n - 1) / 19);
     return plage[0] + (plage[1] - plage[0]) * t;
   }
@@ -176,7 +193,7 @@
     const d = enCours ? delaiPour(s, m.joueurCourant) : 0;
     s.echeance = d ? s.horloge() + d * 1000 : null;
     s.chronoTotal = d * 1000;
-    const pause = s.pauseRobot >= 0 ? s.pauseRobot : entreRobots(s) ? RAPIDE.pauseRobot : PAUSE_ROBOT; // pauseRobot : tests du serveur seulement
+    const pause = s.pauseRobot >= 0 ? s.pauseRobot : rapide(s) ? Math.min(RAPIDE.pauseRobot, pauseRobotDe(s)) : pauseRobotDe(s); // pauseRobot : tests du serveur seulement
     s.robotPret = enCours ? s.horloge() + pause : null;
   }
 
@@ -188,7 +205,7 @@
   }
   function delaiPour(s, id) {
     if (!estAbsent(s, id)) return s.delai;
-    return s.delai ? Math.min(s.delai, DELAI_ABSENT) : DELAI_ABSENT;
+    return s.delai ? Math.min(s.delai, absentDe(s)) : absentDe(s);
   }
   function revenu(s, id) { s.expirations[id] = 0; }
 
@@ -217,7 +234,11 @@
     const avant = m.table.map((p) => ({ joueur: p.joueur, cartes: p.cartes.slice(), compte: p.compte }));
     const phaseAvant = m.phase;
     const mainAvant = (m.mains[action.joueur] || []).slice();
+    // Le Fleuve (serveur) : suivi des coups pour les objectifs et les étoiles. Absent ailleurs.
+    const tailles = s.surAction ? Object.fromEntries(Object.entries(m.mains).map(([k, v]) => [k, v.length])) : null;
+    const courant = m.joueurCourant;
     K.jouer(m, action);
+    if (s.surAction) s.surAction(s, m, action, tailles, courant);
     const j = action.joueur;
     let fin = null;
     if (action.type === 'katapss') {
@@ -239,7 +260,7 @@
       fin = { table: [{ joueur: j, cartes: mainAvant, compte: false }], annonce: { type: 'sortie', joueur: j, meneur: m.phase === 'terminee' ? null : m.meneur } };
     }
     // Un humain qui vient de jouer (ou de se qualifier) voit la fin du tour au rythme normal.
-    const finTour = entreRobots(s) && vraiRobot(s, j) ? Math.min(s.durees.finTour, RAPIDE.finTour) : s.durees.finTour;
+    const finTour = rapide(s) && vraiRobot(s, j) ? Math.min(s.durees.finTour, RAPIDE.finTour) : s.durees.finTour;
     if (fin && finTour > 0) {
       s.pause = { type: 'finTour', jusqua: s.horloge() + finTour, total: finTour, table: fin.table, annonce: fin.annonce };
     } else finirMancheSiBesoin(s);
@@ -251,6 +272,7 @@
   // personne ne change de place (créateur, 16/11). s.restants garde cet ordre.
   function lancer(s) {
     s.restants = K.melanger(s.joueurs.map((j) => j.id), s.rng);
+    s.joueurs.forEach((j) => { delete j.micCoupe; }); // micro coupé par l'hôte : seulement le temps d'une partie
     demarrerManche(s);
   }
   // Partie publique : une salle de N joueurs démarre seule dès qu'elle est pleine.
@@ -345,7 +367,9 @@
     const presents = (l) => l.filter((id) => s.restants.includes(id));
     const tour = K.melanger(s.donne.ordre, hasardManche(s.donne.graine, 0)); // ordre autour de la table, places vides comprises : le même à chaque manche
     const { mains, redistributions } = K.distribuer(presents(s.donne.ordre), rng);
-    const depart = Math.floor(rng() * tour.length);
+    let depart = Math.floor(rng() * tour.length);
+    // Le Fleuve, piège « tu joues en dernier » (1re manche) : on ouvre juste après le joueur.
+    if (s.donne.dernier && s.numeroManche === 0 && tour.includes(s.donne.dernier)) depart = (tour.indexOf(s.donne.dernier) + 1) % tour.length;
     const ouvreur = presents(tour.slice(depart).concat(tour.slice(0, depart)))[0];
     return { sieges: presents(tour), mains, redistributions, premier: ouvreur };
   }
@@ -363,7 +387,7 @@
     s.manche = K.nouvelleManche(sieges, mains, premier, redistributions);
     s.etat = 'manche';
     // Compte à rebours : chacun découvre ses cartes et qui commence.
-    const depart = entreRobots(s) ? Math.min(s.durees.depart, RAPIDE.depart) : s.durees.depart;
+    const depart = rapide(s) ? Math.min(s.durees.depart, RAPIDE.depart) : s.durees.depart;
     s.pause = depart > 0 ? { type: 'depart', jusqua: s.horloge() + depart, total: depart } : null;
     armerChrono(s);
   }
@@ -435,7 +459,7 @@
     } else {
       s.etat = 'finManche';
       // Robots entre eux : la manche suivante part vite (sauf juste après l'élimination d'un humain).
-      const auto = entreRobots(s) && vraiRobot(s, m.elimine) ? Math.min(s.durees.mancheAuto, RAPIDE.mancheAuto) : s.durees.mancheAuto;
+      const auto = rapide(s) && vraiRobot(s, m.elimine) ? Math.min(s.durees.mancheAuto, RAPIDE.mancheAuto) : s.durees.mancheAuto;
       s.suiteA = auto > 0 ? s.horloge() + auto : null; // l'hôte peut lancer plus tôt
       s.suiteTotal = auto;
     }
@@ -534,7 +558,22 @@
         if (!joueur) return { ok: false, erreur: 'Inconnu.' };
         joueur.voix = !!msg.voix;
         if (typeof msg.peerId === 'string') joueur.peerId = msg.peerId.slice(0, 64);
-        joueur.muet = !!msg.muet;
+        joueur.muet = !!msg.muet || !!joueur.micCoupe; // micro coupé par l'hôte : il reste muet
+        return { ok: true };
+      }
+      case 'passerHote': {
+        // L'hôte éliminé laisse la main à un joueur encore en jeu (humain, présent), le temps qui lui reste à regarder.
+        const cible = s.joueurs.find((j) => j.id === msg.cible);
+        if (id !== s.hote || !['manche', 'finManche'].includes(s.etat) || !s.elimines.includes(id)) return { ok: false, erreur: 'Impossible.' };
+        if (!cible || cible.robot || !cible.connecte || !s.restants.includes(cible.id)) return { ok: false, erreur: 'Choisis un joueur encore en jeu.' };
+        s.hote = cible.id;
+        return { ok: true };
+      }
+      case 'couperMicro': { // { cible, coupe } : l'hôte coupe (ou rend) le micro d'un joueur éliminé, pour toute la table
+        const cible = s.joueurs.find((j) => j.id === msg.cible);
+        if (id !== s.hote || s.etat === 'salon' || !cible || cible.robot || cible.id === id || !s.elimines.includes(cible.id)) return { ok: false, erreur: 'Impossible.' };
+        if (msg.coupe === false) delete cible.micCoupe;
+        else { cible.micCoupe = true; cible.muet = true; }
         return { ok: true };
       }
       case 'lancer': {
@@ -572,6 +611,12 @@
         if (!joueur || !seulHumain(s, id) || s.etat === 'salon') return { ok: false, erreur: 'La pause, c\'est seulement contre les robots.' };
         if (msg.pause && !s.enPause) s.enPause = { depuis: s.horloge() };
         else if (!msg.pause && s.enPause) reprendre(s);
+        return { ok: true };
+      }
+      case 'passerPause': { // contre les robots : toucher la table ramasse le pli (ou saute le compte à rebours) tout de suite
+        if (!joueur || !seulHumain(s, id) || s.etat !== 'manche' || !s.pause || s.enPause) return { ok: false, erreur: 'Impossible.' };
+        s.pause.jusqua = s.horloge();
+        tic(s);
         return { ok: true };
       }
       case 'passerFin': { // un humain qui ne joue plus : les robots finissent tout de suite
@@ -626,7 +671,7 @@
       etat: s.etat,
       moi: id,
       hote: s.hote,
-      joueurs: s.joueurs.map((j) => ({ id: j.id, nom: j.nom, connecte: j.connecte, peerId: j.peerId || null, voix: !!j.voix, muet: j.muet !== false, robot: !!j.robot, niveau: j.robot && !j.remplace ? niveauDuRobot(s, j.id) : null, pret: !!j.pret || !!j.robot, remplace: !!j.remplace, absent: estAbsent(s, j.id) })),
+      joueurs: s.joueurs.map((j) => ({ id: j.id, nom: j.nom, connecte: j.connecte, peerId: j.peerId || null, voix: !!j.voix, muet: j.muet !== false, micCoupe: !!j.micCoupe, robot: !!j.robot, niveau: j.robot && !j.remplace ? niveauDuRobot(s, j.id) : null, pret: !!j.pret || !!j.robot, remplace: !!j.remplace, absent: estAbsent(s, j.id) })),
       delai: s.delai,
       publique: !!s.publique,
       taille: s.taille,
@@ -679,7 +724,7 @@
     return s;
   }
 
-  const KopoSalle = { MIN, MAX, hasardManche, placerDonne, DELAIS, PAUSE_ROBOT, DUREES, creerSalle, rendrePublique, choixRobot, NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, niveauDuRobot, robotGentil, robotNormal, robotFort, reconnecter, DELAI_ABSENT, RAPIDE, entreRobots, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
+  const KopoSalle = { MIN, MAX, hasardManche, placerDonne, DELAIS, PAUSE_ROBOT, DUREES, creerSalle, rendrePublique, choixRobot, NIVEAUX_ROBOTS, PLAGES_FORCE, forceRobots, niveauDuRobot, robotGentil, robotNormal, robotFort, reconnecter, DELAI_ABSENT, RAPIDE, BORNES_RYTHME, appliquerRythme, entreRobots, tic, coupAutomatique, recevoir, deconnecter, vue, exporter, importer };
   if (typeof module !== 'undefined' && module.exports) module.exports = KopoSalle;
   else root.KopoSalle = KopoSalle;
 })(typeof window !== 'undefined' ? window : globalThis);

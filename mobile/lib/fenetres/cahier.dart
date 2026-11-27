@@ -14,6 +14,7 @@ import '../commun/cartes.dart';
 import '../commun/theme.dart';
 import '../etat.dart';
 import 'communes.dart';
+import 'social.dart' show hotePeutPasser, choisirNouvelHote;
 
 // Couleurs du cahier d'écolier : papier, encre bleue, marge rouge.
 const _papier = Color(0xFFF7F1DF), _encre = Color(0xFF1F3A6B), _marge = Color(0xFFD64541), _vert = Color(0xFF2A7A4B), _orange = Color(0xFFC76A00), _or = Color(0xFFB07D16);
@@ -97,6 +98,7 @@ void afficherFinDonne(Vue v0, {bool finDePartie = false, required void Function(
       if (v['entreRobots'] == true) actions.add(Btn.principal('Passer à la fin', large: true, onTap: () => app.envoyer({'type': 'passerFin'})));
       if (v['hote'] == v['moi']) {
         actions.add(Btn('Donne suivante', style: v['entreRobots'] == true ? StyleBtn.normal : StyleBtn.principal, large: true, onTap: () => app.envoyer({'type': 'mancheSuivante'})));
+        if (hotePeutPasser(v)) actions.add(Btn('Passer la main', icone: 'couronne', large: true, onTap: choisirNouvelHote));
       } else if (v['suite'] == null) {
         actions.add(Text("En attente de l'hôte pour la donne suivante…", style: K.texte(15, couleur: K.muted)));
       }

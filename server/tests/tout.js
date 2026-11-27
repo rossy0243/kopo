@@ -30,7 +30,7 @@ async function devenirAmis(x, y) {
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Joue une partie jusqu'au bout : chaque client humain joue la première action permise.
-async function jouerPartie(joueurs, { robots = 0, jeu = 'kopo', reglages = null, options = {} } = {}) {
+async function jouerPartie(joueurs, { robots = 0, jeu = 'kopo', reglages = null, options = {}, adversaires = null } = {}) {
   const client = new Client(URL_.replace('http', 'ws'));
   const code = 'T' + Math.random().toString(36).slice(2, 5).toUpperCase().replace(/[^A-Z]/g, 'Q').padEnd(3, 'Q');
   const salles = [];
@@ -39,6 +39,7 @@ async function jouerPartie(joueurs, { robots = 0, jeu = 'kopo', reglages = null,
     const salle = salles.length ? await client.joinById(salles[0].roomId, { jeton: j.jeton }) : await client.create(jeu, Object.assign({ jeton: j.jeton, code, rapide: true }, options));
     salle.onMessage('erreur', () => {});
     salle.onMessage('solde', () => {});
+    salle.onMessage('adversaires', (m) => { if (adversaires) adversaires.set(j.compte.id, m); });
     salle.onMessage('vue', (v) => {
       if (v.etat === 'finPartie') fin = fin || v;
       const a = v.manche && v.manche.actions[0];
@@ -68,7 +69,7 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     const salle = parCode && salles.length
       ? await client.join('kopo', { jeton: j.jeton, code })
       : await client.joinOrCreate('kopo', { jeton: j.jeton, publique: true, taille, rapide: true });
-    salle.onMessage('erreur', () => {}); salle.onMessage('solde', () => {});
+    salle.onMessage('erreur', () => {}); salle.onMessage('solde', () => {}); salle.onMessage('adversaires', () => {});
     salle.onMessage('ligue', (m) => ligue.set(j.compte.id, m));
     salle.onMessage('classee', (m) => classee.set(j.compte.id, m.classee));
     salle.onMessage('vue', (v) => {
@@ -393,6 +394,23 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.deepStrictEqual(r[1].joueurs.map((j) => j.pseudo), ['Rabi'], 'un joueur qui m\'a bloqué disparaît');
     assert.deepStrictEqual((await api('/api/recents', { jeton: d.jeton })).json, [], 'aucune partie');
   });
+  await test('fin de partie : le serveur propose d\'ajouter les adversaires humains qui ne sont pas encore amis', async () => {
+    const [a, b, c, d] = [await invite('Fina'), await invite('Fibo'), await invite('Fico'), await invite('Fido')];
+    await devenirAmis(a, b);
+    await api('/api/amis', { methode: 'POST', jeton: a.jeton, corps: { cible: d.compte.id } }); // demande déjà envoyée
+    const recus = new Map();
+    await jouerPartie([a, b, c, d], { adversaires: recus });
+    assert.deepStrictEqual((recus.get(a.compte.id) || []).map((j) => j.pseudo), ['Fico'], 'ni l\'ami, ni la demande en cours');
+    const pourD = recus.get(d.compte.id) || [];
+    assert.deepStrictEqual(pourD.map((j) => j.pseudo).sort(), ['Fibo', 'Fico', 'Fina']);
+    assert.strictEqual(pourD.find((j) => j.pseudo === 'Fina').recue, true, 'Fina l\'a déjà demandé : à accepter');
+    const avecRobot = new Map();
+    await jouerPartie([c, await invite('Fiseul')], { robots: 1, adversaires: avecRobot });
+    assert.ok([...avecRobot.values()].every((l) => l.every((j) => j.id)), 'jamais de robot dans la liste');
+    const seul = new Map();
+    await jouerPartie([await invite('Fisolo')], { robots: 2, adversaires: seul });
+    assert.strictEqual(seul.size, 0, 'seul contre les robots : rien à proposer');
+  });
   await test('un joueur banni ne peut pas entrer dans une salle', async () => {
     const x = await invite('Tricheur');
     await srv.base.query("UPDATE comptes SET statut = 'banni' WHERE id = $1", [x.compte.id]);
@@ -529,7 +547,7 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
   await test('réglage robotsPublics : attente entre 10 et 600 secondes', async () => {
     await assert.rejects(srv.reglages.ecrire('robotsPublics', { actif: 1, attente: 3 }), /Attente/);
     await srv.reglages.ecrire('robotsPublics', { actif: 0, attente: 60 });
-    assert.deepStrictEqual(srv.reglages.get('robotsPublics'), { actif: 0, attente: 60 });
+    assert.deepStrictEqual(srv.reglages.get('robotsPublics'), { actif: 0, attente: 60, robots: 'normaux', force: 10 }); // niveau et force : valeurs de départ
     await srv.reglages.ecrire('robotsPublics', DEFAUTS.robotsPublics);
   });
   await test('un ami rejoint une salle publique avec son code ; une salle privée n\'est jamais proposée aux inconnus', async () => {
@@ -581,7 +599,7 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     let fin = null;
     for (const j of js) {
       const salle = await client.joinOrCreate('kopo-mise', { jeton: j.jeton, publique: true, taille: 3, mise: 'bronze', rapide: true });
-      salle.onMessage('erreur', () => {}); salle.onMessage('solde', () => {}); salle.onMessage('classee', () => {});
+      salle.onMessage('erreur', () => {}); salle.onMessage('solde', () => {}); salle.onMessage('adversaires', () => {}); salle.onMessage('classee', () => {});
       salle.onMessage('mise', (m) => mises.set(j.compte.id, m));
       salle.onMessage('pot', (m) => pots.set(j.compte.id, m));
       salle.onMessage('vue', (v) => {
@@ -613,7 +631,7 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     let fin = null;
     for (const j of js) {
       const salle = await client.joinOrCreate('inter8-mise', { jeton: j.jeton, publique: true, taille: 3, mise: 'bronze', rapide: true });
-      salle.onMessage('erreur', () => {}); salle.onMessage('solde', () => {}); salle.onMessage('classee', () => {});
+      salle.onMessage('erreur', () => {}); salle.onMessage('solde', () => {}); salle.onMessage('adversaires', () => {}); salle.onMessage('classee', () => {});
       salle.onMessage('mise', (m) => mises.set(j.compte.id, m));
       salle.onMessage('pot', (m) => pots.set(j.compte.id, m));
       salle.onMessage('vue', (v) => {
@@ -1667,7 +1685,7 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.strictEqual((await api('/api/push/abonnement', { methode: 'POST', jeton: b.jeton, corps: { abonnement: { endpoint: 'https://pirate.exemple.com/x', keys: { p256dh: 'p', auth: 'a' } } } })).statut, 400, 'service de notification inconnu');
     assert.strictEqual((await api('/api/push/abonnement', { methode: 'POST', jeton: b.jeton, corps: { abonnement: abo('b1'), appareil: 'Android' } })).statut, 200);
     const e = (await api('/api/push', { jeton: b.jeton })).json;
-    assert.strictEqual(e.appareils, 1); assert.deepStrictEqual(e.prefs, { invitation: true, ami: true, match: true, annonce: true });
+    assert.strictEqual(e.appareils, 1); assert.deepStrictEqual(e.prefs, { invitation: true, ami: true, match: true, annonce: true, fleuve: true });
     await api('/api/amis', { methode: 'POST', jeton: a.jeton, corps: { cible: b.compte.pseudo + '#' + b.compte.numero } });
     await attendre(100);
     const d = pour('b1').find((x) => x.type === 'ami');
@@ -1898,7 +1916,7 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
       // Kopo : 1 robot, partie jouée jusqu'au bout ; ni pièces ni ligue, mais comptée en entraînement.
       const solde = (await api('/api/moi', { jeton: x.jeton })).json.compte.solde;
       salle = await client.create('entrainement', { jeton: x.jeton, robots: 1, rapide: true });
-      salle.onMessage('erreur', () => {}); salle.onMessage('solde', () => {});
+      salle.onMessage('erreur', () => {}); salle.onMessage('solde', () => {}); salle.onMessage('adversaires', () => {});
       salle.onMessage('vue', (v) => {
         premiere = premiere || v;
         if (v.etat === 'finPartie') fin = fin || v;
@@ -1972,6 +1990,23 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.strictEqual((await api('/api/v1/push', { jeton: b.jeton })).json.natifs.length, 0);
   });
   // --- Stickers animés : utilisations vendues (plus tard) ou offertes par l'admin, envoi vérifié et décompté
+  await test('page Recharger : pièces et Kopo+ ensemble, numéro WhatsApp des commandes réglé dans le tableau de bord', async () => {
+    const a = await invite('Rechargeur' + Date.now() % 1000);
+    let R = (await api('/api/v1/recharger', { jeton: a.jeton })).json;
+    assert.strictEqual(R.whatsapp, null); assert.strictEqual(R.compte, a.compte.pseudo + '#' + a.compte.numero);
+    assert.ok(R.pieces.bouquets.length >= 3 && R.kopoPlus.formules.length === 2 && R.kopoPlus.actif === false);
+    assert.strictEqual((await api('/api/v1/recharger')).statut, 401);
+    const mettre = (whatsapp) => api('/admin/api/reglages/achat', { methode: 'PUT', jeton: adminJeton, corps: { valeur: { whatsapp } } });
+    for (const faux of ['abc', '12', '0812345678', '+243 81 234 567 890 123']) assert.strictEqual((await mettre(faux)).statut, 400, faux);
+    assert.strictEqual((await mettre('+243 81-234-5678')).statut, 200);
+    R = (await api('/api/v1/recharger', { jeton: a.jeton })).json;
+    assert.strictEqual(R.whatsapp, '243812345678');
+    assert.strictEqual((await api('/api/v1/bouquets', { jeton: a.jeton })).json.whatsapp, '243812345678');
+    assert.strictEqual((await api('/api/v1/abonnement', { jeton: a.jeton })).json.whatsapp, '243812345678');
+    assert.ok(!('whatsapp' in (await api('/api/config')).json), 'jamais dans la config publique (lue par les applis des stores)');
+    assert.strictEqual((await mettre('')).statut, 200);
+    assert.strictEqual((await api('/api/v1/recharger', { jeton: a.jeton })).json.whatsapp, null);
+  });
   await test('bouquets de pièces : du moins cher au plus cher, 40 000 FC au plus, taux des stickers, livrés par l\'admin', async () => {
     const a = await invite('Acheteur' + Date.now() % 1000);
     const B = (await api('/api/v1/bouquets', { jeton: a.jeton })).json;
@@ -2040,6 +2075,41 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.strictEqual((await api('/api/moi', { jeton: a.jeton })).json.compte.kopoPlus, false);
     assert.ok((await api('/admin/api/journal', { jeton: adminJeton })).json.some((l) => l.action === 'abonnement:annule'));
   });
+  await test('Kopo+ offert par l\'admin : à un joueur ou un groupe, jours ajoutés, message dans le jeu, annulable', async () => {
+    const a = await invite('KpOffA'), b = await invite('KpOffB');
+    const nomA = a.compte.pseudo + '#' + a.compte.numero;
+    const avant = (await api('/admin/api/abonnements', { jeton: adminJeton })).json;
+    assert.ok(avant.criteres.some((c) => c.id === 'kopoPlus'));
+    // Refus : pas de message, jours hors limites, pas admin.
+    assert.strictEqual((await api('/admin/api/abonnements/offrir', { methode: 'POST', jeton: adminJeton, corps: { cible: { type: 'joueur', joueur: nomA }, jours: 7, message: '' } })).statut, 400);
+    assert.strictEqual((await api('/admin/api/abonnements/offrir', { methode: 'POST', jeton: adminJeton, corps: { cible: { type: 'joueur', joueur: nomA }, jours: 0, message: 'Merci beaucoup' } })).statut, 400);
+    assert.strictEqual((await api('/admin/api/abonnements/offrir', { methode: 'POST', jeton: a.jeton, corps: { cible: { type: 'tous' }, jours: 7, message: 'Merci beaucoup' } })).statut, 401);
+    // Un joueur : 7 jours à partir de maintenant, puis un mois payé s'ajoute.
+    const r = await api('/admin/api/abonnements/offrir', { methode: 'POST', jeton: adminJeton, corps: { cible: { type: 'joueur', joueur: nomA }, jours: 7, message: 'Merci pour ta patience !', push: true } });
+    assert.strictEqual(r.statut, 200); assert.strictEqual(r.json.joueurs, 1);
+    let moi = (await api('/api/moi', { jeton: a.jeton })).json.compte;
+    assert.strictEqual(moi.kopoPlus, true);
+    assert.ok(Math.abs(new Date(moi.kopoPlusJusqu) - (Date.now() + 7 * 864e5)) < 120e3);
+    const n = (await api('/api/notifications', { jeton: a.jeton })).json.liste.find((x) => x.donnees && x.donnees.abonnement === 'cadeau');
+    assert.strictEqual(n.type, 'cadeau');
+    assert.strictEqual(n.donnees.message, 'Merci pour ta patience ! (+7 jours de Kopo+)');
+    // Le groupe « Abonnés Kopo+ » : A est prolongé (jours ajoutés à ce qui reste), B (pas abonné) non.
+    const k = await api('/admin/api/abonnements/compter', { methode: 'POST', jeton: adminJeton, corps: { cible: { type: 'groupe', criteres: { kopoPlus: true } } } });
+    assert.ok(k.json.joueurs >= 1);
+    const g = await api('/admin/api/abonnements/offrir', { methode: 'POST', jeton: adminJeton, corps: { cible: { type: 'groupe', criteres: { kopoPlus: true } }, jours: 3, message: 'Trois jours de plus pour vous' } });
+    assert.strictEqual(g.json.joueurs, k.json.joueurs);
+    moi = (await api('/api/moi', { jeton: a.jeton })).json.compte;
+    assert.ok(Math.abs(new Date(moi.kopoPlusJusqu) - (Date.now() + 10 * 864e5)) < 120e3);
+    assert.strictEqual((await api('/api/moi', { jeton: b.jeton })).json.compte.kopoPlus, false);
+    // Hors des ventes, et chaque ligne s'annule (ses jours seulement).
+    const liste = (await api('/admin/api/abonnements', { jeton: adminJeton })).json;
+    assert.strictEqual(liste.francs30j, avant.francs30j);
+    assert.strictEqual(liste.activations30j, avant.activations30j);
+    const ligne = liste.activations.find((l) => l.compte === a.compte.id && l.formule === 'cadeau' && l.jours === 3);
+    const x = await api(`/admin/api/abonnements/${ligne.id}/annuler`, { methode: 'POST', jeton: adminJeton });
+    assert.ok(Math.abs(new Date(x.json.jusqu) - (Date.now() + 7 * 864e5)) < 120e3);
+    assert.ok((await api('/admin/api/journal', { jeton: adminJeton })).json.some((l) => l.action === 'abonnement:offert'));
+  });
   await test('bienvenue : essai Kopo+ de 7 jours (une fois, compte Google) et rappel la veille de la fin', async () => {
     const inv = await invite('EssaiInvite');
     const o = (await api('/api/v1/abonnement', { jeton: inv.jeton })).json;
@@ -2104,6 +2174,17 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     const loin = await ab.verifierLiveKit(async () => { throw new Error('getaddrinfo ENOTFOUND'); });
     assert.match(loin.raison, /injoignable/);
     assert.ok(!(await creerAbonnement(null, {}).verifierLiveKit()).ok);
+    // Micro coupé par l'hôte (joueur éliminé) : le droit de parler est retiré dans LiveKit, sans sortir du salon vocal.
+    let appel = null;
+    assert.ok(await ab.permissionVocal({ salon: 'table-1', identite: 'c2', parler: false }, async (u, o) => { appel = { u, o }; return { ok: true }; }));
+    assert.strictEqual(appel.u, 'https://kopo-x.livekit.cloud/twirp/livekit.RoomService/UpdateParticipant');
+    const pc = JSON.parse(appel.o.body);
+    assert.deepStrictEqual([pc.room, pc.identity, pc.permission.canSubscribe, pc.permission.canPublish], ['table-1', 'c2', true, false]);
+    const adm = JSON.parse(Buffer.from(appel.o.headers.Authorization.split('.')[1], 'base64url').toString());
+    assert.strictEqual(adm.video.roomAdmin, true); assert.strictEqual(adm.video.room, 'table-1');
+    await ab.permissionVocal({ salon: 'table-1', identite: 'c2', parler: true }, async (u, o) => { appel = { u, o }; return { ok: true }; });
+    assert.deepStrictEqual(JSON.parse(appel.o.body).permission.canPublishSources, ['MICROPHONE']);
+    assert.strictEqual(await creerAbonnement(null, {}).permissionVocal({ salon: 's', identite: 'x', parler: false }), false);
   });
   await test('abonnement Kopo+ : 2 500 FC le mois, 25 000 FC l\'an, activé par l\'admin, prolongé, couronne à la table', async () => {
     const a = await invite('AboA'), b = await invite('AboB');
@@ -2343,6 +2424,530 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.strictEqual(p.ensemble, 6);
     assert.strictEqual(p.a === a.compte.id ? p.pots_a : p.pots_b, 540);
     assert.strictEqual((await api('/admin/api/suspects')).statut, 401, 'réservé à l\'admin');
+  });
+  console.log('\nTableau de bord admin et nouveaux réglages');
+  const reg = (cle, valeur) => api('/admin/api/reglages/' + cle, { methode: 'PUT', jeton: adminJeton, corps: { valeur } });
+  await test('tableau de bord : chiffres clés, courbes sur 30 jours, heures, appareils, alertes', async () => {
+    for (const periode of ['jour', '7', '30']) {
+      const t = (await api('/admin/api/tableau?periode=' + periode, { jeton: adminJeton })).json;
+      assert.strictEqual(t.periode, { jour: 1, 7: 7, 30: 30 }[periode]);
+      assert.ok(t.cles.actifs >= 1 && t.cles.parties >= 1, JSON.stringify(t.cles));
+      assert.strictEqual(t.parJour.length, 30);
+      assert.ok('bouquets' in t.parJour[0] && 'kopo_plus' in t.parJour[0]);
+      assert.ok(Array.isArray(t.heures) && Array.isArray(t.appareils));
+      assert.strictEqual(typeof t.alertes.signalements, 'number');
+      assert.strictEqual(typeof t.alertes.suspects, 'number');
+      assert.strictEqual(typeof t.maintenant.connectes, 'number');
+    }
+    assert.strictEqual((await api('/admin/api/tableau')).statut, 401, 'réservé à l\'admin');
+  });
+  await test('tableau de bord : revenus des bouquets livrés et de Kopo+, appareil du joueur', async () => {
+    const x = await invite('Payeur' + Date.now() % 1000);
+    const avant = (await api('/admin/api/tableau?periode=jour', { jeton: adminJeton })).json.cles.revenus;
+    const b = await api('/admin/api/bouquets/livrer', { methode: 'POST', jeton: adminJeton, corps: { joueur: x.compte.id, bouquet: 1, message: 'MP-123' } });
+    assert.strictEqual(b.statut, 200, JSON.stringify(b.json));
+    const t = (await api('/admin/api/tableau?periode=jour', { jeton: adminJeton })).json;
+    assert.strictEqual(t.cles.revenus - avant, b.json.bouquet.francs);
+    assert.ok(t.parJour.at(-1).bouquets >= b.json.bouquet.francs);
+    await fetch(URL_ + '/api/moi', { headers: { authorization: 'Bearer ' + x.jeton, 'x-masano-client': 'android/1.4.0' } });
+    const p = (await srv.base.query('SELECT plateforme, version FROM presences WHERE compte_id = $1', [x.compte.id])).rows[0];
+    assert.deepStrictEqual([p.plateforme, p.version], ['android', '1.4.0']);
+  });
+  await test('rythme des parties : réglé dans Pilotage, envoyé au site, appliqué aux nouvelles salles', async () => {
+    assert.strictEqual((await reg('rythme', { kopo: { ...DEFAUTS.rythme.kopo, depart: 30 }, inter8: DEFAUTS.rythme.inter8 })).statut, 400, 'hors bornes');
+    const r = await reg('rythme', { kopo: { ...DEFAUTS.rythme.kopo, finTour: 3, depart: 3, mancheAuto: 6, pauseRobot: 0.8 }, inter8: { ...DEFAUTS.rythme.inter8, annonce: 2, rapide: 0 } });
+    assert.strictEqual(r.statut, 200, JSON.stringify(r.json));
+    const cfg = (await api('/api/config')).json;
+    assert.strictEqual(cfg.rythme.kopo.finTour, 3);
+    const { salles } = require('../src/salle-kopo');
+    const a = await invite('Rythme' + Date.now() % 1000);
+    const client = new Client(URL_.replace('http', 'ws'));
+    const k = await client.create('kopo', { jeton: a.jeton }), i = await client.create('inter8', { jeton: a.jeton });
+    await attendre(100);
+    const sk = [...salles].find((s) => s.roomId === k.roomId), si = [...salles].find((s) => s.roomId === i.roomId);
+    assert.strictEqual(sk.salle.durees.finTour, 3000);
+    assert.strictEqual(sk.salle.durees.mancheAuto, 6000);
+    assert.strictEqual(sk.salle.rythme.pauseRobot, 800);
+    assert.strictEqual(si.salle.rythme.annonce, 2000);
+    assert.strictEqual(si.salle.rythme.rapide, false);
+    await k.leave(); await i.leave();
+    await reg('rythme', DEFAUTS.rythme);
+  });
+  await test('robots des salles publiques : niveau et force réglables', async () => {
+    assert.strictEqual((await reg('robotsPublics', { actif: 1, attente: 45, robots: 'geants', force: 10 })).statut, 400);
+    assert.strictEqual((await reg('robotsPublics', { actif: 1, attente: 45, robots: 'forts', force: 25 })).statut, 400);
+    const r = await reg('robotsPublics', { actif: 1, attente: 45, robots: 'forts', force: 18 });
+    assert.deepStrictEqual(r.json.valeur, { actif: 1, attente: 45, robots: 'forts', force: 18 });
+    await reg('robotsPublics', DEFAUTS.robotsPublics);
+  });
+  await test('plafond de pièces par jour aux tables gratuites', async () => {
+    const x = await invite('Farm' + Date.now() % 1000), y = await invite('Mule' + Date.now() % 1000);
+    assert.strictEqual((await reg('gains', { ...DEFAUTS.gains, plafondJour: 12 })).statut, 200);
+    try {
+      await jouerPartie([x, y]);
+      await jouerPartie([x, y]);
+      const g = async (c) => Number((await srv.base.query("SELECT coalesce(sum(montant), 0) AS n FROM registre_pieces WHERE compte_id = $1 AND motif IN ('manche', 'katapss', 'victoire', 'deuxieme')", [c.compte.id])).rows[0].n);
+      const gx = await g(x), gy = await g(y);
+      assert.ok(gx <= 12 && gy <= 12, `gains plafonnés : ${gx}, ${gy}`);
+      assert.ok(gx + gy > 0, 'le vainqueur gagne quand même jusqu\'au plafond');
+    } finally { await reg('gains', DEFAUTS.gains); }
+  });
+  await test('Kopo+ : prix réglables, note « mois offerts » recalculée', async () => {
+    assert.strictEqual((await reg('kopoPlus', { mois: 3000, an: 2000 })).statut, 400, 'un an moins cher qu\'un mois');
+    assert.strictEqual((await reg('kopoPlus', { mois: 3000, an: 30000 })).statut, 200);
+    const x = await invite('Prix' + Date.now() % 1000);
+    const o = (await api('/api/abonnement', { jeton: x.jeton })).json;
+    assert.deepStrictEqual(o.formules.map((f) => f.francs), [3000, 30000]);
+    assert.strictEqual(o.formules[1].note, '2 mois offerts');
+    await reg('kopoPlus', DEFAUTS.kopoPlus);
+  });
+  await test('création de comptes invités : fermée puis rouverte', async () => {
+    assert.strictEqual((await reg('inscriptions', { invites: 0 })).statut, 200);
+    try { assert.strictEqual((await api('/api/invite', { methode: 'POST', corps: { pseudo: 'Ferme' } })).statut, 403); }
+    finally { await reg('inscriptions', { invites: 1 }); }
+    assert.ok((await invite('Rouvert' + Date.now() % 1000)).jeton);
+  });
+  await test('annonce programmée : visible seulement entre ses dates', async () => {
+    const demain = new Date(Date.now() + 864e5).toISOString();
+    assert.strictEqual((await reg('annonce', { texte: 'Tournoi demain', active: true, debut: demain, fin: '' })).statut, 200);
+    assert.strictEqual((await api('/api/config')).json.annonce, null, 'pas encore');
+    await reg('annonce', { texte: 'Tournoi ce soir', active: true, debut: new Date(Date.now() - 6e4).toISOString(), fin: demain });
+    assert.strictEqual((await api('/api/config')).json.annonce, 'Tournoi ce soir');
+    await reg('annonce', { texte: '', active: false });
+  });
+  await test('notifications programmées, heures des rappels, seuils de sécurité, limites', async () => {
+    assert.strictEqual((await reg('pushProgrammes', [{ texte: '', quand: '2026-12-01T18:00' }])).statut, 400);
+    const p = await reg('pushProgrammes', [{ titre: 'Ce soir', texte: 'Tournoi à 20 h', quand: '2026-12-01T18:00', pays: 'cd' }]);
+    assert.strictEqual(p.json.valeur[0].quand, '2026-12-01T17:00:00.000Z', 'heure de Kinshasa');
+    assert.strictEqual(p.json.valeur[0].pays, 'CD');
+    await reg('pushProgrammes', []);
+    assert.strictEqual((await reg('heuresPush', { ...DEFAUTS.heuresPush, serie: 24 })).statut, 400);
+    assert.strictEqual((await reg('heuresPush', { ...DEFAUTS.heuresPush, matchJour: 20 })).statut, 200);
+    await reg('heuresPush', DEFAUTS.heuresPush);
+    assert.strictEqual((await reg('suspects', { jours: 14, parties: 1, pourcent: 80 })).statut, 400);
+    assert.strictEqual((await reg('suspects', { jours: 30, parties: 5, pourcent: 90 })).statut, 200);
+    assert.strictEqual((await api('/admin/api/suspects', { jeton: adminJeton })).json.jours, 30, 'seuils par défaut du réglage');
+    await reg('suspects', DEFAUTS.suspects);
+    const { limiteurs } = require('../src/limites');
+    assert.strictEqual((await reg('limites', { ...DEFAUTS.limites, apiCompte: 300 })).statut, 200);
+    assert.strictEqual(limiteurs.apiCompte.max, 300, 'appliquée tout de suite');
+    await reg('limites', DEFAUTS.limites);
+    assert.strictEqual(limiteurs.apiCompte.max, 120);
+    const j = (await api('/admin/api/journal', { jeton: adminJeton })).json.find((x) => x.action === 'reglage:limites');
+    assert.ok(j.details.avant && j.details.apres, 'le journal garde l\'ancienne et la nouvelle valeur');
+    assert.strictEqual((await api('/admin/api/reglages/defauts', { jeton: adminJeton })).json.rythme.kopo.depart, 5);
+  });
+  await test('rappels push : heures de silence réglables', () => {
+    const { heureDeSilence } = require('../src/reglages');
+    assert.ok(heureDeSilence(23) && heureDeSilence(3) && !heureDeSilence(8) && !heureDeSilence(21));
+    assert.ok(heureDeSilence(13, { silenceDebut: 12, silenceFin: 14 }) && !heureDeSilence(14, { silenceDebut: 12, silenceFin: 14 }));
+    assert.ok(!heureDeSilence(3, { silenceDebut: 0, silenceFin: 0 }), 'même heure : pas de silence');
+  });
+  // ===== Le Fleuve (fleuve.md) =====
+  console.log('Le Fleuve');
+  const FS = require('../src/fleuve-suivi');
+  const FG = require('../src/fleuve-generateur');
+  const regF = (cle, valeur) => api('/admin/api/reglages/' + cle, { methode: 'PUT', jeton: adminJeton, corps: { valeur } });
+  const recetteRapide = { ...FG.RECETTE_DEFAUT, simulations: 20, calibrage: 10, essais: 1 };
+  await test('Fleuve : villes vraies puis retour, étoiles, seuils toujours atteignables', () => {
+    const { villeDe, VILLES } = require('../src/fleuve');
+    assert.strictEqual(villeDe('congo', 1), 'Banana');
+    assert.strictEqual(villeDe('congo', 5), 'Kinshasa');
+    assert.strictEqual(villeDe('congo', VILLES.congo.length + 1), 'Kisangani · retour 2');
+    assert.strictEqual(villeDe('niger', VILLES.niger.length * 2 + 1), 'Onitsha · voyage 3');
+    assert.strictEqual(FS.etoilesDe({ reussi: false, score: 99 }, { deux: 1, trois: 2 }), 0);
+    assert.strictEqual(FS.etoilesDe({ reussi: true, score: 5 }, { deux: 6, trois: 9 }), 1);
+    assert.strictEqual(FS.etoilesDe({ reussi: true, score: 9 }, { deux: 6, trois: 9 }), 3);
+    const s = FG.seuilsDe([3, 3, 3, 3].map((score) => ({ score })));
+    assert.ok(s.deux <= 3 && s.trois <= 3, 'jamais au-dessus du meilleur essai');
+    // Les gros scores viennent des essais ratés : les seuils sont abaissés à ce qu'atteignent les essais réussis.
+    const mix = [...Array(80)].map((_, i) => ({ reussi: false, score: 10 + (i % 30) })).concat([...Array(20)].map((_, i) => ({ reussi: true, score: 2 + (i % 6) })));
+    const sm = FG.seuilsDe(mix);
+    assert.ok(sm.trois <= 7 && sm.deux < sm.trois, 'seuils atteignables en réussissant : ' + JSON.stringify(sm));
+    assert.ok(mix.filter((r) => r.reussi && r.score >= sm.trois).length >= 2, 'des essais réussis ont la 3e étoile');
+    // 3e étoile jamais réservée à la chance : sortir premier ou gagner la finale arrive 6 fois sur 100 réussites,
+    // les seuils descendent pour qu'au moins un quart des réussites ait la 3e étoile, et la moitié la 2e.
+    const rare = [...Array(100)].map((_, i) => ({ reussi: true, score: i < 6 ? 13 : i < 30 ? 2 : 1 })).concat([...Array(100)].map(() => ({ reussi: false, score: 0 })));
+    const sr = FG.seuilsDe(rare), part = (v) => rare.filter((r) => r.reussi && r.score >= v).length;
+    assert.ok(part(sr.trois) >= 25 && part(sr.deux) >= 50 && sr.deux <= sr.trois, 'plancher des étoiles : ' + JSON.stringify(sr));
+    // Finale perdue d'avance : petites cartes contre grosses cartes des mêmes couleurs. Fabrication : toujours gagnable.
+    const FD = require('../src/fleuve-donne');
+    assert.strictEqual(FD.finaleGagnable({ moi: ['2P', '3P', '2C', '3C'], adv: ['10P', '9P', '10C', '9C'] }, 'moi'), false);
+    assert.strictEqual(FD.finaleGagnable({ moi: ['10P', '9P', '10C', '9C'], adv: ['2P', '3P', '2C', '3C'] }, 'adv'), true);
+    assert.strictEqual(FD.finaleGagnable({ moi: ['2P', '3P', '4P', '5P'], adv: ['10P', '9P', '10C', '9C'] }, 'adv'), true, 'Katapss');
+    for (let n = 1; n <= 20; n++) assert.ok(FD.finaleOk(FG.candidat('congo', n, FG.RECETTE_DEFAUT, require('../../moteur/kopo-moteur.js').hasard(n), [])), 'finale gagnable, étape ' + n);
+    // Quand les essais réussis font les meilleurs scores (cas courant au Kopo), rien ne change.
+    const bon = [...Array(50)].map((_, i) => ({ reussi: i >= 25, score: i }));
+    assert.deepStrictEqual(FG.seuilsDe(bon), FG.seuilsDe(bon.map((r) => ({ score: r.score }))));
+    assert.strictEqual(FS.texteObjectif({ type: 'manches', n: 3 }), 'Qualifie-toi pour 3 manches');
+    // Vrai joueur : il sort le premier du duel final pendant son coup ; l'étape (2 manches au plus) s'arrête avant
+    // que la salle close la partie. La victoire compte quand même (+10).
+    const sv = FS.creerSuivi('moi', { jeu: 'kopo', objectif: { type: 'premier', m: 2 } });
+    const m1 = { sieges: ['moi', 'a', 'b'], qualifies: ['a', 'moi'], phase: 'terminee' };
+    sv.observer({ joueurs: [1, 2, 3], restants: ['moi', 'a'], manche: m1, elimines: ['b'], etat: 'finManche' });
+    assert.strictEqual(sv.fini(), false);
+    sv.observer({ joueurs: [1, 2, 3], restants: ['moi', 'a'], manche: { sieges: ['a', 'moi'], qualifies: ['moi'], phase: 'jeu' }, elimines: ['b'], etat: 'manche' });
+    assert.strictEqual(sv.fini(), true);
+    const rv = sv.resultat();
+    assert.deepStrictEqual([rv.reussi, rv.gagne, rv.place, rv.score], [true, true, 1, 12], 'sorti 2e puis finale gagnée : 1 + 1 + 10');
+  });
+  await test('Fleuve : dur dès le bief 1, puis de plus en plus dur', () => {
+    const vise = (n) => FG.tauxVise(FG.noteVisee(n));
+    for (let n = 1; n <= FG.ETAPES_PAR_BIEF; n++) assert.ok(vise(n) <= 50, `étape ${n} : ${vise(n)} % visés, trop facile`);
+    assert.ok(vise(FG.ETAPES_PAR_BIEF * 9 + 1) < vise(1), 'le bief 10 plus dur que le bief 1');
+  });
+  await test('Fleuve : réglages vérifiés, fermé par défaut', async () => {
+    assert.strictEqual(srv.reglages.get('fleuve').etat, 'ferme');
+    assert.strictEqual((await regF('fleuve', { ...DEFAUTS.fleuve, etat: 'grand' })).statut, 400);
+    assert.strictEqual((await regF('fleuve', { ...DEFAUTS.fleuve, pagaies: 0 })).statut, 400);
+    assert.strictEqual((await regF('fleuveRecette', { ...FG.RECETTE_DEFAUT, etoiles: { deux: 10, trois: 40 } })).statut, 400);
+    assert.strictEqual((await regF('fleuveRecette', recetteRapide)).statut, 200);
+    assert.strictEqual((await api('/api/config')).json.fleuve, 'ferme');
+  });
+  let gF;
+  await test('Fleuve : l\'admin fabrique un bief, puis le publie dans l\'ordre', async () => {
+    assert.strictEqual((await api('/admin/api/fleuve/congo/biefs/2/publier', { methode: 'POST', jeton: adminJeton })).statut, 400);
+    const g = await api('/admin/api/fleuve/congo/biefs/1/generer', { methode: 'POST', jeton: adminJeton });
+    assert.strictEqual(g.statut, 200);
+    assert.strictEqual((await api('/admin/api/fleuve/congo/biefs/1/generer', { methode: 'POST', jeton: adminJeton })).statut, 409, 'pas deux fois en même temps');
+    let r;
+    for (let t = 0; t < 1200; t++) { r = (await api('/admin/api/fleuve', { jeton: adminJeton })).json; if (r.travaux['congo:1'].fini) break; await attendre(100); }
+    assert.strictEqual(r.travaux['congo:1'].erreur, null);
+    assert.strictEqual(r.fleuves.congo.biefs[0].etapes, 50);
+    const etapes = (await api('/admin/api/fleuve/congo/biefs/1', { jeton: adminJeton })).json;
+    assert.strictEqual(etapes.length, 50);
+    for (const e of etapes) {
+      assert.ok(e.d >= 1 && e.d <= 60 && e.joueurs >= 2 && e.texte, 'étape ' + e.numero);
+      assert.ok(e.seuils.deux >= 1 && e.seuils.trois >= e.seuils.deux, 'seuils ' + e.numero);
+    }
+    assert.ok(etapes[9].escale && etapes[9].ville === 'Banana');
+    assert.strictEqual((await api('/admin/api/fleuve/congo/biefs/2/publier', { methode: 'POST', jeton: adminJeton })).statut, 400, 'bief 2 pas fabriqué');
+    assert.strictEqual((await api('/admin/api/fleuve/congo/biefs/1/publier', { methode: 'POST', jeton: adminJeton })).statut, 200);
+    const m = await api('/admin/api/fleuve/congo/etapes/3/modifier', { methode: 'POST', jeton: adminJeton, corps: { d: 2 } });
+    assert.deepStrictEqual([m.statut, m.json.d, m.json.publie], [200, 2, true]);
+    assert.ok((await api('/admin/api/journal', { jeton: adminJeton })).json.some((x) => x.action === 'fleuve:publier'));
+  });
+  await test('Fleuve : les seuils d\'étoiles d\'avant sont recalculés une fois, jamais relevés', async () => {
+    const lire = async (n) => { const r = (await srv.base.query("SELECT recette, version FROM fleuve_etapes WHERE fleuve = 'congo' AND numero = $1", [n])).rows[0]; return { ...r, recette: typeof r.recette === 'string' ? JSON.parse(r.recette) : r.recette }; };
+    const avant = await lire(5);
+    assert.strictEqual(avant.recette.seuilsV, FG.SEUILS_VERSION, 'nouvelle étape : déjà au bon calcul');
+    // Une étape « d'avant » avec des seuils impossibles, et un joueur qui l'a réussie avec 1 étoile.
+    const { seuilsV, ...vieille } = avant.recette;
+    await srv.base.query("UPDATE fleuve_etapes SET recette = $1 WHERE fleuve = 'congo' AND numero = 5", [JSON.stringify({ ...vieille, seuils: { deux: 900, trois: 999 } })]);
+    const id = (await srv.base.query('SELECT id FROM comptes ORDER BY id LIMIT 1')).rows[0].id;
+    await srv.base.query("INSERT INTO fleuve_etoiles (compte_id, fleuve, numero, etoiles, score) VALUES ($1, 'congo', 5, 1, 500)", [id]);
+    const r = await srv.fleuve.recalculerSeuils();
+    assert.deepStrictEqual(r, { faites: 1, etoiles: 1 });
+    const apres = await lire(5);
+    assert.strictEqual(apres.version, avant.version, 'même étape, même version');
+    assert.strictEqual(apres.recette.seuilsV, FG.SEUILS_VERSION);
+    assert.ok(apres.recette.seuils.trois < 999 && apres.recette.seuils.deux <= apres.recette.seuils.trois, JSON.stringify(apres.recette.seuils));
+    assert.strictEqual((await srv.base.query("SELECT etoiles FROM fleuve_etoiles WHERE compte_id = $1 AND fleuve = 'congo' AND numero = 5", [id])).rows[0].etoiles, 3);
+    assert.deepStrictEqual(await srv.fleuve.recalculerSeuils(), { faites: 0, etoiles: 0 }, 'une seule fois');
+    await srv.base.query("DELETE FROM fleuve_etoiles WHERE compte_id = $1 AND fleuve = 'congo' AND numero = 5", [id]);
+  });
+  await test('Fleuve : une finale perdue d\'avance reçoit une donne gagnable au démarrage', async () => {
+    const FD = require('../src/fleuve-donne');
+    const lire = async (n) => { const r = (await srv.base.query("SELECT recette, version FROM fleuve_etapes WHERE fleuve = 'congo' AND numero = $1", [n])).rows[0]; return { ...r, recette: typeof r.recette === 'string' ? JSON.parse(r.recette) : r.recette }; };
+    const avant = await lire(6);
+    let g = 1;
+    while (FD.finaleOk({ ...avant.recette, graine: g })) g++;
+    await srv.base.query("UPDATE fleuve_etapes SET recette = $1 WHERE fleuve = 'congo' AND numero = 6", [JSON.stringify({ ...avant.recette, graine: g })]);
+    assert.deepStrictEqual(await srv.fleuve.reparerFinales(), { faites: 1 });
+    const apres = await lire(6);
+    assert.ok(FD.finaleOk(apres.recette) && apres.recette.graine !== g, 'nouvelle donne gagnable');
+    assert.strictEqual(apres.version, avant.version + 1);
+    assert.strictEqual(apres.recette.objectif.type, avant.recette.objectif.type, 'même objectif');
+    assert.deepStrictEqual(await srv.fleuve.reparerFinales(), { faites: 0 }, 'rien à refaire');
+  });
+  await test('Fleuve : fermé aux joueurs, puis aux testeurs, puis ouvert', async () => {
+    gF = await connexionG('sb-fleuve-a', { providerId: 'g-fleuve-a' });
+    assert.strictEqual((await api('/api/fleuve', { jeton: gF.jeton })).json.ouvert, false);
+    await assert.rejects(new Client(URL_.replace('http', 'ws')).create('fleuve', { jeton: gF.jeton, fleuve: 'congo', numero: 1 }), /bientôt/);
+    const jeux = srv.reglages.get('jeux');
+    await regF('jeux', { ...jeux, testeurs: [gF.compte.pseudo] });
+    await regF('fleuve', { ...DEFAUTS.fleuve, etat: 'testeurs' });
+    assert.strictEqual((await api('/api/fleuve', { jeton: gF.jeton })).json.ouvert, true, 'testeur');
+    await regF('jeux', jeux);
+    await regF('fleuve', { ...DEFAUTS.fleuve, etat: 'ouvert' });
+    const e = (await api('/api/fleuve', { jeton: gF.jeton })).json;
+    assert.deepStrictEqual([e.ouvert, e.pagaies.restantes, e.fleuves.congo.courante, e.fleuves.congo.etapes.length, e.fleuves.niger.courante], [true, 5, 1, 50, null]);
+    const d2 = (await api('/api/fleuve/congo/2', { jeton: gF.jeton })).json;
+    assert.match(d2.refus, /d'abord/);
+    assert.deepStrictEqual(d2.premierCoup, { joueurs: 0, pct: null }, 'étape toute neuve');
+    // « X % l'ont réussie du premier coup » : seul le premier essai de chacun compte, à partir de 5 joueurs.
+    const ids = (await srv.base.query('SELECT id FROM comptes ORDER BY id LIMIT 5')).rows.map((x) => x.id);
+    const essai = (id, statut) => srv.base.query("INSERT INTO fleuve_essais (compte_id, fleuve, numero, version, statut) VALUES ($1, 'congo', 3, 1, $2)", [id, statut]);
+    for (const [i, st] of [[0, 'reussi'], [1, 'rate'], [1, 'reussi'], [2, 'coupe'], [2, 'reussi'], [3, 'parti']]) await essai(ids[i], st);
+    assert.deepStrictEqual((await api('/api/fleuve/congo/3', { jeton: gF.jeton })).json.premierCoup, { joueurs: 4, pct: null }, 'moins de 5 joueurs');
+    await essai(ids[4], 'rate');
+    assert.deepStrictEqual((await api('/api/fleuve/congo/3', { jeton: gF.jeton })).json.premierCoup, { joueurs: 5, pct: 40 });
+    await srv.base.query("DELETE FROM fleuve_essais WHERE fleuve = 'congo' AND numero = 3");
+    const inv = await invite('SansGF' + Date.now() % 1000);
+    await assert.rejects(new Client(URL_.replace('http', 'ws')).create('fleuve', { jeton: inv.jeton, fleuve: 'congo', numero: 1 }), /Google/);
+    await assert.rejects(new Client(URL_.replace('http', 'ws')).create('fleuve', { jeton: gF.jeton, fleuve: 'congo', numero: 2 }), /d'abord/);
+  });
+  await test('Fleuve : une étape jouée dans la salle, jusqu\'au résultat', async () => {
+    const client = new Client(URL_.replace('http', 'ws'));
+    const salle = await client.create('fleuve', { jeton: gF.jeton, fleuve: 'congo', numero: 1, rapide: true });
+    let debut = null, fin = null, robots = 0, finDirect = null;
+    const directs = [];
+    salle.onMessage('erreur', () => {});
+    salle.onMessage('fleuve', (m) => { if (m.fin) { fin = m; finDirect = directs[directs.length - 1]; } else if (m.direct) directs.push(m.direct); else debut = m; });
+    salle.onMessage('vue', (v) => {
+      robots = v.joueurs.filter((j) => j.robot).length;
+      const a = v.manche && (v.manche.actions.find((x) => x.type === 'jouer') || v.manche.actions.find((x) => x.type !== 'katapss'));
+      if (v.etat === 'manche' && a) setTimeout(() => { try { salle.send('action', { action: a }); } catch (e) {} }, 1);
+    });
+    for (let t = 0; t < 1200 && !fin; t++) await attendre(50);
+    await salle.leave().catch(() => {});
+    assert.ok(debut && debut.etape.numero === 1 && debut.etape.texte, 'fenêtre de départ');
+    assert.ok(fin, 'résultat reçu');
+    assert.strictEqual(robots, debut.etape.joueurs - 1);
+    const e = (await api('/api/fleuve', { jeton: gF.jeton })).json;
+    // La jauge en direct : dès le départ, puis à chaque changement ; la dernière annonce le verdict de la fin.
+    assert.ok(directs.length >= 1 && directs[0].texte === debut.etape.texte && directs[0].seuils, 'jauge au départ');
+    assert.deepStrictEqual([finDirect.etat === 'ok', finDirect.score], [fin.reussi, fin.score], 'jauge = verdict');
+    assert.ok(directs.every((d, i) => i === 0 || d.score >= directs[i - 1].score), 'le score ne recule jamais');
+    // Premier essai sur l'étape : la fin le compare aux autres (étape toute neuve ici : pas encore de pourcentage).
+    assert.deepStrictEqual([fin.premierEssai, fin.premierCoup], [true, { joueurs: 1, pct: null }]);
+    if (fin.reussi) assert.deepStrictEqual([fin.etoiles >= 1, fin.pagaies.restantes, e.fleuves.congo.courante, fin.double, fin.pieces], [true, 5, 2, true, fin.etoiles * 10]);
+    else assert.deepStrictEqual([fin.etoiles, fin.pagaies.restantes, e.fleuves.congo.courante], [0, 4, 1]);
+  });
+  await test('Fleuve : jauge en direct, objectif en danger puis raté', () => {
+    const sv = FS.creerSuivi('a', { jeu: 'kopo', objectif: { type: 'ramasser', n: 1, m: 3 } });
+    const m = { sieges: ['a', 'b', 'c'], mains: { a: ['5C'], b: ['6C'], c: ['7C'] }, enJeu: ['a', 'b', 'c'], joueurCourant: 'b', qualifies: [] };
+    const s = { joueurs: [{ id: 'a' }, { id: 'b' }, { id: 'c' }], restants: ['a', 'b', 'c'], elimines: [], manche: m, etat: 'manche' };
+    sv.observer(s);
+    assert.deepStrictEqual(sv.direct(), { score: 0, prog: 'ramassé 0/1', val: 0, etat: 'en_cours' });
+    sv.surAction(s, m, { joueur: 'a', type: 'ramasser' }, null, 'a'); sv.observer(s);
+    assert.strictEqual(sv.direct().etat, 'danger');
+    m.qualifies = [{ joueur: 'a' }]; sv.observer(s);
+    assert.deepStrictEqual(sv.direct(), { score: 2, prog: 'ramassé 1/1', val: 0.33, etat: 'danger' });
+    sv.surAction(s, m, { joueur: 'a', type: 'ramasser' }, null, 'a'); sv.observer(s);
+    assert.deepStrictEqual(sv.direct(), { score: 2, prog: 'ramassé 2/1', val: 0.33, etat: 'rate' });
+    const q = FS.creerSuivi('a', { jeu: 'kopo', objectif: { type: 'manches', n: 1 } });
+    const m2 = { ...m, qualifies: [] }; q.observer({ ...s, manche: m2 });
+    assert.deepStrictEqual(q.direct(), { score: 0, prog: '0/1', val: 0, etat: 'en_cours' });
+    m2.qualifies = [{ joueur: 'b' }, { joueur: 'a' }]; q.observer({ ...s, manche: m2 });
+    assert.deepStrictEqual(q.direct(), { score: 1, prog: '1/1 ✓', val: 1, etat: 'ok' });
+  });
+  await test('Fleuve : une étape du Niger (Inter (8)) jouée dans la salle', async () => {
+    const e = await FG.fabriquerEtape('niger', 1, { recette: recetteRapide, graine: 12345 });
+    await srv.base.query('INSERT INTO fleuve_etapes (fleuve, numero, bief, recette, publie) VALUES ($1, 1, 1, $2, true)', ['niger', JSON.stringify(e)]);
+    const client = new Client(URL_.replace('http', 'ws'));
+    const salle = await client.create('fleuve', { jeton: gF.jeton, fleuve: 'niger', numero: 1, rapide: true });
+    let debut = null, fin = null, jeu = null;
+    salle.onMessage('erreur', () => {});
+    salle.onMessage('fleuve', (m) => { if (m.fin) fin = m; else if (!m.direct) debut = m; });
+    salle.onMessage('vue', (v) => {
+      jeu = v.jeu || jeu;
+      const a = v.manche && v.manche.actions && (v.manche.actions.find((x) => x.type === 'jouer') || v.manche.actions[0]);
+      if (v.etat === 'manche' && a) setTimeout(() => { try { salle.send('action', { action: a }); } catch (er) {} }, 1);
+    });
+    for (let t = 0; t < 1200 && !fin; t++) await attendre(50);
+    await salle.leave().catch(() => {});
+    assert.ok(debut && fin, 'départ et résultat');
+    assert.deepStrictEqual([jeu, debut.etape.jeu, fin.fleuve], ['inter8', 'inter8', 'niger']);
+    await srv.base.query("DELETE FROM fleuve_pagaies WHERE compte_id = $1", [gF.compte.id]);
+  });
+  await test('Fleuve : quitter = une pagaie perdue ; pas de pagaie, pas d\'étape', async () => {
+    const avant = (await api('/api/fleuve', { jeton: gF.jeton })).json;
+    const n = avant.fleuves.congo.courante;
+    const salle = await new Client(URL_.replace('http', 'ws')).create('fleuve', { jeton: gF.jeton, fleuve: 'congo', numero: n });
+    salle.onMessage('vue', () => {}); salle.onMessage('fleuve', () => {}); salle.onMessage('erreur', () => {});
+    await attendre(150);
+    await assert.rejects(new Client(URL_.replace('http', 'ws')).create('fleuve', { jeton: gF.jeton, fleuve: 'congo', numero: n }), /en cours/);
+    await salle.leave(true);
+    await attendre(300);
+    const apres = (await api('/api/fleuve', { jeton: gF.jeton })).json;
+    assert.strictEqual(apres.pagaies.restantes, avant.pagaies.restantes - 1);
+    await srv.base.query('UPDATE fleuve_pagaies SET perdues = 5 WHERE compte_id = $1', [gF.compte.id]);
+    await assert.rejects(new Client(URL_.replace('http', 'ws')).create('fleuve', { jeton: gF.jeton, fleuve: 'congo', numero: n }), /repose/);
+    await srv.base.query('DELETE FROM fleuve_pagaies WHERE compte_id = $1', [gF.compte.id]);
+  });
+  await test('Fleuve : acheter une pagaie quand on n\'en a plus (100, 200, 400 pièces, pièces détruites)', async () => {
+    const g = await connexionG('sb-fleuve-p', { providerId: 'g-fleuve-p' });
+    const achat = () => api('/api/fleuve/pagaie', { methode: 'POST', jeton: g.jeton });
+    const e0 = (await api('/api/fleuve', { jeton: g.jeton })).json;
+    assert.deepStrictEqual([e0.pagaies.restantes, e0.pagaies.max, e0.pagaies.prix], [5, 5, 100]);
+    assert.strictEqual((await achat()).statut, 409, 'il reste des pagaies');
+    await srv.base.query('INSERT INTO fleuve_pagaies (compte_id, jour, perdues) VALUES ($1, $2, 5)', [g.compte.id, require('../src/match-jour').jourDe(new Date())]);
+    await srv.base.query('UPDATE comptes SET solde = 650 WHERE id = $1', [g.compte.id]);
+    const a1 = await achat();
+    assert.strictEqual(a1.statut, 200);
+    assert.deepStrictEqual([a1.json.paye, Number(a1.json.solde), a1.json.pagaies.restantes, a1.json.pagaies.max, a1.json.pagaies.prix], [100, 550, 1, 6, 200]);
+    assert.strictEqual((await achat()).statut, 409, 'une à la fois');
+    await srv.base.query('UPDATE fleuve_pagaies SET perdues = 6 WHERE compte_id = $1', [g.compte.id]);
+    assert.strictEqual((await achat()).json.paye, 200);
+    await srv.base.query('UPDATE fleuve_pagaies SET perdues = 7 WHERE compte_id = $1', [g.compte.id]);
+    const pauvre = await achat();
+    assert.deepStrictEqual([pauvre.statut, /400 pièces/.test(pauvre.json.erreur)], [400, true], 'solde 350 < 400');
+    await srv.base.query('UPDATE comptes SET solde = 1000 WHERE id = $1', [g.compte.id]);
+    const a3 = await achat();
+    assert.deepStrictEqual([a3.json.paye, Number(a3.json.solde), a3.json.pagaies.prix], [400, 600, null]);
+    await srv.base.query('UPDATE fleuve_pagaies SET perdues = 8 WHERE compte_id = $1', [g.compte.id]);
+    assert.strictEqual((await achat()).statut, 403, '3 par jour au plus');
+    const reg = (await srv.base.query("SELECT sum(montant)::int AS n FROM registre_pieces WHERE compte_id = $1 AND motif = 'pagaie'", [g.compte.id])).rows[0].n;
+    assert.strictEqual(reg, -700);
+    // Pas en vente (prix à 0) ; compte invité refusé.
+    await srv.reglages.ecrire('fleuve', { ...srv.reglages.get('fleuve'), prixPagaie1: 0 });
+    assert.strictEqual((await api('/api/fleuve', { jeton: g.jeton })).json.pagaies.prix, null);
+    const inv = await invite('SansGP' + Date.now() % 1000);
+    assert.strictEqual((await api('/api/fleuve/pagaie', { methode: 'POST', jeton: inv.jeton })).statut, 403);
+    await srv.reglages.ecrire('fleuve', { ...srv.reglages.get('fleuve'), prixPagaie1: 100 });
+  });
+  await test('Fleuve : étoiles et pièces (doublées au premier succès du jour), escale fermée sans assez d\'étoiles', async () => {
+    const F = srv.fleuve;
+    const g = await connexionG('sb-fleuve-b', { providerId: 'g-fleuve-b' });
+    const c = await srv.comptes.statut(g.compte.id);
+    const solde0 = Number(c.solde);
+    const seuils = (await api('/admin/api/fleuve/congo/biefs/1', { jeton: adminJeton })).json.map((x) => x.seuils);
+    const jouer = async (n, score) => { const d = await F.commencer(c, 'congo', n); return F.terminer(c.id, d.essai, { reussi: true, score }); };
+    const r1 = await jouer(1, seuils[0].trois);
+    assert.deepStrictEqual([r1.etoiles, r1.double, r1.pieces, r1.nouvelles], [3, true, 30, 3]);
+    const r2 = await jouer(2, 0);
+    assert.deepStrictEqual([r2.etoiles, r2.double, r2.pieces], [1, false, 5]);
+    const r2b = await jouer(2, seuils[1].trois); // rejouer pour la 3e étoile : seulement les étoiles nouvelles
+    assert.deepStrictEqual([r2b.etoiles, r2b.pieces, r2b.premiereFois], [3, 10, false]);
+    const rate = await F.terminer(c.id, (await F.commencer(c, 'congo', 3)).essai, { reussi: false, score: 50 });
+    assert.deepStrictEqual([rate.etoiles, rate.pieces, rate.pagaies.restantes], [0, 0, 4]);
+    for (let n = 3; n <= 9; n++) await jouer(n, 0);
+    assert.strictEqual(Number((await srv.comptes.statut(c.id)).solde), solde0 + 30 + 5 + 10 + 7 * 5);
+    await assert.rejects(F.commencer(c, 'congo', 10), /20 étoiles/);
+    const d = (await api('/api/fleuve/congo/10', { jeton: g.jeton })).json;
+    assert.deepStrictEqual([d.escale, d.villeEtoiles, d.ville], [true, 13, 'Banana']);
+    await srv.reglages.ecrire('fleuve', { ...srv.reglages.get('fleuve'), etoilesVille: 13 });
+    const boss = await jouer(10, 0);
+    assert.deepStrictEqual([boss.escale, boss.piecesEscale, boss.pieces], [true, 200, 205]);
+    await srv.reglages.ecrire('fleuve', { ...DEFAUTS.fleuve, etat: 'ouvert' });
+    const reg = (await srv.base.query("SELECT count(*)::int AS n FROM registre_pieces WHERE compte_id = $1 AND motif = 'fleuve'", [c.id])).rows[0].n;
+    assert.strictEqual(reg, 11);
+  });
+  await test('Fleuve : bloqué 5 jours sur une étape, les robots baissent d\'un cran', async () => {
+    const F = srv.fleuve;
+    const g = await connexionG('sb-fleuve-c', { providerId: 'g-fleuve-c' });
+    const c = await srv.comptes.statut(g.compte.id);
+    const maintenant = Date.now();
+    for (let j = 5; j >= 1; j--) {
+      F.regler(() => new Date(maintenant - j * 864e5));
+      const d = await F.commencer(c, 'congo', 1);
+      assert.strictEqual(d.adoucir, 0);
+      await F.terminer(c.id, d.essai, { reussi: false, score: 0 });
+    }
+    F.regler(() => new Date(maintenant));
+    const d = await F.commencer(c, 'congo', 1);
+    assert.strictEqual(d.adoucir, 10);
+    await F.annuler(c.id, d.essai);
+    await srv.reglages.ecrire('fleuve', { ...DEFAUTS.fleuve });
+  });
+  await test('Fleuve : amis sur la carte, dépassement (une alerte par jour), 1er à l\'escale, course de la semaine', async () => {
+    const F = srv.fleuve;
+    await srv.reglages.ecrire('fleuve', { ...DEFAUTS.fleuve, etat: 'ouvert', etoilesVille: 0 });
+    const maintenant = Date.now();
+    F.regler(() => new Date(maintenant));
+    const ga = await connexionG('sb-fleuve-d', { providerId: 'g-fleuve-d' }), gb = await connexionG('sb-fleuve-e', { providerId: 'g-fleuve-e' }), gc = await connexionG('sb-fleuve-f', { providerId: 'g-fleuve-f' });
+    await devenirAmis(ga, gb); await devenirAmis(ga, gc);
+    const A = await srv.comptes.statut(ga.compte.id), B = await srv.comptes.statut(gb.compte.id);
+    const jouer = async (c, n, score = 0) => { const d = await F.commencer(c, 'congo', n); return F.terminer(c.id, d.essai, { reussi: true, score }); };
+    for (let n = 1; n <= 3; n++) await jouer(B, n);
+    for (let n = 1; n <= 3; n++) assert.deepStrictEqual((await jouer(A, n)).depasses, [], 'B est devant');
+    const r4 = await jouer(A, 4);
+    assert.deepStrictEqual(r4.depasses, [B.pseudo]);
+    await attendre(300);
+    const notifsB = async () => (await srv.base.query("SELECT texte, donnees FROM notifications WHERE compte_id = $1 AND type = 'fleuve' ORDER BY id", [B.id])).rows;
+    let nb = await notifsB();
+    assert.strictEqual(nb.length, 1);
+    assert.match(nb[0].texte, new RegExp(A.pseudo + ' t\'a dépassé sur le Congo \\(étape 4\\)'));
+    await jouer(B, 4);
+    assert.deepStrictEqual((await jouer(A, 5)).depasses, [B.pseudo], 'dépassé encore');
+    await attendre(300);
+    assert.strictEqual((await notifsB()).length, 1, 'une seule alerte par jour');
+    // Ce que voit A : B sur la carte, la course de la semaine.
+    const e = (await api('/api/fleuve', { jeton: ga.jeton })).json.fleuves.congo;
+    const b = e.amis.find((x) => x.id === B.id);
+    assert.deepStrictEqual([e.amis.length, b.n, b.etoiles], [1, 5, 4], 'C n\'a pas commencé : absent');
+    assert.deepStrictEqual(e.course.lignes.map((l) => [l.pseudo, l.etoiles]), [[A.pseudo, 5], [B.pseudo, 4]]);
+    assert.strictEqual(e.course.pieces, 300);
+    // 1er à l'escale : A passe Banana avant ses amis ; B ensuite ne l'a pas.
+    for (let n = 6; n <= 9; n++) await jouer(A, n);
+    const boss = await jouer(A, 10);
+    assert.strictEqual(boss.premierA, 'Banana');
+    for (let n = 5; n <= 10; n++) await jouer(B, n);
+    assert.strictEqual((await srv.base.query("SELECT count(*)::int AS n FROM fleuve_marques WHERE compte_id = $1 AND type = 'premier'", [B.id])).rows[0].n, 0);
+    assert.deepStrictEqual((await api('/api/fleuve', { jeton: ga.jeton })).json.fleuves.congo.marques.premiers, ['1er à Banana']);
+    // Alertes coupées dans les paramètres : plus rien.
+    await api('/api/push/prefs', { methode: 'PATCH', jeton: gb.jeton, corps: { fleuve: false } });
+    // Fin de la semaine : A (10 étoiles) bat B (10 aussi : ex æquo, les deux gagnent) ; C n'a pas couru.
+    await jouer(A, 1, 999); // 3 étoiles sur l'étape 1 : 2 étoiles nouvelles de plus pour A
+    const soldeA = Number((await srv.comptes.statut(A.id)).solde), soldeB = Number((await srv.comptes.statut(B.id)).solde);
+    F.regler(() => new Date(maintenant + 7 * 864e5));
+    const faits = await F.reglerCourses();
+    const congo = faits.find((x) => x.fleuve === 'congo');
+    assert.deepStrictEqual(congo.gagnants.map((g) => g.id), [A.id]);
+    assert.strictEqual(Number((await srv.comptes.statut(A.id)).solde), soldeA + 300);
+    assert.strictEqual(Number((await srv.comptes.statut(B.id)).solde), soldeB);
+    assert.deepStrictEqual(await F.reglerCourses(), [], 'une seule fois');
+    const ea = (await api('/api/fleuve', { jeton: ga.jeton })).json.fleuves.congo;
+    assert.deepStrictEqual([ea.marques.pagayeur, ea.course.lignes.map((l) => l.etoiles)], [true, [0]], 'nouvelle semaine');
+    assert.ok((await srv.base.query("SELECT 1 FROM notifications WHERE compte_id = $1 AND type = 'fleuve' AND donnees->>'course' = 'true'", [A.id])).rows.length);
+    F.regler(() => new Date());
+    await srv.reglages.ecrire('fleuve', { ...DEFAUTS.fleuve });
+  });
+
+  await test('Fleuve : le lancement ferme la Bande (mises rendues), arrête le Match du jour, ouvre le Fleuve, une seule fois', async () => {
+    const F = srv.fleuve;
+    const ga = await connexionG('sb-fleuve-g', { providerId: 'g-fleuve-g' }), gb = await connexionG('sb-fleuve-h', { providerId: 'g-fleuve-h' });
+    const lundi = require('../src/match-jour').lundiDe(require('../src/match-jour').jourDe(new Date()));
+    await srv.base.query("INSERT INTO bandes (id, nom, code, createur, mise) VALUES ('b-lance', 'Les Pagayeurs', 'LANCE1', $1, 700)", [ga.compte.id]);
+    await srv.base.query("INSERT INTO bande_semaines (bande_id, semaine, mise) VALUES ('b-lance', $1, 700)", [lundi]);
+    for (const g of [ga, gb]) {
+      await srv.base.query("INSERT INTO bande_inscriptions (bande_id, semaine, compte_id, mise) VALUES ('b-lance', $1, $2, 700)", [lundi, g.compte.id]);
+    }
+    const solde = async (g) => Number((await srv.comptes.statut(g.compte.id)).solde);
+    const avantA = await solde(ga);
+    assert.strictEqual((await api('/admin/api/fleuve/lancer', { methode: 'POST', jeton: adminJeton, corps: {} })).statut, 400, 'confirmation obligatoire');
+    const r = await api('/admin/api/fleuve/lancer', { methode: 'POST', jeton: adminJeton, corps: { confirmation: 'LANCER' } });
+    assert.strictEqual(r.statut, 200);
+    assert.ok(r.json.joueurs >= 2 && r.json.pieces >= 1400);
+    assert.strictEqual(await solde(ga), avantA + 700);
+    assert.strictEqual((await srv.base.query("SELECT statut FROM bande_semaines WHERE bande_id = 'b-lance'")).rows[0].statut, 'annulee');
+    assert.deepStrictEqual([srv.reglages.get('bande').actif, srv.reglages.get('matchJour').actif, srv.reglages.get('fleuve').etat], [false, false, 'ouvert']);
+    const cfg = (await api('/api/config')).json;
+    assert.deepStrictEqual([cfg.fleuve, cfg.nouveaute, !!cfg.fleuveLance], ['ouvert', 'fleuve', true]);
+    assert.strictEqual((await api('/api/fleuve', { jeton: gb.jeton })).json.rembourse, 700);
+    await attendre(200);
+    assert.ok((await srv.base.query("SELECT 1 FROM notifications WHERE compte_id = $1 AND type = 'bande' AND donnees->>'fermeture' = 'true'", [gb.compte.id])).rows.length);
+    assert.strictEqual((await api('/admin/api/fleuve/lancer', { methode: 'POST', jeton: adminJeton, corps: { confirmation: 'LANCER' } })).statut, 409, 'une seule fois');
+    // Les réglages gardent la date du lancement quand l'admin change autre chose.
+    await api('/admin/api/reglages/fleuve', { methode: 'PUT', jeton: adminJeton, corps: { valeur: { ...DEFAUTS.fleuve, etat: 'ouvert', pagaies: 6 } } });
+    assert.ok(srv.reglages.get('fleuve').lance);
+    assert.ok((await api('/admin/api/journal', { jeton: adminJeton })).json.some((x) => x.action === 'fleuve:lancer'));
+  });
+  await test('Fleuve : chaque fleuve a son interrupteur (Kasaï, Oubangui, Nil éteints au départ)', async () => {
+    const g = await connexionG('sb-fleuve-i', { providerId: 'g-fleuve-i' });
+    const { VILLES, NOMS } = require('../src/fleuve');
+    assert.deepStrictEqual(Object.keys(require('../src/fleuve-generateur').FLEUVES), ['congo', 'niger', 'kasai', 'oubangui', 'nil']);
+    assert.deepStrictEqual(Object.keys(NOMS), Object.keys(VILLES));
+    assert.deepStrictEqual([VILLES.kasai[0], VILLES.oubangui[6], VILLES.nil[VILLES.nil.length - 1]], ['Kwamouth', 'Bangui', 'Jinja']);
+    let e = (await api('/api/fleuve', { jeton: g.jeton })).json;
+    assert.deepStrictEqual(Object.keys(e.fleuves), ['congo', 'niger'], 'les nouveaux fleuves sont éteints');
+    let r = await api('/api/fleuve/kasai/1', { jeton: g.jeton });
+    assert.strictEqual(r.statut, 403); assert.match(r.json.erreur, /Kasaï ouvre bientôt/);
+    const reg = srv.reglages.get('fleuve');
+    assert.strictEqual((await api('/admin/api/reglages/fleuve', { methode: 'PUT', jeton: adminJeton, corps: { valeur: { ...reg, fleuves: { kasai: 'allume' } } } })).statut, 400);
+    assert.strictEqual((await api('/admin/api/reglages/fleuve', { methode: 'PUT', jeton: adminJeton, corps: { valeur: { ...reg, fleuves: { amazone: 'ouvert' } } } })).statut, 400);
+    assert.strictEqual((await api('/admin/api/reglages/fleuve', { methode: 'PUT', jeton: adminJeton, corps: { valeur: { ...reg, fleuves: { kasai: 'ouvert' } } } })).statut, 200);
+    assert.deepStrictEqual(srv.reglages.get('fleuve').fleuves, { congo: 'ouvert', niger: 'ouvert', kasai: 'ouvert', oubangui: 'ferme', nil: 'ferme' }, 'les autres gardent leur état');
+    e = (await api('/api/fleuve', { jeton: g.jeton })).json;
+    assert.deepStrictEqual(Object.keys(e.fleuves), ['congo', 'niger', 'kasai']);
+    assert.deepStrictEqual([e.fleuves.kasai.nom, e.fleuves.kasai.jeu, e.fleuves.kasai.ville], ['Kasaï', 'kopo', 'Kwamouth']);
+    // Testeurs : seulement les pseudos de la liste.
+    await api('/admin/api/reglages/fleuve', { methode: 'PUT', jeton: adminJeton, corps: { valeur: { ...srv.reglages.get('fleuve'), fleuves: { kasai: 'ferme', nil: 'testeurs' } } } });
+    assert.deepStrictEqual(Object.keys((await api('/api/fleuve', { jeton: g.jeton })).json.fleuves), ['congo', 'niger']);
+    const adm = (await api('/admin/api/fleuve', { jeton: adminJeton })).json;
+    assert.deepStrictEqual([adm.fleuves.nil.etat, adm.fleuves.nil.villes, adm.fleuves.kasai.etat], ['testeurs', 15, 'ferme']);
+    await api('/admin/api/reglages/fleuve', { methode: 'PUT', jeton: adminJeton, corps: { valeur: { ...srv.reglages.get('fleuve'), fleuves: { nil: 'ferme' } } } });
   });
   await srv.arreter();
   console.log(`\n${reussis} tests réussis, ${echecs} en échec.`);
