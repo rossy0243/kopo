@@ -45,7 +45,7 @@ Documentation de l'API pour l'appli mobile (Flutter) : [docs/api/](docs/api/) (O
 - `src/kopo-retention.js` : XP, niveau, stats, face-à-face, missions, défi, bienvenue, joker, collection (calculés sur le téléphone, dans `kopo-profil`) et ses tests.
 - `src/kopo-sons.js` : effets sonores et musique d'ambiance, synthétisés en Web Audio.
 - `src/source.html` : écrans et réseau.
-- `vendor/` : MQTT.js, colyseus.js, PeerJS et qrcode-generator (licences MIT), et LiveKit (`livekit-client.umd.js`, Apache 2.0, servi par le serveur sur `/vendor/livekit-client.js` et chargé seulement quand un abonné ouvre le micro).
+- `vendor/` : MQTT.js (servi par le serveur sur `/vendor/mqtt.js` et chargé seulement en mode relais, sans serveur de jeu), colyseus.js et qrcode-generator (licences MIT), et LiveKit (`livekit-client.umd.js`, Apache 2.0, servi par le serveur sur `/vendor/livekit-client.js` et chargé seulement quand un abonné ouvre le micro).
 
 ## Serveur
 Quand une adresse de serveur est renseignée (`SERVEUR_PAR_DEFAUT` dans `src/source.html`, ou `?serveur=http://localhost:2567` dans l'adresse de la page, pour les essais : seuls `localhost` et `127.0.0.1` sont acceptés), les parties, la mise en relation et le compteur en ligne passent par le serveur (`server/`). Sans adresse, le jeu garde le mode relais MQTT.

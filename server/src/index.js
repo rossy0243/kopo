@@ -130,6 +130,8 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
   app.get('/api/openapi.yaml', (req, res) => { res.type('application/yaml'); res.sendFile(path.join(__dirname, '..', '..', 'docs', 'api', 'openapi.yaml')); });
   // Bibliothèque du micro pour le site (LiveKit, Apache 2.0) : chargée seulement quand un abonné ouvre le micro.
   app.get('/vendor/livekit-client.js', (req, res) => { res.set('Cache-Control', 'public, max-age=604800'); res.type('application/javascript'); res.sendFile(path.join(__dirname, '..', '..', 'vendor', 'livekit-client.umd.js')); });
+  // Relais MQTT (MIT) : n'est plus dans la page du site, chargé seulement en mode de secours sans serveur de jeu.
+  app.get('/vendor/mqtt.js', (req, res) => { res.set('Cache-Control', 'public, max-age=604800'); res.type('application/javascript'); res.sendFile(path.join(__dirname, '..', '..', 'vendor', 'mqtt.min.js')); });
   app.use('/api/v1', routes);
   app.use('/api', routes);
   app.use('/admin/api', routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainage, bande, fleuve, push, stickers, bouquets, abonnement, salles, demarrage: Date.now() }));

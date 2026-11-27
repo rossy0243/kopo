@@ -1320,8 +1320,9 @@ class App extends ChangeNotifier {
       if (suiteAuto == null) return;
       if (fenetreType != 'recap') { arreterSuiteAuto(); return; }
       if (DateTime.now().isAfter(fin)) { partieSuivante(v['taille'] as int, v['jeu'] as String?); return; }
-      maj();
+      // Pas de maj() ici : le décompte « Prochaine partie dans… » se redessine seul, sans reconstruire tout l'écran 4 fois par seconde.
     }));
+    maj(); // une fois, pour afficher le décompte
   }
   void partieSuivante(int taille, String? j) {
     arreterSuiteAuto();

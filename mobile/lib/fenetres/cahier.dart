@@ -746,18 +746,27 @@ class _Decompte extends StatefulWidget {
 }
 
 class _DecompteState extends State<_Decompte> {
-  late final Timer _t = Timer.periodic(const Duration(milliseconds: 250), (_) {
-    if (mounted) setState(() {});
-  });
+  // Redessin seulement quand la seconde change, arrêt à zéro (relancé au prochain affichage s'il reste du temps).
+  Timer? _t;
+  int _s = -1;
+  void _tic(Timer t) {
+    if (!mounted) return;
+    final ms = app.resteChrono;
+    if (ms <= 0) t.cancel();
+    if ((ms / 1000).ceil() != _s) setState(() {});
+  }
+
   @override
   void dispose() {
-    _t.cancel();
+    _t?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    _t.isActive;
-    return widget.builder((app.resteChrono / 1000).ceil());
+    final ms = app.resteChrono;
+    if (ms > 0 && !(_t?.isActive ?? false)) _t = Timer.periodic(const Duration(milliseconds: 250), _tic);
+    _s = (ms / 1000).ceil();
+    return widget.builder(_s);
   }
 }
