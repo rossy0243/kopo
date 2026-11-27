@@ -3,10 +3,13 @@
   "short_name": "Masano",
   "description": "Kopo et Inter (8), jeux de cartes entre amis ou en ligne.",
   "lang": "fr",
+  "id": "./",
   "start_url": "./",
   "scope": "./",
   "display": "fullscreen",
   "orientation": "any",
+  "launch_handler": { "client_mode": ["focus-existing", "auto"] },
+  "handle_links": "preferred",
   "background_color": "#10233a",
   "theme_color": "#10233a",
   "icons": [

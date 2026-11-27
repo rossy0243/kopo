@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.masano.masano",
+      "sha256_cert_fingerprints": [
+        "2B:1C:A9:47:BA:61:1D:1B:12:D2:C0:A9:36:DD:A2:23:53:A8:61:58:10:AD:4D:78:0C:7E:E6:01:96:F8:E5:2A"
+      ]
+    }
+  }
+]

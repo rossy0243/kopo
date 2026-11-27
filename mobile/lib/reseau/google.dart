@@ -34,13 +34,13 @@ class Google {
       if (_iPhone) closeInAppWebView().catchError((_) {});
       app.toast('Connexion Google annulée.', Niv.alerte);
     }
-    // Liens du site : ?parrain=CODE, ?bande=CODE, #CODE (une table).
-    final q = u.queryParameters;
-    final parrain = (q['parrain'] ?? '').toUpperCase();
-    if (RegExp(r'^[A-Z0-9]{6}$').hasMatch(parrain)) app.noterParrain(parrain);
-    final bande = (q['bande'] ?? '').toUpperCase();
-    if (RegExp(r'^[A-Z0-9]{6}$').hasMatch(bande)) app.noterBande(bande);
+    // Liens du jeu (https://masano.online/kopo/#CODE, ?bande=, ?parrain=…, ou masano://ouvrir?… depuis le bandeau
+    // « Ouvrir dans l'appli » du site) : traités par les fenêtres (branchement.dart).
+    if (u.scheme == 'masano' || (u.scheme == 'https' && RegExp(r'^(www\.)?masano\.online$').hasMatch(u.host)) || kIsWeb) surLienJeu?.call(u);
   }
+
+  /// Branché par les fenêtres : un lien du jeu a ouvert l'appli (ou l'a remise devant).
+  static void Function(Uri)? surLienJeu;
 
   /// Sur iPhone, la page Google s'ouvre dans l'appli (fenêtre Safari intégrée) et se referme au retour :
   /// Apple refuse les applis qui envoient le joueur dans Safari pour se connecter (règle 4.0).

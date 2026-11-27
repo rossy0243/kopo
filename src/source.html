@@ -2153,6 +2153,8 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   const prefs = Object.assign({}, PREFS_DEFAUT, stock.lire('kopo-prefs') || {});
   // La musique des menus était coupée par défaut : on l'allume une fois pour tous (le joueur peut la recouper).
   if (!prefs.musiqueMenus) { prefs.musique = true; prefs.musiqueMenus = 1; try { stock.ecrire('kopo-prefs', prefs); } catch (e) {} }
+  // Adresse d'ouverture, gardée avant que les liens reçus (?parrain=, ?bande=, ?jeu=, #CODE) ne soient retirés de la barre.
+  const ADRESSE_OUVERTURE = location.href;
   // Retour de la connexion Google (Supabase) : le jeton arrive dans l'adresse (#access_token=…).
   // On le met de côté et on nettoie l'adresse avant que le jeu ne lise un code de partie.
   const retourGoogle = /access_token=/.test(location.hash);
@@ -8421,6 +8423,74 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     ouvrirFenetre([el('h2', null, 'Installer Masano'), el('p', null, 'Mets Masano sur ton écran d\'accueil : il s\'ouvre d\'un geste, en plein écran, comme une appli.'), el('p', null, texteCadeauInstallation()), oui, tard, non]);
     return true;
   }
+  // ------------------------------------------------------------------ liens du jeu → appli ou PWA
+  // Un lien du jeu (table #CODE, ?bande=, ?parrain=, kopo/, inter8/) doit ouvrir l'appli ou le jeu installé :
+  // - l'appli Android le prend d'elle-même (App Links, vérifiés par .well-known/assetlinks.json) ;
+  // - le jeu installé (PWA) aussi sur Android (« handle_links » du manifest) ; s'il est déjà ouvert,
+  //   « launch_handler: focus-existing » le remet devant SANS recharger la page, et lireLienRecu() fait le reste ;
+  // - ouvert malgré tout dans un navigateur Android (Facebook, Messenger…) : un bandeau « Ouvrir dans l'appli ».
+  // iPhone : Apple n'ouvre jamais le jeu installé depuis un lien (toujours Safari), on n'y peut rien.
+  const ANDROID = /Android/i.test(navigator.userAgent);
+  function lienDuJeuRecu(adresse) {
+    let u; try { u = new URL(adresse); } catch (e) { return null; }
+    const q = u.searchParams, code = (u.hash.slice(1) || q.get('code') || '').toUpperCase();
+    const jeuChemin = /\/inter8\/?$/.test(u.pathname) ? 'inter8' : /\/kopo\/?$/.test(u.pathname) ? 'kopo' : null;
+    const l = {
+      jeu: ['kopo', 'inter8'].includes(q.get('jeu')) ? q.get('jeu') : jeuChemin,
+      code: /^[A-Z]{4}$/.test(code) ? code : null,
+      bande: /^[A-Z0-9]{6}$/.test((q.get('bande') || '').toUpperCase()) ? q.get('bande').toUpperCase() : null,
+      parrain: /^[A-Z0-9]{6}$/.test((q.get('parrain') || '').toUpperCase()) ? q.get('parrain').toUpperCase() : null,
+    };
+    return l.jeu || l.code || l.bande || l.parrain ? l : null;
+  }
+  // PWA déjà ouverte, remise devant par un lien : même effet qu'à l'ouverture, sans couper la partie en cours.
+  function lireLienRecu(l) {
+    if (l.parrain && !stock.lire('kopo-parrain')) stock.ecrire('kopo-parrain', { code: l.parrain, le: Date.now() });
+    const surAccueil = !$('ecranAccueil').hidden;
+    if (l.jeu && surAccueil) { stock.ecrire('kopo-jeu', l.jeu); majChoixJeu(); }
+    if (l.bande) { stock.ecrire('kopo-bande-lien', { code: l.bande, le: Date.now() }); lienBandeVu = false; setTimeout(proposerLienBande, 300); }
+    if (l.code) {
+      if (!surAccueil) toast(`Invitation à la table ${l.code} : termine ta partie d'abord.`, 'alerte');
+      else { $('codeRejoindre').value = l.code; $('voileRejoindre').hidden = false; }
+    }
+  }
+  if ('launchQueue' in window) {
+    let premier = true;
+    window.launchQueue.setConsumer((p) => {
+      const adresse = p && p.targetURL, deja = premier && adresse === ADRESSE_OUVERTURE;
+      premier = false;
+      if (!adresse || deja) return; // l'ouverture elle-même : déjà lue au démarrage
+      const l = lienDuJeuRecu(adresse);
+      if (l) lireLienRecu(l);
+    });
+  }
+  // Navigateur Android avec un lien du jeu : bandeau pour passer dans l'appli Masano (si elle n'est pas
+  // installée, Android ouvre la page de téléchargement app.masano.online à la place).
+  (function bandeauAppli() {
+    const l = lienDuJeuRecu(ADRESSE_OUVERTURE);
+    if (!l || !ANDROID || LANCE_ICONE || DANS_APPLI_NATIVE || ANCIENNE_PAGE) return;
+    const vu = stock.lire('kopo-bandeau-appli');
+    if (vu && Date.now() - vu < 3 * 864e5) return; // fermé il y a moins de 3 jours
+    const q = new URLSearchParams();
+    for (const k of ['jeu', 'code', 'bande', 'parrain']) if (l[k]) q.set(k, l[k]);
+    const lien = 'intent://ouvrir?' + q + '#Intent;scheme=masano;package=com.masano.masano;S.browser_fallback_url='
+      + encodeURIComponent('https://app.masano.online/') + ';end';
+    const b = el('div', 'bandeau-appli');
+    b.style.cssText = 'position:fixed;left:12px;right:12px;top:calc(env(safe-area-inset-top) + 10px);z-index:9000;display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:#10233a;border:1px solid #e2b04a;box-shadow:0 8px 24px rgba(0,0,0,.45);color:#eef2f7;font-size:14px';
+    const a = el('a', null, 'Ouvrir dans l\'appli');
+    a.href = lien;
+    a.style.cssText = 'margin-left:auto;padding:8px 14px;border-radius:10px;background:#e2b04a;color:#1d1606;font-weight:700;text-decoration:none;white-space:nowrap';
+    const x = el('button', null, '✕');
+    x.setAttribute('aria-label', 'Fermer');
+    x.style.cssText = 'background:none;border:0;color:#eef2f7;font-size:18px;padding:4px 6px';
+    const fermer = () => { b.remove(); stock.ecrire('kopo-bandeau-appli', Date.now()); };
+    x.onclick = fermer;
+    a.onclick = () => setTimeout(() => b.remove(), 500);
+    b.append(el('span', null, 'Tu as l\'appli Masano ?'), a, x);
+    document.body.append(b);
+    setTimeout(() => b.remove(), 20000);
+  })();
+
   // ------------------------------------------------------------------ notifications push
   // Le téléphone est prévenu même jeu fermé : invitation d'un ami, demande d'ami, rappel du Match du jour, annonces.
   // Jamais demandé au lancement : un bandeau propose « Activer » dans la fenêtre Amis et à la fin du premier Match du jour.
