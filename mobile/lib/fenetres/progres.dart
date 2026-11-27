@@ -87,7 +87,7 @@ void ouvrirMissions() {
           if (m.aEncaisser) Btn.principal(null, marge: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), onTap: () => encaisserMission(m.id), enfant: Row(mainAxisSize: MainAxisSize.min, children: [Text('Encaisser ', style: K.texte(13, couleur: K.encre, poids: FontWeight.w700)), recompense(m.pieces, taille: 13)]))
           else if (m.finie) const Muet('Fait', taille: 12)
           else recompense(m.pieces, taille: 13),
-          if (peutChanger && !m.finie && m.avance == 0) Padding(padding: const EdgeInsets.only(top: 4), child: Btn('Changer', taille: 12, marge: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), onTap: () { final q = app.lireProfil(); if (R.changerMission(q, jour, m.id)) { app.ecrireProfil(q); } })),
+          if (peutChanger && !m.finie && m.avance == 0) Padding(padding: const EdgeInsets.only(top: 4), child: Btn('Changer', taille: 13, marge: const EdgeInsets.symmetric(horizontal: 11, vertical: 9), /* assez haut pour le doigt */ onTap: () { final q = app.lireProfil(); if (R.changerMission(q, jour, m.id)) { app.ecrireProfil(q); } })),
         ]), finie: m.finie),
       Titre3('Défi de la semaine', sous: (d['joursRestants'] as int) > 1 ? 'encore ${d['joursRestants']} jours' : 'dernier jour'),
       carte('couronne', d['texte'] as String, '${d['avance']}/${d['cible']} · ${d['xp']} XP', (d['avance'] as int) / (d['cible'] as int), Column(mainAxisSize: MainAxisSize.min, children: [

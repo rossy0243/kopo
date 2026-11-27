@@ -145,6 +145,8 @@ class CarteMode extends StatelessWidget {
   Widget build(BuildContext context) {
     final encre = creer ? K.encre : K.brass;
     final coinCouleur = creer ? const Color(0x8C1D1606) : const Color(0xB3E2B04A);
+    // Téléphone couché : la carte du Fleuve a la forme des autres ; l'étape passe sous le nom (« Étape 16 »).
+    final enLigne2 = ligne && MediaQuery.orientationOf(context) == Orientation.portrait;
     final carte = Material(
       color: Colors.transparent,
       child: InkWell(
@@ -165,7 +167,7 @@ class CarteMode extends StatelessWidget {
             child: Stack(children: [
               Positioned(top: 5, left: 6, child: Text(coin, style: TextStyle(fontSize: 13, color: coinCouleur))),
               Positioned(bottom: 5, right: 6, child: Transform.rotate(angle: math.pi, child: Text(coin, style: TextStyle(fontSize: 13, color: coinCouleur)))),
-              if (ligne) _contenuLigne() else Center(
+              if (enLigne2) _contenuLigne() else Center(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                   // Si la carte est petite (écran étroit ou bas), tout son contenu rétrécit au lieu d'être coupé.
@@ -178,6 +180,10 @@ class CarteMode extends StatelessWidget {
                     FittedBox(fit: BoxFit.scaleDown, child: Text(titre, style: TextStyle(fontFamily: K.display, fontSize: creer ? 24 : 19, letterSpacing: 1.2, height: 1, color: encre))),
                     const SizedBox(height: 4),
                     Text(sous, textAlign: TextAlign.center, maxLines: 3, overflow: TextOverflow.ellipsis, style: K.texte(11, couleur: creer ? const Color(0xFF4A3A12) : K.muted).copyWith(height: 1.2)),
+                    if (grand != null) Padding(padding: const EdgeInsets.only(top: 4), child: Text.rich(TextSpan(children: [
+                      TextSpan(text: '${grand!.$1.toUpperCase()} ', style: K.texte(11, couleur: const Color(0xFF7FC4E8)).copyWith(letterSpacing: 1.5)),
+                      TextSpan(text: grand!.$2, style: const TextStyle(fontFamily: K.display, fontSize: 26, height: 1, color: Colors.white)),
+                    ]))),
                     if (creer && amis > 0) _pointEnLigne('$amis ami${amis > 1 ? 's' : ''} en ligne', const Color(0xFF4A3A12)),
                     if (enLigne != null) _pointEnLigne('$enLigne joueur${enLigne! > 1 ? 's' : ''} en ligne', K.muted),
                   ])))),

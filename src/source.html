@@ -179,6 +179,9 @@ input.code { text-transform: uppercase; letter-spacing: 8px; font-weight: 700; t
 .fenetre { background: var(--table-2); border: 1px solid var(--line); border-radius: 16px; padding: 20px; width: min(440px, 100%); display: grid; gap: 12px; box-shadow: 0 20px 50px rgba(0,0,0,.5); max-height: 90vh; max-height: 90dvh; overflow-y: auto; grid-auto-rows: max-content; }
 .fenetre h2 { margin: 0; font-family: var(--display); font-size: 36px; letter-spacing: 2px; color: var(--brass); font-weight: 400; line-height: 1; }
 .fenetre p { margin: 0; color: var(--muted); }
+/* --pb : la marge du bas de la fenêtre ; le pied la recouvre pour que rien ne défile sous lui. */
+.fen-pied { --pb: 20px; position: sticky; bottom: calc(-1 * var(--pb)); margin-bottom: calc(-1 * var(--pb)); padding: 4px 0 var(--pb); z-index: 2; display: grid; gap: 8px; background: var(--table-2); box-shadow: 0 -12px 12px -4px var(--table-2); }
+@media (orientation: landscape) and (max-height: 600px) { .fen-pied { grid-auto-flow: column; grid-auto-columns: 1fr; } .fen-pied .btn.large { padding: 10px 12px; } }
 .guide-ios { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; counter-reset: etape; }
 .guide-ios li { display: grid; grid-template-columns: 30px 1fr 44px; align-items: center; gap: 10px; background: rgba(255,255,255,.05); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; counter-increment: etape; }
 .guide-ios li::before { content: counter(etape); width: 28px; height: 28px; border-radius: 50%; background: var(--brass); color: var(--table-2); font-weight: 800; display: grid; place-items: center; }
@@ -341,6 +344,7 @@ details.rappel summary { cursor: pointer; font-weight: 600; }
   body.en-jeu header { position: absolute; top: 0; left: 0; right: 0; z-index: 3; padding: 6px max(10px, env(safe-area-inset-right)) 0 max(10px, env(safe-area-inset-left)); pointer-events: none; }
   body.en-jeu header > * { pointer-events: auto; }
   body.en-jeu #btnPleinEcranEntete:not([hidden]) { display: inline-block; }
+  body.en-jeu header .btn { min-height: 38px; min-width: 38px; } /* Plein écran, Quitter… : assez grands pour le doigt */
   body.en-jeu .bandeau { position: absolute; top: 46px; left: 50%; transform: translateX(-50%); z-index: 4; width: max-content; max-width: 70%; }
   body.en-jeu #ecranPartie { position: absolute; inset: 0; display: block; }
   body.en-jeu .tapis { display: block; position: absolute; left: 6%; right: 6%; top: 10%; bottom: 12%; border-radius: 50%;
@@ -555,7 +559,7 @@ body.accueil .app { max-width: none; min-height: 100vh; min-height: 100dvh; padd
 .choix-jeu .etat-jeu { font: 700 10px/1 var(--body); letter-spacing: .5px; text-transform: uppercase; padding: 3px 6px; border-radius: 6px; background: var(--brass); color: #1d1606; }
 .choix-jeu .etat-jeu.maint { background: var(--bad); color: #fff; }
 .choix-jeu button[aria-pressed="true"] i { background: #1d1606; color: #f3d48a; border-color: #1d1606; }
-@media (max-height: 500px) { .choix-jeu { padding: 3px; } .choix-jeu button { padding: 5px; font-size: 16px; } .choix-jeu button i { width: 16px; height: 22px; font-size: 12px; } }
+@media (max-height: 500px) { .choix-jeu { padding: 3px; } .choix-jeu button { padding: 5px; font-size: 16px; min-height: 36px; } .choix-jeu button i { width: 16px; height: 22px; font-size: 12px; } }
 .profil { margin-left: auto; display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,.3); border: 1px solid var(--line); border-radius: 99px; padding: 4px 14px 4px 4px; cursor: text; }
 .avatar { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--brass); color: #1d1606; font-family: var(--display); font-size: 24px; flex: none; }
 .profil-champ { display: grid; line-height: 1.1; }
@@ -623,11 +627,16 @@ body.accueil .app { max-width: none; min-height: 100vh; min-height: 100dvh; padd
 .choix-mise button .ico-k { width: 12px; height: 12px; }
 .aide-mise { text-align: center; }
 .choix-niveau-robots button { flex: 1; padding: 10px 6px; font-size: 15px; }
+.choix-niveau-robots button { min-height: 40px; } /* assez haut pour le doigt, même couché */
+#btnComposerTable { min-height: 40px; padding: 8px; }
+#voileRobots .fenetre > #btnFermerRobots { position: sticky; bottom: 0; z-index: 2; background: linear-gradient(rgba(255,255,255,.07), rgba(255,255,255,.07)), var(--table-2); box-shadow: 0 -10px 12px -2px var(--table-2); } /* petit écran : Annuler reste visible */
 .choix-robots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .choix-robots .btn { font-size: 20px; padding: 12px 0; }
 ul.regles, ol.regles { margin: 0; padding-left: 20px; display: grid; gap: 6px; color: var(--ink); }
 .fenetre .regles-titre { margin: 4px 0 -4px; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; color: var(--brass); font-weight: 700; }
 .fenetre .regles-note { margin: 0; font-size: 14px; color: var(--muted); }
+.regles-liens { display: flex; flex-wrap: wrap; gap: 6px; }
+.regles-liens .btn { padding: 8px 12px; font-size: 13.5px; min-height: 38px; }
 .regles b { color: var(--brass); font-weight: 700; }
 @media (max-height: 500px) { ul.regles, ol.regles { gap: 3px; font-size: 14px; } }
 @media (orientation: landscape) {
@@ -863,7 +872,7 @@ body.dos-kinshasa { --dos-motif: linear-gradient(135deg, transparent 38%, #f7d03
 .carte-mission small { color: var(--muted); font-size: 12px; }
 .carte-mission.finie { border-color: rgba(63,191,127,.45); background: rgba(63,191,127,.07); }
 .carte-mission.finie .ico { color: var(--good); }
-.carte-mission .btn { padding: 3px 9px; font-size: 12px; }
+.carte-mission .btn { padding: 3px 11px; font-size: 13px; min-height: 36px; } /* assez haut pour le doigt */
 .carte-mission .btn.principal { display: inline-flex; align-items: center; gap: 6px; }
 .carte-mission .btn.principal .recompense { color: inherit; font-size: 12px; }
 .carte-mission.defi { border-color: rgba(226,176,74,.5); background: rgba(226,176,74,.07); }
@@ -1014,8 +1023,33 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
 .mode-fleuve { border-color: #7fc4e8; }
 .fl-etape-grande { grid-column: 3; grid-row: 1 / span 2; align-self: center; display: grid; justify-items: center; font-family: var(--display); font-size: 44px; line-height: .9; color: #fff; padding: 4px 14px 0 0; }
 .fl-etape-grande small { font-family: inherit; font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; color: #7fc4e8; }
-@media (orientation: landscape) { .fl-etape-grande { font-size: 30px; } }
+/* Téléphone couché : la carte du Fleuve a la forme des autres ; l'étape passe sous le nom, sur une ligne (« Étape 16 »). */
+@media (orientation: landscape) {
+  .mode.mode-fleuve { grid-template-columns: minmax(0, 1fr); }
+  .fl-etape-grande { grid-column: auto; grid-row: auto; display: flex; align-items: baseline; gap: 5px; font-size: 26px; padding: 0; }
+  .fl-etape-grande small { font-size: 11px; }
+  .mode-fleuve b, .mode-fleuve small { max-width: 100%; }
+}
 .fenetre[data-type="fleuve"] { width: min(460px, 100%); padding: 14px; gap: 10px; }
+/* La carte ouverte : la fenêtre prend la hauteur de l'écran et ne défile plus ; seule la carte défile (un seul défilement).
+   Téléphone couché : les infos à gauche, la carte à droite sur toute la hauteur. */
+.fenetre[data-type="fleuve"][data-plein] { display: flex; flex-direction: column; gap: 8px; padding: 12px; height: min(90vh, 880px); height: min(90dvh, 880px); overflow: hidden; }
+.fl-haut { display: grid; gap: 8px; flex: none; min-width: 0; }
+.fl-cadre { position: relative; flex: 1 1 auto; min-height: 180px; display: flex; flex-direction: column; }
+.fl-cadre .fl-carte { flex: 1 1 auto; height: auto; min-height: 0; }
+.fl-fermer { flex: none; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line); background: rgba(255,255,255,.07); color: var(--muted); font-size: 18px; line-height: 1; display: grid; place-items: center; padding: 0; }
+.fl-recentrer { position: absolute; right: 10px; bottom: 10px; z-index: 3; border: 1px solid #f3e7c9; background: rgba(16,35,58,.92); color: #fff3d0; border-radius: 999px; padding: 8px 12px; font-weight: 600; font-size: 13.5px; box-shadow: 0 4px 12px rgba(0,0,0,.4); }
+.fl-recentrer[hidden] { display: none; }
+.fenetre[data-plein] .fl-tete h2 { font-size: 30px; }
+.fenetre[data-plein] .fl-tete .fl-pagaie { width: 12px; height: 26px; }
+.fenetre[data-plein] .fl-actions .btn { padding: 7px 10px; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.fenetre[data-plein] .fl-actions .btn:last-child { flex: 0 0 auto; padding: 7px 16px; } /* « Partager » : juste sa place, la course prend le reste */
+.fenetre[data-plein] .fl-biefs button { padding: 4px 8px; min-height: 36px; }
+@media (orientation: landscape) and (max-height: 600px) {
+  .fenetre[data-type="fleuve"][data-plein] { flex-direction: row; width: min(880px, 100%); gap: 12px; height: calc(100vh - 16px); height: calc(100dvh - 16px); max-height: none; }
+  .fenetre[data-plein] .fl-haut { flex: 0 0 min(46%, 380px); overflow-y: auto; align-content: start; overscroll-behavior: contain; }
+  .fenetre[data-plein] .fl-cadre { min-height: 0; }
+}
 .fl-tete { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .fl-tete h2 { flex: 1; }
 .fl-pagaies { display: flex; gap: 3px; align-items: center; }
@@ -1024,13 +1058,16 @@ body.quatre-couleurs .carte[data-carte$="T"] { color: #2e7d32; }
 .fl-pagaie.perdue { opacity: .22; }
 .fl-info { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--muted); }
 .fl-info b { color: var(--brass); }
+.fl-info .fl-jeu { color: var(--ink); opacity: .75; }
 .fl-carte { position: relative; height: min(62vh, 560px); overflow-y: auto; border-radius: 14px; background: linear-gradient(#1a3b2a, #224a33 40%, #1d4130); border: 1px solid var(--line); overscroll-behavior: contain; }
 .fl-niger .fl-carte { background: linear-gradient(#3b3220, #4a3d24 40%, #3f3420); }
 .fl-kasai .fl-carte { background: linear-gradient(#3e2a1e, #4d3424 40%, #42301f); } /* terre rouge du Kasaï */
 .fl-oubangui .fl-carte { background: linear-gradient(#123224, #17402c 40%, #133827); } /* grande forêt */
 .fl-nil .fl-carte { background: linear-gradient(#4a3f26, #5a4c2c 40%, #4d4128); } /* désert */
-.fl-onglets { flex-wrap: wrap; }
-.fl-onglets button { flex: 1 1 30%; }
+/* Les fleuves sur une seule ligne, leur nom seul (le jeu est rappelé sous les onglets) ; trop nombreux : la ligne glisse. */
+.fl-onglets { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.fl-onglets::-webkit-scrollbar { display: none; }
+.fl-onglets button { flex: 1 0 auto; white-space: nowrap; padding: 9px 10px; min-height: 38px; }
 .fl-fond { position: relative; margin: 0 auto; }
 .fl-fond svg { position: absolute; inset: 0; width: 100%; height: 100%; }
 .fl-eau { fill: none; stroke: #2f7fb4; stroke-width: 30; stroke-linecap: round; stroke-linejoin: round; }
@@ -4325,7 +4362,20 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     envoyer({ type: 'action', action: { type: 'jouer', carte: c } });
   }
 
-  function ouvrirFenetre(contenu, type) { $('fenetre').replaceChildren(...contenu); $('fenetre').dataset.type = type || ''; delete $('fenetre').dataset.annonce; $('voile').hidden = false; }
+  function ouvrirFenetre(contenu, type) { $('fenetre').replaceChildren(...contenu); $('fenetre').dataset.type = type || ''; delete $('fenetre').dataset.annonce; delete $('fenetre').dataset.plein; piedFenetre($('fenetre'), type); $('voile').hidden = false; $('fenetre').scrollTop = 0; }
+  // Les boutons qui ferment une fenêtre (Jouer, Fermer, Compris…) : groupés en bas et toujours visibles, même quand
+  // la fenêtre est trop haute pour l'écran (téléphone couché, longues règles). Côte à côte en paysage.
+  const SANS_PIED = ['chat', 'findonne', 'cahier', 'fleuve', 'nouveaute'];
+  function piedFenetre(f, type) {
+    if (SANS_PIED.includes(type || '')) return;
+    const enfants = [...f.children];
+    let i = enfants.length;
+    while (i > 0 && enfants[i - 1].matches('button.btn.large, button.btn.principal')) i--;
+    if (i === 0 || i === enfants.length) return;
+    const pied = el('div', 'fen-pied');
+    pied.style.setProperty('--pb', getComputedStyle(f).paddingBottom);
+    enfants[i - 1].after(pied); pied.append(...enfants.slice(i));
+  }
   const annonceMicroOuverte = () => $('fenetre').dataset.annonce === 'micro' && !$('voile').hidden;
   function fermerFenetre() { $('voile').hidden = true; }
   const chatOuvert = () => $('fenetre').dataset.type === 'chat' && !$('voile').hidden;
@@ -5766,10 +5816,11 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     tete.append(el('h2', null, LeF(F.nom)), pagaiesEl(E.pagaies));
     const onglets = el('div', 'ligue-onglets');
     onglets.classList.add('fl-onglets');
-    for (const k of Object.keys(E.fleuves).filter((x) => FLEUVES[x])) { const b = el('button', null, `${FLEUVES[k].nom} · ${FLEUVES[k].jeuNom}`); b.setAttribute('aria-pressed', String(k === cle)); b.onclick = () => afficherCarteFleuve(k); onglets.append(b); }
+    // Le nom seul sur l'onglet (une seule ligne) ; le jeu du fleuve est écrit juste dessous.
+    for (const k of Object.keys(E.fleuves).filter((x) => FLEUVES[x])) { const b = el('button', null, FLEUVES[k].nom); b.setAttribute('aria-pressed', String(k === cle)); b.setAttribute('aria-label', `${FLEUVES[k].nom}, ${FLEUVES[k].jeuNom}`); b.onclick = () => afficherCarteFleuve(k); onglets.append(b); }
     retenirFleuve(cle);
     const info = el('div', 'fl-info');
-    const gauche = el('span'); gauche.append('Étoiles ', el('b', null, '★ ' + f.etoiles));
+    const gauche = el('span'); gauche.append(el('b', null, '★ ' + f.etoiles), ' · ', el('span', 'fl-jeu', F.jeuNom));
     info.append(gauche, el('span', null, E.pagaies.restantes < E.pagaies.max ? `Nouvelles pagaies dans ${dureeLisible(E.pagaies.retourMs)}` : 'Une pagaie se perd à chaque échec'));
     const z = [tete, onglets, info];
     if (!f.publiees) {
@@ -5793,16 +5844,33 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       actions.append(bc, bp);
       const m = marquesEl(f.marques);
       z.push(actions); if (m) z.push(m);
-      z.push(nav, carte);
-      ouvrirFenetre([...z, fermerBouton()], 'fleuve');
+      z.push(nav);
+      // Un seul défilement : la fenêtre tient dans l'écran, seule la carte défile. La croix remplace « Fermer » en bas.
+      const croix = el('button', 'fl-fermer', '✕'); croix.setAttribute('aria-label', 'Fermer'); croix.onclick = fermerCarteFleuve;
+      tete.append(croix);
+      const haut = el('div', 'fl-haut'); haut.append(...z);
+      const cadre = el('div', 'fl-cadre');
+      // Mon étape hors de vue (on a fait défiler, ou on regarde un autre bief) : un bouton y ramène.
+      const ramener = el('button', 'fl-recentrer', '🛶 Mon étape'); ramener.hidden = true;
+      const biefCourant = f.courante ? Math.ceil(f.courante / PAR_BIEF) : null;
+      if (biefCourant && biefCourant !== bief) { ramener.hidden = false; ramener.textContent = `🛶 Mon étape (${f.courante})`; ramener.onclick = () => { biefVu[cle] = biefCourant; afficherCarteFleuve(cle); }; }
+      cadre.append(carte, ramener);
+      ouvrirFenetre([haut, cadre], 'fleuve');
+      $('fenetre').dataset.plein = '1';
       for (const k of Object.keys(FLEUVES)) $('fenetre').classList.toggle('fl-' + k, k === cle && k !== 'congo');
-      dessinerCarte(carte, cle, f, etapes);
+      const courant = dessinerCarte(carte, cle, f, etapes);
+      if (courant) {
+        const voir = () => { const rc = carte.getBoundingClientRect(), rt = courant.getBoundingClientRect(); ramener.hidden = rt.bottom > rc.top && rt.top < rc.bottom; };
+        ramener.onclick = () => carte.scrollTo({ top: Math.max(0, parseFloat(courant.style.top) - carte.clientHeight / 2), behavior: sansAnim ? 'auto' : 'smooth' });
+        carte.addEventListener('scroll', voir, { passive: true });
+      }
       guideFleuve(cle, carte);
       return;
     }
     ouvrirFenetre([...z, fermerBouton()], 'fleuve');
   }
-  function fermerBouton() { const b = el('button', 'btn large', 'Fermer'); b.onclick = () => { fermerFenetre(); for (const k of Object.keys(FLEUVES)) $('fenetre').classList.remove('fl-' + k); majCarteFleuve(false); }; return b; }
+  function fermerCarteFleuve() { fermerFenetre(); for (const k of Object.keys(FLEUVES)) $('fenetre').classList.remove('fl-' + k); majCarteFleuve(false); }
+  function fermerBouton() { const b = el('button', 'btn large', 'Fermer'); b.onclick = fermerCarteFleuve; return b; }
 
   // La carte : le fleuve serpente de bas en haut (on le remonte depuis la mer), une étape tous les 74 px.
   function dessinerCarte(carte, cle, f, etapes) {
@@ -5876,6 +5944,7 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
       bandeau.animate([{ opacity: 0, transform: 'translate(-50%, -50%) scale(.7)' }, { opacity: 1, transform: 'translate(-50%, -50%) scale(1.05)', offset: .15 }, { opacity: 1, transform: 'translate(-50%, -50%)', offset: .8 }, { opacity: 0 }], { duration: 3000, fill: 'forwards' }).onfinish = () => bandeau.remove();
     }
     requestAnimationFrame(() => { carte.scrollTop = courant ? Math.max(0, parseFloat(courant.style.top) - carte.clientHeight / 2) : H; });
+    return courant;
   }
 
   // Détail de l'étape courante lu d'avance pendant que la carte s'affiche (servi une fois, frais d'une minute au plus).
@@ -8649,21 +8718,21 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
   }
   $('btnComposerTable').onclick = composerTable;
   function montrerRegles() {
+    // Les autres guides (partie guidée, Fleuve, Match du jour) en haut, sans défiler ; « C'est compris » reste en bas, toujours visible.
     const ok = el('button', 'btn principal large', "C'est compris");
     ok.onclick = fermerFenetre;
+    const liens = el('div', 'regles-liens');
+    const lien = (t, f) => { const b = el('button', 'btn', t); b.onclick = f; liens.append(b); };
+    const fleuve = MODE_SERVEUR && configServeur && configServeur.fleuve && configServeur.fleuve !== 'ferme';
     if (jeuChoisi() === 'inter8') {
-      const guidee = el('button', 'btn large', 'Jouer une partie guidée');
-      guidee.onclick = () => lancerPartieGuidee('inter8');
-      const fl = [];
-      if (MODE_SERVEUR && configServeur && configServeur.fleuve && configServeur.fleuve !== 'ferme') { const b = el('button', 'btn large', 'Le Fleuve'); b.onclick = reglesFleuve; fl.push(b); }
-      return ouvrirFenetre([el('h2', null, 'Règles d\'Inter (8)'), $('modeleReglesInter').content.cloneNode(true), ok, guidee, ...fl]);
+      lien('▶ Partie guidée', () => lancerPartieGuidee('inter8'));
+      if (fleuve) lien('Le Fleuve', reglesFleuve);
+      return ouvrirFenetre([el('h2', null, 'Règles d\'Inter (8)'), liens, $('modeleReglesInter').content.cloneNode(true), ok]);
     }
-    const tuto = el('button', 'btn large', 'Apprendre en jouant (1 min)');
-    tuto.onclick = ouvrirTutoriel;
-    const extra = [];
-    if (MODE_SERVEUR && configServeur && configServeur.fleuve && configServeur.fleuve !== 'ferme') { const fl = el('button', 'btn large', 'Le Fleuve'); fl.onclick = reglesFleuve; extra.push(fl); }
-    if (MODE_SERVEUR && !fleuveLance()) { const nv = el('button', 'btn large', 'Match du jour et Bande'); nv.onclick = () => fenetreNouveaute(0); extra.push(nv); }
-    ouvrirFenetre([el('h2', null, 'Règles'), $('modeleRegles').content.cloneNode(true), ok, tuto, ...extra]);
+    lien('▶ Apprendre en jouant (1 min)', ouvrirTutoriel);
+    if (fleuve) lien('Le Fleuve', reglesFleuve);
+    if (MODE_SERVEUR && !fleuveLance()) lien('Match du jour et Bande', () => fenetreNouveaute(0));
+    ouvrirFenetre([el('h2', null, 'Règles'), liens, $('modeleRegles').content.cloneNode(true), ok]);
   }
   $('btnRegles').onclick = montrerRegles;
 
