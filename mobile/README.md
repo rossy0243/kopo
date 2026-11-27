@@ -78,6 +78,15 @@ Pour une version à installer : `flutter build apk --release` (Android) ou `flut
    jeton LiveKit. Les autorisations sont déjà déclarées (Android : `RECORD_AUDIO` ; iOS : `NSMicrophoneUsageDescription`) ;
    le téléphone ne demande le micro qu'au premier toucher du bouton micro en partie, par un abonné. Après la mise à jour du
    paquet, lancer `pod install` dans `ios/` (Xcode le fait aussi au premier `flutter build ipa`).
+8. **Liens du jeu → appli (Android App Links)** : les liens `https://masano.online/` (tables `kopo/#CODE`, `?bande=`,
+   `?parrain=`) ouvrent l'appli si Android a vérifié `https://masano.online/.well-known/assetlinks.json`. Ce fichier
+   contient l'empreinte SHA-256 de la clé qui signe l'APK : la clé doit donc être **toujours la même**. Sur GitHub, l'APK
+   se signe avec la clé fixe des secrets du dépôt (*Settings → Secrets and variables → Actions*) :
+   `ANDROID_CLE_BASE64` (le fichier `.jks` en base64, `base64 -w0 masano.jks`) et `ANDROID_CLE_MOT_DE_PASSE` (alias
+   `masano`, même mot de passe pour le magasin et la clé). Le log de la construction affiche l'empreinte. Si l'appli
+   passe un jour par le Play Store avec la signature Google, ajouter aussi l'empreinte donnée par la Play Console
+   (*Intégrité de l'appli*) dans `assetlinks.json`. Le bandeau « Ouvrir dans l'appli » du site utilise
+   `masano://ouvrir?…`, qui marche même sans cette vérification.
 
 ## Organisation du code
 

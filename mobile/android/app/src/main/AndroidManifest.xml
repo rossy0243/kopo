@@ -29,6 +29,8 @@
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
               />
+            <!-- Les liens sont lus par app_links (reseau/google.dart), pas par le routeur de Flutter. -->
+            <meta-data android:name="flutter_deeplinking_enabled" android:value="false"/>
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
@@ -39,6 +41,27 @@
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="com.masano.masano" android:host="login-callback"/>
+            </intent-filter>
+            <!-- Liens du jeu (tables, Bandes, parrainage) : https://masano.online/, /kopo/, /inter8/ s'ouvrent dans l'appli.
+                 Android vérifie https://masano.online/.well-known/assetlinks.json (empreinte de la clé de signature). -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https"/>
+                <data android:host="masano.online"/>
+                <data android:host="www.masano.online"/>
+                <data android:path="/"/>
+                <data android:path="/index.html"/>
+                <data android:pathPrefix="/kopo"/>
+                <data android:pathPrefix="/inter8"/>
+            </intent-filter>
+            <!-- Bouton « Ouvrir dans l'appli » du site (navigateur de Facebook, Messenger…) : masano://ouvrir?… -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="masano" android:host="ouvrir"/>
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.

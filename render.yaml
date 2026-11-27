@@ -55,7 +55,7 @@ services:
   - type: web
     name: kopo
     runtime: static
-    buildCommand: node build.js && rm -rf _site && mkdir _site && cp -r index.html manifest.webmanifest sw.js icons legal _site/ && cp -r _partage/. _site/
+    buildCommand: node build.js && rm -rf _site && mkdir _site && cp -r index.html manifest.webmanifest sw.js icons legal .well-known _site/ && cp -r _partage/. _site/
     staticPublishPath: _site
     autoDeploy: true
     envVars:
@@ -68,6 +68,9 @@ services:
       - path: /*
         name: X-Content-Type-Options
         value: nosniff
+      - path: /.well-known/assetlinks.json   # Android lit ce fichier pour ouvrir les liens masano.online dans l'appli
+        name: Content-Type
+        value: application/json
 
   # Page de téléchargement de l'appli Android (app.masano.online) : dossier telecharger/ seul.
   # Le bouton pointe sur /masano.apk, redirigé vers le fichier de la release GitHub : pour publier
