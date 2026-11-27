@@ -2949,6 +2949,47 @@ async function jouerPublique(joueurs, { parCode = false } = {}) {
     assert.deepStrictEqual([adm.fleuves.nil.etat, adm.fleuves.nil.villes, adm.fleuves.kasai.etat], ['testeurs', 15, 'ferme']);
     await api('/admin/api/reglages/fleuve', { methode: 'PUT', jeton: adminJeton, corps: { valeur: { ...srv.reglages.get('fleuve'), fleuves: { nil: 'ferme' } } } });
   });
+  await test('Pages légales : reprises des fichiers, modifiées dans le tableau de bord, servies au site et aux applis', async () => {
+    const { nettoyerHtml } = require('../src/legal');
+    let l = (await api('/api/legal')).json.pages;
+    assert.deepStrictEqual(l.map((p) => p.cle), ['conditions', 'confidentialite']);
+    let p = (await api('/api/legal/conditions')).json;
+    assert.strictEqual(p.titre, "Conditions d'utilisation");
+    assert.strictEqual(p.version, '2026-11-27'); assert.strictEqual(p.versionTexte, '27 novembre 2026');
+    assert.match(p.html, /^<h2>1\. Qui édite Masano<\/h2>/); assert.ok(!/<\/main>|<script|<nav/.test(p.html));
+    const conf = (await api('/api/legal/confidentialite')).json;
+    assert.match(conf.html, /<table>/); assert.match(conf.html, /id="suppression"/, 'les ancres restent (lien « ces indications » des CGU)');
+    assert.strictEqual((await api('/api/legal/inconnue')).statut, 404);
+    assert.strictEqual((await api('/admin/api/legal')).statut, 401, 'réservé à l\'admin');
+    // Modifier : en ligne tout de suite, nettoyé, l'ancienne version gardée.
+    let r = await api('/admin/api/legal/conditions', { methode: 'PUT', jeton: adminJeton, corps: { titre: "Conditions d'utilisation", version: '2026-11-27', html: '<h2 onclick="x()">1. Nouveau</h2><script>alert(1)</script><p>Texte <a href="javascript:alert(1)">piège</a> <a href="https://masano.online/">site</a> <img src=x onerror=alert(1)></p>' } });
+    assert.strictEqual(r.statut, 200, JSON.stringify(r.json));
+    p = (await api('/api/legal/conditions')).json;
+    assert.strictEqual(p.html, '<h2>1. Nouveau</h2><p>Texte <a>piège</a> <a href="https://masano.online/" target="_blank" rel="noopener">site</a> </p>');
+    assert.strictEqual(p.versionTexte, '27 novembre 2026');
+    const a = (await api('/admin/api/legal/conditions', { jeton: adminJeton })).json;
+    assert.strictEqual(a.historique.length, 1); assert.strictEqual(a.historique[0].version, '2026-11-27');
+    const v = (await api('/admin/api/legal/conditions/versions/' + a.historique[0].id, { jeton: adminJeton })).json;
+    assert.match(v.html, /Qui édite Masano/);
+    assert.strictEqual((await api('/admin/api/legal/conditions', { methode: 'PUT', jeton: adminJeton, corps: { ...v, visible: false } })).statut, 400, 'les CGU restent visibles');
+    assert.strictEqual((await api('/admin/api/legal/conditions', { methode: 'PUT', jeton: adminJeton, corps: v })).statut, 200, 'version remise');
+    assert.strictEqual((await api('/admin/api/legal/conditions', { methode: 'DELETE', jeton: adminJeton })).statut, 400);
+    // Ajouter une page : elle apparaît dans les liens de /config (Paramètres du site et des applis).
+    assert.strictEqual((await api('/admin/api/legal/Mauvaise%20cle', { methode: 'PUT', jeton: adminJeton, corps: { titre: 'X', version: '2026-11-27', html: '<p>x</p>' } })).statut, 400);
+    r = await api('/admin/api/legal/mentions-legales', { methode: 'PUT', jeton: adminJeton, corps: { titre: 'Mentions légales', version: '2026-11-27', html: '<p>Éditeur : Masano.</p>' } });
+    assert.strictEqual(r.statut, 200);
+    const cfg = (await api('/api/config')).json;
+    assert.deepStrictEqual(cfg.liens.pages.map((x) => x.cle), ['conditions', 'confidentialite', 'mentions-legales']);
+    assert.match(cfg.liens.pages[2].lien, /legal\/page\.html\?p=mentions-legales$/);
+    assert.match(cfg.liens.pages[0].lien, /legal\/conditions\.html$/);
+    await api('/admin/api/legal/mentions-legales', { methode: 'PUT', jeton: adminJeton, corps: { titre: 'Mentions légales', version: '2026-11-27', html: '<p>x</p>', visible: false } });
+    assert.strictEqual((await api('/api/config')).json.liens.pages.length, 2, 'page cachée : plus de lien');
+    assert.strictEqual((await api('/admin/api/legal/mentions-legales', { methode: 'DELETE', jeton: adminJeton })).statut, 200);
+    assert.strictEqual((await api('/api/legal/mentions-legales')).statut, 404);
+    const j = (await api('/admin/api/journal', { jeton: adminJeton })).json;
+    assert.ok(j.some((x) => x.action === 'legal:modifier' && x.cible === 'conditions'));
+    assert.strictEqual(nettoyerHtml('<style>a{}</style><iframe src=x></iframe><p class="a-completer" style="color:red">ok</p>'), '<p class="a-completer">ok</p>');
+  });
   await srv.arreter();
   console.log(`\n${reussis} tests réussis, ${echecs} en échec.`);
   process.exit(echecs ? 1 : 0);

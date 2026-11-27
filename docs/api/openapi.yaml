@@ -64,6 +64,45 @@ paths:
           description: Réglages
           content: { application/json: { schema: { $ref: '#/components/schemas/Config' } } }
 
+  /legal:
+    get:
+      tags: [Démarrage]
+      summary: Pages légales visibles (CGU, confidentialité, pages ajoutées dans le tableau de bord)
+      security: []
+      responses:
+        '200':
+          description: Liste des pages
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pages: { type: array, items: { type: object, properties: { cle: { type: string }, titre: { type: string }, version: { type: string, format: date }, versionTexte: { type: string, example: 23 novembre 2026 }, lien: { type: string } } } }
+  /legal/{cle}:
+    get:
+      tags: [Démarrage]
+      summary: Une page légale (HTML déjà nettoyé, lu par legal/*.html du site)
+      security: []
+      parameters:
+        - { name: cle, in: path, required: true, schema: { type: string, example: conditions } }
+      responses:
+        '200':
+          description: La page
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  cle: { type: string }
+                  titre: { type: string }
+                  version: { type: string, format: date }
+                  versionTexte: { type: string }
+                  html: { type: string }
+                  majLe: { type: string, format: date-time }
+                  lien: { type: string }
+                  autres: { type: array, items: { type: object, properties: { cle: { type: string }, titre: { type: string }, lien: { type: string } } } }
+        '404': { description: Page introuvable }
+
   # ------------------------------------------------------------------ Compte
   /invite:
     post:
@@ -1414,7 +1453,7 @@ components:
         google: { type: [string, 'null'], description: 'Adresse Supabase (site), null si la connexion Google est fermée' }
         supabase: { type: [object, 'null'], properties: { url: { type: string }, cleAnon: { type: [string, 'null'], description: Clé publique anon pour le SDK Supabase } } }
         googleObligatoire: { type: boolean, description: 'En ligne et entre amis : compte Google exigé (sinon : robots seulement)' }
-        liens: { type: object, properties: { site: { type: string }, conditions: { type: string, description: CGU }, confidentialite: { type: string }, support: { type: [string, 'null'] } } }
+        liens: { type: object, properties: { site: { type: string }, conditions: { type: string, description: CGU }, confidentialite: { type: string }, support: { type: [string, 'null'] }, pages: { type: array, description: "Liens légaux de Paramètres (tableau de bord, « Pages légales »), dans l'ordre", items: { type: object, properties: { cle: { type: string }, titre: { type: string }, lien: { type: string } } } } } }
         push: { type: object, properties: { web: { type: boolean }, natif: { type: boolean, description: FCM ouvert sur le serveur } } }
     VersionMobile:
       type: object

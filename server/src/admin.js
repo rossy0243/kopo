@@ -5,9 +5,11 @@ const express = require('express');
 const { enveloppe, publicCompte } = require('./api');
 const { emailSupabase } = require('./comptes');
 
-function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainage, bande, fleuve, push, stickers, bouquets, abonnement, salles, demarrage }) {
+function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainage, bande, fleuve, push, stickers, bouquets, abonnement, legal, salles, demarrage }) {
   const r = express.Router();
-  r.use(express.json({ limit: '50kb' }));
+  // Pages légales : quelques dizaines de ko de HTML ; le reste du tableau de bord reste limité à 50 ko.
+  const json50 = express.json({ limit: '50kb' }), jsonLegal = express.json({ limit: '400kb' });
+  r.use((req, res, next) => (req.path.startsWith('/legal') ? jsonLegal : json50)(req, res, next));
 
   r.post('/connexion', enveloppe(async (req, res) => {
     const x = await auth.connexionAdmin(req.body.motDePasse, req.body.code, req.ip);
@@ -479,6 +481,30 @@ function routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainag
     if (req.params.cle === 'limites') require('./limites').appliquerLimites(v);
     await journal('reglage:' + req.params.cle, null, { avant, apres: v });
     res.json({ ok: true, valeur: v });
+  }));
+
+  // --- Pages légales (CGU, confidentialité, pages ajoutées) : en ligne dès l'enregistrement, sur le site et dans les applis.
+  r.get('/legal', (req, res) => res.json({ pages: legal.liste() }));
+  r.get('/legal/:cle', enveloppe(async (req, res) => {
+    const p = await legal.page(req.params.cle);
+    if (!p) return res.status(404).json({ erreur: 'Page introuvable.' });
+    res.json({ ...p, historique: await legal.historique(p.cle) });
+  }));
+  r.get('/legal/:cle/versions/:id', enveloppe(async (req, res) => {
+    const v = await legal.ancienne(req.params.cle, req.params.id);
+    if (!v) return res.status(404).json({ erreur: 'Version introuvable.' });
+    res.json(v);
+  }));
+  r.put('/legal/:cle', enveloppe(async (req, res) => {
+    const b = req.body || {};
+    const x = await legal.enregistrer(req.params.cle, { titre: b.titre, version: b.version, html: b.html, visible: b.visible, ordre: b.ordre });
+    await journal(x.nouvelle ? 'legal:creer' : 'legal:modifier', req.params.cle, { titre: x.page.titre, version: x.page.version, avant: x.avant, taille: x.page.html.length });
+    res.json({ ok: true, page: x.page });
+  }));
+  r.delete('/legal/:cle', enveloppe(async (req, res) => {
+    await legal.supprimer(req.params.cle);
+    await journal('legal:supprimer', req.params.cle);
+    res.json({ ok: true });
   }));
 
   r.get('/journal', enveloppe(async (req, res) => res.json(n((await base.query('SELECT * FROM journal_admin ORDER BY id DESC LIMIT 300')).rows))));

@@ -551,3 +551,25 @@ CREATE TABLE IF NOT EXISTS fleuve_pagaies (
   PRIMARY KEY (compte_id, jour)
 );
 ALTER TABLE fleuve_pagaies ADD COLUMN IF NOT EXISTS achetees integer NOT NULL DEFAULT 0; -- pagaies achetées ce jour-là (contre des pièces)
+
+-- ===== Pages légales (27/11) : CGU, politique de confidentialité et autres pages, modifiables dans le tableau de bord
+-- (rubrique « Pages légales ») sans redéployer le site ni mettre à jour les applis. Remplies au premier démarrage
+-- avec le contenu de legal/*.html. Chaque enregistrement garde la version précédente dans pages_legales_versions.
+CREATE TABLE IF NOT EXISTS pages_legales (
+  cle     text PRIMARY KEY,               -- conditions, confidentialite, ou une page ajoutée (lettres, chiffres, tirets)
+  titre   text NOT NULL,
+  version date NOT NULL,                  -- « Version du … » en haut de la page
+  html    text NOT NULL,                  -- contenu sous le titre (balises autorisées seulement, voir legal.js)
+  ordre   integer NOT NULL DEFAULT 0,     -- ordre des liens dans Paramètres
+  visible boolean NOT NULL DEFAULT true,  -- lien montré dans Paramètres (site et applis)
+  maj_le  timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS pages_legales_versions (
+  id      bigserial PRIMARY KEY,
+  cle     text NOT NULL,
+  titre   text NOT NULL,
+  version date NOT NULL,
+  html    text NOT NULL,
+  cree_le timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS pages_legales_versions_cle ON pages_legales_versions (cle, id DESC);

@@ -30,7 +30,7 @@ function clientMobile(req) {
 // Adresse publique du site (liens légaux, liens d'invitation).
 const adresseSite = (env) => String(env.SITE_URL || 'https://masano.online/').replace(/\/?$/, '/');
 
-function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours, parrainage, matchJour, bande, fleuve, push, stickers, bouquets, abonnement, env = process.env }) {
+function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours, parrainage, matchJour, bande, fleuve, push, stickers, bouquets, abonnement, legal, env = process.env }) {
   const r = express.Router();
   r.use(express.json({ limit: '64kb' })); // la copie du profil (PUT /profil) peut faire quelques dizaines de ko
   // Limite par adresse IP (large : en 4G, beaucoup de joueurs partagent la même adresse).
@@ -100,9 +100,29 @@ function routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours,
       // Versions minimales des applis et liens des stores ; miseAJour = true si l'appli qui appelle est trop ancienne.
       mobile: Object.fromEntries(PLATEFORMES.map((p) => [p, { versionMin: (mobile[p] && mobile[p].versionMin) || null, store: (mobile[p] && mobile[p].store) || null }])),
       miseAJour: !!(client && mobile[client.plateforme] && mobile[client.plateforme].versionMin && versionPlusRecente(mobile[client.plateforme].versionMin, client.version)),
-      liens: { site, conditions: site + 'legal/conditions.html', confidentialite: site + 'legal/confidentialite.html', support: env.SUPPORT_URL || null },
+      // pages : liens légaux de Paramètres (tableau de bord, « Pages légales »), dans l'ordre : le site et les applis
+      // les affichent tels quels, une page ajoutée ou renommée apparaît sans mise à jour.
+      liens: { site, conditions: site + 'legal/conditions.html', confidentialite: site + 'legal/confidentialite.html', support: env.SUPPORT_URL || null,
+        pages: legal ? legal.liens(site) : [{ cle: 'conditions', titre: "Conditions d'utilisation", lien: site + 'legal/conditions.html' }, { cle: 'confidentialite', titre: 'Politique de confidentialité', lien: site + 'legal/confidentialite.html' }] },
       push: { web: !!(push && push.cle()), natif: !!(push && push.fcmActif && push.fcmActif()) },
     });
+  }));
+
+  // Pages légales (CGU, confidentialité…) : lues par legal/*.html du site, ouvert aussi depuis les applis.
+  // Publiques, sans jeton ; le contenu est déjà nettoyé à l'enregistrement (legal.js).
+  r.get('/legal', (req, res) => {
+    const site = adresseSite(env);
+    res.set('Cache-Control', 'public, max-age=60');
+    res.json({ pages: legal ? legal.liste().filter((p) => p.visible).map((p) => ({ cle: p.cle, titre: p.titre, version: p.version, versionTexte: p.versionTexte, lien: site + p.lien })) : [] });
+  });
+  r.get('/legal/:cle', enveloppe(async (req, res) => {
+    const p = legal && (await legal.page(req.params.cle));
+    if (!p) return res.status(404).json({ erreur: 'Page introuvable.' });
+    const site = adresseSite(env);
+    res.set('Cache-Control', 'public, max-age=60');
+    res.json({ cle: p.cle, titre: p.titre, version: p.version, versionTexte: p.versionTexte, html: p.html, majLe: p.majLe, lien: site + p.lien,
+      // Autres pages, pour les liens entre pages légales en bas de page.
+      autres: legal.liste().filter((x) => x.visible && x.cle !== p.cle).map((x) => ({ cle: x.cle, titre: x.titre, lien: x.lien })) });
   }));
 
   // Jouer sans compte (invité). Le compte pourra être rattaché à Google ou au téléphone ensuite.

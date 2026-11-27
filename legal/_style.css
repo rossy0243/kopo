@@ -13,3 +13,5 @@ a { color: var(--laiton); }
 table { border-collapse: collapse; width: 100%; }
 th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,.08); vertical-align: top; }
 th { color: var(--muted); font-weight: 500; }
+nav#autres { margin-top: 36px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,.08); font-size: 14px; }
+nav#autres:empty { display: none; }

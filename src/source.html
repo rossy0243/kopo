@@ -5079,7 +5079,11 @@ try { (function () { var p = JSON.parse(localStorage.getItem('kopo-prefs') || '{
     tuto.onclick = ouvrirTutoriel;
     const liens = el('p', 'version');
     const lien = (t, h) => { const a = el('a', null, t); a.href = h; a.target = '_blank'; a.rel = 'noopener'; a.style.color = 'var(--brass)'; return a; };
-    liens.append(lien("Conditions d'utilisation", 'legal/conditions.html'), ' · ', lien('Confidentialité', 'legal/confidentialite.html'));
+    // Pages légales : la liste vient du serveur (tableau de bord, « Pages légales »), sinon les deux pages de départ.
+    const pagesLegales = configServeur && configServeur.liens && Array.isArray(configServeur.liens.pages) && configServeur.liens.pages.length
+      ? configServeur.liens.pages.map((x) => [x.cle === 'confidentialite' ? 'Confidentialité' : x.titre, x.lien])
+      : [["Conditions d'utilisation", 'legal/conditions.html'], ['Confidentialité', 'legal/confidentialite.html']];
+    pagesLegales.forEach(([t, h], i) => { if (i) liens.append(' · '); liens.append(lien(t, h)); });
     z.append(tuto, liens);
     const reinit = el('button', 'btn', 'Remettre les réglages par défaut');
     reinit.onclick = () => { Object.assign(prefs, PREFS_DEFAUT); enregistrerPrefs(); ouvrirParametres(); if (vueActuelle) afficher(vueActuelle); };

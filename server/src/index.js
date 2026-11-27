@@ -24,6 +24,7 @@ const { creerStickers } = require('./stickers');
 const { creerBouquets } = require('./bouquets');
 const { creerAbonnement } = require('./abonnement');
 const { permis } = require('./limites');
+const { creerLegal } = require('./legal');
 
 async function demarrer({ port = Number(process.env.PORT || 2567), env = process.env } = {}) {
   const base = await ouvrirBase(env.DATABASE_URL);
@@ -53,6 +54,8 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
   fleuve.recalculerSeuils().catch((e) => console.error('Fleuve, seuils :', e.message)) // en tâche de fond, une seule fois
     .then(() => fleuve.reparerFinales()).catch((e) => console.error('Fleuve, finales :', e.message)); // puis les finales perdues d'avance
   const bouquets = creerBouquets(base, reglages, comptes);
+  const legal = creerLegal(base); // pages légales (CGU, confidentialité) modifiables dans le tableau de bord
+  await legal.charger();
   const abonnement = creerAbonnement(base, env);
   abonnement.prix = () => reglages.get('kopoPlus');
   require('./limites').appliquerLimites(reglages.get('limites'));
@@ -89,7 +92,7 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
   // version = commit déployé (Render le donne dans RENDER_GIT_COMMIT) : pour vérifier qu'une mise à jour est en ligne.
   app.get('/sante', (req, res) => res.json({ ok: true, salles: salles.size, version: (env.RENDER_GIT_COMMIT || '').slice(0, 7) || null }));
   // API des joueurs : /api (site) et /api/v1 (applis mobiles, version figée de l'API). Les deux servent les mêmes routes.
-  const routes = routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours, parrainage, matchJour, bande, fleuve, push, stickers, bouquets, abonnement, env });
+  const routes = routesJoueurs({ base, auth, comptes, reglages, ligue, social, parcours, parrainage, matchJour, bande, fleuve, push, stickers, bouquets, abonnement, legal, env });
 
   // Compteur en ligne et salles ouvertes (lu par l'accueil).
   routes.get('/en-ligne', async (req, res) => {
@@ -134,7 +137,7 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
   app.get('/vendor/mqtt.js', (req, res) => { res.set('Cache-Control', 'public, max-age=604800'); res.type('application/javascript'); res.sendFile(path.join(__dirname, '..', '..', 'vendor', 'mqtt.min.js')); });
   app.use('/api/v1', routes);
   app.use('/api', routes);
-  app.use('/admin/api', routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainage, bande, fleuve, push, stickers, bouquets, abonnement, salles, demarrage: Date.now() }));
+  app.use('/admin/api', routesAdmin({ base, auth, comptes, reglages, ligue, parcours, parrainage, bande, fleuve, push, stickers, bouquets, abonnement, legal, salles, demarrage: Date.now() }));
   app.get('/admin', (req, res) => { res.set('Cache-Control', 'no-store'); res.set('X-Frame-Options', 'DENY'); res.sendFile(path.join(__dirname, '..', 'public', 'admin.html')); });
 
   const serveurHttp = http.createServer(app);
@@ -157,7 +160,7 @@ async function demarrer({ port = Number(process.env.PORT || 2567), env = process
   console.log(`Kopo : serveur prêt sur le port ${adresse.port} (base : ${base.genre}).`);
 
   return {
-    port: adresse.port, base, comptes, reglages, auth, ligue, social, parcours, parrainage, matchJour, bande, fleuve, push, abonnement, stickers,
+    port: adresse.port, base, comptes, reglages, auth, ligue, social, parcours, parrainage, matchJour, bande, fleuve, push, abonnement, stickers, legal,
     async arreter() { clearInterval(minuteurSaison); clearInterval(minuteurBande); clearInterval(minuteurPush); clearInterval(minuteurRappels); await jeu.gracefullyShutdown(false).catch(() => {}); serveurHttp.close(); await base.fermer(); },
   };
 }
